@@ -1,7 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import { access, chmod, cp, mkdir, open, readFile, readdir, readlink, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, join, posix } from "node:path";
+import { dirname, join, posix } from "node:path";
 import { promisify } from "node:util";
 
 import {
@@ -29,7 +29,6 @@ import {
 import type { ToolPackConfig } from "./config.js";
 import { domToPptxBundleResource } from "./dom-to-pptx-resource.js";
 import { copyBundledResourceTrees, linuxResources } from "./resources.js";
-import { copyOptionalVelaCliBinary } from "./vela-cli.js";
 import { electronBuilderVersionForAppVersion, readRuntimeAppVersion } from "./versions.js";
 import { processWebSourcemaps } from "./web-sourcemaps.js";
 
@@ -183,9 +182,6 @@ export function buildDockerArgs(
     `--namespace ${config.namespace}`,
     "--dir /tools-pack",
   ];
-  if (config.requireVelaCli) {
-    innerArgs.push("--require-vela-cli");
-  }
   if (config.portable) {
     innerArgs.push("--portable");
   }
@@ -218,20 +214,6 @@ export function buildDockerArgs(
     "-e",
     `${PRODUCTION_INSTALL_PNPM_BIN_ENV}=${CONTAINER_PNPM_PATH}`,
   ];
-  const velaBinHost = process.env.OPEN_DESIGN_VELA_CLI_BIN?.trim();
-  if (velaBinHost) {
-    // The container only mounts /project, /tools-pack and cache/home dirs by
-    // default, so a Vela CLI living outside those (a host path like
-    // `~/.local/bin/vela` is the common dev case) would be invisible inside.
-    // Bind-mount the containing directory read-only and rewrite the env to
-    // the container-side path so `copyOptionalVelaCliBinary` can actually
-    // read it.
-    const hostVelaDir = dirname(velaBinHost);
-    const velaBinBase = basename(velaBinHost);
-    const containerVelaDir = "/opt/vela-cli";
-    dockerArgs.push("-v", `${hostVelaDir}:${containerVelaDir}:ro`);
-    dockerArgs.push("-e", `OPEN_DESIGN_VELA_CLI_BIN=${containerVelaDir}/${velaBinBase}`);
-  }
   dockerArgs.push(
     "-w",
     "/project",
@@ -522,11 +504,6 @@ async function copyResourceTree(config: ToolPackConfig, paths: LinuxPaths): Prom
   await mkdir(join(paths.resourceRoot, "bin"), { recursive: true });
   await cp(process.execPath, join(paths.resourceRoot, "bin", "node"));
   await chmod(join(paths.resourceRoot, "bin", "node"), 0o755);
-  await copyOptionalVelaCliBinary({
-    platform: "linux",
-    requireBundled: config.requireVelaCli,
-    resourceRoot: paths.resourceRoot,
-  });
 }
 
 // --- Step 4: writeAssembledApp helper ---

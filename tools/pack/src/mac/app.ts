@@ -20,7 +20,6 @@ import {
   shouldUseMacStandalonePrebundle,
 } from "../mac-prebundle.js";
 import { copyBundledResourceTrees } from "../resources.js";
-import { copyOptionalVelaCliBinary } from "../vela-cli.js";
 import { electronBuilderVersionForAppVersion } from "../versions.js";
 import { runEsbuild, runNpmInstall, runPnpm } from "./commands.js";
 import {
@@ -138,11 +137,6 @@ export async function copyResourceTree(config: ToolPackConfig, paths: MacPaths):
 
   await copyBundledResourceTrees({
     workspaceRoot: config.workspaceRoot,
-    resourceRoot: paths.resourceRoot,
-  });
-  await copyOptionalVelaCliBinary({
-    platform: "mac",
-    requireBundled: config.requireVelaCli,
     resourceRoot: paths.resourceRoot,
   });
 }

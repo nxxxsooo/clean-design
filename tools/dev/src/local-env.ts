@@ -2,8 +2,24 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 export const DEFAULT_LOCAL_ENV_FILE_NAMES = [".env.development.local", ".env.local", ".env.development", ".env"] as const;
-export const LOCAL_DEVELOPMENT_TELEMETRY_ENV = "local_development";
-export const TELEMETRY_ENV_KEY = "OD_TELEMETRY_ENV";
+export const DISABLED_TELEMETRY_ENV_KEYS = [
+  "LANGFUSE_BASE_URL",
+  "LANGFUSE_PUBLIC_KEY",
+  "LANGFUSE_SECRET_KEY",
+  "OD_TELEMETRY_ENV",
+  "OPEN_DESIGN_TELEMETRY_RELAY_URL",
+  "POSTHOG_API_KEY",
+  "POSTHOG_CLI_API_KEY",
+  "POSTHOG_CLI_PROJECT_ID",
+  "POSTHOG_HOST",
+  "POSTHOG_KEY",
+  "POSTHOG_PERSONAL_API_KEY",
+  "POSTHOG_PROJECT_ID",
+  "POSTHOG_PROJECT_OD",
+  "POSTHOG_TOKEN",
+] as const;
+
+const DISABLED_TELEMETRY_ENV_KEY_SET = new Set<string>(DISABLED_TELEMETRY_ENV_KEYS);
 
 export interface LoadWorkspaceLocalEnvResult {
   envPath: string | null;
@@ -20,9 +36,11 @@ export function loadWorkspaceLocalEnv(options: {
   log?: (message: string) => void;
 }): LoadWorkspaceLocalEnvResult {
   const flags = parseLocalEnvFlags(options.args ?? []);
-  if (flags.disabled || flags.help) return { envPath: null, loaded: false, loadedFiles: [], keys: [], skippedFiles: [] };
-
   const env = options.env ?? process.env;
+  if (flags.help) return { envPath: null, loaded: false, loadedFiles: [], keys: [], skippedFiles: [] };
+  stripDisabledTelemetryEnv(env);
+  if (flags.disabled) return { envPath: null, loaded: false, loadedFiles: [], keys: [], skippedFiles: [] };
+
   const envFileNames = flags.explicitFiles.length > 0 ? flags.explicitFiles : [...DEFAULT_LOCAL_ENV_FILE_NAMES];
   const explicit = flags.explicitFiles.length > 0;
   const loadedFiles: string[] = [];
@@ -39,6 +57,7 @@ export function loadWorkspaceLocalEnv(options: {
 
     const parsed = parseDotEnvLocal(readFileSync(envPath, "utf8"));
     for (const [key, value] of Object.entries(parsed)) {
+      if (DISABLED_TELEMETRY_ENV_KEY_SET.has(key)) continue;
       if (loadedKeys.has(key)) continue;
       env[key] = value;
       loadedKeys.add(key);
@@ -50,10 +69,6 @@ export function loadWorkspaceLocalEnv(options: {
     return { envPath: null, loaded: false, loadedFiles, keys: [], skippedFiles };
   }
 
-  if (env[TELEMETRY_ENV_KEY] == null || env[TELEMETRY_ENV_KEY]?.trim() === "") {
-    env[TELEMETRY_ENV_KEY] = LOCAL_DEVELOPMENT_TELEMETRY_ENV;
-    loadedKeys.add(TELEMETRY_ENV_KEY);
-  }
   if (!flags.json) {
     options.log?.(`tools-dev env: loaded ${loadedFiles.join(", ")}`);
   }
@@ -65,6 +80,10 @@ export function loadWorkspaceLocalEnv(options: {
     keys: [...loadedKeys].sort(),
     skippedFiles,
   };
+}
+
+function stripDisabledTelemetryEnv(env: NodeJS.ProcessEnv): void {
+  for (const key of DISABLED_TELEMETRY_ENV_KEYS) delete env[key];
 }
 
 function parseLocalEnvFlags(args: readonly string[]): {
