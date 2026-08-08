@@ -24,8 +24,6 @@ import { renderAsCursorAgent } from './lib/format-cursor-agent.mjs';
 import { renderAsKimi }        from './lib/format-kimi.mjs';
 import { renderAsPlain }       from './lib/format-plain.mjs';
 import { runAcpServer }        from './lib/format-acp.mjs';
-import { runVelaAcpServer }    from './lib/format-vela.mjs';
-import { runVelaLogin, runVelaModels } from './lib/vela-subcommands.mjs';
 
 function parseArgs(argv) {
   const opts = { as: null, noDelay: false, reportFile: null, positionals: [] };
@@ -37,7 +35,7 @@ function parseArgs(argv) {
     if (a === '--report-file')           { opts.reportFile = argv[++i]; continue; }
     if (flagsWithValue.has(a))           { i++; continue; }
     if (a.startsWith('-')) continue;     // Unknown flag — silently skip (model/permission flags etc.)
-    // Anything left is a positional — used by vela subcommand dispatch.
+    // Anything left is a positional argument.
     opts.positionals.push(a);
   }
   if (process.env.OD_MOCKS_NO_DELAY === '1') opts.noDelay = true;
@@ -79,20 +77,8 @@ async function main() {
       '  supported: opencode | claude | amp | codex | gemini | cursor-agent |\n' +
       '             deepseek | qwen | grok | plain |\n' +
       '             kimi                                         (stream-json)\n' +
-      '             devin | hermes | kilo | kiro | vibe          (ACP)\n' +
-      '             vela                                          (AMR — vela CLI)\n',
+      '             devin | hermes | kilo | kiro | vibe          (ACP)\n',
     );
-  }
-
-  // `vela` dispatches by the first positional arg passed by OD (login /
-  // models / agent). Subcommands run BEFORE recording selection because
-  // they don't use trace data at all.
-  if (opts.as === 'vela') {
-    const cmd = (opts.positionals[0] || '').trim();
-    if (cmd === 'login')  return runVelaLogin();
-    if (cmd === 'models') return runVelaModels();
-    // Default: `agent run --runtime opencode` — fall through to the ACP
-    // server below with the vela-flavored protocol.
   }
 
   // Modern Kimi rejects the old `kimi acp ...` launch shape; keep the
@@ -104,7 +90,7 @@ async function main() {
   // ACP agents read JSON-RPC messages off stdin one line at a time, so the
   // bulk-prompt buffering logic below doesn't apply — pickRecording sees no
   // prompt for hash-mode (use OD_MOCKS_TRACE or _POOL instead).
-  const ACP_AGENTS = new Set(['devin', 'hermes', 'kilo', 'kiro', 'vibe', 'vela']);
+  const ACP_AGENTS = new Set(['devin', 'hermes', 'kilo', 'kiro', 'vibe']);
   const isAcp = ACP_AGENTS.has(opts.as);
   const prompt = isAcp ? '' : await readStdinIfPiped();
   const picked = await pickRecording({ prompt });
@@ -149,9 +135,6 @@ async function main() {
     case 'kilo':
     case 'kiro':
     case 'vibe':         await runAcpServer(events, renderOpts);        break;
-    // AMR (vela CLI) — ACP with vela-specific protocol extensions
-    // (agentCapabilities + models block + strict set_model gate).
-    case 'vela':         await runVelaAcpServer(events, renderOpts);    break;
     default:
       failUsage(`unknown agent "${opts.as}"`);
   }

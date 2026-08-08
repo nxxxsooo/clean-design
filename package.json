@@ -11,8 +11,6 @@
     "bootstrap": "node ./scripts/postinstall.mjs",
     "tools-dev": "pnpm exec tools-dev",
     "tools-pack": "pnpm exec tools-pack",
-    "tools-release": "pnpm exec tools-release",
-    "tools-serve": "pnpm exec tools-serve",
     "nix:update-hash": "node --experimental-strip-types ./scripts/update-nix-pnpm-deps-hash.ts",
     "guard": "tsx ./scripts/guard.ts && node --import tsx --test scripts/style-policy.test.ts scripts/product-neutrality.test.ts scripts/web-import-isolation.test.ts scripts/check-cross-app-imports.test.ts scripts/check-ts-nocheck-imports.test.ts scripts/approve-fork-pr-workflows.test.ts scripts/lint-craft-references.test.ts scripts/check-design-system-manifests.test.ts scripts/check-plugin-preview-manifest.test.ts",
     "lint:craft": "tsx ./scripts/lint-craft-references.ts",
@@ -30,8 +28,6 @@
     "@open-design/daemon": "workspace:*",
     "@open-design/tools-dev": "workspace:*",
     "@open-design/tools-pack": "workspace:*",
-    "@open-design/tools-release": "workspace:*",
-    "@open-design/tools-serve": "workspace:*",
     "@types/node": "20.19.39",
     "tsx": "4.22.3",
     "typescript": "5.9.3"

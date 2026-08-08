@@ -26,7 +26,6 @@ import { collectCssHardcodedColorMatches, cssWideAndSpecialColorKeywords, realNa
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const allowedE2eScripts = new Set([
   "e2e/scripts/playwright.ts",
-  "e2e/scripts/release-smoke.ts",
   "e2e/scripts/visual-report.ts",
 ]);
 
@@ -88,46 +87,16 @@ const residualAllowedExactPaths = new Set([
   // for editable PPTX export. It is loaded into the off-screen Chromium page as
   // an upstream browser asset, not compiled as project-owned TypeScript.
   "apps/desktop/vendor/dom-to-pptx/dom-to-pptx.bundle.js",
-  // Shared nav enhancer for the landing-page static `/community/` pages,
-  // which are verbatim HTML served straight from `public/` (not Astro-
-  // compiled). It must ship as a browser-loadable `.js` asset, same as the
-  // web notifications service worker above.
-  "apps/landing-page/public/community/_site-nav.js",
   // PostCSS loads Tailwind through a web-local .mjs compatibility config entry.
   "apps/web/postcss.config.mjs",
   "scripts/bake-html-ppt-examples.mjs",
-  // CI-only plugin-preview renderer. Kept .mjs and run directly by Node so its
-  // runtime deps (puppeteer-core + a headless Chrome + ffmpeg) are provided by
-  // the CI environment and never pulled into the daemon/web TS build or bundle.
-  "scripts/bake-plugin-previews.mjs",
-  // Manifest diff guard + its node:test coverage. Run directly by Node from the
-  // bake workflows (no TS build step there) to decide whether a `previews` entry
-  // actually changed, ignoring the per-run `generatedAt` timestamp.
-  "scripts/plugin-previews-diff.mjs",
-  "scripts/plugin-previews-diff.test.mjs",
-  // CI-only R2 garbage collector for orphaned preview clips + its node:test.
-  "scripts/plugin-previews-gc.mjs",
-  "scripts/plugin-previews-gc.test.mjs",
   "scripts/scaffold-html-ppt-skills.mjs",
   "scripts/sync-hyperframes-skill.mjs",
   "scripts/verify-media-models.mjs",
-  // AMR (vela) verifier: ad-hoc dev runner that imports the daemon's compiled
-  // `dist/acp.js` and drives a real `vela agent run` against a live model.
-  // Kept as .mjs so it can be invoked directly via Node without any transform.
-  "apps/daemon/scripts/verify-amr-real-vela.mjs",
-  // Fake `vela agent run --runtime opencode` ACP stdio stub used by the AMR
-  // integration tests. The Vitest test spawns it via `child_process.spawn`,
-  // which needs a directly-executable file (shebang + .mjs).
-  "apps/daemon/tests/fixtures/fake-vela.mjs",
   "tools/dev/bin/tools-dev.mjs",
   "tools/dev/esbuild.config.mjs",
   "tools/pack/bin/tools-pack.mjs",
   "tools/pack/esbuild.config.mjs",
-  // Checked-in bin shim so pnpm can link `tools-release` before dist output exists.
-  "tools/release/bin/tools-release.mjs",
-  "tools/release/esbuild.config.mjs",
-  "tools/serve/bin/tools-serve.mjs",
-  "tools/serve/esbuild.config.mjs",
   "tools/pack/resources/mac/notarize.cjs",
   // electron-builder hook path; CJS compatibility entry used by tools-pack desktop builds.
   "tools/pack/resources/web-standalone-after-pack.cjs",
@@ -160,14 +129,13 @@ const residualAllowedPathPrefixes = [
   // (Jane-xiaoer/claude-skill-web-clone). Global skill assets staged into the
   // project cwd for direct `node scripts/...` execution by the agent.
   "skills/web-clone/scripts/",
-  // Replay-based mock CLIs that impersonate the agent CLIs OD spawns
+  // Replay-based mock CLIs that impersonate local agent CLIs
   // (opencode/claude/codex/gemini/cursor-agent + ACP family). Need to
   // be directly executable via Node so `child_process.spawn` from test
   // harnesses and PATH-overlay shells work without any transform step.
   // `mocks/scripts/` holds the maintainer-facing helpers (manifest math,
   // fetch from R2) which are also pure-node single-file modules — same
-  // precedent as `apps/daemon/tests/fixtures/fake-vela.mjs` (an ACP
-  // stdio stub, allowlisted individually above). See `mocks/README.md`.
+  // for direct execution. See `mocks/README.md`.
   "mocks/lib/",
   "mocks/mock-agent.mjs",
   "mocks/scripts/",

@@ -86,64 +86,6 @@ for agent in deepseek qwen grok; do
   fi
 done
 
-# vela subcommands — `vela models` (prints catalog) and `vela login` (writes
-# ~/.amr/config.json). These exit immediately, no recording involved.
-vela_models_out=$(vela models 2>/dev/null | wc -l | tr -d ' ')
-if [ "$vela_models_out" -ge 10 ]; then
-  pass "vela models printed $vela_models_out catalog lines"
-else
-  fail "vela models printed only $vela_models_out lines (expected ≥10)"
-fi
-
-# Sandbox vela login into a temp HOME so we never touch the caller's real
-# ~/.amr config (which holds the production vela login state for anyone
-# using the real CLI). vela's login subcommand resolves ~/.amr from $HOME,
-# so override just for this one invocation.
-amr_sandbox="$(mktemp -d -t od-mocks-amr.XXXXXX)"
-trap 'rm -rf "$amr_sandbox"' EXIT
-if HOME="$amr_sandbox" FAKE_VELA_LOGIN_USER_EMAIL=smoke@od.local vela login >/dev/null 2>&1 \
-   && [ -f "$amr_sandbox/.amr/config.json" ]; then
-  email=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$amr_sandbox/.amr/config.json','utf-8')).profiles.prod.user.email)" 2>/dev/null || echo "")
-  if [ "$email" = "smoke@od.local" ]; then
-    pass "vela login wrote ~/.amr/config.json with profile.prod.user.email"
-  else
-    fail "vela login config.json missing expected email (got: $email)"
-  fi
-else
-  fail "vela login did not produce ~/.amr/config.json"
-fi
-
-# vela ACP roundtrip (strict set_model gate enforced).
-vela_acp_out=$(cat <<EOF | vela agent run --runtime opencode 2>/dev/null
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
-{"jsonrpc":"2.0","id":2,"method":"session/new","params":{"cwd":"/tmp"}}
-{"jsonrpc":"2.0","id":3,"method":"session/set_model","params":{"sessionId":"fake-vela-session-1","modelId":"deepseek-v3.2"}}
-{"jsonrpc":"2.0","id":4,"method":"session/prompt","params":{"sessionId":"fake-vela-session-1","prompt":[{"type":"text","text":"hi"}]}}
-EOF
-)
-if printf '%s' "$vela_acp_out" | grep -q '"agentCapabilities"' \
-  && printf '%s' "$vela_acp_out" | grep -q '"availableModels"' \
-  && printf '%s' "$vela_acp_out" | grep -q '"id":3,"result":{}' \
-  && printf '%s' "$vela_acp_out" | grep -q '"sessionUpdate":"agent_message_chunk"' \
-  && printf '%s' "$vela_acp_out" | grep -q '"id":4,"result":{"stopReason":'; then
-  pass "vela agent run ACP roundtrip (initialize+models, set_model accepted, prompt streamed)"
-else
-  fail "vela agent run ACP roundtrip incomplete"
-fi
-
-# vela strict set_model gate — skipping set_model must reject prompt.
-vela_gate_out=$(cat <<EOF | vela agent run --runtime opencode 2>/dev/null
-{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
-{"jsonrpc":"2.0","id":2,"method":"session/new","params":{"cwd":"/tmp"}}
-{"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{"sessionId":"fake-vela-session-1","prompt":[{"type":"text","text":"hi"}]}}
-EOF
-)
-if printf '%s' "$vela_gate_out" | grep -q 'session/set_model must be called before session/prompt'; then
-  pass "vela strict set_model gate rejects session/prompt without prior set_model"
-else
-  fail "vela strict set_model gate did not reject (negative-path regression)"
-fi
-
 # Kimi — prompt-mode stream-json. Newer Kimi CLIs reject an `acp`
 # positional arg, so keep this smoke check on the real prompt-mode
 # launch shape OD uses in Settings and chat.

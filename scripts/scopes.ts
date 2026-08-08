@@ -329,17 +329,12 @@ function isWorkspaceValidationExemptFile(file: string): boolean {
   return (
     isDocumentationOrMetadataFile(file) ||
     startsWithAny(file, [
-      "apps/landing-page/",
       "nix/",
       ".github/ISSUE_TEMPLATE/",
     ]) ||
     [
       "flake.nix",
       "flake.lock",
-      ".github/workflows/landing-page-ci.yml",
-      ".github/workflows/landing-page-staging.yml",
-      ".github/workflows/landing-page-production.yml",
-      ".github/workflows/blog-indexing-on-deploy.yml",
       ".github/workflows/autofix.atom.yml",
       ".github/workflows/comment.atom.yml",
       ".github/workflows/report.atom.yml",
