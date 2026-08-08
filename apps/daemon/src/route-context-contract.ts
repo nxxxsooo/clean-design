@@ -8,7 +8,6 @@ import type { RegisterHostToolsRoutesDeps } from './routes/host-tools.js';
 import type { RegisterLiveArtifactRoutesDeps } from './routes/live-artifact.js';
 import type { RegisterMediaRoutesDeps } from './routes/media.js';
 import type { RegisterMemoryRoutesDeps } from './routes/memory.js';
-import type { RegisterOpenDesignPublicMetadataRoutesDeps } from './routes/open-design-public-metadata.js';
 import type { RegisterProjectArtifactRoutesDeps, RegisterProjectFileRoutesDeps, RegisterProjectRoutesDeps, RegisterProjectUploadRoutesDeps } from './routes/project/index.js';
 import type { RegisterRunRoutesDeps } from './routes/runs.js';
 import type { RegisterStaticResourceRoutesDeps } from './routes/static-resource.js';
@@ -25,7 +24,6 @@ type AllRegisteredRouteDeps =
   & RegisterLiveArtifactRoutesDeps
   & RegisterMediaRoutesDeps
   & RegisterMemoryRoutesDeps
-  & RegisterOpenDesignPublicMetadataRoutesDeps
   & RegisterProjectArtifactRoutesDeps
   & RegisterProjectExportRoutesDeps
   & RegisterProjectFileRoutesDeps

@@ -11,7 +11,6 @@ import {
   type DesktopEvalResult,
   type DesktopScreenshotResult,
   type DesktopStatusSnapshot,
-  type DesktopUpdateResult,
   type SidecarStamp,
   type WebStatusSnapshot,
 } from "@open-design/sidecar-proto";
@@ -29,7 +28,6 @@ import {
 import type { ToolPackConfig } from "../config.js";
 import { resolveToolPackLauncherLayout } from "../launcher-layout.js";
 import { readToolPackLauncherRuntimeSnapshot } from "../launcher-runtime-snapshot.js";
-import { readToolPackUpdateCacheLifecycleSnapshot } from "../update-cache-lifecycle-snapshot.js";
 import { DESKTOP_LOG_ECHO_ENV } from "./constants.js";
 import { listDirectories, pathExists, removeTree } from "./fs.js";
 import { readBuiltAppManifest } from "./manifest.js";
@@ -61,7 +59,6 @@ import type {
 } from "./types.js";
 
 const PACKAGED_CONFIG_PATH_ENV = "OD_PACKAGED_CONFIG_PATH";
-const UPDATE_ACTION_TIMEOUT_MS = 10 * 60 * 1000;
 
 function desktopStamp(config: ToolPackConfig): SidecarStamp {
   return {
@@ -475,12 +472,6 @@ export async function resetPackedWinNamespaces(config: ToolPackConfig): Promise<
   return { namespaces, results };
 }
 
-function resolveUpdateAction(value: string | undefined): "status" | "check" | "download" | "install" | null {
-  if (value == null) return null;
-  if (value === "status" || value === "check" || value === "download" || value === "install") return value;
-  throw new Error("--update-action must be status, check, download, or install");
-}
-
 async function requestDesktopEval(
   ipc: string,
   expression: string,
@@ -552,7 +543,7 @@ async function pollWinInspectStatus(config: ToolPackConfig, count: number, inter
 
 export async function inspectPackedWinApp(
   config: ToolPackConfig,
-  options: { expr?: string; path?: string; statusPollCount?: string | number; statusPollIntervalMs?: string | number; updateAction?: string },
+  options: { expr?: string; path?: string; statusPollCount?: string | number; statusPollIntervalMs?: string | number },
 ): Promise<WinInspectResult> {
   const stamp = desktopStamp(config);
   const [desktopSnapshot, daemonSnapshot, webSnapshot] = await Promise.all([
@@ -560,11 +551,9 @@ export async function inspectPackedWinApp(
     requestStatusSnapshot<DaemonStatusSnapshot>(appIpcPath(config, APP_KEYS.DAEMON)),
     requestStatusSnapshot<WebStatusSnapshot>(appIpcPath(config, APP_KEYS.WEB)),
   ]);
-  const updateAction = resolveUpdateAction(options.updateAction);
   const statusPollCount = resolveOptionalPositiveInteger(options.statusPollCount, "--status-poll-count");
   const statusPollIntervalMs = resolveOptionalPositiveInteger(options.statusPollIntervalMs, "--status-poll-interval-ms") ?? 500;
   const launcher = await readToolPackLauncherRuntimeSnapshot(config);
-  const updateCache = await readToolPackUpdateCacheLifecycleSnapshot(config);
   return {
     daemonStatus: daemonSnapshot.status,
     ...(daemonSnapshot.error == null ? {} : { daemonStatusError: daemonSnapshot.error }),
@@ -577,24 +566,11 @@ export async function inspectPackedWinApp(
       note: "launcher snapshot is read from the tools-pack runtime root; user-installed launcher state is reported by the running desktop status and its AppData paths",
       root: launcher.root,
     },
-    updateCache,
-    updateCacheSource: {
-      kind: "tools-pack-runtime",
-      note: "update cache snapshot is read from the tools-pack runtime root; user-installed update cache is reported by status.update.paths",
-      root: updateCache.updateRoot,
-    },
     ...(options.path == null ? {} : {
       screenshot: await requestJsonIpc<DesktopScreenshotResult>(
         stamp.ipc,
         { input: { path: options.path }, type: SIDECAR_MESSAGES.SCREENSHOT },
         { timeoutMs: 10000 },
-      ),
-    }),
-    ...(updateAction == null ? {} : {
-      update: await requestJsonIpc<DesktopUpdateResult>(
-        stamp.ipc,
-        { input: { action: updateAction }, type: SIDECAR_MESSAGES.UPDATE },
-        { timeoutMs: UPDATE_ACTION_TIMEOUT_MS },
       ),
     }),
     status: desktopSnapshot.status,

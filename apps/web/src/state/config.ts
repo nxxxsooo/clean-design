@@ -685,7 +685,6 @@ export function loadConfig(): AppConfig {
     delete merged.agentCliEnv?.amr;
     delete merged.agentCliEnvIntent?.amr;
     merged.telemetry = { metrics: false, content: false };
-    delete merged.allowSilentUpdates;
 
     let migratedConfig = false;
     const parsedMigrationVersion =
@@ -975,7 +974,6 @@ const DAEMON_OWNED_KEYS = new Set<keyof AppConfig>([
   'installationId',
   'telemetry',
   'privacyDecisionAt',
-  'allowSilentUpdates',
 ]);
 
 const AGENT_CLI_SECRET_ENV_KEYS = new Set([
@@ -1049,7 +1047,6 @@ export function mergeDaemonConfig(
   next.installationId = null;
   next.telemetry = { metrics: false, content: false };
   next.privacyDecisionAt = Date.now();
-  delete next.allowSilentUpdates;
   if (daemonConfig.customInstructions !== undefined) {
     next.customInstructions = daemonConfig.customInstructions ?? undefined;
   }
@@ -1173,7 +1170,6 @@ export async function syncConfigToDaemon(
     installationId: config.installationId,
     telemetry: config.telemetry,
     privacyDecisionAt: config.privacyDecisionAt,
-    allowSilentUpdates: config.allowSilentUpdates,
     customInstructions: config.customInstructions ?? null,
     projectLocations: config.projectLocations ?? [],
     defaultProjectLocationId: config.defaultProjectLocationId ?? 'default',

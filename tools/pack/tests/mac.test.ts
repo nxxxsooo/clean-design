@@ -250,26 +250,6 @@ describe("renderMacPackagedConfig", () => {
     }
   });
 
-  it("omits updater metadata even when the build environment provides it", async () => {
-    const root = await mkdtemp(join(tmpdir(), "open-design-tools-pack-mac-"));
-    try {
-      const config = makeConfig(root, {
-        updateMetadataUrl: "http://127.0.0.1:4567/beta/latest/metadata.json",
-      });
-
-      const packagedConfig = JSON.parse(
-        renderMacPackagedConfig({
-          appVersion: "1.2.3-beta.0",
-          config,
-          usePrebundledStandaloneWeb: true,
-        }),
-      ) as Record<string, unknown>;
-
-      expect(packagedConfig).not.toHaveProperty("updateMetadataUrl");
-    } finally {
-      await rm(root, { force: true, recursive: true });
-    }
-  });
 });
 
 describe("runElectronBuilder", () => {

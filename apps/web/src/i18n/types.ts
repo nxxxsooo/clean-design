@@ -530,8 +530,6 @@ export interface Dict {
   'settings.runtimePackaged': string;
   'settings.runtimeDevelopment': string;
   'settings.versionUnavailable': string;
-  'settings.allowSilentUpdates': string;
-  'settings.allowSilentUpdatesDesc': string;
   'settings.installLatest': string;
   'settings.alreadyLatest': string;
   'settings.updateCheck': string;
@@ -945,46 +943,6 @@ export interface Dict {
   'notify.successBody': string;
   'notify.failureBody': string;
 
-  // Desktop updater
-  'updater.available': string;
-  'updater.availableBody': string;
-  'updater.activeRunsTitle': string;
-  'updater.activeRunsBody': string;
-  'updater.activeRunsUnknownBody': string;
-  'updater.checking': string;
-  'updater.download': string;
-  'updater.downloading': string;
-  'updater.downloadingPercent': string;
-  'updater.dialogAvailableGeneric': string;
-  'updater.dialogAvailableVersion': string;
-  'updater.dialogCheckFailed': string;
-  'updater.dialogReadyGeneric': string;
-  'updater.dialogReadyVersion': string;
-  'updater.dialogUnsupported': string;
-  'updater.done': string;
-  'updater.failed': string;
-  'updater.installerOpenBody': string;
-  'updater.installerOpened': string;
-  'updater.later': string;
-  'updater.manualDownload': string;
-  'updater.allowSilentUpdates': string;
-  'updater.openFailedFallback': string;
-  'updater.installRestart': string;
-  'updater.installingRestart': string;
-  'updater.openInstaller': string;
-  'updater.opening': string;
-  'updater.payloadReadyGeneric': string;
-  'updater.payloadReadyVersion': string;
-  'updater.quitButton': string;
-  'updater.quitFailedBody': string;
-  'updater.quitFailedTitle': string;
-  'updater.quitting': string;
-  'updater.ready': string;
-  'updater.readyGeneric': string;
-  'updater.readyVersion': string;
-  'updater.restartAnyway': string;
-  'updater.upToDate': string;
-  'updater.viewVersionFeatures': string;
 
   // Post-update "what's new" card on the home surface. Release-configured
   // copy comes from the release feed; these keys cover the card chrome and

@@ -20,19 +20,12 @@ describe("desktop preload host boundary", () => {
     expect(source).toContain("satisfies OpenDesignHostBridge");
     expect(source).toContain("browser");
     expect(source).toContain("browser:clear-data");
-    expect(source).toContain("updater");
     // OS locale forwarded from main via webPreferences.additionalArguments
     // is mirrored onto __od__.client.osLocale. Pin the literal prefix
     // here so it can't drift away from `applyOsLocaleSwitch`/runtime's
     // additionalArguments without the test going red.
     expect(source).toContain("'--od-os-locale='");
     expect(source).toContain("osLocale");
-    expect(source).toContain("invokeUpdater('install'");
-    expect(source).toContain("od:update:quit");
-    expect(source).toContain("od:update:status-changed");
-    expect(source).toContain("od:update:open-dialog");
-    expect(source).toContain("od:update:set-menu-labels");
-    expect(source).toContain("subscribeOpenDialog");
     expect(source).toContain("od:app-config-changed");
     expect(source).toContain("open-design:app-config-changed");
     expect(source).toContain("window.dispatchEvent(new CustomEvent(APP_CONFIG_CHANGED_EVENT))");

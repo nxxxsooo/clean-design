@@ -1,12 +1,11 @@
 import type { Express } from 'express';
 import { type ChatSessionMode } from '@open-design/contracts';
-import { readAnalyticsContext } from '../../analytics.js';
 import { backfillBrandExtractionTranscriptForProject } from '../../brands/index.js';
 import type { RouteDeps } from '../../server-context.js';
 import { registerProjectCommentRoutes } from './comments.js';
 import { cancelRunsOwnedBy } from './cancel-owned-runs.js';
 
-export interface RegisterProjectConversationRoutesDeps extends RouteDeps<'db' | 'design' | 'http' | 'paths' | 'projectStore' | 'conversations' | 'ids' | 'telemetry' | 'appConfig' | 'agents'> {}
+export interface RegisterProjectConversationRoutesDeps extends RouteDeps<'db' | 'design' | 'http' | 'paths' | 'projectStore' | 'conversations' | 'ids' | 'appConfig' | 'agents'> {}
 
 function normalizeChatSessionMode(value: unknown): ChatSessionMode {
   return value === 'chat' || value === 'plan' ? value : 'design';
@@ -207,11 +206,6 @@ export function registerProjectConversationRoutes(app: Express, ctx: RegisterPro
     });
     // Bump the parent project's updatedAt so the project list re-orders.
     updateProject(db, req.params.id, {});
-    ctx.telemetry?.reportFinalizedMessage(saved, m, {
-      analyticsContext: readAnalyticsContext(req),
-      projectId: req.params.id,
-      conversationId: req.params.cid,
-    });
     res.json({ message: saved });
   });
 

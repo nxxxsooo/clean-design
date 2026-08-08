@@ -2,7 +2,6 @@
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { OpenDesignHostUpdaterStatusSnapshot } from '@open-design/host';
 import { installMockOpenDesignHost } from '@open-design/host/testing';
 import { en } from '../../src/i18n/locales/en';
 
@@ -32,7 +31,6 @@ const {
   importLocalDesignSystemMock,
   importGitHubDesignSystemMock,
   fetchProviderModelsMock,
-  fetchLatestGithubReleaseInfoMock,
   openExternalUrlMock,
   analyticsTrackMock,
 } = vi.hoisted(() => ({
@@ -49,7 +47,6 @@ const {
   importLocalDesignSystemMock: vi.fn(),
   importGitHubDesignSystemMock: vi.fn(),
   fetchProviderModelsMock: vi.fn(),
-  fetchLatestGithubReleaseInfoMock: vi.fn(),
   openExternalUrlMock: vi.fn(),
   analyticsTrackMock: vi.fn(),
 }));
@@ -81,7 +78,6 @@ vi.mock('../../src/providers/registry', async () => {
     fetchDesignSystem: fetchDesignSystemMock,
     importLocalDesignSystem: importLocalDesignSystemMock,
     importGitHubDesignSystem: importGitHubDesignSystemMock,
-    fetchLatestGithubReleaseInfo: fetchLatestGithubReleaseInfoMock,
     openExternalUrl: openExternalUrlMock,
     codexPetSpritesheetUrl: (pet: { spritesheetUrl: string }) => pet.spritesheetUrl,
   };
@@ -245,28 +241,6 @@ const sampleDesignSystems = [
 
 let restoreOpenDesignHost: (() => void) | null = null;
 
-function updateStatus(
-  overrides: Partial<OpenDesignHostUpdaterStatusSnapshot> = {},
-): OpenDesignHostUpdaterStatusSnapshot {
-  return {
-    arch: 'arm64',
-    capabilities: {
-      canApplyInPlace: false,
-      canDownload: true,
-      canOpenInstaller: true,
-      requiresManualInstall: true,
-    },
-    channel: 'beta',
-    currentVersion: '1.2.3-beta.3',
-    enabled: true,
-    mode: 'package-launcher',
-    platform: 'darwin',
-    state: 'idle',
-    supported: true,
-    ...overrides,
-  };
-}
-
 function renderSettingsDialog(
   initial: Partial<AppConfig> = {},
   options: {
@@ -277,14 +251,10 @@ function renderSettingsDialog(
     appVersionInfo?: AppVersionInfo | null;
     providerModelsCache?: Record<string, ProviderModelOption[]>;
     welcome?: boolean;
-    onSilentUpdatePreferenceChange?: (allowSilentUpdates: boolean) => Promise<void>;
   } = {},
 ) {
   const onPersist = vi.fn();
   const onPersistComposioKey = vi.fn();
-  const onSilentUpdatePreferenceChange: (allowSilentUpdates: boolean) => Promise<void> =
-    options.onSilentUpdatePreferenceChange
-    ?? (async () => undefined);
   const onClose = vi.fn();
   const onRefreshAgents = options.onRefreshAgents ?? vi.fn<OnRefreshAgents>();
 
@@ -298,7 +268,6 @@ function renderSettingsDialog(
       providerModelsCache={options.providerModelsCache}
       welcome={options.welcome}
       onPersist={onPersist}
-      onSilentUpdatePreferenceChange={onSilentUpdatePreferenceChange}
       onPersistComposioKey={onPersistComposioKey}
       onClose={onClose}
       onRefreshAgents={onRefreshAgents}
@@ -307,7 +276,6 @@ function renderSettingsDialog(
 
   return {
     onPersist,
-    onSilentUpdatePreferenceChange,
     onPersistComposioKey,
     onClose,
     onRefreshAgents,
@@ -432,8 +400,6 @@ beforeEach(() => {
     id,
     body: `design system body for ${id}`,
   }));
-  fetchLatestGithubReleaseInfoMock.mockReset();
-  fetchLatestGithubReleaseInfoMock.mockResolvedValue(null);
   openExternalUrlMock.mockResolvedValue(true);
   importLocalDesignSystemMock.mockResolvedValue({
     designSystem: {

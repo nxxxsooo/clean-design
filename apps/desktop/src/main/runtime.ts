@@ -8,23 +8,16 @@ import { promisify } from "node:util";
 
 import { BrowserWindow, app, dialog, ipcMain, nativeImage, screen, session, shell } from "electron";
 import {
-  DESKTOP_UPDATE_CHANNELS,
-  DESKTOP_UPDATE_MODES,
-  DESKTOP_UPDATE_STATES,
   type DesktopExportArtifactInput,
   type DesktopExportArtifactResult,
   type DesktopExportPdfInput,
   type DesktopExportPdfResult,
   type DesktopRenderSlidesInput,
   type DesktopRenderSlidesResult,
-  type DesktopUpdateStatusSnapshot,
 } from "@open-design/sidecar-proto";
 import type {
   OpenDesignHostActionResult,
   OpenDesignHostCaptureResult,
-  OpenDesignHostUpdaterActionOptions,
-  OpenDesignHostUpdaterMenuLabels,
-  OpenDesignHostUpdaterOpenDialogRequest,
 } from "@open-design/host";
 import type {
   CredentialDeleteResult,
@@ -40,13 +33,6 @@ import { createElectronPdfTarget, exportPdfFromHtml, savePrintReadyDocumentAsPdf
 import { SPLASH_VIDEO_DATA_URL } from "./splash-video.js";
 import { RendererCrashLoopBreaker } from "./renderer-crash-loop.js";
 import type { PrintReadyPdfOptions } from "./pdf-export.js";
-import type { DesktopUpdater } from "./updater.js";
-import { parseDesktopUpdateMenuLabels } from "./update-menu.js";
-import {
-  checkUpdateRestartSafety,
-  parseUpdateActionRequest,
-  updateRestartSafetyError,
-} from "./update-preflight.js";
 import type { DesktopCredentialVault } from './credential-vault.js';
 
 const execFileAsync = promisify(execFile);
@@ -284,17 +270,7 @@ const MAX_CONSOLE_ENTRIES = 200;
 const DESKTOP_PET_WINDOW_WIDTH = 360;
 const DESKTOP_PET_WINDOW_HEIGHT = 300;
 const DESKTOP_PET_WINDOW_MARGIN = 24;
-const UPDATER_STATUS_EVENT = "od:update:status-changed";
-const UPDATER_OPEN_DIALOG_EVENT = "od:update:open-dialog";
 const DESIGN_BROWSER_PARTITION = "persist:clean-design-design-browser";
-const UPDATER_IPC_CHANNELS = [
-  "od:update:status",
-  "od:update:check",
-  "od:update:download",
-  "od:update:install",
-  "od:update:quit",
-  "od:update:set-menu-labels",
-] as const;
 
 export type DesktopEvalInput = {
   expression: string;
@@ -359,7 +335,6 @@ export type DesktopRuntime = {
   eval(input: DesktopEvalInput): Promise<DesktopEvalResult>;
   exportArtifact(input: DesktopExportArtifactInput): Promise<DesktopExportArtifactResult>;
   exportPdf(input: DesktopExportPdfInput): Promise<DesktopExportPdfResult>;
-  openUpdateDialog(request: OpenDesignHostUpdaterOpenDialogRequest): void;
   renderSlides(input: DesktopRenderSlidesInput): Promise<DesktopRenderSlidesResult>;
   screenshot(input: DesktopScreenshotInput): Promise<DesktopScreenshotResult>;
   show(): void;
@@ -440,7 +415,6 @@ export type DesktopRuntimeOptions = {
    * `splashWindow` is omitted (the runtime stamps its own splash at creation).
    */
   splashStartedAt?: number;
-  updater?: DesktopUpdater;
   /**
    * Fired once the main window is actually revealed (the web app mounted and
    * the window is shown) — the real "app is running" moment, distinct from
@@ -449,7 +423,6 @@ export type DesktopRuntimeOptions = {
    * as having reached running for abnormal-exit detection.
    */
   onRevealed?: () => void;
-  onUpdateMenuLabels?: (labels: OpenDesignHostUpdaterMenuLabels) => void;
 };
 
 const DESKTOP_IMPORT_TOKEN_HEADER = "X-OD-Desktop-Import-Token";
@@ -1331,7 +1304,7 @@ function splashStagePayload(stage: SplashBootStage): { step: number; total: numb
 }
 
 /**
- * Narrow view of the splash window that the stage updater needs. A real
+ * Narrow view of the splash window that the staged startup flow needs. A real
  * `BrowserWindow` satisfies this structurally; tests pass a mock so the
  * load-ready/replay logic is exercisable without a live Electron renderer.
  */
@@ -1799,36 +1772,6 @@ function parseCaptureClip(value: unknown): Electron.Rectangle | undefined {
   };
 }
 
-function unavailableUpdaterStatus(): DesktopUpdateStatusSnapshot {
-  return {
-    arch: process.arch,
-    capabilities: {
-      canApplyInPlace: false,
-      canDownload: false,
-      canOpenInstaller: false,
-      requiresManualInstall: false,
-    },
-    channel: DESKTOP_UPDATE_CHANNELS.BETA,
-    currentVersion: "0.0.0",
-    enabled: false,
-    error: {
-      code: "updater-unavailable",
-      message: "Desktop updater is not available.",
-    },
-    mode: DESKTOP_UPDATE_MODES.PACKAGE_LAUNCHER,
-    platform: process.platform,
-    state: DESKTOP_UPDATE_STATES.UNSUPPORTED,
-    supported: false,
-  };
-}
-
-function checkOptionsFromHost(options: unknown): { autoDownload?: boolean } | undefined {
-  const input = options as OpenDesignHostUpdaterActionOptions | null | undefined;
-  const payload = input?.payload;
-  if (payload == null || typeof payload.autoDownload !== "boolean") return undefined;
-  return { autoDownload: payload.autoDownload };
-}
-
 async function reportRendererCrash(
   options: DesktopRuntimeOptions,
   properties: {
@@ -1918,9 +1861,6 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
   ipcMain.removeHandler('cd:credentials:save');
   ipcMain.removeHandler('cd:credentials:delete');
   ipcMain.removeHandler('cd:handoff:select-root');
-  for (const channel of UPDATER_IPC_CHANNELS) {
-    ipcMain.removeHandler(channel);
-  }
   ipcMain.handle("shell:open-external", async (_event, url: string) => {
     // http(s) as before, plus a mailto strictly to our support address (the
     // crash screen's "Email us"); no other scheme opens.
@@ -2235,7 +2175,7 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
     // During app quit / teardown the renderer goes away and the window (and its
     // webContents) can already be destroyed when this fires. Reading getURL()
     // then throws "Object has been destroyed" as a fatal uncaught exception, so
-    // guard the same way `sendUpdaterStatus` does below and skip crash-report /
+    // guard the renderer boundary and skip crash-report /
     // recovery work once the window is already on its way out.
     const gone = window.isDestroyed() || window.webContents.isDestroyed();
     console.error("[open-design desktop] main window render-process-gone", {
@@ -2307,11 +2247,6 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
     markRendererFailed();
   });
 
-  const sendUpdaterStatus = (status = options.updater?.snapshot() ?? unavailableUpdaterStatus()) => {
-    if (window.isDestroyed()) return;
-    window.webContents.send(UPDATER_STATUS_EVENT, status);
-  };
-  const unsubscribeUpdater = options.updater?.subscribe(() => sendUpdaterStatus()) ?? (() => undefined);
   const requireMainWindowSender = (event: Electron.IpcMainInvokeEvent): void => {
     if (event.sender !== window.webContents) {
       throw new Error("host IPC is only available to the main Clean Design window");
@@ -2348,20 +2283,6 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
       return { ok: false, reason: error instanceof Error ? error.message : String(error) };
     }
   });
-  const discoverUpdateDaemonBaseUrl = async (): Promise<string> => {
-    const daemonUrl = await options.discoverDaemonUrl?.();
-    const baseUrl = daemonUrl ?? await options.discoverUrl();
-    if (baseUrl == null) throw new Error("daemon URL is unavailable");
-    return baseUrl;
-  };
-  const guardedUpdaterStatus = async (rawOptions: unknown): Promise<DesktopUpdateStatusSnapshot | null> => {
-    const request = parseUpdateActionRequest(rawOptions);
-    if (request.force) return null;
-    const safety = await checkUpdateRestartSafety({ discoverDaemonBaseUrl: discoverUpdateDaemonBaseUrl });
-    if (safety.state === "clear") return null;
-    const status = await (options.updater?.status() ?? unavailableUpdaterStatus());
-    return { ...status, error: updateRestartSafetyError(safety) };
-  };
   window.webContents.on("will-attach-webview", (event, webPreferences, params) => {
     const src = typeof params.src === "string" ? params.src : "";
     const partition = typeof params.partition === "string" ? params.partition : "";
@@ -2422,62 +2343,6 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
       };
     }
   });
-  ipcMain.handle("od:update:status", async (event) => {
-    requireMainWindowSender(event);
-    const status = await (options.updater?.status() ?? unavailableUpdaterStatus());
-    sendUpdaterStatus(status);
-    return status;
-  });
-  ipcMain.handle("od:update:check", async (event, updaterOptions: unknown) => {
-    requireMainWindowSender(event);
-    const status = await (options.updater?.checkForUpdates(checkOptionsFromHost(updaterOptions)) ?? unavailableUpdaterStatus());
-    sendUpdaterStatus(status);
-    return status;
-  });
-  ipcMain.handle("od:update:download", async (event) => {
-    requireMainWindowSender(event);
-    const status = await (options.updater?.downloadUpdate() ?? unavailableUpdaterStatus());
-    sendUpdaterStatus(status);
-    return status;
-  });
-  ipcMain.handle("od:update:install", async (event, updaterOptions: unknown) => {
-    requireMainWindowSender(event);
-    const blocked = await guardedUpdaterStatus(updaterOptions);
-    if (blocked != null) {
-      // Preflight denials travel only on the IPC response. The updater store
-      // itself is still healthy, so broadcasting the synthetic error through
-      // the shared status channel would make unrelated subscribers observe a
-      // failure that never happened.
-      return blocked;
-    }
-    const status = await (options.updater?.installUpdate() ?? unavailableUpdaterStatus());
-    sendUpdaterStatus(status);
-    return status;
-  });
-  ipcMain.handle("od:update:quit", async (event, updaterOptions: unknown): Promise<OpenDesignHostActionResult> => {
-    requireMainWindowSender(event);
-    const blocked = await guardedUpdaterStatus(updaterOptions);
-    if (blocked?.error != null) {
-      return { details: blocked.error.details, ok: false, reason: blocked.error.code };
-    }
-    const status = await (options.updater?.status() ?? unavailableUpdaterStatus());
-    if (status.installResult == null) {
-      return { ok: false, reason: "installer has not been opened" };
-    }
-    if (options.requestQuit == null) {
-      return { ok: false, reason: "desktop quit is not available" };
-    }
-    setTimeout(() => options.requestQuit?.(), 0);
-    return { ok: true };
-  });
-  ipcMain.handle("od:update:set-menu-labels", async (event, rawLabels: unknown): Promise<OpenDesignHostActionResult> => {
-    requireMainWindowSender(event);
-    const labels = parseDesktopUpdateMenuLabels(rawLabels);
-    if (labels == null) return { ok: false, reason: "invalid updater menu labels" };
-    options.onUpdateMenuLabels?.(labels);
-    return { ok: true };
-  });
-
   ipcMain.removeAllListeners("desktop-pet:set-visible");
   ipcMain.on("desktop-pet:set-visible", (event, visible: unknown) => {
     if (petWindow.isDestroyed() || event.sender !== petWindow.webContents) return;
@@ -2643,7 +2508,6 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
     splashStartedAt = created.startedAt;
   }
 
-  let pendingUpdateDialogRequest: OpenDesignHostUpdaterOpenDialogRequest | null = null;
   let revealed = false;
   let revealing = false;
 
@@ -2654,10 +2518,6 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
     window.show();
     window.focus();
     ensureWindowVisible(window);
-    if (pendingUpdateDialogRequest != null) {
-      window.webContents.send(UPDATER_OPEN_DIALOG_EVENT, pendingUpdateDialogRequest);
-      pendingUpdateDialogRequest = null;
-    }
     if (splash != null && !splash.isDestroyed()) splash.close();
     // The app is now truly up (mounted + shown). Fire once — revealed guards
     // re-entry — so callers can mark "reached running".
@@ -2857,11 +2717,7 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
         clearTimeout(timer);
         timer = null;
       }
-      unsubscribeUpdater();
       ipcMain.removeAllListeners("desktop-pet:set-visible");
-      for (const channel of UPDATER_IPC_CHANNELS) {
-        ipcMain.removeHandler(channel);
-      }
       ipcMain.removeHandler("browser:clear-data");
       if (splash != null && !splash.isDestroyed()) splash.close();
       if (!petWindow.isDestroyed()) petWindow.close();
@@ -2902,16 +2758,6 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
     },
     exportPdf(input) {
       return exportPdfFromHtml(input);
-    },
-    openUpdateDialog(request) {
-      if (window.isDestroyed()) return;
-      if (!revealed) {
-        pendingUpdateDialogRequest = request;
-        return;
-      }
-      window.webContents.send(UPDATER_OPEN_DIALOG_EVENT, request);
-      window.show();
-      window.focus();
     },
     renderSlides(input) {
       return renderDeckSlides(input);

@@ -258,12 +258,6 @@ interface Props {
    * incremental save, not a final commit.
    */
   onPersist: (cfg: AppConfig, options?: { forceMediaProviderSync?: boolean }) => Promise<void> | void;
-  /**
-   * Non-optimistic write for the daemon-owned silent-update preference.
-   * Settings → About uses this instead of the generic autosave path so a
-   * failed `/api/app-config` cannot leave app-wide config on the rejected value.
-   */
-  onSilentUpdatePreferenceChange?: (allowSilentUpdates: boolean) => Promise<void>;
   onDraftChange?: (cfg: AppConfig) => void;
   /**
    * Persist the Composio API key separately from the broader autosave
@@ -2752,9 +2746,6 @@ export function SettingsDialog({
   // Skip the very first effect tick so just opening the dialog doesn't
   // appear to "save" anything before the user has touched a field.
   const autosaveSkipFirstRef = useRef(true);
-  // Silent-update toggles use a dedicated non-optimistic path; skip the next
-  // autosave effect tick so we do not double-write through handleConfigPersist.
-  const suppressNextAutosaveRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveSavedTimerRef = useRef<number | null>(null);
   const autosaveRetryTimerRef = useRef<number | null>(null);
@@ -2777,10 +2768,6 @@ export function SettingsDialog({
   useEffect(() => {
     if (autosaveSkipFirstRef.current) {
       autosaveSkipFirstRef.current = false;
-      return;
-    }
-    if (suppressNextAutosaveRef.current) {
-      suppressNextAutosaveRef.current = false;
       return;
     }
     setAutosaveStatus('pending');

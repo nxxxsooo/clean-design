@@ -221,23 +221,6 @@ describe('syncConfigToDaemon', () => {
     });
   });
 
-  it('syncs the silent update preference to daemon app config', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await syncConfigToDaemon({
-      ...DEFAULT_CONFIG,
-      allowSilentUpdates: true,
-    });
-
-    const [, init] = fetchMock.mock.calls[0] as unknown as [
-      string,
-      RequestInit,
-    ];
-    expect(JSON.parse(String(init.body))).toMatchObject({
-      allowSilentUpdates: true,
-    });
-  });
 });
 
 describe('syncMediaProvidersToDaemon', () => {
@@ -364,17 +347,6 @@ describe('mergeDaemonConfig', () => {
     expect(merged.installationId == null).toBe(true);
   });
 
-  it('ignores daemon silent update preferences', () => {
-    expect(
-      mergeDaemonConfig(DEFAULT_CONFIG, { allowSilentUpdates: false }).allowSilentUpdates,
-    ).toBeUndefined();
-    expect(
-      mergeDaemonConfig(DEFAULT_CONFIG, { allowSilentUpdates: true }).allowSilentUpdates,
-    ).toBeUndefined();
-    expect(
-      mergeDaemonConfig({ ...DEFAULT_CONFIG, allowSilentUpdates: true }, {}).allowSilentUpdates,
-    ).toBeUndefined();
-  });
 });
 
 describe('mergeDaemonMediaProviders', () => {
@@ -1338,14 +1310,12 @@ describe('saveConfig', () => {
       installationId: 'install-1',
       privacyDecisionAt: 1778244000000,
       telemetry: { metrics: true },
-      allowSilentUpdates: true,
     });
 
     const saved = JSON.parse(store.get('open-design:config') ?? '{}');
     expect(saved.installationId).toBeUndefined();
     expect(saved.privacyDecisionAt).toBeUndefined();
     expect(saved.telemetry).toBeUndefined();
-    expect(saved.allowSilentUpdates).toBeUndefined();
   });
 
   it('keeps CLI API key env values out of localStorage while preserving intent and non-secret env', () => {

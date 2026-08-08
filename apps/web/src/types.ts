@@ -455,7 +455,6 @@ export interface AppConfig {
   // resolved. This is independent from installationId so Delete my data can
   // rotate or clear the anonymous id without re-opening the consent banner.
   privacyDecisionAt?: number | null;
-  allowSilentUpdates?: boolean;
   // Privacy preferences governing what (if anything) is shipped to the
   // PostHog / Langfuse telemetry endpoints. `metrics` and `content`
   // default ON (set by `DEFAULT_CONFIG.telemetry` in state/config.ts) so

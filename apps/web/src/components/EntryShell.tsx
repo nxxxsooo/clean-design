@@ -239,10 +239,6 @@ interface Props {
   onApiProtocolChange: (protocol: ApiProtocol) => void;
   onApiModelChange: (model: string) => void;
   onConfigPersist: (cfg: AppConfig) => Promise<void> | void;
-  /** True only when GET /api/app-config returned a real config object. */
-  daemonAppConfigReady?: boolean;
-  /** Non-optimistic daemon write for the silent-update preference. */
-  onSilentUpdatePreferenceChange?: (allowSilentUpdates: boolean) => Promise<void>;
   onSkillsRefresh?: () => Promise<void> | void;
   onSkillsChanged?: (affectedSkillId?: string) => void;
   onRefreshAgents: () => Promise<AgentInfo[]> | AgentInfo[];
@@ -339,8 +335,6 @@ export function EntryShell({
   onApiProtocolChange,
   onApiModelChange,
   onConfigPersist,
-  daemonAppConfigReady = false,
-  onSilentUpdatePreferenceChange,
   onSkillsRefresh,
   onSkillsChanged,
   onRefreshAgents,

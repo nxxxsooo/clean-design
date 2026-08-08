@@ -264,30 +264,10 @@ interface ProjectFileEntry {
   artifactManifest?: ArtifactManifest | JsonRecord | null;
 }
 
-interface RunRetryAnalyticsEvent {
-  event: string;
-  data: Record<string, unknown>;
-}
-
-interface RunArtifactBaselines {
-  take(runId: string): RunArtifactBaseline | undefined;
-}
-
 interface SseResponse {
   send(event: string, data: unknown, id?: number): void;
   end(): void;
   cleanup?(): void;
-}
-
-interface RunCreatedFallbackInput {
-  analyticsContext: AnalyticsContext | null;
-  run: ChatRun;
-  status: string;
-}
-
-interface RunProjectKindInput {
-  hintProjectKind: string | null;
-  projectMetadata?: ProjectMetadata;
 }
 
 export interface RegisterRunRoutesDeps {
@@ -333,12 +313,6 @@ export interface RegisterRunRoutesDeps {
     }) => void;
     loadPluginRegistryView: () => Promise<Parameters<typeof resolvePluginSnapshot>[0]['registry']>;
     renderPluginBriefTemplate: (template: string, inputs?: Record<string, unknown>) => string;
-  };
-  telemetry: {
-    reportRunCompletionTelemetryFallback: (input: RunCreatedFallbackInput) => void;
-    resolveRunProjectKindForAnalytics: (input: RunProjectKindInput) => string | null;
-    runArtifactBaselines: RunArtifactBaselines;
-    runRetryEventsForAnalytics: (events: RunEventRecord[]) => RunRetryAnalyticsEvent[];
   };
   messages: {
     pinAssistantMessageOnRunCreate: (db: SqliteDb, run: ChatRun) => void;
@@ -516,12 +490,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
     loadPluginRegistryView,
     renderPluginBriefTemplate,
   } = ctx.plugins;
-  const {
-    reportRunCompletionTelemetryFallback,
-    resolveRunProjectKindForAnalytics,
-    runArtifactBaselines,
-    runRetryEventsForAnalytics,
-  } = ctx.telemetry;
   const {
     pinAssistantMessageOnRunCreate,
     reconcileAssistantMessageOnRunEnd,

@@ -2,7 +2,7 @@ import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
 import { stopProcesses, waitForProcessExit, type StopProcessesResult } from "@open-design/platform";
-import { compareLauncherVersions, type LauncherAfterQuitRequest } from "@open-design/launcher-proto";
+import { type LauncherAfterQuitRequest } from "@open-design/launcher-proto";
 import {
   APP_KEYS,
   OPEN_DESIGN_SIDECAR_CONTRACT,
@@ -17,7 +17,7 @@ import type { PackagedNamespacePaths } from "./paths.js";
 type LauncherAfterQuitLogger = Pick<Console, "warn"> & Partial<Pick<Console, "info">>;
 
 export type LauncherExistingDesktopGateResult =
-  | { action: "continue"; reason: "inspect-failed" | "not-running" | "stale-sidecar" | "superseded-version" }
+  | { action: "continue"; reason: "inspect-failed" | "not-running" | "stale-sidecar" }
   | { action: "exit"; reason: "existing-focused" | "existing-focus-failed" };
 
 /**
@@ -122,21 +122,6 @@ async function restartExistingDesktop(
   );
 }
 
-function incomingVersionSupersedesExisting(
-  incomingVersion: string | null | undefined,
-  existingVersion: string | null | undefined,
-): boolean {
-  if (incomingVersion == null || existingVersion == null) return false;
-  const incoming = incomingVersion.trim();
-  const existing = existingVersion.trim();
-  if (incoming.length === 0 || existing.length === 0) return false;
-  try {
-    return compareLauncherVersions(incoming, existing) > 0;
-  } catch {
-    return false;
-  }
-}
-
 export async function waitForLauncherAfterQuit(
   request: LauncherAfterQuitRequest | null,
   paths: PackagedNamespacePaths,
@@ -163,7 +148,6 @@ export async function waitForLauncherAfterQuit(
 export async function inspectExistingDesktopForLauncher(
   namespace: string,
   options: {
-    incomingVersion?: string | null;
     logger?: LauncherAfterQuitLogger;
     paths: PackagedNamespacePaths;
     requestIpc?: typeof requestJsonIpc;
@@ -235,28 +219,6 @@ export async function inspectExistingDesktopForLauncher(
     });
     if (!restarted) return { action: "exit", reason: "existing-focus-failed" };
     return { action: "continue", reason: "stale-sidecar" };
-  }
-
-  const existingVersion = status.update?.currentVersion;
-  if (incomingVersionSupersedesExisting(options.incomingVersion, existingVersion)) {
-    const pid = typeof status.pid === "number" ? status.pid : null;
-    await writeLauncherAfterQuitLog(
-      options.paths,
-      `inspect-found-existing namespace=${namespace} action=restart reason=superseded-version incomingVersion=${options.incomingVersion?.trim()} existingVersion=${existingVersion?.trim()} pid=${pid ?? "unknown"}`,
-    );
-    const restarted = await restartExistingDesktop({
-      ipcPath,
-      logger,
-      namespace,
-      paths: options.paths,
-      pid,
-      reason: "superseded-version",
-      requestIpc,
-      stop,
-      waitForExit,
-    });
-    if (!restarted) return { action: "exit", reason: "existing-focus-failed" };
-    return { action: "continue", reason: "superseded-version" };
   }
 
   try {

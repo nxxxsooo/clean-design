@@ -924,19 +924,6 @@ export async function velaLogout(): Promise<{ ok: boolean }> {
 // a Langfuse `score-create`. Fire-and-forget — failures are not surfaced
 // to the UI (the rating is already persisted on the message itself via
 // the PUT /messages/:id round-trip).
-export async function reportChatRunFeedback(req: {
-  runId: string;
-  projectId: string;
-  conversationId: string;
-  assistantMessageId: string;
-  rating: 'positive' | 'negative';
-  reasonCodes: string[];
-  hasCustomReason: boolean;
-  customReason: string;
-}): Promise<void> {
-  void req;
-}
-
 export async function listActiveChatRuns(
   projectId: string,
   conversationId: string,

@@ -2419,12 +2419,6 @@ export async function startServer({
     env: process.env,
   });
 
-  const openDesignPublicMetadata = {
-    readGithubRepoStats: async () => { throw new Error('hosted metadata is disabled'); },
-    readLatestReleaseInfo: async () => { throw new Error('hosted metadata is disabled'); },
-    readDiscordPresence: async () => { throw new Error('community metadata is disabled'); },
-  };
-
   // Gate the diagnostics export behind requireLocalDaemonRequest so it stays
   // unreachable when daemon binds to a non-loopback address (Tailscale,
   // 0.0.0.0, etc.). The bundle contains daemon/web/desktop logs, host
@@ -2662,7 +2656,6 @@ export async function startServer({
     status: projectStatusDeps,
     events: projectEventDeps,
     ids: idDeps,
-    telemetry: { reportFinalizedMessage },
     appConfig: appConfigDeps,
     agents: agentDeps,
     validation: validationDeps,
@@ -7445,12 +7438,6 @@ export async function startServer({
       loadPluginRegistryView,
       renderPluginBriefTemplate,
     },
-    telemetry: {
-      reportRunCompletionTelemetryFallback,
-      resolveRunProjectKindForAnalytics,
-      runArtifactBaselines,
-      runRetryEventsForAnalytics,
-    },
     messages: {
       pinAssistantMessageOnRunCreate,
       reconcileAssistantMessageOnRunEnd,
@@ -7507,7 +7494,6 @@ export async function startServer({
     },
     agents: agentDeps,
     critique: critiqueDeps,
-    openDesignPublicMetadata,
     lifecycle: { isDaemonShuttingDown: () => daemonShuttingDown },
   });
 
@@ -7529,7 +7515,6 @@ export async function startServer({
     critique: critiqueDeps,
     validation: validationDeps,
     lifecycle: { isDaemonShuttingDown: () => daemonShuttingDown },
-    telemetry: { reportFinalizedMessage, reportFeedback },
   });
 
   registerStaticSpaFallback(app, STATIC_DIR);

@@ -605,8 +605,6 @@ export const zhCN: Dict = {
   "settings.runtimePackaged": "已打包应用",
   "settings.runtimeDevelopment": "开发环境",
   "settings.versionUnavailable": "守护进程离线时无法获取版本详情。",
-  "settings.allowSilentUpdates": "允许以后自动安装应用内更新",
-  "settings.allowSilentUpdatesDesc": "有可应用的应用内更新时，下次启动将自动安装。不会立刻升级当前版本。安装器更新仍会先询问。",
   "settings.installLatest": "安装最新版本",
   "settings.alreadyLatest": "当前为最新版本",
   "settings.mcpTitle": "MCP 服务器",
@@ -3934,55 +3932,6 @@ export const zhCN: Dict = {
   "notify.failureTitle": "任务失败",
   "notify.successBody": "一轮回答已经写完。",
   "notify.failureBody": "本轮任务出错，请查看错误信息。",
-  "updater.available": "有可用更新",
-  "updater.activeRunsTitle": "Clean Design 仍在执行任务",
-  "updater.activeRunsBody": "仍有 {count} 个任务正在运行。现在重启会中断这些任务。",
-  "updater.activeRunsUnknownBody": "Clean Design 无法确认是否仍有任务运行。现在重启可能会中断正在进行的工作。",
-  "updater.availableBody":
-    "Clean Design {version} 可用。下载安装完成后即可打开安装器。",
-  "updater.checking": "正在检查更新",
-  "updater.download": "下载更新",
-  "updater.downloading": "正在下载更新",
-  "updater.downloadingPercent": "正在下载更新 {percent}%",
-  "updater.done": "完成",
-  "updater.failed": "更新失败",
-  "updater.installerOpenBody":
-    "安装器已打开。Clean Design 正在退出，以便你完成更新。",
-  "updater.installerOpened": "安装器已打开",
-  "updater.later": "稍后",
-  "updater.allowSilentUpdates": "允许以后自动安装应用内更新",
-  "updater.openFailedFallback": "无法打开安装器。",
-  "updater.installRestart": "安装并重启",
-  "updater.installingRestart": "正在安装并重启…",
-  "updater.openInstaller": "安装更新",
-  "updater.opening": "正在打开安装器…",
-  "updater.dialogAvailableGeneric": "发现新版本。\n下载后即可安装。",
-  "updater.dialogAvailableVersion": "v{version} 可供更新。\n下载后即可安装。",
-  "updater.dialogCheckFailed": "检查更新失败。\n请稍后重试。",
-  "updater.dialogReadyGeneric":
-    "新版本已准备就绪。\n更好的体验，更智能的设计，欢迎体验新版本。",
-  "updater.dialogReadyVersion":
-    "v{version} 已准备就绪。\n更好的体验，更智能的设计，欢迎体验新版本。",
-  "updater.dialogUnsupported":
-    "当前环境不支持应用内更新。\n可前往发布页手动下载。",
-  "updater.payloadReadyGeneric":
-    "Clean Design 更新已就绪。Clean Design 会关闭并自动重启。",
-  "updater.payloadReadyVersion":
-    "Clean Design {version} 已就绪。Clean Design 会关闭并自动重启。",
-  "updater.quitButton": "退出 Clean Design",
-  "updater.quitFailedBody":
-    "安装器已打开，但 Clean Design 无法退出。替换应用前请先退出 Clean Design。",
-  "updater.quitFailedTitle": "无法退出",
-  "updater.quitting": "正在退出…",
-  "updater.ready": "更新已就绪",
-  "updater.readyGeneric": "新版本已就绪。Clean Design 会关闭并打开安装器。",
-  "updater.readyVersion":
-    "Clean Design {version} 已就绪。Clean Design 会关闭并打开安装器。",
-  "updater.upToDate": "您已经是最新版本啦",
-  "updater.viewVersionFeatures": "查看新版本特性",
-  "updater.manualDownload": "手动下载",
-  "updater.restartAnyway": "仍然重启",
-
   "whatsNew.cta": "看看有什么新功能",
   "whatsNew.dismissAria": "关闭更新亮点",
 

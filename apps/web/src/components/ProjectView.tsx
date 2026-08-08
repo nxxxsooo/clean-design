@@ -26,10 +26,8 @@ import {
   listProjectRuns,
   publishDaemonRunFinishedEvent,
   reattachDaemonRun,
-  reportChatRunFeedback,
   streamViaDaemon,
 } from '../providers/daemon';
-import { normalizeCustomReason } from '@open-design/contracts/analytics';
 import {
   deletePreviewComment,
   fetchConnectorStatuses,
@@ -3179,23 +3177,6 @@ export function ProjectView({
               },
         true,
       );
-      // Forward affirmative ratings to the daemon → Langfuse `score-create`.
-      // Clears (change=null) are skipped — Langfuse scores are append-only,
-      // and the rating is also captured by the PostHog event so a clear is
-      // recoverable downstream if we ever need it.
-      const runId = assistantMessage.runId;
-      if (change && runId && activeConversationId) {
-        void reportChatRunFeedback({
-          runId,
-          projectId: project.id,
-          conversationId: activeConversationId,
-          assistantMessageId: assistantMessage.id,
-          rating: change.rating,
-          reasonCodes: change.reasonCodes ?? [],
-          hasCustomReason: !!change.customReason,
-          customReason: normalizeCustomReason(change.customReason),
-        });
-      }
     },
     [updateMessageById, activeConversationId, project.id],
   );

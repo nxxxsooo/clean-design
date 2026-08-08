@@ -1,5 +1,3 @@
-import { RELEASE_CHANNELS, type ReleaseChannel } from "@open-design/release";
-
 export const APP_KEYS = Object.freeze({
   DAEMON: "daemon",
   DESKTOP: "desktop",
@@ -97,48 +95,7 @@ export const SIDECAR_MESSAGES = Object.freeze({
   SHUTDOWN: "shutdown",
   SHOW: "show",
   STATUS: "status",
-  UPDATE: "update",
 } as const);
-
-export const DESKTOP_UPDATE_ACTIONS = Object.freeze({
-  CHECK: "check",
-  DOWNLOAD: "download",
-  INSTALL: "install",
-  STATUS: "status",
-} as const);
-
-export type DesktopUpdateAction = (typeof DESKTOP_UPDATE_ACTIONS)[keyof typeof DESKTOP_UPDATE_ACTIONS];
-
-export const DESKTOP_UPDATE_MODES = Object.freeze({
-  JS_INCREMENTAL: "js-incremental",
-  PACKAGE_LAUNCHER: "package-launcher",
-} as const);
-
-export type DesktopUpdateMode = (typeof DESKTOP_UPDATE_MODES)[keyof typeof DESKTOP_UPDATE_MODES];
-
-export const DESKTOP_UPDATE_CHANNELS = Object.freeze({
-  BETA: RELEASE_CHANNELS.BETA,
-  BETAS: RELEASE_CHANNELS.BETAS,
-  PRERELEASE: RELEASE_CHANNELS.PRERELEASE,
-  PREVIEW: RELEASE_CHANNELS.PREVIEW,
-  STABLE: RELEASE_CHANNELS.STABLE,
-} as const);
-
-export type DesktopUpdateChannel = ReleaseChannel;
-
-export const DESKTOP_UPDATE_STATES = Object.freeze({
-  AVAILABLE: "available",
-  CHECKING: "checking",
-  DOWNLOADED: "downloaded",
-  DOWNLOADING: "downloading",
-  ERROR: "error",
-  IDLE: "idle",
-  INSTALLING: "installing",
-  NOT_AVAILABLE: "not-available",
-  UNSUPPORTED: "unsupported",
-} as const);
-
-export type DesktopUpdateState = (typeof DESKTOP_UPDATE_STATES)[keyof typeof DESKTOP_UPDATE_STATES];
 
 export const SIDECAR_ERROR_CODES = Object.freeze({
   INVALID_MESSAGE: "SIDECAR_INVALID_MESSAGE",
@@ -192,8 +149,6 @@ export type DesktopStatusSnapshot = {
   pid?: number | null;
   state: DesktopRuntimeState;
   title?: string | null;
-  update?: DesktopUpdateStatusSnapshot;
-  updateStatusError?: string;
   updatedAt?: string;
   url?: string | null;
   windowVisible?: boolean;
@@ -352,138 +307,6 @@ export type DesktopExportArtifactResult = {
   path?: string;
 };
 
-export type DesktopUpdateCapabilitySet = {
-  canApplyInPlace: boolean;
-  canDownload: boolean;
-  canOpenInstaller: boolean;
-  requiresManualInstall: boolean;
-};
-
-export type DesktopUpdatePathSnapshot = {
-  downloadRoot?: string;
-  manifestPath?: string;
-};
-
-export type DesktopUpdateChecksumSnapshot = {
-  algorithm: "sha256" | "sha512";
-  url?: string;
-  value?: string;
-};
-
-export type DesktopUpdateArtifactSnapshot = {
-  name?: string;
-  platformKey?: string;
-  size?: number;
-  type?: string;
-  url: string;
-};
-
-export type DesktopUpdateProgressSnapshot = {
-  receivedBytes: number;
-  totalBytes?: number;
-};
-
-export type DesktopUpdateErrorSnapshot = {
-  code: string;
-  details?: unknown;
-  message: string;
-};
-
-export type DesktopUpdateInstallResult = {
-  activeVersion?: string;
-  artifactPath?: string;
-  dryRun?: boolean;
-  helperLogPath?: string;
-  launcherRuntimePath?: string;
-  launchPath?: string;
-  openedAt: string;
-  path: string;
-};
-
-export type DesktopUpdateReleaseSnapshot = {
-  arch: string;
-  artifact: DesktopUpdateArtifactSnapshot;
-  checksum: DesktopUpdateChecksumSnapshot;
-  channel: DesktopUpdateChannel;
-  downloadedAt: string;
-  key: string;
-  metadata?: Record<string, unknown>;
-  path: string;
-  platformKey: string;
-  version: string;
-};
-
-export type DesktopUpdateIncomingSnapshot = {
-  arch: string;
-  artifact: DesktopUpdateArtifactSnapshot;
-  channel: DesktopUpdateChannel;
-  key?: string;
-  metadata?: Record<string, unknown>;
-  progress?: DesktopUpdateProgressSnapshot;
-  startedAt: string;
-  version: string;
-};
-
-export type DesktopUpdateCacheLifecycleTrigger = "cold-start" | "next-version-ready";
-
-export type DesktopUpdateReleaseLifecycleState =
-  | "cleanup-deferred"
-  | "cleanup-removed"
-  | "deprecated"
-  | "retained"
-  | "unknown";
-
-export type DesktopUpdateCacheLifecycleSummary = {
-  lastRunAt?: string;
-  lastTrigger?: DesktopUpdateCacheLifecycleTrigger;
-  platform: string;
-  releases: {
-    cleanupDeferred: number;
-    cleanupRemoved: number;
-    deprecated: number;
-    errors: number;
-    retained: number;
-    total: number;
-    unknown: number;
-  };
-};
-
-export type DesktopUpdateCacheSnapshot = {
-  lifecycle?: DesktopUpdateCacheLifecycleSummary;
-};
-
-export type DesktopUpdateStatusSnapshot = {
-  active?: DesktopUpdateReleaseSnapshot;
-  arch: string;
-  artifact?: DesktopUpdateArtifactSnapshot;
-  artifactUrl?: string;
-  availableVersion?: string;
-  cache?: DesktopUpdateCacheSnapshot;
-  capabilities: DesktopUpdateCapabilitySet;
-  channel: DesktopUpdateChannel;
-  checksum?: DesktopUpdateChecksumSnapshot;
-  currentVersion: string;
-  downloadPath?: string;
-  enabled: boolean;
-  error?: DesktopUpdateErrorSnapshot;
-  incoming?: DesktopUpdateIncomingSnapshot;
-  installResult?: DesktopUpdateInstallResult;
-  lastCheckedAt?: string;
-  metadata?: Record<string, unknown>;
-  mode: DesktopUpdateMode;
-  paths?: DesktopUpdatePathSnapshot;
-  platform: string;
-  progress?: DesktopUpdateProgressSnapshot;
-  state: DesktopUpdateState;
-  supported: boolean;
-};
-
-export type DesktopUpdateInput = {
-  action: DesktopUpdateAction;
-};
-
-export type DesktopUpdateResult = DesktopUpdateStatusSnapshot;
-
 export type SidecarStatusMessage = { type: typeof SIDECAR_MESSAGES.STATUS };
 export type SidecarShutdownMessage = { type: typeof SIDECAR_MESSAGES.SHUTDOWN };
 export type DesktopEvalMessage = { input: DesktopEvalInput; type: typeof SIDECAR_MESSAGES.EVAL };
@@ -494,7 +317,6 @@ export type DesktopClickMessage = { input: DesktopClickInput; type: typeof SIDEC
 export type DesktopExportPdfMessage = { input: DesktopExportPdfInput; type: typeof SIDECAR_MESSAGES.EXPORT_PDF };
 export type DesktopRenderSlidesMessage = { input: DesktopRenderSlidesInput; type: typeof SIDECAR_MESSAGES.RENDER_SLIDES };
 export type DesktopExportArtifactMessage = { input: DesktopExportArtifactInput; type: typeof SIDECAR_MESSAGES.EXPORT_ARTIFACT };
-export type DesktopUpdateMessage = { input: DesktopUpdateInput; type: typeof SIDECAR_MESSAGES.UPDATE };
 
 // Sent by the desktop main process to the daemon over its sidecar IPC at
 // startup, before the BrowserWindow is created. The base64 string is a
@@ -614,8 +436,7 @@ export type DesktopSidecarMessage =
   | DesktopClickMessage
   | DesktopExportPdfMessage
   | DesktopRenderSlidesMessage
-  | DesktopExportArtifactMessage
-  | DesktopUpdateMessage;
+  | DesktopExportArtifactMessage;
 
 export type ShutdownResult = {
   accepted: true;
@@ -647,10 +468,6 @@ export type OpenDesignSidecarContract = {
   sources: typeof SIDECAR_SOURCES;
   stampFields: typeof SIDECAR_STAMP_FIELDS;
   stampFlags: typeof SIDECAR_STAMP_FLAGS;
-  updateActions: typeof DESKTOP_UPDATE_ACTIONS;
-  updateChannels: typeof DESKTOP_UPDATE_CHANNELS;
-  updateModes: typeof DESKTOP_UPDATE_MODES;
-  updateStates: typeof DESKTOP_UPDATE_STATES;
 };
 
 function assertObject(value: unknown, label: string): Record<string, unknown> {
@@ -943,19 +760,6 @@ function normalizeDesktopExportArtifactInput(input: unknown): DesktopExportArtif
   };
 }
 
-function isDesktopUpdateAction(value: unknown): value is DesktopUpdateAction {
-  return Object.values(DESKTOP_UPDATE_ACTIONS).includes(value as DesktopUpdateAction);
-}
-
-function normalizeDesktopUpdateInput(input: unknown): DesktopUpdateInput {
-  const value = assertObject(input, "desktop update input");
-  assertKnownKeys(value, ["action"], "desktop update input");
-  if (!isDesktopUpdateAction(value.action)) {
-    throw new Error(`unsupported desktop update action: ${String(value.action)}`);
-  }
-  return { action: value.action };
-}
-
 function normalizeMessageType(value: unknown, label: string): string {
   if (typeof value !== "string" || value.length === 0) {
     throw new SidecarContractError(SIDECAR_ERROR_CODES.INVALID_MESSAGE, `${label} type must be a non-empty string`);
@@ -1027,9 +831,6 @@ export function normalizeDesktopSidecarMessage(input: unknown): DesktopSidecarMe
     case SIDECAR_MESSAGES.EXPORT_ARTIFACT:
       assertKnownKeys(value, ["input", "type"], "desktop sidecar message");
       return { input: normalizeDesktopExportArtifactInput(value.input), type };
-    case SIDECAR_MESSAGES.UPDATE:
-      assertKnownKeys(value, ["input", "type"], "desktop sidecar message");
-      return { input: normalizeDesktopUpdateInput(value.input), type };
     default:
       throw new SidecarContractError(SIDECAR_ERROR_CODES.UNKNOWN_MESSAGE, `unknown desktop sidecar message: ${type}`);
   }
@@ -1050,8 +851,4 @@ export const OPEN_DESIGN_SIDECAR_CONTRACT = Object.freeze({
   sources: SIDECAR_SOURCES,
   stampFields: SIDECAR_STAMP_FIELDS,
   stampFlags: SIDECAR_STAMP_FLAGS,
-  updateActions: DESKTOP_UPDATE_ACTIONS,
-  updateChannels: DESKTOP_UPDATE_CHANNELS,
-  updateModes: DESKTOP_UPDATE_MODES,
-  updateStates: DESKTOP_UPDATE_STATES,
 } as const satisfies OpenDesignSidecarContract);

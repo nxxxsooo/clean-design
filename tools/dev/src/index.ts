@@ -16,7 +16,6 @@ import {
   type DesktopEvalResult,
   type DesktopScreenshotResult,
   type DesktopStatusSnapshot,
-  type DesktopUpdateResult,
   type WebStatusSnapshot,
 } from "@open-design/sidecar-proto";
 import { createSidecarLaunchEnv, requestJsonIpc } from "@open-design/sidecar";
@@ -77,7 +76,6 @@ type CliOptions = ToolDevOptions & {
   path?: string;
   selector?: string;
   timeout?: string;
-  updateAction?: string;
 };
 
 const TOOLS_DEV_PARENT_PID_ENV = SIDECAR_ENV.TOOLS_DEV_PARENT_PID;
@@ -1020,18 +1018,6 @@ async function inspectDesktop(config: ToolDevConfig, target: string | undefined,
       );
     case "console":
       return await requestJsonIpc<DesktopConsoleResult>(config.apps.desktop.ipcPath, { type: SIDECAR_MESSAGES.CONSOLE }, { timeoutMs });
-    case "update":
-      if (
-        options.updateAction != null &&
-        !["status", "check", "download", "install"].includes(options.updateAction)
-      ) {
-        throw new Error("--update-action must be status, check, download, or install");
-      }
-      return await requestJsonIpc<DesktopUpdateResult>(
-        config.apps.desktop.ipcPath,
-        { input: { action: options.updateAction ?? "status" }, type: SIDECAR_MESSAGES.UPDATE },
-        { timeoutMs },
-      );
     case "click":
       if (options.selector == null) throw new Error("--selector is required for desktop click");
       return await requestJsonIpc<DesktopClickResult>(
@@ -1182,7 +1168,6 @@ addSharedOptions(
   .option("--path <file>", "Output path for desktop screenshot")
   .option("--selector <css>", "CSS selector for desktop click")
   .option("--timeout <seconds>", "Desktop inspect timeout in seconds")
-  .option("--update-action <action>", "Desktop update action: status|check|download|install")
   .action(async (appName: string, target: string | undefined, options: CliOptions) => {
     output(await inspect(resolveToolDevConfig(options), appName, target, options), options);
   });

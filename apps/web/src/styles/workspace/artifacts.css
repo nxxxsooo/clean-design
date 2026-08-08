@@ -500,9 +500,6 @@
   margin: 0;
   font-size: 12px;
 }
-.settings-about-silent-updates {
-  align-items: center;
-}
 .settings-about-diagnostics > .settings-about-toggle {
   display: flex;
   flex-direction: row;

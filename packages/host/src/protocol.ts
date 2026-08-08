@@ -1,10 +1,8 @@
-import type { ReleaseChannel } from "@open-design/release";
-
 /**
  * @module protocol
  *
  * The Open Design renderer host-bridge wire contract: the injected-global name
- * and version, client/updater constant registries, and every request/result
+ * and version, client constant registries, and every request/result
  * type that crosses the host bridge — including the {@link OpenDesignHostBridge}
  * shape itself. Pure declarations only; depends on nothing else in the package.
  */
@@ -135,192 +133,6 @@ export type OpenDesignHostBrowserClearDataOptions = {
   storage?: boolean;
 };
 
-export const OPEN_DESIGN_HOST_UPDATER_ACTIONS = Object.freeze({
-  CHECK: "check",
-  DOWNLOAD: "download",
-  INSTALL: "install",
-  QUIT: "quit",
-  STATUS: "status",
-} as const);
-
-export type OpenDesignHostUpdaterAction =
-  (typeof OPEN_DESIGN_HOST_UPDATER_ACTIONS)[keyof typeof OPEN_DESIGN_HOST_UPDATER_ACTIONS];
-
-/** @internal Updater actions that return a status snapshot (every action except `quit`). */
-export type OpenDesignHostUpdaterStatusAction = Exclude<
-  OpenDesignHostUpdaterAction,
-  typeof OPEN_DESIGN_HOST_UPDATER_ACTIONS.QUIT
->;
-
-export const OPEN_DESIGN_HOST_UPDATER_STATES = Object.freeze({
-  AVAILABLE: "available",
-  CHECKING: "checking",
-  DOWNLOADED: "downloaded",
-  DOWNLOADING: "downloading",
-  ERROR: "error",
-  IDLE: "idle",
-  INSTALLING: "installing",
-  NOT_AVAILABLE: "not-available",
-  UNSUPPORTED: "unsupported",
-} as const);
-
-export type OpenDesignHostUpdaterState =
-  (typeof OPEN_DESIGN_HOST_UPDATER_STATES)[keyof typeof OPEN_DESIGN_HOST_UPDATER_STATES];
-
-export type OpenDesignHostUpdaterMode = "js-incremental" | "package-launcher";
-export type OpenDesignHostUpdaterChannel = ReleaseChannel;
-
-export type OpenDesignHostUpdaterActionOptions = {
-  payload?: Record<string, unknown>;
-};
-
-export type OpenDesignHostUpdaterCapabilitySet = {
-  canApplyInPlace: boolean;
-  canDownload: boolean;
-  canOpenInstaller: boolean;
-  requiresManualInstall: boolean;
-};
-
-export type OpenDesignHostUpdaterPathSnapshot = {
-  downloadRoot?: string;
-  manifestPath?: string;
-};
-
-export type OpenDesignHostUpdaterChecksumSnapshot = {
-  algorithm: "sha256" | "sha512";
-  url?: string;
-  value?: string;
-};
-
-export type OpenDesignHostUpdaterArtifactSnapshot = {
-  name?: string;
-  platformKey?: string;
-  size?: number;
-  type?: string;
-  url: string;
-};
-
-export type OpenDesignHostUpdaterProgressSnapshot = {
-  receivedBytes: number;
-  totalBytes?: number;
-};
-
-export type OpenDesignHostUpdaterErrorSnapshot = {
-  code: string;
-  details?: unknown;
-  message: string;
-};
-
-export type OpenDesignHostUpdaterInstallResult = {
-  activeVersion?: string;
-  artifactPath?: string;
-  dryRun?: boolean;
-  helperLogPath?: string;
-  launcherRuntimePath?: string;
-  launchPath?: string;
-  openedAt: string;
-  path: string;
-};
-
-export type OpenDesignHostUpdaterReleaseSnapshot = {
-  arch: string;
-  artifact: OpenDesignHostUpdaterArtifactSnapshot;
-  checksum: OpenDesignHostUpdaterChecksumSnapshot;
-  channel: OpenDesignHostUpdaterChannel;
-  downloadedAt: string;
-  key: string;
-  metadata?: Record<string, unknown>;
-  path: string;
-  platformKey: string;
-  version: string;
-};
-
-export type OpenDesignHostUpdaterIncomingSnapshot = {
-  arch: string;
-  artifact: OpenDesignHostUpdaterArtifactSnapshot;
-  channel: OpenDesignHostUpdaterChannel;
-  key?: string;
-  metadata?: Record<string, unknown>;
-  progress?: OpenDesignHostUpdaterProgressSnapshot;
-  startedAt: string;
-  version: string;
-};
-
-export type OpenDesignHostUpdaterCacheLifecycleTrigger = "cold-start" | "next-version-ready";
-
-export type OpenDesignHostUpdaterReleaseLifecycleState =
-  | "cleanup-deferred"
-  | "cleanup-removed"
-  | "deprecated"
-  | "retained"
-  | "unknown";
-
-export type OpenDesignHostUpdaterCacheLifecycleSummary = {
-  lastRunAt?: string;
-  lastTrigger?: OpenDesignHostUpdaterCacheLifecycleTrigger;
-  platform: string;
-  releases: {
-    cleanupDeferred: number;
-    cleanupRemoved: number;
-    deprecated: number;
-    errors: number;
-    retained: number;
-    total: number;
-    unknown: number;
-  };
-};
-
-export type OpenDesignHostUpdaterCacheSnapshot = {
-  lifecycle?: OpenDesignHostUpdaterCacheLifecycleSummary;
-};
-
-export type OpenDesignHostUpdaterStatusSnapshot = {
-  active?: OpenDesignHostUpdaterReleaseSnapshot;
-  arch: string;
-  artifact?: OpenDesignHostUpdaterArtifactSnapshot;
-  artifactUrl?: string;
-  availableVersion?: string;
-  cache?: OpenDesignHostUpdaterCacheSnapshot;
-  capabilities: OpenDesignHostUpdaterCapabilitySet;
-  channel: OpenDesignHostUpdaterChannel;
-  checksum?: OpenDesignHostUpdaterChecksumSnapshot;
-  currentVersion: string;
-  downloadPath?: string;
-  enabled: boolean;
-  error?: OpenDesignHostUpdaterErrorSnapshot;
-  incoming?: OpenDesignHostUpdaterIncomingSnapshot;
-  installResult?: OpenDesignHostUpdaterInstallResult;
-  lastCheckedAt?: string;
-  metadata?: Record<string, unknown>;
-  mode: OpenDesignHostUpdaterMode;
-  paths?: OpenDesignHostUpdaterPathSnapshot;
-  platform: string;
-  progress?: OpenDesignHostUpdaterProgressSnapshot;
-  state: OpenDesignHostUpdaterState;
-  supported: boolean;
-};
-
-export type OpenDesignHostUpdaterResult =
-  | { ok: true; status: OpenDesignHostUpdaterStatusSnapshot }
-  | OpenDesignHostFailure;
-
-export type OpenDesignHostUpdaterStatusListener = (status: OpenDesignHostUpdaterStatusSnapshot) => void;
-
-export type OpenDesignHostUpdaterMenuLabels = {
-  check: string;
-  checking: string;
-  downloading: string;
-  install: string;
-  installing: string;
-  restart: string;
-};
-
-export type OpenDesignHostUpdaterOpenDialogRequest = {
-  source: string;
-};
-
-export type OpenDesignHostUpdaterOpenDialogListener = (request: OpenDesignHostUpdaterOpenDialogRequest) => void;
-
 export type OpenDesignHostBridge = {
   browser: {
     clearData(options?: OpenDesignHostBrowserClearDataOptions): Promise<OpenDesignHostActionResult>;
@@ -353,16 +165,6 @@ export type OpenDesignHostBridge = {
   shell: {
     openExternal(url: string): Promise<OpenDesignHostActionResult>;
     openPath(projectId: string): Promise<OpenDesignHostActionResult>;
-  };
-  updater: {
-    check(options?: OpenDesignHostUpdaterActionOptions): Promise<OpenDesignHostUpdaterStatusSnapshot>;
-    download(options?: OpenDesignHostUpdaterActionOptions): Promise<OpenDesignHostUpdaterStatusSnapshot>;
-    install(options?: OpenDesignHostUpdaterActionOptions): Promise<OpenDesignHostUpdaterStatusSnapshot>;
-    quit(options?: OpenDesignHostUpdaterActionOptions): Promise<OpenDesignHostActionResult>;
-    setMenuLabels(labels: OpenDesignHostUpdaterMenuLabels): Promise<OpenDesignHostActionResult>;
-    status(options?: OpenDesignHostUpdaterActionOptions): Promise<OpenDesignHostUpdaterStatusSnapshot>;
-    subscribe(listener: OpenDesignHostUpdaterStatusListener): () => void;
-    subscribeOpenDialog(listener: OpenDesignHostUpdaterOpenDialogListener): () => void;
   };
   version: typeof OPEN_DESIGN_HOST_VERSION;
 };

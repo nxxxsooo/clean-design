@@ -18,8 +18,6 @@ import {
   type DesktopRenderSlidesInput,
   type DesktopScreenshotInput,
   type DesktopStatusSnapshot,
-  type DesktopUpdateStatusSnapshot,
-  type DesktopUpdateInput,
   type RegisterDesktopAuthResult,
   type SyncCredentialsResult,
   type SetHandoffRootResult,
@@ -45,13 +43,6 @@ import { createDesktopRuntime, type DesktopRuntime } from "./runtime.js";
 import { setUpDesktopCrashReporter, writeDesktopGpuInfo } from "./crash-diagnostics.js";
 import { beginDesktopSession, endDesktopSessionCleanly, markDesktopSessionRunning } from "./session-lifecycle.js";
 import { attachDesktopProcessErrorFilter } from "./uncaught-exception.js";
-import {
-  type DesktopUpdateMenuLabels,
-} from "./update-menu.js";
-import {
-  createDisabledDesktopUpdater,
-  type DesktopUpdater,
-} from "./updater.js";
 import {
   exportDiagnosticsToFile,
   registerDesktopDiagnosticsIpc,
@@ -97,15 +88,10 @@ export {
 } from "./runtime.js";
 
 const TOOLS_DEV_PARENT_PID_ENV = SIDECAR_ENV.TOOLS_DEV_PARENT_PID;
-const AMR_PROFILE_ENV_KEY = "OPEN_DESIGN_AMR_PROFILE";
-const AMR_PROFILE_AGENT_ID = "amr";
-const AMR_ENVIRONMENT_PROFILES = ["prod", "test", "local"] as const;
 const APP_CONFIG_CHANGED_IPC_CHANNEL = "od:app-config-changed";
-type AmrEnvironmentProfile = (typeof AMR_ENVIRONMENT_PROFILES)[number];
 type DesktopAppConfigPrefs = {
   agentModels?: Record<string, { model?: string; reasoning?: string }>;
   agentCliEnv?: Record<string, Record<string, string>>;
-  allowSilentUpdates?: boolean;
   [key: string]: unknown;
 };
 
@@ -162,15 +148,6 @@ export type DesktopMainOptions = {
   /** Creation time of `splashWindow` (from `createSplashWindow().startedAt`), so
    * the runtime measures the minimum splash hold from when it actually appeared. */
   splashStartedAt?: number;
-  update?: {
-    currentVersion?: string | null;
-    downloadRoot?: string | null;
-    installerObservationRoot?: string | null;
-    launcherLaunchPath?: string | null;
-    launcherRoot?: string | null;
-    launcherPayloadExtractorPath?: string | null;
-    launcherRuntimePath?: string | null;
-  };
 };
 
 function isDirectEntry(): boolean {
@@ -238,74 +215,8 @@ function resolveDaemonBaseUrl(
   };
 }
 
-export function normalizeAmrEnvironmentProfile(profile: unknown): AmrEnvironmentProfile {
-  if (typeof profile !== "string") return "prod";
-  const trimmed = profile.trim();
-  return AMR_ENVIRONMENT_PROFILES.includes(trimmed as AmrEnvironmentProfile)
-    ? (trimmed as AmrEnvironmentProfile)
-    : "prod";
-}
-
-export function mergeAmrEnvironmentProfileConfig(
-  config: DesktopAppConfigPrefs,
-  profile: AmrEnvironmentProfile,
-): DesktopAppConfigPrefs {
-  if (!AMR_ENVIRONMENT_PROFILES.includes(profile)) {
-    throw new Error(`Unsupported AMR Environment Profile: ${String(profile)}`);
-  }
-  const currentProfile = normalizeAmrEnvironmentProfile(
-    config.agentCliEnv?.[AMR_PROFILE_AGENT_ID]?.[AMR_PROFILE_ENV_KEY],
-  );
-  const shouldClearAmrModel = currentProfile !== profile;
-  const hadAmrModel =
-    shouldClearAmrModel && Object.prototype.hasOwnProperty.call(config.agentModels ?? {}, AMR_PROFILE_AGENT_ID);
-  const nextAgentModels = { ...(config.agentModels ?? {}) };
-  if (shouldClearAmrModel) {
-    delete nextAgentModels[AMR_PROFILE_AGENT_ID];
-  }
-  return {
-    ...config,
-    ...(Object.keys(nextAgentModels).length > 0
-      ? { agentModels: nextAgentModels }
-      : hadAmrModel
-        ? { agentModels: {} }
-        : {}),
-    agentCliEnv: {
-      ...(config.agentCliEnv ?? {}),
-      [AMR_PROFILE_AGENT_ID]: {
-        ...(config.agentCliEnv?.[AMR_PROFILE_AGENT_ID] ?? {}),
-        [AMR_PROFILE_ENV_KEY]: profile,
-      },
-    },
-  };
-}
-
-export function createAmrEnvironmentProfileMenuItems(
-  selectedProfile: AmrEnvironmentProfile,
-  onSelect: (profile: AmrEnvironmentProfile) => void,
-): MenuItemConstructorOptions[] {
-  return [
-    {
-      label: "AMR Profile",
-      submenu: AMR_ENVIRONMENT_PROFILES.map((profile) => ({
-        label: profile,
-        type: "radio" as const,
-        checked: selectedProfile === profile,
-        click: () => onSelect(profile),
-      })),
-    },
-  ];
-}
-
-export function resolveAboutPanelVersion(options: DesktopMainOptions): string | null {
-  const version = options.update?.currentVersion?.trim();
-  return version == null || version.length === 0 ? null : version;
-}
-
-function configureAboutPanel(options: DesktopMainOptions): void {
-  const version = resolveAboutPanelVersion(options);
-  if (version == null) return;
-  app.setAboutPanelOptions({ version });
+function configureAboutPanel(): void {
+  app.setAboutPanelOptions({ version: app.getVersion() });
 }
 
 function appConfigUrl(baseUrl: string): string {
@@ -345,7 +256,6 @@ async function writeAppConfigToDaemon(
 
 type DesktopMenuController = {
   dispose(): void;
-  setUpdateLabels(labels: DesktopUpdateMenuLabels): void;
 };
 
 function installDesktopMenu(
@@ -453,7 +363,6 @@ function installDesktopMenu(
   rebuild();
   return {
     dispose() {},
-    setUpdateLabels(_labels) {},
   };
 }
 
@@ -612,7 +521,7 @@ export async function runDesktopMain(
   const osLocale = applyOsLocaleSwitch(app);
 
   await app.whenReady();
-  configureAboutPanel(options);
+  configureAboutPanel();
 
   // PR #974: mint a per-process auth secret and hand it to the daemon
   // BEFORE the BrowserWindow loads. The daemon uses it to verify the
@@ -660,20 +569,6 @@ export async function runDesktopMain(
     });
   }
 
-  const updater = createDisabledDesktopUpdater(
-    {
-      currentVersion: options.update?.currentVersion,
-      downloadRoot: options.update?.downloadRoot,
-      installerObservationRoot: options.update?.installerObservationRoot,
-      launcherLaunchPath: options.update?.launcherLaunchPath,
-      launcherRoot: options.update?.launcherRoot,
-      launcherPayloadExtractorPath: options.update?.launcherPayloadExtractorPath,
-      launcherRuntimePath: options.update?.launcherRuntimePath,
-      namespace: runtime.namespace,
-      runtimeBase: runtime.base,
-      source: runtime.source,
-    },
-  );
   // Resolve the namespace root the same way the daemon diagnostics export does
   // (apps/daemon/src/diagnostics-export.ts buildSidecarLogSources). In packaged
   // builds `runtime.base` is `<namespaceRoot>/runtime`, so re-appending the
@@ -720,34 +615,7 @@ export async function runDesktopMain(
   let ipcServer: JsonIpcServerHandle | null = null;
   let shuttingDown = false;
 
-  async function snapshotUpdateForStatus(): Promise<{
-    update: DesktopUpdateStatusSnapshot;
-    updateStatusError?: string;
-  }> {
-    const timeoutMs = 250;
-    let timeout: NodeJS.Timeout | null = null;
-    try {
-      const update = await Promise.race([
-        updater.status(),
-        new Promise<never>((_, reject) => {
-          timeout = setTimeout(() => {
-            reject(new Error(`desktop updater status timed out after ${timeoutMs}ms`));
-          }, timeoutMs);
-        }),
-      ]);
-      return { update };
-    } catch (error) {
-      return {
-        update: updater.snapshot(),
-        updateStatusError: error instanceof Error ? error.message : String(error),
-      };
-    } finally {
-      if (timeout != null) clearTimeout(timeout);
-    }
-  }
-
   async function desktopStatusSnapshot(activeDesktop: DesktopRuntime | null): Promise<DesktopStatusSnapshot> {
-    const update = await snapshotUpdateForStatus();
     if (activeDesktop == null) {
       return {
         pid: process.pid,
@@ -755,10 +623,9 @@ export async function runDesktopMain(
         updatedAt: new Date().toISOString(),
         url: null,
         windowVisible: false,
-        ...update,
       };
     }
-    return { ...activeDesktop.status(), ...update };
+    return activeDesktop.status();
   }
 
   async function shutdown(): Promise<void> {
@@ -824,8 +691,6 @@ export async function runDesktopMain(
             return await activeDesktop.renderSlides(request.input as DesktopRenderSlidesInput);
           case SIDECAR_MESSAGES.EXPORT_ARTIFACT:
             return await activeDesktop.exportArtifact(request.input as DesktopExportArtifactInput);
-          case SIDECAR_MESSAGES.UPDATE:
-            return await updater.handle((request.input as DesktopUpdateInput).action);
         }
       } catch (error) {
         console.error("[open-design desktop] desktop IPC request failed", {
@@ -875,11 +740,9 @@ export async function runDesktopMain(
     // fires, a crash is still a startup failure (covered by
     // packaged_runtime_failed), not a runtime abnormal exit.
     onRevealed: () => markDesktopSessionRunning({ stateFilePath: sessionStatePath }),
-    onUpdateMenuLabels: menuController.setUpdateLabels,
     requestQuit: shutdownAndExit,
     splashWindow: options.splashWindow,
     splashStartedAt: options.splashStartedAt,
-    updater,
     windowTitle: options.windowTitle,
   });
   console.info("[open-design desktop] desktop runtime created");
