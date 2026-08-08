@@ -28,7 +28,6 @@ const OFFICIAL_PRESET_DOMAINS: Record<string, string> = {
   clickhouse: 'clickhouse.com',
   cohere: 'cohere.com',
   coinbase: 'coinbase.com',
-  composio: 'composio.dev',
   cursor: 'cursor.com',
   discord: 'discord.com',
   duolingo: 'duolingo.com',

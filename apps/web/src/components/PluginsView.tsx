@@ -50,7 +50,7 @@ import type { PluginUseAction } from './plugins-home/useActions';
 import { AnimatePresence } from 'motion/react';
 import { navigate } from '../router';
 
-type PluginsTab = 'installed' | 'available' | 'sources' | 'team';
+type PluginsTab = 'installed' | 'available' | 'sources';
 
 const USER_SOURCE_KINDS = new Set<PluginSourceKind>([
   'user',
@@ -67,7 +67,6 @@ const PLUGINS_TABS: ReadonlyArray<{
   { id: 'installed' },
   { id: 'available' },
   { id: 'sources' },
-  { id: 'team' },
 ];
 
 const PLUGIN_SHARE_DETAILS: Record<PluginShareAction, {
@@ -565,8 +564,6 @@ export function PluginsView({
             t={t}
           />
         ) : null}
-
-        {activeTab === 'team' ? <TeamPanel t={t} /> : null}
       </div>
 
       <AnimatePresence>
@@ -798,7 +795,6 @@ function pluginTabLabel(id: PluginsTab, t: ReturnType<typeof useI18n>['t']): str
     case 'installed': return t('pluginsView.tab.installed');
     case 'available': return t('pluginsView.tab.available');
     case 'sources': return t('pluginsView.tab.sources');
-    case 'team': return t('pluginsView.tab.team');
   }
 }
 
@@ -807,7 +803,6 @@ function pluginTabHint(id: PluginsTab, t: ReturnType<typeof useI18n>['t']): stri
     case 'installed': return t('pluginsView.tabHint.installed');
     case 'available': return t('pluginsView.tabHint.available');
     case 'sources': return t('pluginsView.tabHint.sources');
-    case 'team': return t('pluginsView.tabHint.team');
   }
 }
 
@@ -2079,21 +2074,4 @@ function pluginLookupKeys(plugin: InstalledPluginRecord): string[] {
 
 function normalizePluginName(name: string): string {
   return name.trim().toLowerCase();
-}
-
-function TeamPanel({ t }: { t: ReturnType<typeof useI18n>['t'] }) {
-  return (
-    <section className="plugins-view__team" aria-labelledby="plugins-team-title">
-      <span className="plugins-view__future-icon" aria-hidden>
-        <Icon name="sparkles" size={18} />
-      </span>
-      <div>
-        <p className="plugins-view__kicker">{t('tasks.comingSoon')}</p>
-        <h2 id="plugins-team-title">{t('pluginsView.teamTitle')}</h2>
-        <p>
-          {t('pluginsView.teamBody')}
-        </p>
-      </div>
-    </section>
-  );
 }

@@ -14,12 +14,10 @@ export type EntryHomeView =
   | 'home'
   | 'onboarding'
   | 'projects'
-  | 'tasks'
   | 'plugins'
   | 'design-systems'
   | 'library'
-  | 'brands'
-  | 'integrations';
+  | 'brands';
 
 export type Route =
   | {
@@ -111,9 +109,6 @@ export function parseRoute(pathname: string): Route {
   if (LIBRARY_UI_VISIBLE && parts[0] === 'library' && !parts[1]) {
     return { kind: 'home', view: 'library' };
   }
-  if (parts[0] === 'integrations') {
-    return { kind: 'home', view: 'home' };
-  }
   if (parts[0] === 'marketplace' || parts[0] === 'plugins') {
     return { kind: 'home', view: 'home' };
   }
@@ -124,14 +119,12 @@ export function buildPath(route: Route): string {
   if (route.kind === 'home') {
     if (route.view === 'onboarding') return '/';
     if (route.view === 'projects') return '/projects';
-    if (route.view === 'tasks') return '/';
     if (route.view === 'plugins') return '/';
     if (route.view === 'design-systems') return '/design-systems';
     if (route.view === 'library') return LIBRARY_UI_VISIBLE ? '/library' : '/';
     if (route.view === 'brands') {
       return route.brandId ? `/brands/${encodeURIComponent(route.brandId)}` : '/brands';
     }
-    if (route.view === 'integrations') return '/';
     return '/';
   }
   if (route.kind === 'marketplace' || route.kind === 'marketplace-detail') return '/';

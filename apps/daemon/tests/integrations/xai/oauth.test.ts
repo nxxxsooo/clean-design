@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
-import { PendingAuthCache } from '../../../src/mcp-oauth.js';
+import { PendingAuthCache } from '../../../src/provider-oauth.js';
 import {
   XAI_OAUTH_AUTHORIZATION_ENDPOINT,
   XAI_OAUTH_CLIENT_ID,
@@ -56,17 +56,17 @@ describe('beginXAIAuth', () => {
     }
   });
 
-  it('puts a pending state keyed by `state` whose serverId is "xai"', () => {
+  it('puts a pending state keyed by `state` whose providerId is "xai"', () => {
     const pending = new PendingAuthCache();
     try {
       const { state } = beginXAIAuth({ pending });
       expect(pending.size()).toBe(1);
 
       // We don't expose the inner state, but consume() should yield a
-      // record with the right serverId and a non-empty verifier.
+      // record with the right providerId and a non-empty verifier.
       const consumed = pending.consume(state);
       expect(consumed).not.toBeNull();
-      expect(consumed!.serverId).toBe(XAI_PROVIDER_ID);
+      expect(consumed!.providerId).toBe(XAI_PROVIDER_ID);
       expect(consumed!.codeVerifier.length).toBeGreaterThanOrEqual(43);
       expect(consumed!.tokenEndpoint).toBe(XAI_OAUTH_TOKEN_ENDPOINT);
     } finally {
@@ -196,13 +196,12 @@ describe('completeXAIAuth', () => {
     }
   });
 
-  it('rejects state issued for a different serverId', async () => {
+  it('rejects state issued for a different providerId', async () => {
     const pending = new PendingAuthCache();
     try {
       // Hand-craft a pending entry as if some other provider had stashed it.
       pending.put('foreign-state', {
-        serverId: 'some-other-provider',
-        authServerIssuer: 'https://example.test',
+        providerId: 'some-other-provider',
         tokenEndpoint: 'https://example.test/token',
         clientId: 'x',
         redirectUri: 'http://localhost/cb',
@@ -215,7 +214,7 @@ describe('completeXAIAuth', () => {
           state: 'foreign-state',
           code: 'c',
         }),
-      ).rejects.toThrow(/serverId/i);
+      ).rejects.toThrow(/providerId/i);
     } finally {
       pending.stop();
     }

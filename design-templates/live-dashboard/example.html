@@ -124,7 +124,7 @@
     animation: pulse 1.8s infinite;
   }
   .pill-live.stale .dot { background: #e6a23c; animation: none; }
-  /* "Sample data" — no real connector is bound. Stays grey and static
+  /* "Sample data" — no real source is bound. Stays grey and static
      so the artifact does not claim a live data source it does not have. */
   .pill-live.sample {
     background: var(--bg-soft); color: var(--ink-3);
@@ -146,7 +146,7 @@
     align-self: center;
   }
   .page-cover {
-    height: 24px; /* keep airy like Notion default */
+    height: 24px; /* keep airy like Workspace default */
   }
   .page-emoji {
     font-size: 64px; line-height: 1;
@@ -411,7 +411,7 @@
 
     <div class="side-section">Connections</div>
     <div class="nav">
-      <div class="nav-item" role="button" tabindex="0"><span class="nav-icon">🔌</span><span>Notion · acme.so</span></div>
+      <div class="nav-item" role="button" tabindex="0"><span class="nav-icon">🔌</span><span>Workspace · acme.so</span></div>
     </div>
   </aside>
 
@@ -425,7 +425,7 @@
         <span>Team Dashboard</span>
       </div>
       <div class="topbar-spacer"></div>
-      <div class="pill-live sample" id="livePill" title="No connector bound — values below are seeded sample data">
+      <div class="pill-live sample" id="livePill" title="No source bound — values below are seeded sample data">
         <span class="dot"></span>
         <span id="liveText">Sample data</span>
       </div>
@@ -446,9 +446,9 @@
         <button class="btn ghost" id="autoBtn" title="Auto refresh every 30s">
           <span>⏱</span><span id="autoLbl">Auto · on</span>
         </button>
-        <button class="btn primary" id="refreshBtn" title="Pull latest from Notion (sample mode — refreshes seeded data)">
+        <button class="btn primary" id="refreshBtn" title="Pull latest from Workspace (sample mode — refreshes seeded data)">
           <span class="ico" id="refreshIco">↻</span>
-          <span>Refresh from Notion</span>
+          <span>Refresh from Workspace</span>
         </button>
       </div>
 
@@ -456,12 +456,10 @@
         <div class="emj">💡</div>
         <div>
           <div><strong>This page is a Live Artifact running on sample data.</strong>
-          The shape mirrors what the <strong>Acme Studio</strong> Notion workspace
-          would return through the Composio connector — but the numbers, names,
-          tasks and activity below are seeded fixtures, not a real workspace.</div>
-          <small>When a connector is bound, the pill switches to <em>Live · synced</em>
-          and the same renderer paints real data. Until then, refreshes only
-          tween the seeded fixture so the live behaviors stay demo-able offline.</small>
+          The shape mirrors an <strong>Acme Studio</strong> project snapshot, but the
+          numbers, names, tasks, and activity below are seeded fixtures.</div>
+          <small>Load a local <code>data.json</code> snapshot to render approved data.
+          Until then, refreshes only tween the fixture so the behavior stays testable offline.</small>
         </div>
       </div>
 
@@ -514,7 +512,7 @@
         <div class="card">
           <div class="card-title">
             <strong>Recent activity</strong>
-            <span>From <span style="color:var(--accent-ink)">Notion</span></span>
+            <span>From <span style="color:var(--accent-ink)">Workspace</span></span>
           </div>
           <div class="feed" id="feed"></div>
         </div>
@@ -537,9 +535,9 @@
       </div>
 
       <div class="footer">
-        <span>Source: Notion API · workspace <strong>acme.so</strong></span>
+        <span>Source: Sample data · workspace <strong>Acme Studio</strong></span>
         <span>·</span>
-        <span>Connector <span class="key">composio.notion</span></span>
+        <span>Mode <span class="key">sample</span></span>
         <span>·</span>
         <span id="footerTime"></span>
       </div>
@@ -548,7 +546,7 @@
   </main>
 </div>
 
-<div class="toast" id="toast">Synced — 3 changes from Notion</div>
+<div class="toast" id="toast">Synced — 3 changes from Workspace</div>
 
 <script>
 (function(){
@@ -568,7 +566,7 @@
     { icon: "🐛", title: "Fix mobile nav overflow on iOS", status: "blocked",  who: "MK", due: "May 09", prio: "High" },
     { icon: "📊", title: "Pricing experiment readout",   status: "todo",     who: "DT", due: "May 18", prio: "Low"  },
     { icon: "✍️", title: "Launch blog draft · Live Artifacts", status: "progress", who: "AN", due: "May 11", prio: "High" },
-    { icon: "🔐", title: "Rotate Notion integration token", status: "todo", who: "RJ", due: "May 20", prio: "Med"  },
+    { icon: "🔐", title: "Rotate Workspace integration token", status: "todo", who: "RJ", due: "May 20", prio: "Med"  },
     { icon: "🧪", title: "QA onboarding flow regressions", status: "review",  who: "MK", due: "May 16", prio: "Med"  },
     { icon: "🎨", title: "Refresh marketing OG images",   status: "progress", who: "LZ", due: "May 13", prio: "Low"  }
   ];
@@ -612,7 +610,7 @@
   // ---------- Helpers ----------
   // Every dynamic value rendered into innerHTML below goes through e():
   // task titles / activity strings / person names can come from a
-  // connector payload, and unescaped innerHTML is a working XSS sink.
+  // source payload, and unescaped innerHTML is a working XSS sink.
   function e(v) {
     return String(v == null ? "" : v)
       .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
@@ -681,7 +679,7 @@
       tweenText($("kDone"),   prev.done,   kpi.done);    if (prev.done   !== kpi.done)   flash($("kDone"));
       tweenText($("kReview"), prev.review, kpi.review);  if (prev.review !== kpi.review) flash($("kReview"));
       // people render keeps html — numeric values are safe but pass them
-      // through e() anyway so connector-driven payloads can flow through
+      // through e() anyway so source-driven payloads can flow through
       // this same path without revisiting the markup.
       $("kPeople").innerHTML = e(kpi.people) + `<span style="color:var(--ink-3); font-size:18px; font-weight:500"> / ${e(kpi.peopleAll)}</span>`;
       if (prev.people !== kpi.people) flash($("kPeople"));
@@ -805,7 +803,7 @@
     livePill.classList.remove("stale");
     liveText.textContent = "Syncing…";
 
-    // Simulate latency to a Notion API call.
+    // Simulate latency to a Workspace API call.
     await new Promise(r => setTimeout(r, 700 + Math.random() * 600));
 
     const prev = {...kpi};
@@ -859,7 +857,7 @@
     busy = false;
     refreshIco.classList.remove("spin");
     // Only mock-mode here — keep the "Sample data" badge so the artifact
-    // never falsely claims a real connector is bound.
+    // never falsely claims a real source is bound.
     liveText.textContent = "Sample data";
     livePill.classList.remove("stale");
     livePill.classList.add("sample");
@@ -883,7 +881,7 @@
   function updateTimes() {
     updatedAt.textContent = "Last refreshed " + timeAgo(lastRefresh);
     footerTime.textContent = "Last sync · " + fmtDateTime(lastRefresh);
-    // Sample mode (no connector bound) is sticky — the artifact never
+    // Sample mode (no source bound) is sticky — the artifact never
     // claims "Live · synced" against fixture data. The pill only escalates
     // to "Stale · …" if even the sample-refresh loop has not run for a
     // while (e.g. the auto-refresh was paused).

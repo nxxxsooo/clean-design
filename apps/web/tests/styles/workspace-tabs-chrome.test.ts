@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 const shellCss = readFileSync(new URL('../../src/styles/shell.css', import.meta.url), 'utf8');
 const routinesCss = readFileSync(new URL('../../src/styles/viewer/routines.css', import.meta.url), 'utf8');
-const composioCss = readFileSync(new URL('../../src/styles/viewer/composio.css', import.meta.url), 'utf8');
+const workspaceExtrasCss = readFileSync(new URL('../../src/styles/viewer/workspace-extras.css', import.meta.url), 'utf8');
 const entryLayoutCss = readFileSync(new URL('../../src/styles/home/entry-layout.css', import.meta.url), 'utf8');
 
 function cssDeclarations(css: string, selector: string): string {
@@ -290,7 +290,7 @@ describe('workspace tabs chrome styles', () => {
     const main = cssDeclarations(routinesCss, '.workspace-shell .workspace-tab__main');
     const popover = cssDeclarations(shellCss, '.workspace-tabs-popover');
     const preview = cssDeclarations(shellCss, '.workspace-tab-preview');
-    const presentOverlay = cssDeclarations(composioCss, '.present-overlay');
+    const presentOverlay = cssDeclarations(workspaceExtrasCss, '.present-overlay');
     const projectChrome = cssDeclarations(
       routinesCss,
       '.workspace-shell .workspace-tabs-chrome.app-chrome-header',

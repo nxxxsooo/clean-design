@@ -1,7 +1,7 @@
 ---
 name: live-artifact
 description: |
-  Create refreshable, auditable Open Design artifacts backed by connector or local data.
+  Create refreshable, auditable Clean Design artifacts backed by local data.
   Trigger when the user asks for live dashboards, refreshable reports, synced views, or reusable data-backed artifacts.
 triggers:
   - "live artifact"
@@ -35,7 +35,7 @@ od:
 
 # Live Artifact Skill
 
-Create an Open Design live artifact: a project-scoped, previewable HTML artifact whose data can later be refreshed without redesigning the presentation.
+Create a Clean Design live artifact: a project-scoped, previewable HTML artifact whose local data can later be refreshed without redesigning the presentation.
 
 ## Resource map
 
@@ -44,8 +44,7 @@ live-artifact/
 ├── SKILL.md
 └── references/
     ├── artifact-schema.md      ← `references/artifact-schema.md`: artifact files, DTO shape, template binding rules
-    ├── connector-policy.md     ← `references/connector-policy.md`: connector safety, redaction, credential boundaries
-    └── refresh-contract.md     ← `references/refresh-contract.md`: source metadata, refresh execution, snapshots
+    └── refresh-contract.md     ← `references/refresh-contract.md`: local source metadata, refresh execution, snapshots
 ```
 
 ## Current status
@@ -54,24 +53,21 @@ Use the references in this directory as the source of truth for the live artifac
 
 ## When to use this skill
 
-Use this skill when the user asks for a data-backed view that should remain useful after the first render, for example a live dashboard, refreshable report, synced status page, auditable data view, or artifact that can later be refreshed from local/project data or connectors.
+Use this skill when the user asks for a data-backed view that should remain useful after the first render, for example a live dashboard, refreshable report, synced status page, auditable data view, or artifact that can later be refreshed from local or project data.
 
 Before creating files, decide whether the user actually wants a live artifact or a normal static artifact:
 
-- Use a live artifact when the user mentions refresh, sync, recurring updates, connector-backed data, source/provenance tracking, dashboards, reports, or reusable data-backed views.
+- Use a live artifact when the user mentions refresh, sync, recurring updates, local data, source/provenance tracking, dashboards, reports, or reusable data-backed views.
 - Use a normal static artifact when the user only wants a one-off HTML/mockup/image/file and does not need refresh, source metadata, or data/provenance panels.
 - If the intent is ambiguous, ask one short question: “Should this be refreshable/live, or just a static artifact?”
 
 ## Workflow
 
-1. **Resolve scope and data source without blocking on connected connectors**
+1. **Resolve scope and local data source**
    - Identify the preview goal, audience, data freshness expectations, and whether refresh should be possible later.
-   - If the user explicitly names a connector/source such as Notion, GitHub, Slack, or Google Drive, do not ask “where should the data come from?” before checking daemon connector tools.
-   - Prefer local/project sources or daemon connector tools when available.
-   - Do not call provider APIs directly when a daemon connector/wrapper exists.
-   - If connector data is needed, first list connectors with `"$OD_NODE_BIN" "$OD_BIN" tools connectors list --format compact`. If the named connector is present with `status: "connected"`, choose an appropriate read-only `auto` tool from its catalog and execute it through the connector wrapper.
-   - For Notion specifically, a connected `notion` connector plus a user brief that names Notion is enough to start with `notion.notion_search` using a query derived from the requested artifact/topic. Use `notion.notion_fetch_database` only when the user supplied a database id or the search result clearly identifies one.
-   - Ask the user a data-source question only when no matching connected connector exists, multiple connected candidates fit equally well, or the requested artifact has no usable topic/query to search for. If you must ask, be specific: ask for the page/database/topic or permission to search broadly, not “where is the Notion data source?”
+   - Prefer project files, explicitly linked local files, or an authenticated daemon tool the user invoked.
+   - Do not call arbitrary provider APIs or infer access to account data.
+   - Ask one specific question when no usable local source is available.
 
 2. **Author the source files**
    - Write `template.html` as the human-designed HTML template. The daemon hydrates it with `data.json` using the `html_template_v1` binding contract — stay inside it or hydration fails and the raw template ships with visible `{{…}}` tokens:
@@ -80,7 +76,7 @@ Before creating files, decide whether the user actually wants a live artifact or
      - Do NOT hand-loop in a `<script>` (scripts are stripped from previews), and do NOT reference a bare loop variable like `{{metric.value}}` without a matching `data-od-repeat` scope — that binding is unresolvable. Nested repeats, conditionals, filters, helpers, and raw/triple-brace interpolation are unsupported.
    - Write `data.json` as the canonical preview data used by those bindings — real values, not placeholders.
    - Write `artifact.json` with the live artifact metadata, preview declaration, document declaration, and safe source descriptors.
-   - Write `provenance.json` with concise source notes, timestamps, non-sensitive connector references, and transformation notes.
+   - Write `provenance.json` with concise local source notes, timestamps, and transformation notes.
    - Do not author `index.html` as source. The daemon derives `index.html` from `template.html` and `data.json`.
 
 3. **Keep data compact and preview-oriented**
@@ -106,24 +102,7 @@ Before creating files, decide whether the user actually wants a live artifact or
    - Do not include or invent `projectId`; the daemon derives project/run scope from the token.
    - Use raw HTTP only for daemon development/debugging when explicitly requested.
 
-6. **Use connector wrappers for connector data**
-   - Discover available connectors and tools:
-
-     ```bash
-     "$OD_NODE_BIN" "$OD_BIN" tools connectors list --format compact
-     ```
-
-   - Execute a read-only connector tool with a JSON object input file:
-
-     ```bash
-     "$OD_NODE_BIN" "$OD_BIN" tools connectors execute --connector "$CONNECTOR_ID" --tool "$TOOL_NAME" --input input.json
-     ```
-
-   - Persist only the compact normalized fields needed by the preview plus non-sensitive connector references (`connectorId`, `toolName`, `accountLabel`). Never persist connector credentials, transport metadata, or raw provider output.
-   - Do not ask for connector secrets or duplicate setup. If `status` is `connected`, use the listed tools; if it is not connected, tell the user to connect it in the UI.
-   - See `references/connector-policy.md` for listing/execution and credential boundaries, and `references/refresh-contract.md` for read-only refresh source metadata.
-
-7. **Report concise results**
+6. **Report concise results**
    - On success, return the artifact ID/title and note that `index.html` is daemon-derived.
    - On validation failure, fix the source files and retry through the wrapper. Do not bypass validation.
 

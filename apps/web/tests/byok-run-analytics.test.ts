@@ -52,7 +52,6 @@ describe('buildByokRunCreatedProps', () => {
       design_system_source: 'not_applicable',
       agent_provider_id: 'anthropic',
       model_id: 'claude-opus-4-8',
-      mcp_id: null,
       token_count_source: 'unknown',
       session_mode: 'design',
     });

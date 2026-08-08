@@ -13,7 +13,7 @@ describe('SettingsDialog media providers', () => {
     vi.useRealTimers();
   });
 
-  it('shows saved masked media provider keys like Composio does', () => {
+  it('shows saved masked media provider keys', () => {
     renderDialog({
       ...DEFAULT_CONFIG,
       mediaProviders: {
@@ -26,9 +26,9 @@ describe('SettingsDialog media providers', () => {
       },
     });
 
-    expect(screen.getByText('Saved · ••••1234')).toBeTruthy();
+    expect(screen.getByText('Configured · ••••1234')).toBeTruthy();
     expect(screen.getByLabelText('OpenAI API key').getAttribute('placeholder')).toBe(
-      'Paste a new key to replace the saved one',
+      'Paste API key',
     );
   });
 
@@ -74,7 +74,7 @@ describe('SettingsDialog media providers', () => {
 
     await waitFor(() => {
       expect(reloadMock).toHaveBeenCalledTimes(1);
-      expect(screen.getByText('Saved · ••••9876')).toBeTruthy();
+      expect(screen.getByText('Configured · ••••9876')).toBeTruthy();
       expect(screen.getByText('Reloaded media provider settings from the local daemon.')).toBeTruthy();
     });
 
@@ -200,7 +200,7 @@ describe('SettingsDialog media providers', () => {
       'https://daemon.example/v1',
     );
     expect((screen.getByLabelText('OpenAI API key') as HTMLInputElement).value).toBe('');
-    expect(screen.getByText('Saved · ••••9876')).toBeTruthy();
+    expect(screen.getByText('Configured · ••••9876')).toBeTruthy();
     // Fal.ai is a non-integrated (coming-soon) provider and no longer has
     // editable input fields in the UI; its config is preserved in state via
     // mergeDaemonMediaProviders (covered by state/config.test.ts).
@@ -350,7 +350,7 @@ describe('SettingsDialog media providers', () => {
     expect((screen.getByLabelText('OpenAI Base URL') as HTMLInputElement).value).toBe(
       'https://daemon.example/v1',
     );
-    expect(screen.getByText('Saved · ••••9876')).toBeTruthy();
+    expect(screen.getByText('Configured · ••••9876')).toBeTruthy();
   });
 
   it('keeps newer pending provider edits during reload when an older media autosave resolves', async () => {
@@ -495,9 +495,9 @@ describe('SettingsDialog media providers', () => {
     const row = screen.getByText('Nano Banana').closest('.media-provider-row') as HTMLElement | null;
     if (!row) throw new Error('Expected Nano Banana media provider row');
 
-    expect(screen.getByText('Saved · ••••5555')).toBeTruthy();
+    expect(screen.getByText('Configured · ••••5555')).toBeTruthy();
     expect(screen.getByLabelText('Nano Banana API key').getAttribute('placeholder')).toBe(
-      'Paste a new key to replace the saved one',
+      'Paste API key',
     );
 
     fireEvent.click(within(row).getByRole('button', { name: 'Clear' }));

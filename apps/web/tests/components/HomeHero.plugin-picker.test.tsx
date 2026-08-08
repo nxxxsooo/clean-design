@@ -6,7 +6,6 @@ import { KEY_ENTER_COMMAND } from 'lexical';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   InstalledPluginRecord,
-  McpServerConfig,
   PluginSourceKind,
   SkillSummary,
   TrustTier,
@@ -64,16 +63,6 @@ function makeSkill(id: string, name: string): SkillSummary {
     hasBody: true,
     examplePrompt: `Use ${name}`,
     aggregatesExamples: false,
-  };
-}
-
-function makeMcp(id: string, label: string): McpServerConfig {
-  return {
-    id,
-    label,
-    transport: 'stdio',
-    enabled: true,
-    command: 'npx',
   };
 }
 

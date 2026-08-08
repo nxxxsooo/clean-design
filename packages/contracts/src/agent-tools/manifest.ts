@@ -23,8 +23,7 @@ export interface AgentToolManifest {
 
 /**
  * A progressive-discovery query over the registry — the answer to "too many
- * tools." Mirrors the Composio `listToolsPage({ limit, cursor })` paged idiom so
- * an agent fetches relevant tools just-in-time instead of receiving the full
+ * tools." A paged query lets an agent fetch relevant tools just-in-time instead of receiving the full
  * list. All fields optional: an empty query pages the whole registry.
  */
 export interface AgentToolSearchQuery {

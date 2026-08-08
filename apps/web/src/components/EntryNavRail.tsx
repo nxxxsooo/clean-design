@@ -2,8 +2,7 @@
 //
 // Renders a narrow icon-only column. The first slot is the brand logo,
 // followed by the primary destinations users expect to keep in reach:
-// New project, home, projects, brand kit, automations, plugins,
-// and integrations. Footer controls are reserved for lower-frequency
+// New project, home, projects, and brand kit. Footer controls are reserved for lower-frequency
 // support affordances such as the help launcher.
 // Language switching and other account-scoped controls live behind the
 // floating settings cog in the top-right corner of the main content.
@@ -18,12 +17,10 @@ export type EntryView =
   | 'home'
   | 'onboarding'
   | 'projects'
-  | 'tasks'
   | 'plugins'
   | 'design-systems'
   | 'library'
-  | 'brands'
-  | 'integrations';
+  | 'brands';
 
 interface Props {
   view: EntryView;

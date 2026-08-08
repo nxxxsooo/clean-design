@@ -3,7 +3,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises
 import os from 'node:os';
 import path from 'node:path';
 
-import { auditDesignSystemPackage, runConnectorsToolCli } from '../src/tools-connectors-cli.js';
+import { auditDesignSystemPackage, runDesignToolCli } from '../src/tools-design-cli.js';
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -453,12 +453,11 @@ function auditUiKitComponent(componentName: string): string {
   return baseName === 'App' ? auditAppComponent() : auditComponent(baseName);
 }
 
-describe('connectors tool CLI', () => {
+describe('design tool CLI', () => {
   let stdoutWrite: { mockRestore: () => void };
   let stderrWrite: { mockRestore: () => void };
   let stdoutOutput: string[];
   let stderrOutput: string[];
-  let fetchMock: ReturnType<typeof vi.fn>;
   let cwd: string;
 
   beforeEach(() => {
@@ -474,8 +473,6 @@ describe('connectors tool CLI', () => {
       stderrOutput.push(String(chunk));
       return true;
     });
-    fetchMock = vi.fn(async () => new Response(JSON.stringify({ connectors: [] }), { headers: { 'Content-Type': 'application/json' }, status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
   });
 
   afterEach(() => {
@@ -536,7 +533,7 @@ exit 128
     await writeFile(path.join(sourceDir, 'build/logo.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     await writeFile(path.join(tmpDir, 'build/icon.png'), Buffer.from('existing-icon'));
 
-    const result = await runConnectorsToolCli([
+    const result = await runDesignToolCli([
       'local-design-context',
       '--path',
       sourceDir,
@@ -619,7 +616,7 @@ exit 128
     await writeSource('src/renderer/src/pages/settings/AgentSettings/components/AdvancedSettings.tsx');
     await writeSource('src/renderer/src/pages/home/Messages/__tests__/MessageGroup.test.tsx');
 
-    const result = await runConnectorsToolCli([
+    const result = await runDesignToolCli([
       'local-design-context',
       '--path',
       sourceDir,
@@ -726,7 +723,7 @@ exit 128
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/pages/home/Chat.tsx'), 'export function Chat(){ return <main><InputBar /><Messages /></main>; }');
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/build/icon.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join(''))).toMatchObject({
@@ -793,7 +790,7 @@ exit 128
     ].join('\n'));
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/components/Button.tsx'), 'export function Button(){ return <button />; }');
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
@@ -828,7 +825,7 @@ exit 128
     }
     await writeFile(path.join(tmpDir, 'ui_kits/app/index.html'), auditUiKitIndex());
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
@@ -870,7 +867,7 @@ exit 128
       );
     }
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -912,7 +909,7 @@ exit 128
       );
     }
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -954,7 +951,7 @@ exit 128
       );
     }
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     const warnings = JSON.parse(stdoutOutput.join('')).warnings ?? [];
@@ -994,7 +991,7 @@ exit 128
       );
     }
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -1036,7 +1033,7 @@ exit 128
       );
     }
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -1078,7 +1075,7 @@ exit 128
       );
     }
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -1123,7 +1120,7 @@ exit 128
       );
     }
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -1180,7 +1177,7 @@ exit 128
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/build/icon.ico'), Buffer.from([0x00, 0x00, 0x01, 0x00]));
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/build/tray_icon.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -1240,7 +1237,7 @@ exit 128
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/build/icon.png'), Buffer.from('source-icon'));
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/build/tray_icon.png'), Buffer.from('source-tray'));
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -1302,7 +1299,7 @@ exit 128
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/build/icon.png'), sourceIcon);
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/build/tray_icon.png'), sourceTray);
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).not.toEqual(expect.arrayContaining([
@@ -1346,7 +1343,7 @@ exit 128
     await writeFile(path.join(tmpDir, 'assets/logo.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     await writeFile(path.join(tmpDir, 'build/icon.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -1399,7 +1396,7 @@ exit 128
     ].join('\n'));
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/components/Button.tsx'), 'export function Button(){ return <button />; }');
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
@@ -1448,7 +1445,7 @@ exit 128
     ].join('\n'));
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/components/Button.tsx'), 'export function Button(){ return <button />; }');
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
@@ -1506,7 +1503,7 @@ exit 128
     ].join('\n'));
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/components/Button.tsx'), 'export function Button(){ return <button />; }');
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
@@ -1568,7 +1565,7 @@ exit 128
     ].join('\n'));
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/pages/home/Chat.tsx'), 'export function Chat(){ return <main><InputBar /><Messages /></main>; }');
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
@@ -1622,7 +1619,7 @@ exit 128
     ].join('\n'));
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/pages/home/Chat.tsx'), 'export function Chat(){ return <main><InputBar /><Messages /></main>; }');
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
@@ -1679,7 +1676,7 @@ exit 128
     ].join('\n'));
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/pages/home/Chat.tsx'), 'export function Chat(){ return <main><InputBar /><Messages /></main>; }');
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
@@ -1732,7 +1729,7 @@ exit 128
     ].join('\n'));
     await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/pages/home/Chat.tsx'), 'export function Chat(){ return <main><InputBar /><Messages /></main>; }');
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
@@ -1802,7 +1799,7 @@ exit 128
       '- src/assets/fonts/ubuntu/Ubuntu-Bold.ttf -> `context/local-code/cherry/files/src/assets/fonts/ubuntu/Ubuntu-Bold.ttf` (binary asset)',
     ].join('\n'));
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
@@ -1854,7 +1851,7 @@ exit 128
       '- fonts/ubuntu/Ubuntu-Regular.ttf -> `context/local-code/cherry/files/fonts/ubuntu/Ubuntu-Regular.ttf` (binary asset)',
     ].join('\n'));
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
@@ -1914,7 +1911,7 @@ exit 128
       await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/components', `${componentName}.tsx`), `export function ${componentName}(){ return null; }`);
     }
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -1926,7 +1923,7 @@ exit 128
     ]));
 
     stdoutOutput = [];
-    const strictResult = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir, '--fail-on-warnings']);
+    const strictResult = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir, '--fail-on-warnings']);
 
     expect(strictResult.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join(''))).toMatchObject({
@@ -1987,7 +1984,7 @@ exit 128
       await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/components', `${componentName}.tsx`), `export function ${componentName}(){ return null; }`);
     }
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -2048,7 +2045,7 @@ exit 128
       await writeFile(path.join(tmpDir, 'context/local-code/cherry/files/src/components', `${componentName}.tsx`), `export function ${componentName}(){ return null; }`);
     }
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -2113,7 +2110,7 @@ exit 128
       await writeFile(path.join(tmpDir, 'source_examples', `${componentName}.tsx`), `export function ${componentName}(){ return null; }\n`);
     }
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join('')).warnings).toEqual(expect.arrayContaining([
@@ -2149,7 +2146,7 @@ exit 128
       '- /tmp/acme-ui',
     ].join('\n'));
 
-    const result = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const result = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
 
     expect(result.exitCode).toBe(1);
     const output = JSON.parse(stdoutOutput.join(''));
@@ -2199,14 +2196,14 @@ exit 128
     await writeFile(path.join(tmpDir, 'assets/logo.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     await writeFile(path.join(tmpDir, 'fonts/ubuntu/Ubuntu-Regular.ttf'), Buffer.from('font-data'));
 
-    const strict = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir]);
+    const strict = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir]);
     expect(strict.exitCode).toBe(1);
     expect(JSON.parse(stdoutOutput.join('')).errors).toEqual(expect.arrayContaining([
       expect.objectContaining({ code: 'missing_required_file', path: 'DESIGN.md' }),
     ]));
 
     stdoutOutput = [];
-    const reference = await runConnectorsToolCli(['design-system-package-audit', '--path', tmpDir, '--reference-package']);
+    const reference = await runDesignToolCli(['design-system-package-audit', '--path', tmpDir, '--reference-package']);
     expect(reference.exitCode).toBe(0);
     expect(JSON.parse(stdoutOutput.join(''))).toMatchObject({
       ok: true,
@@ -2219,8 +2216,8 @@ exit 128
     await cleanupTempDir(tmpDir);
   });
 
-  it('uses shallow local git clone before connector-backed intake', async () => {
-    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-connectors-cli-'));
+  it('uses a shallow local git clone for repository intake', async () => {
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'clean-design-tools-cli-'));
     process.chdir(tmpDir);
     process.env.OD_DAEMON_URL = 'http://127.0.0.1:7456';
     process.env.OD_TOOL_TOKEN = 'agent-run-token';
@@ -2263,50 +2260,7 @@ printf 'font-data' > "$last/fonts/ubuntu/Ubuntu-Regular.ttf"
     ].join('\r\n'));
     process.env.PATH = `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`;
 
-    const encode = (value: string) => Buffer.from(value, 'utf8').toString('base64');
-    fetchMock
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        connectors: [{
-          id: 'github',
-          name: 'GitHub',
-          provider: 'composio',
-          category: 'Developer',
-          status: 'connected',
-          tools: [{ name: 'github.github_get_repository_content' }],
-        }],
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { default_branch: 'main', html_url: 'https://github.com/acme/rate-limited-ui' } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { path: 'README.md', encoding: 'base64', content: encode('# Connector README') } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: { code: 'CONNECTOR_OUTPUT_TOO_LARGE', message: 'connector output exceeds max serialized size' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 502 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { content: [
-          { path: 'package.json', type: 'file' },
-          { path: 'src', type: 'dir' },
-        ] } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { content: [
-          { path: 'src/styles.css', type: 'file' },
-        ] } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: { code: 'CONNECTOR_RATE_LIMITED', message: 'connector tool rate limit exceeded' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 429 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: { code: 'CONNECTOR_RATE_LIMITED', message: 'connector tool rate limit exceeded' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 429 }));
-
-    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/rate-limited-ui', '--max-files', '6']);
+    const result = await runDesignToolCli(['github-design-context', '--repo', 'acme/rate-limited-ui', '--max-files', '6']);
 
     expect(result.exitCode).toBe(0);
     const stdout = JSON.parse(stdoutOutput.join(''));
@@ -2342,8 +2296,8 @@ printf 'font-data' > "$last/fonts/ubuntu/Ubuntu-Regular.ttf"
     await cleanupTempDir(tmpDir);
   });
 
-  it('uses GitHub CLI authenticated clone before connector fallback', async () => {
-    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-connectors-cli-'));
+  it('uses an authenticated GitHub CLI clone when git cannot authenticate', async () => {
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'clean-design-tools-cli-'));
     process.chdir(tmpDir);
     process.env.OD_DAEMON_URL = 'http://127.0.0.1:7456';
     process.env.OD_TOOL_TOKEN = 'agent-run-token';
@@ -2400,21 +2354,8 @@ exit 1
     ].join('\r\n'));
     process.env.PATH = `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`;
 
-    fetchMock
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        connectors: [{
-          id: 'github',
-          name: 'GitHub',
-          provider: 'composio',
-          category: 'Developer',
-          status: 'connected',
-        }],
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: { message: 'repository access denied' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 403 }));
 
-    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/private-ui']);
+    const result = await runDesignToolCli(['github-design-context', '--repo', 'acme/private-ui']);
 
     expect(result.exitCode).toBe(0);
     const stdout = JSON.parse(stdoutOutput.join(''));
@@ -2433,13 +2374,12 @@ exit 1
     await expect(readFile(path.join(tmpDir, 'context/github/acme-private-ui.md'), 'utf8')).resolves.toContain('GitHub CLI authenticated clone');
     await expect(readFile(path.join(tmpDir, 'context/github/acme-private-ui.md'), 'utf8')).resolves.toContain('This-device intake was used through local git or GitHub CLI.');
     await expect(readFile(path.join(tmpDir, 'context/github/acme-private-ui/files/src/theme.css'), 'utf8')).resolves.toContain('--color-brand');
-    expect(fetchMock).not.toHaveBeenCalled();
 
     await cleanupTempDir(tmpDir);
   });
 
   it('reports GitHub CLI login when local clone cannot read a repository', async () => {
-    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-connectors-cli-'));
+    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'clean-design-tools-cli-'));
     process.chdir(tmpDir);
 
     const fakeBinDir = path.join(tmpDir, 'bin');
@@ -2473,12 +2413,11 @@ exit 1
     ].join('\r\n'));
     process.env.PATH = `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`;
 
-    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/private-ui']);
+    const result = await runDesignToolCli(['github-design-context', '--repo', 'acme/private-ui']);
 
     expect(result.exitCode).toBe(1);
     expect(stderrOutput.join('')).toContain('gh auth login --web');
     await expect(readFile(path.join(tmpDir, 'context/github/acme-private-ui.md'), 'utf8')).rejects.toThrow();
-    expect(fetchMock).not.toHaveBeenCalled();
 
     await cleanupTempDir(tmpDir);
   });

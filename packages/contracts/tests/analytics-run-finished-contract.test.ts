@@ -18,7 +18,6 @@ function makeBaseRunFinishedProps(): RunFinishedProps {
     model_id: 'claude-sonnet-4-5',
     agent_provider_id: 'claude_code',
     skill_id: null,
-    mcp_id: null,
     token_count_source: 'unknown',
     result: 'failed',
     artifact_count: 0,

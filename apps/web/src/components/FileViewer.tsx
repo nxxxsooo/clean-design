@@ -9879,13 +9879,13 @@ function HtmlViewer({
     const safeUrl = url.trim();
     if (!safeUrl) {
       setShareLinkFeedback('failed');
-      setExportToast({ message: t('useEverywhere.copyFailed'), tone: 'error' });
+      setExportToast({ message: t('handoff.copyFailed'), tone: 'error' });
       return false;
     }
     const ok = await copyToClipboard(safeUrl);
     const feedback = ok ? 'copied' : 'failed';
     setShareLinkFeedback(feedback);
-    if (!ok) setExportToast({ message: t('useEverywhere.copyFailed'), tone: 'error' });
+    if (!ok) setExportToast({ message: t('handoff.copyFailed'), tone: 'error' });
     window.setTimeout(() => {
       setShareLinkFeedback((current) => (current === feedback ? null : current));
     }, 1800);
@@ -10961,7 +10961,7 @@ function HtmlViewer({
     shareLinkFeedback === 'copied'
       ? t('fileViewer.copied')
       : shareLinkFeedback === 'failed'
-        ? t('useEverywhere.copyFailed')
+        ? t('handoff.copyFailed')
         : t('fileViewer.copyShareLink');
   const shareMenuLabel = t('fileViewer.shareLabel');
   const deployMenuLabel = t('fileViewer.deployModalTitle') || 'Deploy';

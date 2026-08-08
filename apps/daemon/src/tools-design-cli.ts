@@ -20,10 +20,10 @@ interface ParsedOptions {
   help: boolean;
 }
 
-const CONNECTORS_USAGE = `Usage:
-  od tools connectors github-design-context --repo owner/repo [--ref main] [--output context/github/owner-repo.md] [--max-files 48]
-  od tools connectors local-design-context --path /path/to/project [--output context/local-code/project.md] [--max-files 48]
-  od tools connectors design-system-package-audit --path /path/to/project [--reference-package] [--fail-on-warnings]
+const DESIGN_TOOLS_USAGE = `Usage:
+  od tools design github-design-context --repo owner/repo [--ref main] [--output context/github/owner-repo.md] [--max-files 48]
+  od tools design local-design-context --path /path/to/project [--output context/local-code/project.md] [--max-files 48]
+  od tools design design-system-package-audit --path /path/to/project [--reference-package] [--fail-on-warnings]
 
 Environment:
   OD_NODE_BIN     Node-compatible runtime for agent wrapper invocations
@@ -965,7 +965,7 @@ function renderLocalDesignEvidenceMarkdown(evidence: LocalDesignEvidence): strin
     '',
     '## Intake Status',
     '',
-    '- Local source folder was read through bounded `od tools connectors local-design-context` intake.',
+    '- Local source folder was read through bounded `od tools design local-design-context` intake.',
   ];
   if (evidence.warnings.length > 0) {
     lines.push('', '## Warnings', '', ...evidence.warnings.map((warning) => `- ${warning}`));
@@ -2096,11 +2096,11 @@ function missingUiKitComponentRoles(componentFiles: string[]): string[] {
     .map(([role]) => role);
 }
 
-export async function runConnectorsToolCli(args: string[]): Promise<ToolCliResult> {
+export async function runDesignToolCli(args: string[]): Promise<ToolCliResult> {
   const options = parseOptions(args);
   if ('error' in options) return fail(options.error);
   if (options.help || !options.command) {
-    process.stdout.write(CONNECTORS_USAGE);
+    process.stdout.write(DESIGN_TOOLS_USAGE);
     return { exitCode: options.command ? 0 : 1 };
   }
 
@@ -2131,5 +2131,5 @@ export async function runConnectorsToolCli(args: string[]): Promise<ToolCliResul
     }
   }
 
-  return fail(`external connector command is disabled: ${options.command}`);
+  return fail(`unsupported design tool command: ${options.command}`);
 }

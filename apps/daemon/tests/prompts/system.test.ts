@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   composeSystemPrompt,
-  renderConnectedExternalMcpDirective,
   resolveExclusiveSurface,
 } from '../../src/prompts/system.js';
 
@@ -29,7 +28,7 @@ const liveArtifactSkillBody = [
   '> below references side files such as `references/artifact-schema.md`, resolve',
   '> them against the skill root above and open them via their full absolute path.',
   '>',
-  '> Known side files in this skill: `references/artifact-schema.md`, `references/connector-policy.md`, `references/refresh-contract.md`.',
+  '> Known side files in this skill: `references/artifact-schema.md`, `references/refresh-contract.md`.',
   '',
   '',
   liveArtifactSkillMarkdown.replace(/^---[\s\S]*?---\n\n/, '').trim(),
@@ -232,14 +231,11 @@ describe('composeSystemPrompt', () => {
     expect(prompt).not.toContain('live-artifact/references/layouts.md');
     expect(prompt).not.toContain('live-artifact/assets/template.html');
     expect(prompt).toContain('`references/artifact-schema.md`');
-    expect(prompt).toContain('`references/connector-policy.md`');
     expect(prompt).toContain('`references/refresh-contract.md`');
     expect(prompt).toContain('The wrapper reads injected `OD_NODE_BIN`, `OD_BIN`, `OD_DAEMON_URL`, and `OD_TOOL_TOKEN`');
     expect(prompt).toContain('Do not include or invent `projectId`; the daemon derives project/run scope from the token.');
     expect(prompt).toContain('"$OD_NODE_BIN" "$OD_BIN" tools live-artifacts create --input artifact.json');
-    expect(prompt).toContain('if the user names a connector/source (for example Notion)');
-    expect(prompt).toContain('list connectors before asking where the data comes from');
-    expect(prompt).toContain('a connected `notion` connector plus a user brief that names Notion is enough to start with `notion.notion_search`');
+    expect(prompt).toContain('Do not call arbitrary provider APIs or infer access to account data.');
     expect(prompt).toContain('Prefer the `live-artifact` skill workflow when available');
     expect(prompt).toContain('The first output should be a live artifact/dashboard/report');
   });
@@ -465,72 +461,6 @@ describe('composeSystemPrompt', () => {
       expect(deckPrompt).not.toContain('Copy the canonical skeleton below as index.html');
       expect(deckPrompt).toContain('semantically named deck HTML file');
       expect(deckPrompt).toMatch(/Summarize the written or changed deck file/i);
-    });
-  });
-
-  // The connected-external-MCP directive reflects live OAuth token state, which
-  // flips mid-conversation as Bearers expire/refresh. It now rides in the
-  // per-turn instruction slice (server.ts), NOT the cached system prompt, so it
-  // no longer churns the cacheable prefix across resumes. composeSystemPrompt
-  // must therefore never emit it; the exported renderer is tested directly.
-  describe('connectedExternalMcp directive is no longer in the system prompt', () => {
-    it('never emits the MCP directive from composeSystemPrompt', () => {
-      const prompt = composeSystemPrompt({});
-      expect(prompt).not.toContain('External MCP servers — already authenticated');
-      expect(prompt).not.toContain('mcp__<server>__authenticate');
-    });
-
-    it('keeps the media-execution-disabled block, still with no MCP directive', () => {
-      const prompt = composeSystemPrompt({
-        metadata: { kind: 'image' },
-        mediaExecution: { mode: 'disabled' },
-      });
-      expect(prompt).toContain('Open Design-owned media execution is **disabled for this run**');
-      expect(prompt).not.toContain('## Media generation contract');
-      expect(prompt).not.toContain('External MCP servers — already authenticated');
-    });
-  });
-
-  describe('renderConnectedExternalMcpDirective', () => {
-    it('returns an empty string for no / empty servers', () => {
-      expect(renderConnectedExternalMcpDirective(undefined)).toBe('');
-      expect(renderConnectedExternalMcpDirective([])).toBe('');
-    });
-
-    it('lists each connected server and forbids the synthetic auth tools', () => {
-      const directive = renderConnectedExternalMcpDirective([
-        { id: 'higgsfield-openclaw', label: 'Higgsfield (OpenClaw)' },
-        { id: 'github' },
-      ]);
-      expect(directive).toContain('## External MCP servers — already authenticated');
-      expect(directive).toContain('`higgsfield-openclaw`');
-      expect(directive).toContain('Higgsfield (OpenClaw)');
-      expect(directive).toContain('`github`');
-      expect(directive).toContain(
-        '**Do NOT call any tool whose name matches `mcp__<server>__authenticate` or `mcp__<server>__complete_authentication`',
-      );
-      expect(directive).toContain('localhost:<random>/callback');
-      expect(directive).toContain('Settings → External MCP');
-    });
-
-    it('skips entries with blank ids and emits nothing when none remain', () => {
-      expect(
-        renderConnectedExternalMcpDirective([
-          { id: '   ', label: 'blank' },
-          { id: '', label: 'empty' },
-        ] as any),
-      ).toBe('');
-    });
-
-    it('does not duplicate the label when it equals the id', () => {
-      const directive = renderConnectedExternalMcpDirective([{ id: 'github', label: 'github' }]);
-      expect(directive).toContain('- `github`\n');
-      expect(directive).not.toContain('- `github` (github)');
-    });
-
-    it('has no leading separator so it composes cleanly in a `---`-joined slice', () => {
-      const directive = renderConnectedExternalMcpDirective([{ id: 'github' }]);
-      expect(directive.startsWith('## External MCP servers')).toBe(true);
     });
   });
 

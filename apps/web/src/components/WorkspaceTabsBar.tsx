@@ -152,10 +152,8 @@ function reviveTab(value: unknown): WorkspaceChromeTab | null {
     if (
       view === 'home'
       || view === 'projects'
-      || view === 'tasks'
       || view === 'plugins'
       || view === 'design-systems'
-      || view === 'integrations'
     ) {
       return { id, kind: 'entry', view, createdAt, lastActiveAt };
     }
@@ -195,7 +193,7 @@ function normalizeTabsState(state: WorkspaceTabsState): WorkspaceTabsState {
   let sourceTabs = state.tabs.length > 0 ? state.tabs : [createEntryTab('home')];
 
   // Deduplicate entry tabs (singleton constraint): all sidebar sections
-  // (home / projects / tasks / design-systems / plugins / integrations) share
+  // (home / projects / design-systems / plugins) share
   // ONE entry tab that switches its view in place. Keep the canonical one:
   // 1. Is one of them currently active?
   // 2. Otherwise, pick the one with highest lastActiveAt.
@@ -315,7 +313,7 @@ function syncStateToRoute(state: WorkspaceTabsState, route: Route): WorkspaceTab
   const currentActive = current.tabs.find((tab) => tab.id === current.activeTabId) ?? null;
 
   // 1. If we are navigating to any entry view (home / projects / tasks /
-  // design-systems / plugins / integrations / onboarding), reuse the single
+  // design-systems / plugins / onboarding), reuse the single
   // entry tab and switch its view IN PLACE — all sidebar sections collapse
   // into the one leftmost tab. Only create one if none exists.
   if (route.kind === 'home') {
@@ -1192,23 +1190,19 @@ function displayTabFor(
     home: t('entry.navHome'),
     onboarding: t('settings.welcomeTitle'),
     projects: t('entry.navProjects'),
-    tasks: t('entry.navTasks'),
     plugins: t('entry.navPlugins'),
     'design-systems': t('entry.navDesignSystems'),
     library: 'Library',
     brands: t('entry.navBrands'),
-    integrations: t('entry.navIntegrations'),
   };
   const entryIcon: Record<EntryHomeView, IconName> = {
     home: 'home',
     onboarding: 'sparkles',
     projects: 'folder',
-    tasks: 'kanban',
     plugins: 'grid',
     'design-systems': 'blocks',
     library: 'image',
     brands: 'blocks',
-    integrations: 'link',
   };
   return {
     id: tab.id,

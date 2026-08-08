@@ -1,8 +1,7 @@
 // xAI Grok OAuth 2.0 + PKCE client.
 //
-// Wraps the PKCE primitives in `mcp-oauth.ts` for the specific case of
-// xAI's `auth.x.ai` OAuth server. xAI doesn't speak MCP and doesn't
-// expose Dynamic Client Registration, so we hardcode the issuer /
+// Uses the shared provider OAuth primitives for xAI's `auth.x.ai` server.
+// xAI does not expose Dynamic Client Registration, so we hardcode the issuer /
 // endpoints / client_id / scope / loopback port instead of running
 // discovery.
 //
@@ -22,7 +21,7 @@ import {
   type OAuthTokenResponse,
   type PendingAuthCache,
   type PendingAuthState,
-} from '../mcp-oauth.js';
+} from '../provider-oauth.js';
 
 // ───────────────────────────────────────────────────────────────────────
 // xAI OAuth constants.
@@ -96,8 +95,7 @@ export function beginXAIAuth(input: BeginXAIAuthInput): BeginXAIAuthResult {
   });
 
   const pendingState: PendingAuthState = {
-    serverId: XAI_PROVIDER_ID,
-    authServerIssuer: XAI_OAUTH_ISSUER,
+    providerId: XAI_PROVIDER_ID,
     tokenEndpoint: XAI_OAUTH_TOKEN_ENDPOINT,
     clientId: XAI_OAUTH_CLIENT_ID,
     redirectUri,
@@ -130,9 +128,9 @@ export async function completeXAIAuth(
   if (!consumed) {
     throw new Error('xAI OAuth state not found or expired');
   }
-  if (consumed.serverId !== XAI_PROVIDER_ID) {
+  if (consumed.providerId !== XAI_PROVIDER_ID) {
     throw new Error(
-      `xAI OAuth state mismatch: expected serverId=${XAI_PROVIDER_ID}, got ${consumed.serverId}`,
+      `xAI OAuth state mismatch: expected providerId=${XAI_PROVIDER_ID}, got ${consumed.providerId}`,
     );
   }
   return exchangeCodeForToken(

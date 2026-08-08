@@ -7,8 +7,6 @@ export const CHAT_TOOL_ENDPOINTS = [
   '/api/tools/live-artifacts/list',
   '/api/tools/live-artifacts/refresh',
   '/api/tools/live-artifacts/update',
-  '/api/tools/connectors/list',
-  '/api/tools/connectors/execute',
   '/api/tools/design-systems/read',
   '/api/tools/media/generate',
   '/api/tools/library/search',
@@ -20,8 +18,6 @@ export const CHAT_TOOL_OPERATIONS = [
   'live-artifacts:list',
   'live-artifacts:refresh',
   'live-artifacts:update',
-  'connectors:list',
-  'connectors:execute',
   'design-systems:read',
   'media:generate',
   'library:search',
@@ -46,12 +42,7 @@ export interface ToolTokenGrant {
   allowedOperations: readonly ToolOperation[];
   issuedAt: string;
   expiresAt: string;
-  // Plan §3.A3 / spec §9. When the run is plugin-driven, the snapshot id
-  // and the cached trust tier ride alongside the token so
-  // `/api/tools/connectors/execute` can re-validate per-call without
-  // re-reading the SQLite row. `pluginSnapshotId` undefined means the
-  // run is not plugin-driven; the connector gate is bypassed (legacy
-  // behavior).
+  // Plugin provenance retained for audit and future local tool gates.
   pluginSnapshotId?: string;
   pluginTrust?: 'trusted' | 'restricted' | 'bundled';
   pluginCapabilitiesGranted?: readonly string[];
@@ -90,35 +81,6 @@ function createOpaqueToolToken(): string {
 function asPublicGrant(stored: StoredToolTokenGrant): ToolTokenGrant {
   const { tokenHash: _tokenHash, expiresAtMs: _expiresAtMs, timer: _timer, ...grant } = stored;
   return grant;
-}
-
-// Plan §3.A3 / spec §9: pure connector capability gate over a token grant.
-// When the grant carries no plugin snapshot id, the call is from a
-// non-plugin run and we let it through (back-compat). When the grant
-// carries a snapshot id, we apply the §9 / §5.3 rule:
-//
-//   - trusted / bundled plugins implicitly carry connector:* — accept.
-//   - restricted plugins must list `connector:<id>` in
-//     pluginCapabilitiesGranted — otherwise reject with TOOL_OPERATION_DENIED.
-//
-// Used by `/api/tools/connectors/execute` (defense in depth, c). Phase 4
-// extends this to `connector:*` glob support if the spec patches §5.3 to
-// allow it; today we accept only the exact id form.
-export function checkConnectorAccess(
-  grant: ToolTokenGrant,
-  connectorId: string,
-): { ok: true } | { ok: false; reason: string } {
-  if (!grant.pluginSnapshotId) return { ok: true };
-  const tier = grant.pluginTrust ?? 'restricted';
-  if (tier !== 'restricted') return { ok: true };
-  const granted = new Set(grant.pluginCapabilitiesGranted ?? []);
-  if (granted.has(`connector:${connectorId}`) || granted.has('connector')) {
-    return { ok: true };
-  }
-  return {
-    ok: false,
-    reason: `restricted plugin (snapshot ${grant.pluginSnapshotId}) lacks "connector:${connectorId}" — grant via /api/plugins/:id/trust before retrying`,
-  };
 }
 
 export class ToolTokenRegistry {

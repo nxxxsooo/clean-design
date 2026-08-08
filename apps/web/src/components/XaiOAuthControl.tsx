@@ -1,9 +1,8 @@
 // xAI / SuperGrok OAuth control rendered inside the Grok provider row in
 // the Settings → Media Providers panel.
 //
-// Mirrors the shape of McpOAuthControl in McpClientSection.tsx (state
-// machine, polling cadence, CSS classes), but skips the postMessage /
-// BroadcastChannel handshake because the xAI callback is served by the
+// Provider OAuth state machine with polling and a browser fallback. The
+// xAI callback is served by the
 // one-shot listener on 127.0.0.1:56121 — a separate process that can't
 // talk to the OD UI directly. Polling /api/xai/auth/status is the only
 // delivery channel for "auth completed".
@@ -293,11 +292,11 @@ export function XaiOAuthControl() {
     || (Boolean(pendingAuthUrl) && !connected);
 
   return (
-    <div className={`mcp-oauth-control${connected ? ' connected' : ''}`}>
-      <div className="mcp-oauth-status" aria-live="polite">
+    <div className={`provider-oauth-control${connected ? ' connected' : ''}`}>
+      <div className="provider-oauth-status" aria-live="polite">
         {connected ? (
           <>
-            <span className="mcp-oauth-dot mcp-oauth-dot-ok" aria-hidden />
+            <span className="provider-oauth-dot provider-oauth-dot-ok" aria-hidden />
             <span>
               <strong>Signed in with X.</strong>{' '}
               {expiresLabel ? (
@@ -315,7 +314,7 @@ export function XaiOAuthControl() {
           </>
         ) : isAwaiting ? (
           <>
-            <span className="mcp-oauth-dot mcp-oauth-dot-pending" aria-hidden />
+            <span className="provider-oauth-dot provider-oauth-dot-pending" aria-hidden />
             <span>
               <strong>Waiting for authorization…</strong>{' '}
               <span className="hint">
@@ -327,7 +326,7 @@ export function XaiOAuthControl() {
           </>
         ) : (
           <>
-            <span className="mcp-oauth-dot" aria-hidden />
+            <span className="provider-oauth-dot" aria-hidden />
             <span>
               <strong>Not signed in.</strong>{' '}
               <span className="hint">
@@ -352,7 +351,7 @@ export function XaiOAuthControl() {
         </div>
       ) : null}
 
-      <div className="mcp-oauth-actions">
+      <div className="provider-oauth-actions">
         {connected ? (
           <>
             <button
@@ -399,7 +398,7 @@ export function XaiOAuthControl() {
       </div>
 
       {pendingAuthUrl && !connected ? (
-        <div className="mcp-oauth-fallback hint">
+        <div className="provider-oauth-fallback hint">
           Browser tab didn't open?{' '}
           <a href={pendingAuthUrl} target="_blank" rel="noopener noreferrer">
             Click here to open the authorize URL manually
@@ -439,13 +438,13 @@ export function XaiOAuthControl() {
       ) : null}
 
       {error ? (
-        <div className="mcp-oauth-error" role="alert">
+        <div className="provider-oauth-error" role="alert">
           {error}
         </div>
       ) : null}
 
       {status?.scope ? (
-        <div className="mcp-oauth-scope hint">
+        <div className="provider-oauth-scope hint">
           Granted scopes: <code>{status.scope}</code>
         </div>
       ) : null}

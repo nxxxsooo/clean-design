@@ -789,17 +789,16 @@ function AppInner() {
    * Autosave-driven persistence path. The settings dialog calls this on
    * every committed edit (via a debounced effect) so localStorage and
    * the daemon stay in lock-step with the user's draft. We deliberately
-   * do NOT touch the Composio secret here — it has its own gesture
-   * (handleConfigPersistComposioKey) so partial keys never leave the
-   * browser. Onboarding is also left alone; the dialog's close path
+   * do not persist plaintext provider credentials from the renderer.
+   * Onboarding is also left alone; the dialog's close path
    * is the canonical "I'm done" signal.
    */
   const handleConfigPersist = useCallback(async (
     next: AppConfig,
     options?: { forceMediaProviderSync?: boolean },
   ) => {
-    // Strip the in-flight Composio secret before anything hits disk so
-    // a half-typed key can't survive in localStorage. If the dialog is
+    // Strip in-flight credentials before anything hits disk so a
+    // half-typed key can't survive in localStorage. If the dialog is
     // closing, preserve any onboarding completion that the close gesture
     // already committed so an unmount autosave cannot re-open the welcome flow.
     const protectedNext = await protectConfigCredentials(

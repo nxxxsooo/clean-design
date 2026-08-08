@@ -59,11 +59,6 @@ import type {
   DesignSystemEnrichClickProps,
   DesignSystemEnrichResultProps,
   DesignSystemEditClickProps,
-  IntegrationsTabClickProps,
-  IntegrationsMcpTabClickProps,
-  IntegrationsConnectorsTabClickProps,
-  IntegrationsSkillsTabClickProps,
-  IntegrationsUseEverywhereTabClickProps,
   ChatPanelClickProps,
   ComposerSessionModeClickProps,
   ComposerBarClickProps,
@@ -109,14 +104,12 @@ import type {
   SettingsByokProviderOptionClickProps,
   SettingsByokFieldClickProps,
   SettingsMediaProvidersClickProps,
-  SettingsConnectorsClickProps,
   SettingsLanguageClickProps,
   SettingsAppearanceClickProps,
   SettingsNotificationsClickProps,
   SettingsPetsClickProps,
   SettingsPrivacyClickProps,
   SettingsDesignReviewClickProps,
-  SettingsExternalMcpClickProps,
   // Result events
   ProjectCreateResultProps,
   PluginReplacementResultProps,
@@ -135,7 +128,6 @@ import type {
   SettingsCliTestResultProps,
   SettingsByokModelsFetchResultProps,
   SettingsByokTestResultProps,
-  SettingsConnectorAuthResultProps,
   ByokPreflightBlockedProps,
   OnboardingClickProps,
   OnboardingRuntimeScanResultProps,
@@ -608,41 +600,6 @@ export function trackDesignSystemEditClick(
   send(track, 'ui_click', props);
 }
 
-export function trackIntegrationsTabClick(
-  track: Track,
-  props: IntegrationsTabClickProps,
-): void {
-  send(track, 'ui_click', props);
-}
-
-export function trackIntegrationsMcpTabClick(
-  track: Track,
-  props: IntegrationsMcpTabClickProps,
-): void {
-  send(track, 'ui_click', props);
-}
-
-export function trackIntegrationsConnectorsTabClick(
-  track: Track,
-  props: IntegrationsConnectorsTabClickProps,
-): void {
-  send(track, 'ui_click', props);
-}
-
-export function trackIntegrationsSkillsTabClick(
-  track: Track,
-  props: IntegrationsSkillsTabClickProps,
-): void {
-  send(track, 'ui_click', props);
-}
-
-export function trackIntegrationsUseEverywhereTabClick(
-  track: Track,
-  props: IntegrationsUseEverywhereTabClickProps,
-): void {
-  send(track, 'ui_click', props);
-}
-
 // ---- ui_click (chat panel) -----------------------------------------------
 
 export function trackChatPanelClick(
@@ -898,13 +855,6 @@ export function trackSettingsMediaProvidersClick(
   send(track, 'ui_click', props);
 }
 
-export function trackSettingsConnectorsClick(
-  track: Track,
-  props: SettingsConnectorsClickProps,
-): void {
-  send(track, 'ui_click', props);
-}
-
 export function trackSettingsLanguageClick(
   track: Track,
   props: SettingsLanguageClickProps,
@@ -943,13 +893,6 @@ export function trackSettingsPrivacyClick(
 export function trackSettingsDesignReviewClick(
   track: Track,
   props: SettingsDesignReviewClickProps,
-): void {
-  send(track, 'ui_click', props);
-}
-
-export function trackSettingsExternalMcpClick(
-  track: Track,
-  props: SettingsExternalMcpClickProps,
 ): void {
   send(track, 'ui_click', props);
 }
@@ -1077,13 +1020,6 @@ export function trackByokPreflightBlocked(
   props: ByokPreflightBlockedProps,
 ): void {
   send(track, 'byok_preflight_blocked', props);
-}
-
-export function trackSettingsConnectorAuthResult(
-  track: Track,
-  props: SettingsConnectorAuthResultProps,
-): void {
-  send(track, 'settings_connector_auth_result', props);
 }
 
 export function trackAssistantFeedbackClick(

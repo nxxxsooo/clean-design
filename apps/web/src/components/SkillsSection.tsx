@@ -23,8 +23,8 @@ import {
 // Templates tab and are managed under their own daemon registry. See
 // specs/current/skills-and-design-templates.md.
 //
-// Layout mirrors the External MCP servers panel: a single vertical
-// stack of collapsible rows. Each row is a skill — the header is
+// A single vertical stack of collapsible rows keeps the narrow settings
+// column readable. Each row is a skill — the header is
 // always visible (enable toggle, name, mode badge, source badge,
 // actions); the body (SKILL.md preview, file tree, inline edit form)
 // is revealed only when the row is expanded. Replaces the previous

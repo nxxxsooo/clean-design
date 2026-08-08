@@ -423,9 +423,8 @@
    The lift must stay BELOW `.entry-main__topbar` (z-index 10): the sticky
    topbar is opaque chrome and the card scrolling under it must never cover
    the chip cluster. It must also stay below the fixed modal family
-   (`.home-hero-confirm__backdrop` 80, `.plus-menu__popup` 90,
-   `.plugins-import-modal__backdrop` 100, `.use-everywhere-modal-backdrop`
-   920). Popover z-indexes inside the card (1503/1701/…) are local to the
+   (`.home-hero-confirm__backdrop` 80 and `.plugins-import-modal__backdrop`
+   100). Popover z-indexes inside the card (1503/1701/…) are local to the
    card's stacking context and only order its own children. */
 .home-hero__input-card:has(.inline-switcher__popover),
 .home-hero__input-card:has(.session-mode-toggle__popover),

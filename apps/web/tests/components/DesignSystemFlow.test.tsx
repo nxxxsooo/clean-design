@@ -279,7 +279,7 @@ describe('design system package audit helpers', () => {
       'Package audit found 1 error and 5 warnings',
     );
     expect(buildDesignSystemPackageAuditRepairPrompt(failingAudit)).toContain(
-      'tools connectors design-system-package-audit --path . --fail-on-warnings',
+      'tools design design-system-package-audit --path . --fail-on-warnings',
     );
     expect(buildDesignSystemPackageAuditRepairPrompt(failingAudit)).toContain(
       'Treat every error and warning as blocking',
@@ -1121,7 +1121,7 @@ describe('DesignSystemCreationFlow', () => {
     expect(mocks.patchProject).toHaveBeenCalledWith(
       project.id,
       expect.objectContaining({
-        pendingPrompt: expect.stringContaining('tools connectors design-system-package-audit --path . --fail-on-warnings'),
+        pendingPrompt: expect.stringContaining('tools design design-system-package-audit --path . --fail-on-warnings'),
       }),
     );
     expect(mocks.patchProject).toHaveBeenCalledWith(
@@ -1133,7 +1133,7 @@ describe('DesignSystemCreationFlow', () => {
     expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
       project.id,
       'context/source-context.md',
-      expect.stringContaining('tools connectors design-system-package-audit --path . --fail-on-warnings'),
+      expect.stringContaining('tools design design-system-package-audit --path . --fail-on-warnings'),
     );
     expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
       project.id,
@@ -1338,7 +1338,7 @@ describe('DesignSystemCreationFlow', () => {
     expect(mocks.patchProject).toHaveBeenCalledWith(
       project.id,
       expect.objectContaining({
-        pendingPrompt: expect.stringContaining('tools connectors local-design-context --path'),
+        pendingPrompt: expect.stringContaining('tools design local-design-context --path'),
       }),
     );
     expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
@@ -1354,7 +1354,7 @@ describe('DesignSystemCreationFlow', () => {
     expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
       project.id,
       'context/source-context.md',
-      expect.stringContaining('tools connectors local-design-context --path'),
+      expect.stringContaining('tools design local-design-context --path'),
     );
   });
 

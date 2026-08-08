@@ -5,8 +5,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_UNSELECTED_SCENARIO_PLUGIN_ID,
   type InstalledPluginRecord,
-  type ConnectorDetail,
-  type McpServerConfig,
   type SkillSummary,
 } from '@open-design/contracts';
 
@@ -62,22 +60,6 @@ const DECK_SKILL: SkillSummary = {
 };
 
 const WEB_PROTOTYPE_PLUGIN = makePlugin('example-web-prototype', 'Web Prototype');
-const MCP_SERVER: McpServerConfig = {
-  id: 'linear',
-  label: 'Linear',
-  transport: 'stdio',
-  enabled: true,
-  command: 'npx',
-};
-const CONNECTOR: ConnectorDetail = {
-  id: 'slack',
-  name: 'Slack',
-  provider: 'Composio',
-  category: 'Communication',
-  status: 'connected',
-  tools: [],
-};
-
 function makePlugin(id: string, title: string): InstalledPluginRecord {
   return {
     id,
@@ -117,12 +99,6 @@ describe('HomeView context picker', () => {
     const fetchMock = vi.fn<typeof fetch>(async (url) => {
       if (typeof url === 'string' && url === '/api/plugins') {
         return new Response(JSON.stringify({ plugins: [] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url === '/api/mcp/servers') {
-        return new Response(JSON.stringify({ servers: [], templates: [] }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
@@ -182,12 +158,6 @@ describe('HomeView context picker', () => {
     const fetchMock = vi.fn<typeof fetch>(async (url) => {
       if (typeof url === 'string' && url === '/api/plugins') {
         return new Response(JSON.stringify({ plugins }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url === '/api/mcp/servers') {
-        return new Response(JSON.stringify({ servers: [], templates: [] }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
@@ -257,12 +227,6 @@ describe('HomeView context picker', () => {
           headers: { 'content-type': 'application/json' },
         });
       }
-      if (typeof url === 'string' && url === '/api/mcp/servers') {
-        return new Response(JSON.stringify({ servers: [], templates: [] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
       throw new Error(`unexpected fetch ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -306,12 +270,6 @@ describe('HomeView context picker', () => {
     const fetchMock = vi.fn<typeof fetch>(async (url) => {
       if (typeof url === 'string' && url === '/api/plugins') {
         return new Response(JSON.stringify({ plugins: [WEB_PROTOTYPE_PLUGIN] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url === '/api/mcp/servers') {
-        return new Response(JSON.stringify({ servers: [], templates: [] }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
@@ -382,12 +340,6 @@ describe('HomeView context picker', () => {
           headers: { 'content-type': 'application/json' },
         });
       }
-      if (typeof url === 'string' && url === '/api/mcp/servers') {
-        return new Response(JSON.stringify({ servers: [], templates: [] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
       throw new Error(`unexpected fetch ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -446,12 +398,6 @@ describe('HomeView context picker', () => {
     const fetchMock = vi.fn<typeof fetch>(async (url, init) => {
       if (typeof url === 'string' && url === '/api/plugins') {
         return new Response(JSON.stringify({ plugins: [] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url === '/api/mcp/servers') {
-        return new Response(JSON.stringify({ servers: [], templates: [] }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
@@ -529,12 +475,6 @@ describe('HomeView context picker', () => {
     const fetchMock = vi.fn<typeof fetch>(async (url, init) => {
       if (typeof url === 'string' && url === '/api/plugins') {
         return new Response(JSON.stringify({ plugins: [] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url === '/api/mcp/servers') {
-        return new Response(JSON.stringify({ servers: [], templates: [] }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });

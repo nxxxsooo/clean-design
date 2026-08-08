@@ -8,12 +8,12 @@
    1. Replace every {{placeholder}} with the user's brief or DESIGN.md.
    2. Fill the four SEED_* arrays at the bottom (people, rows, feed,
       series) with plausible mock data — this is what shows when the
-      connector is offline or the user picks `inputs.connector === mock`.
+      local source is unavailable or the user picks `inputs.data_source === sample`.
    3. Re-skin the CSS custom-property block (`:root`) using the active
       DESIGN.md tokens. Do not introduce new property names.
-   4. Wire the Refresh button to a real connector by replacing the
-      contents of `seedNextChange()` with a `poll()` call into
-      `/api/od/connectors/poll`. See references/connectors.md.
+   4. For local-file mode, replace `seedNextChange()` with a validated
+      `fetch('./data.json', { cache: 'no-store' })` path. See
+      references/data-sources.md.
    5. Honor `prefers-reduced-motion: reduce` everywhere.
 
   Hard nos: see references/checklist.md (P0 rows are non-negotiable).
@@ -272,7 +272,7 @@
 
     <div class="side-section">Connections</div>
     <div class="nav">
-      <div class="nav-item" role="button" tabindex="0"><span class="nav-icon">🔌</span><span>{{connector_label}}</span></div>
+      <div class="nav-item" role="button" tabindex="0"><span class="nav-icon">🔌</span><span>{{source_label}}</span></div>
     </div>
   </aside>
 
@@ -305,9 +305,9 @@
         <span id="updatedAt">Last refreshed just now</span>
         <span style="flex:1"></span>
         <button class="btn ghost" id="autoBtn" title="Auto refresh"><span>⏱</span><span id="autoLbl">Auto · on</span></button>
-        <button class="btn primary" id="refreshBtn" title="Pull latest from {{connector_label}}">
+        <button class="btn primary" id="refreshBtn" title="Pull latest from {{source_label}}">
           <span class="ico" id="refreshIco">↻</span>
-          <span>Refresh from {{connector_label}}</span>
+          <span>Refresh from {{source_label}}</span>
         </button>
       </div>
 
@@ -315,7 +315,7 @@
         <div class="emj">💡</div>
         <div>
           <div><strong>This page is a Live Artifact.</strong> Numbers below are pulled from
-          your <strong>{{workspace_name}}</strong> {{connector_label}} via the Composio connector.</div>
+          the <strong>{{workspace_name}}</strong> workspace from {{source_label}}.</div>
           <small>Refreshes on demand or when the page opens. Last 7 days only.</small>
         </div>
       </div>
@@ -344,7 +344,7 @@
         <div class="card">
           <div class="card-title">
             <strong>Recent activity</strong>
-            <span>From <span style="color: var(--accent-ink)">{{connector_label}}</span></span>
+            <span>From <span style="color: var(--accent-ink)">{{source_label}}</span></span>
           </div>
           <div class="feed" id="feed"></div>
         </div>
@@ -361,9 +361,9 @@
       </div>
 
       <div class="footer">
-        <span>Source: {{connector_label}} API · workspace <strong>{{workspace_slug}}</strong></span>
+        <span>Source: {{source_label}} · workspace <strong>{{workspace_slug}}</strong></span>
         <span>·</span>
-        <span>Connector <span class="key">composio.{{connector_slug}}</span></span>
+        <span>Mode <span class="key">{{data_source}}</span></span>
         <span>·</span>
         <span id="footerTime"></span>
       </div>
@@ -380,7 +380,7 @@
    The agent fills SEED_PEOPLE / SEED_ROWS / SEED_FEED / SEED_SERIES
    below. The runtime renders, refreshes (mock or real), and tracks
    staleness. Replace seedNextChange() with poll() to wire a real
-   connector.
+   source.
    ===================================================================== */
 
 /* --- AGENT FILL: people, rows, feed, series ------------------------ */
@@ -425,7 +425,7 @@ function timeAgo(d) {
 }
 
 /* All data interpolations into innerHTML must go through e() — task
-   titles / activity strings / person names can come from a connector
+   titles / activity strings / person names can come from a source
    payload, and unescaped innerHTML is a working XSS sink. */
 function e(v) {
   return String(v == null ? "" : v)
@@ -463,7 +463,7 @@ function flash(el) {
   setTimeout(() => el.classList.remove("flash"), 700);
 }
 
-/* connector hook: replace this with a real poll() — see references/connectors.md */
+/* Sample-mode refresh. For local-file mode, load and validate ./data.json. */
 async function seedNextChange() {
   await new Promise(r => setTimeout(r, 700 + Math.random() * 600));
   const candidates = rows.filter(r => r.status !== "done");
@@ -483,7 +483,7 @@ async function seedNextChange() {
 function renderKpi(prev) {
   const wrap = $("kpis");
   // First render: build the cards from scratch (escaped) so KPI labels /
-  // deltas / values can come from any connector payload safely.
+  // deltas / values can come from any source payload safely.
   if (!wrap.children.length) {
     wrap.innerHTML = KPI_DEFS.map(def => `
       <div class="kpi">
@@ -532,7 +532,7 @@ function renderSpark() {
 function pcolor(name) { return (people.find(p=>p.name===name)||{}).color || "#7f8c8d"; }
 const STATUS_CSS = { done: 1, progress: 1, blocked: 1, todo: 1, review: 1 };
 const STATUS_LABEL = { done: "Done", progress: "In progress", blocked: "Blocked", todo: "To do", review: "In review" };
-/* Connector payloads can contain attacker-controlled strings (task
+/* Source payloads can contain attacker-controlled strings (task
    titles, activity descriptors, person names). Every dynamic value
    below goes through e() before it lands in innerHTML. */
 function renderFeed(highlightId) {

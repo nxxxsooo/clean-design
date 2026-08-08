@@ -10,11 +10,6 @@
 //                                    and produce no FS mutation.
 //   e2e-4 replay invariance        — replay reproduces the prompt block
 //                                    byte-for-byte after a plugin upgrade.
-//   e2e-6 connector trust gate     — restricted plugin without
-//                                    connector:<id> fails apply with 409
-//                                    capabilities-required, the matching
-//                                    /api/tools/connectors/execute call
-//                                    is also rejected with 403.
 //   e2e-8 apply purity regression  — 100 applies grow the snapshot count
 //                                    by 100, leave the project cwd byte
 //                                    size unchanged, and emit no
@@ -33,7 +28,6 @@ import { getInstalledPlugin } from '../src/plugins/registry.js';
 import { createSnapshot, getSnapshot } from '../src/plugins/snapshots.js';
 import { resolvePluginSnapshot, capabilitiesRequiredError } from '../src/plugins/resolve-snapshot.js';
 import { renderPluginBlock } from '@open-design/contracts';
-import { checkConnectorAccess, ToolTokenRegistry } from '../src/tool-tokens.js';
 import { FIRST_PARTY_ATOMS, type AtomCatalogEntry } from '../src/plugins/atoms.js';
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
@@ -191,71 +185,6 @@ describe('Plan §8 e2e — daemon-side anchors', () => {
     const promptBlock2 = renderPluginBlock(replayed);
     expect(promptBlock2).toBe(promptBlock1);
     expect(replayed.manifestSourceDigest).toBe(a.manifestSourceDigest);
-  });
-
-  it('e2e-6 connector trust gate: restricted plugin without connector:<id> blocks apply + tool token', async () => {
-    // Build a fixture plugin that requires a slack connector but does
-    // not declare the matching capability.
-    const folder = path.join(tmpRoot, 'connector-plugin');
-    await mkdir(folder, { recursive: true });
-    const manifest = {
-      $schema: 'https://open-design.ai/schemas/plugin.v1.json',
-      name: 'connector-plugin',
-      title: 'Connector Plugin',
-      version: '1.0.0',
-      description: 'requires slack',
-      license: 'MIT',
-      od: {
-        kind: 'skill',
-        taskKind: 'new-generation',
-        useCase: { query: 'List slack channels.' },
-        connectors: { required: [{ id: 'slack', tools: ['channels.list'] }] },
-        capabilities: ['prompt:inject'],
-      },
-    };
-    await writeFile(path.join(folder, 'open-design.json'), JSON.stringify(manifest));
-    await writeFile(
-      path.join(folder, 'SKILL.md'),
-      '---\nname: connector-plugin\ndescription: requires slack\n---\n# Connector\n',
-    );
-    // Install as restricted (the GitHub-style default for non-local
-    // sources). We simulate that by overriding sourceKind via the
-    // already-installed registry record.
-    await installLocal(folder);
-    db.prepare('UPDATE installed_plugins SET trust = ? WHERE id = ?')
-      .run('restricted', 'connector-plugin');
-    const plugin = getInstalledPlugin(db, 'connector-plugin')!;
-
-    // Apply via the resolver — restricted + missing capability →
-    // capabilities-required envelope.
-    const result = resolvePluginSnapshot({
-      db,
-      body: { pluginId: 'connector-plugin' },
-      projectId: 'project-1',
-      registry: REGISTRY_VIEW,
-    });
-    expect(result).toBeDefined();
-    expect(result?.ok).toBe(false);
-    if (result && !result.ok) {
-      expect(result.status).toBe(409);
-      expect(result.exitCode).toBe(66);
-      expect(result.body.error.code).toBe('capabilities-required');
-      const required = result.body.error.data?.required as string[];
-      expect(required).toContain('connector:slack');
-    }
-
-    // The token-issuance gate refuses the same call independently.
-    const registry = new ToolTokenRegistry();
-    const grant = registry.mint({
-      runId: 'run-1',
-      projectId: 'project-1',
-      pluginSnapshotId: 'fake-snap',
-      pluginTrust: 'restricted',
-      pluginCapabilitiesGranted: ['prompt:inject'],
-    });
-    const gateResult = checkConnectorAccess(grant, 'slack');
-    expect(gateResult.ok).toBe(false);
-    expect(plugin.trust).toBe('restricted');
   });
 
   it('e2e-8 apply purity regression: 100 applies → 0 FS mutation, snapshot count grows by 100', async () => {

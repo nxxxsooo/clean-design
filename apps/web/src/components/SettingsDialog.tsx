@@ -2242,11 +2242,7 @@ export function SettingsDialog({
   const committedClearedByokProviderKeyRef = useRef<string | null>(null);
   const autosaveLatestRef = useRef<AppConfig>(cfg);
   // Baseline used by the draft-only detector: the snapshot at the most
-  // recent successful autosave (or the initial cfg on mount). Compared
-  // against the current snapshot to decide whether the only edits
-  // since last save are intentionally-stripped fields like the
-  // Composio API key — in which case we must NOT flash "All changes
-  // saved", because the draft has not actually been persisted.
+  // recent successful autosave (or the initial cfg on mount).
   const autosaveLastSavedRef = useRef<AppConfig>(normalizedInitialConfig);
   const mediaProvidersChangeVersionRef = useRef(0);
   const lastSyncedMediaProvidersVersionRef = useRef(0);
@@ -2311,8 +2307,7 @@ export function SettingsDialog({
       const persistOptions = {
         forceMediaProviderSync: mediaProvidersVersion > lastSyncedMediaProvidersVersionRef.current,
       };
-      // Draft-only edit (e.g. the user is mid-typing the Composio API
-      // key, which only commits via the explicit "Save key" gesture):
+      // Draft-only edit, such as an in-flight credential value:
       // the persisted shape would be identical to what is already on
       // disk, so a save would be a no-op that mis-reports "Saved" and
       // makes users trust that a sensitive key was persisted when it
@@ -4783,11 +4778,9 @@ function MediaProvidersSection({
                     {isSavedState ? (
                       <span
                         className="field-status-badge field-status-badge--inline"
-                        title={t('settings.connectorsSavedTitle')}
+                        title={t('settings.mediaProviderConfigured')}
                       >
-                        {tail
-                          ? t('settings.connectorsSavedWithTail', { tail })
-                          : t('settings.connectorsSaved')}
+                        {t('settings.mediaProviderConfigured')}{tail ? ` · ••••${tail}` : ''}
                       </span>
                     ) : null}
                   </div>
@@ -4808,7 +4801,7 @@ function MediaProvidersSection({
                     <input
                       type={apiKeyVisible ? 'text' : 'password'}
                       value={credentialInputValue(entry.apiKey)}
-                      placeholder={isSavedState ? t('settings.connectorsReplaceKeyPlaceholder') : t('settings.mediaProviderPlaceholder')}
+                      placeholder={t('settings.mediaProviderPlaceholder')}
                       aria-label={`${provider.label} ${t('settings.mediaProviderApiKey')}`}
                       disabled={disabled}
                       onFocus={() => {
@@ -4920,7 +4913,7 @@ function MediaProvidersSection({
         <details className="library-group media-provider-coming-soon">
           <summary className="memory-details-summary">
             <span className="memory-details-title">
-              {t('tasks.comingSoon')}
+              {t('common.comingSoon')}
             </span>
             <span className="filter-pill-count">
               {comingSoonProviders.length}

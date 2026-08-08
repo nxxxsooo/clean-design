@@ -75,39 +75,6 @@ const RESEARCH_PLUGIN = {
   updatedAt: 0,
 };
 
-const HIGGSFIELD_MCP = {
-  id: 'higgsfield',
-  label: 'Higgsfield Video MCP',
-  transport: 'http',
-  enabled: true,
-  url: 'https://mcp.higgsfield.ai/mcp',
-};
-
-const FIGMA_CONNECTOR = {
-  id: 'figma',
-  name: 'Figma',
-  provider: 'composio',
-  category: 'design',
-  description: 'Reads Figma files and design references.',
-  status: 'connected',
-  accountLabel: 'Design Team',
-  tools: [],
-  allowedToolNames: ['FIGMA_GET_FILE'],
-  curatedToolNames: ['FIGMA_GET_FILE'],
-  toolCount: 1,
-};
-
-const GMAIL_CONNECTOR = {
-  ...FIGMA_CONNECTOR,
-  id: 'gmail',
-  name: 'Gmail',
-  category: 'email',
-  description: 'Reads Gmail messages.',
-  accountLabel: 'Inbox',
-  allowedToolNames: ['GMAIL_FETCH_EMAILS'],
-  curatedToolNames: ['GMAIL_FETCH_EMAILS'],
-};
-
 let fetchMock: ReturnType<typeof vi.fn>;
 
 // The design toolbox left the "+" menu; it now opens as a standalone popover
@@ -166,43 +133,8 @@ function openToolbox(ref: { current: ChatComposerHandle | null }) {
 
 beforeEach(() => {
   fetchMock = vi.fn(async (url: string) => {
-    if (url === '/api/mcp/servers') {
-      return new Response(JSON.stringify({
-        servers: [HIGGSFIELD_MCP],
-        templates: [
-          {
-            id: 'higgsfield-template',
-            label: 'Higgsfield Template',
-            description: 'Image and video generation MCP template.',
-            transport: 'http',
-            category: 'image-generation',
-          },
-        ],
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }
     if (url === '/api/plugins') {
       return new Response(JSON.stringify({ plugins: [RESEARCH_PLUGIN] }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }
-    if (url === '/api/connectors') {
-      return new Response(JSON.stringify({ connectors: [FIGMA_CONNECTOR] }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }
-    if (url === '/api/connectors/status') {
-      return new Response(JSON.stringify({ statuses: { figma: { status: 'connected' } } }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }
-    if (url === '/api/connectors/discovery?refresh=true') {
-      return new Response(JSON.stringify({ connectors: [FIGMA_CONNECTOR, GMAIL_CONNECTOR] }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });

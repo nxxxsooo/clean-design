@@ -25,7 +25,6 @@ export const FIRST_PARTY_ATOMS: ReadonlyArray<AtomCatalogEntry> = [
   { id: 'media-video',             label: 'Media video',             description: 'Video generation through media providers.', status: 'implemented', taskKinds: ['new-generation', 'tune-collab'] },
   { id: 'media-audio',             label: 'Media audio',             description: 'Audio generation through media providers.', status: 'implemented', taskKinds: ['new-generation', 'tune-collab'] },
   { id: 'live-artifact',           label: 'Live artifact',           description: 'Create/refresh live artifacts.',            status: 'implemented', taskKinds: ['new-generation', 'tune-collab'] },
-  { id: 'connector',               label: 'Connector',               description: 'Composio connector tool calls.',            status: 'implemented', taskKinds: ['new-generation', 'tune-collab'] },
   { id: 'critique-theater',        label: 'Critique theater',        description: '5-dim panel critique; devloop signal.',     status: 'implemented', taskKinds: ['new-generation', 'code-migration', 'figma-migration', 'tune-collab'] },
   // Phase 6/7/8 atoms — promoted from 'planned' to 'implemented'
   // by the §3.N1-N4 / §3.O2-O5 / §3.P1-P2 / §3.Q2 / §3.S1 slices.

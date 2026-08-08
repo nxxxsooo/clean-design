@@ -44,7 +44,6 @@ export interface ProjectCreateResultProps {
   target_platforms?: string;
   companion_surfaces?: string;
   fidelity: TrackingFidelity;
-  connectors?: string;
   use_speaker_notes?: boolean;
   include_animations?: boolean;
   reference_template?: string;
@@ -196,7 +195,6 @@ export interface RunCreatedProps {
   target_platforms?: string;
   companion_surfaces?: string;
   fidelity?: TrackingFidelity;
-  connectors?: string;
   use_speaker_notes?: boolean;
   include_animations?: boolean;
   reference_template?: string;
@@ -218,7 +216,6 @@ export interface RunCreatedProps {
   // already pin it. Omit to inherit the global value.
   runtime_type?: TrackingRuntimeType;
   skill_id: string | null;
-  mcp_id: string | null;
   // Composer mode the prompt was sent in. `ask` is the lighter Q&A mode
   // (wire value `chat`); `design` is the full design-agent run. Optional so
   // DS-generation runs (which have no user-facing mode) can omit it.
@@ -226,10 +223,6 @@ export interface RunCreatedProps {
   // The plugin actively bound to this run (the applied plugin snapshot), or
   // null when the user ran with no active plugin.
   plugin_id?: string | null;
-  // Per-turn capability context: the MCP servers and skills actually enabled
-  // for this send. Multi-valued, so recorded as arrays alongside the legacy
-  // singular `mcp_id` / `skill_id` (which stay for back-compat).
-  mcp_ids?: string[];
   skill_ids?: string[];
   token_count_source: TrackingTokenCountSource;
 }
@@ -763,15 +756,6 @@ export interface ByokPreflightBlockedProps {
   reason: TrackingByokPreflightBlockReason;
   provider_id: TrackingByokProviderId | 'unknown';
   active_execution_mode: TrackingExecutionMode;
-}
-
-export interface SettingsConnectorAuthResultProps {
-  page_name: TrackingSettingsPage;
-  area: 'connectors';
-  connector_id: string;
-  action: 'connect' | 'disconnect' | 'refresh';
-  result: TrackingRunResult;
-  error_code?: string;
 }
 
 // ---- Packaged startup failure --------------------------------------------

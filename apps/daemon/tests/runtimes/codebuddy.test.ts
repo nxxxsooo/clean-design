@@ -120,9 +120,6 @@ describe('codebuddy definition metadata', () => {
     expect(codebuddyAgentDef.streamFormat).toBe('claude-stream-json');
   });
 
-  it('uses claude-mcp-json for external MCP injection', () => {
-  });
-
   it('exposes fallback models with multi-provider coverage', () => {
     const modelIds = codebuddyAgentDef.fallbackModels.map((m) => m.id);
     expect(modelIds).toContain('default');

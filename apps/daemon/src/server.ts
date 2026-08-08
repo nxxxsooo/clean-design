@@ -593,7 +593,6 @@ import {
   isLoopbackPeerAddress,
   requireLocalDaemonRequest,
 } from './http/local-daemon-request.js';
-import { renderOAuthResultPage } from './http/oauth-result-page.js';
 import { createToolRequestAuth } from './http/tool-request-auth.js';
 
 /** @typedef {import('@open-design/contracts').ApiErrorCode} ApiErrorCode */

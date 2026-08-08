@@ -273,16 +273,6 @@ export function settingsSectionToTracking(
       return 'pets';
     case 'about':
       return 'about';
-    case 'composio':
-    case 'integrations':
-    case 'connectors':
-      return 'connectors';
-    case 'mcpClient':
-      return 'external_mcp';
-    case 'mcp_server':
-      return 'mcp_server';
-    case 'orbit':
-      return 'orbit';
     case 'skills':
       return 'skills';
     case 'designSystems':
@@ -297,8 +287,6 @@ export function settingsSectionToTracking(
       return 'privacy';
     case 'notifications':
       return 'notifications';
-    case 'externalMcp':
-      return 'external_mcp';
     default:
       return 'configure_execution_mode';
   }

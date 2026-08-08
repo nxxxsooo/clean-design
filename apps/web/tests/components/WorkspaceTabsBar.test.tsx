@@ -268,12 +268,10 @@ describe('WorkspaceTabsBar navigation semantics', () => {
     );
     expect(screen.getAllByRole('tab')).toHaveLength(1);
 
-    const sections: Array<{ view: 'projects' | 'tasks' | 'design-systems' | 'plugins' | 'integrations'; label: string }> = [
+    const sections: Array<{ view: 'projects' | 'design-systems' | 'plugins'; label: string }> = [
       { view: 'projects', label: 'Projects' },
-      { view: 'tasks', label: 'Automations' },
       { view: 'design-systems', label: 'Design systems' },
       { view: 'plugins', label: 'Plugins' },
-      { view: 'integrations', label: 'Integrations' },
     ];
 
     for (const section of sections) {
@@ -311,11 +309,11 @@ describe('WorkspaceTabsBar navigation semantics', () => {
     });
 
     // Switching to another section keeps the SAME entry tab and the project tab.
-    rerender(<WorkspaceTabsBar route={{ kind: 'home', view: 'tasks' }} projects={[project]} />);
+    rerender(<WorkspaceTabsBar route={{ kind: 'home', view: 'projects' }} projects={[project]} />);
     await waitFor(() => {
       const labels = screen.getAllByRole('tab').map((tab) => tab.textContent ?? '');
       expect(labels).toHaveLength(2);
-      expect(labels.some((label) => label.includes('Automations'))).toBe(true);
+      expect(labels.some((label) => label.includes('Projects'))).toBe(true);
       expect(labels.some((label) => label.includes('Project Alpha'))).toBe(true);
     });
   });

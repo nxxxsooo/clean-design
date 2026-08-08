@@ -5,11 +5,11 @@
   "sources": [
     {
       "label": "Brokerage holdings (mocked)",
-      "type": "connector"
+      "type": "mock_file"
     },
     {
       "label": "Quotes (mocked)",
-      "type": "connector"
+      "type": "mock_file"
     },
     {
       "label": "AI recommendation",

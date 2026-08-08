@@ -117,9 +117,6 @@ export const codebuddyAgentDef = {
     promptViaStdin: true,
     promptInputFormat: 'stream-json',
     streamFormat: 'claude-stream-json',
-    // Codebuddy CLI auto-loads `.mcp.json` from the project cwd at spawn
-    // (same behavior as Claude Code), so the daemon can write the user's
-    // external MCP servers there before launching.
     resumesSessionViaCli: true,
     installUrl: 'https://www.codebuddy.cn',
     docsUrl: 'https://www.codebuddy.cn/docs/workbuddy/Overview',

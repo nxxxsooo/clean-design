@@ -666,7 +666,7 @@ function buildCreateDesignSystemFromProjectPrompt(input: {
     '',
     'Completion gate:',
     '- Finish only after the project contains reviewable design-system artifacts and the right-side Design System tab can inspect them.',
-    '- Before your final response, run `"$OD_NODE_BIN" "$OD_BIN" tools connectors design-system-package-audit --path . --fail-on-warnings`.',
+    '- Before your final response, run `"$OD_NODE_BIN" "$OD_BIN" tools design design-system-package-audit --path . --fail-on-warnings`.',
     '- Fix every audit error and design-quality warning. If an issue cannot be fixed because source evidence is missing, explain that blocker instead of claiming the design system is ready.',
     '',
     'When finished, summarize the generated files and name the first previews reviewers should inspect.',

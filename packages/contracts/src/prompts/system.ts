@@ -1047,9 +1047,6 @@ function derivePreflight(skillBody: string): string {
   if (/references\/components\.md/.test(skillBody)) refs.push('`references/components.md`');
   if (/references\/checklist\.md/.test(skillBody)) refs.push('`references/checklist.md`');
   if (/references\/artifact-schema\.md/.test(skillBody)) refs.push('`references/artifact-schema.md`');
-  if (/references\/connector-policy\.md|connector-policy\.md/.test(skillBody)) {
-    refs.push('`references/connector-policy.md`');
-  }
   if (/references\/refresh-contract\.md|refresh-contract\.md/.test(skillBody)) {
     refs.push('`references/refresh-contract.md`');
   }

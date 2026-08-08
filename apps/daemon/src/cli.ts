@@ -6,7 +6,7 @@ import { runDaemonCliStartup, startDaemonRuntime } from './daemon-startup.js';
 import { runLiveArtifactsMcpServer } from './mcp-live-artifacts-server.js';
 import { runArtifactsCli } from './artifacts-cli.js';
 import { runProjectHandoff } from './handoff-cli.js';
-import { runConnectorsToolCli } from './tools-connectors-cli.js';
+import { runDesignToolCli } from './tools-design-cli.js';
 import { runDesignSystemsToolCli } from './tools-design-systems-cli.js';
 import { DESIGN_SYSTEMS_USAGE, isDesignSystemsHelpArg } from './cli-help/index.js';
 import { BRAND_USAGE, isBrandHelpArg } from './cli-help/index.js';
@@ -504,14 +504,14 @@ if (argv[0] === 'tools' && argv[1] === 'live-artifacts') {
       process.stderr.write(`${JSON.stringify({ ok: false, error: { message } })}\n`);
       process.exitCode = 1;
     });
-} else if (argv[0] === 'tools' && argv[1] === 'connectors') {
+} else if (argv[0] === 'tools' && argv[1] === 'design') {
   const localCommand = argv[2];
   if (localCommand !== 'github-design-context'
       && localCommand !== 'local-design-context'
       && localCommand !== 'design-system-package-audit') {
-    process.stderr.write(`${JSON.stringify({ ok: false, error: { message: 'External connector tools are disabled in Clean Design.' } })}\n`);
+    process.stderr.write(`${JSON.stringify({ ok: false, error: { message: 'Unsupported design tool command.' } })}\n`);
     process.exitCode = 64;
-  } else runConnectorsToolCli(argv.slice(2))
+  } else runDesignToolCli(argv.slice(2))
     .then(({ exitCode }) => {
       process.exitCode = exitCode;
     })
@@ -618,7 +618,7 @@ function printRootHelp() {
   od artifacts create --name <path> --input <file> [--project <id-or-name>]
       Create a normal project artifact through the local daemon.
 
-  od tools connectors <github-design-context|local-design-context|design-system-package-audit> [options]
+  od tools design <github-design-context|local-design-context|design-system-package-audit> [options]
       Inspect a user-selected local source or audit a local design-system package.
 
   od tools design-systems read --path <manifest-declared-path>

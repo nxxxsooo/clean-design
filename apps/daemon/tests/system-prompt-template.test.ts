@@ -361,8 +361,7 @@ describe('composeSystemPrompt — metadata.promptTemplate', () => {
     });
 
     expect(out).toContain('## Media generation policy');
-    expect(out).toContain('Open Design-owned media execution is **disabled for this run**');
-    expect(out).toContain('External MCP media tools, when explicitly configured for this run, are outside');
+    expect(out).toContain('Media execution is **disabled for this run**');
     expect(out).toMatch(/Do not call\s+`"\$OD_NODE_BIN" "\$OD_BIN" media generate`/);
     expect(out).not.toContain('## Media generation contract');
     expect(out).not.toContain('## Codex built-in imagegen override');

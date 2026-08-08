@@ -110,26 +110,6 @@
    ================================================================ */
 
 /* ================================================================
-   Integrations view
-   ================================================================ */
-
-.integrations-view__hero {
-  animation: od-fade-slide-up 350ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-.integrations-view__tabs {
-  animation: od-fade-in 300ms cubic-bezier(0.23, 1, 0.32, 1) 60ms both;
-}
-
-.integrations-view__panel {
-  animation: od-fade-slide-up 300ms cubic-bezier(0.23, 1, 0.32, 1) 100ms both;
-}
-
-.integrations-view__coming-soon {
-  animation: od-fade-slide-up 350ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-/* ================================================================
    Nav rail
    ================================================================ */
 
@@ -431,14 +411,6 @@
 
 .live-artifact-refresh-section {
   animation: od-fade-slide-up 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-
-/* ================================================================
-   Use everywhere sections
-   ================================================================ */
-
-.use-everywhere-section {
-  animation: od-fade-slide-up 280ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
 /* ================================================================

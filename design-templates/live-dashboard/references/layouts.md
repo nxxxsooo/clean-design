@@ -25,7 +25,7 @@ Vertical stack inside the page column, in this order:
 
 Use this when:
 - The user said "team dashboard" / "ops dashboard" without further qualifier.
-- The user wants a generalist Notion-like landing page for a team
+- The user wants a generalist Workspace-like landing page for a team
   workspace.
 
 This is what `example.html` ships.

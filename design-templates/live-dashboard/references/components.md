@@ -108,7 +108,7 @@ Do not use Chart.js / Recharts / D3 — single artifact, no external deps.
 
 ---
 
-## status pills (Notion canonical five-color set)
+## status pills (Workspace canonical five-color set)
 
 ```html
 <span class="pill done">Done</span>
@@ -118,7 +118,7 @@ Do not use Chart.js / Recharts / D3 — single artifact, no external deps.
 <span class="pill todo">To do</span>
 ```
 
-| Class      | Background      | Foreground      | Notion label   |
+| Class      | Background      | Foreground      | Workspace label   |
 |---         |---              |---              |---             |
 | `done`     | `#dbeddb`       | `#2b593f`       | Done           |
 | `progress` | `#fdecc8`       | `#976d23`       | In progress    |
@@ -156,7 +156,7 @@ of these five.
 ```html
 <button class="btn primary" id="refreshBtn">
   <span class="ico" id="refreshIco">↻</span>
-  <span>Refresh from Notion</span>
+  <span>Refresh from Workspace</span>
 </button>
 ```
 
@@ -165,7 +165,7 @@ of these five.
 - During poll: add `.spin` to `.ico`, disable button taps via the
   `busy` flag in JS (do **not** rely on `[disabled]` so visuals stay
   identical).
-- Label adapts to connector: "Refresh from Notion" / "Refresh from
+- Label adapts to source: "Refresh from Workspace" / "Refresh from
   Linear" / "Refresh from Stripe" — never just "Refresh" alone.
 
 ---
@@ -186,7 +186,7 @@ Toggles `setInterval(refresh, refresh_seconds * 1000)`. Persists to
 ## toast (bottom-center, transient)
 
 ```html
-<div class="toast" id="toast">Synced — 3 changes from Notion</div>
+<div class="toast" id="toast">Synced — 3 changes from Workspace</div>
 ```
 
 `position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);`
@@ -195,14 +195,14 @@ at a time; subsequent calls reset the timer.
 
 ---
 
-## callout (Notion idiom)
+## callout (Workspace idiom)
 
 ```html
 <div class="callout">
   <div class="emj">💡</div>
   <div>
     <div><strong>This page is a Live Artifact.</strong> Numbers below are pulled from
-    your <strong>Acme Studio</strong> Notion workspace via the Composio connector.</div>
+    your <strong>Acme Studio</strong> Workspace workspace via the local snapshot source.</div>
     <small>Refreshes on demand or when the page opens. Last 7 days only.</small>
   </div>
 </div>

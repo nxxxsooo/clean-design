@@ -51,7 +51,7 @@ import {
   scanProjectLocation,
   writeProjectManifest,
 } from '../../project-locations.js';
-import { auditDesignSystemPackage } from '../../tools-connectors-cli.js';
+import { auditDesignSystemPackage } from '../../tools-design-cli.js';
 import { parseOrchestratorWorkspace } from '../../workspace-contract.js';
 import { registerProjectConversationRoutes } from './conversations.js';
 import { cancelRunsOwnedBy } from './cancel-owned-runs.js';
@@ -1146,7 +1146,7 @@ function buildDesignSystemCopySourceContext(input: {
     '- Read the copied files directly from the project workspace; they are source evidence, not generated design-system output.',
     '- Preserve high-signal assets, source examples, UI surfaces, copy, tokens, typography, and interaction patterns from the copied project.',
     '- Generate a reusable Open Design design-system package in this same project: DESIGN.md, README.md, SKILL.md, colors_and_type.css, context/provenance, focused preview cards, preserved assets/build/fonts when available, and ui_kits/app/.',
-    '- Before final response, run `"$OD_NODE_BIN" "$OD_BIN" tools connectors design-system-package-audit --path . --fail-on-warnings` and fix every actionable issue.',
+    '- Before final response, run `"$OD_NODE_BIN" "$OD_BIN" tools design design-system-package-audit --path . --fail-on-warnings` and fix every actionable issue.',
     '',
   ].join('\n');
 }
@@ -1204,7 +1204,7 @@ function buildDesignSystemCopyPendingPrompt(input: {
     '',
     'Completion gate:',
     '- Finish only after the project contains reviewable design-system artifacts and the right-side Design System tab can inspect them.',
-    '- Before your final response, run `"$OD_NODE_BIN" "$OD_BIN" tools connectors design-system-package-audit --path . --fail-on-warnings`.',
+    '- Before your final response, run `"$OD_NODE_BIN" "$OD_BIN" tools design design-system-package-audit --path . --fail-on-warnings`.',
     '- Fix every audit error and design-quality warning. If an issue cannot be fixed because source evidence is missing, explain that blocker instead of claiming the design system is ready.',
     '',
     'When finished, summarize the generated files and name the first previews reviewers should inspect.',

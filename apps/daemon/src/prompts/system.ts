@@ -1422,51 +1422,6 @@ If this is a plain API run where filesystem tools are unavailable, output the sa
 
 // Defense-in-depth against Claude Code's synthetic OAuth tools.
 //
-// When Claude Code's built-in HTTP MCP transport gets a 401 on its first
-// initialize (transient propagation lag, edge cache miss, header
-// re-canonicalization quirk, etc.), it injects two synthetic tools per
-// server — `mcp__<server>__authenticate` and
-// `mcp__<server>__complete_authentication` — that drive a per-process
-// OAuth dance with a `localhost:<random>/callback` redirect_uri. That
-// listener dies with the agent process, so the round-trip never
-// completes, and meanwhile the model burns a turn pasting an
-// unreachable URL into the chat. By the time the user is back, our
-// daemon-issued Bearer is already in `.mcp.json` and the real tools
-// (`generate_image`, `models_explore`, …) are reachable on the next
-// turn — but the model doesn't know that and keeps escalating the
-// fake auth flow.
-//
-// The fix is to tell the model up front: these specific servers are
-// already authenticated by the daemon, do NOT call any
-// `*_authenticate` / `*_complete_authentication` tool for them. If
-// the real tools really are missing, surface that as a separate
-// failure instead of pivoting to the synthetic flow.
-export function renderConnectedExternalMcpDirective(
-  connectedExternalMcp:
-    | ReadonlyArray<{ id: string; label?: string | undefined }>
-    | undefined,
-): string {
-  if (!connectedExternalMcp || connectedExternalMcp.length === 0) return '';
-  const lines = connectedExternalMcp
-    .map((s) => {
-      const id = typeof s?.id === 'string' ? s.id.trim() : '';
-      if (!id) return null;
-      const label = typeof s?.label === 'string' && s.label.trim() ? s.label.trim() : id;
-      return `- \`${id}\`${label !== id ? ` (${label})` : ''}`;
-    })
-    .filter((line): line is string => typeof line === 'string');
-  if (lines.length === 0) return '';
-  // No leading separator: callers place this in a `---`-joined slice.
-  return [
-    '## External MCP servers — already authenticated\n\n',
-    'The following external MCP servers are already authenticated for this run via an OAuth Bearer token the daemon injected into `.mcp.json`. You can call their real tools directly:\n\n',
-    lines.join('\n'),
-    '\n\n',
-    '**Do NOT call any tool whose name matches `mcp__<server>__authenticate` or `mcp__<server>__complete_authentication` for the servers above.** Those are synthetic fallback tools Claude Code exposes when its first HTTP connect briefly flipped the server into a needs-auth state. The flow they drive (a `localhost:<random>/callback` redirect) cannot complete in this environment, and the real tools (e.g. `generate_image`, `models_explore`, `balance`, …) are already reachable.\n\n',
-    'If a real tool actually fails with an auth-related error, report the exact tool name and error text and stop — the user will reconnect the server in Settings → External MCP. Do not retry by invoking any `*_authenticate` tool.\n',
-  ].join('');
-}
-
 const CODEX_IMAGEGEN_MODEL_IDS = new Set(
   IMAGE_MODELS.filter(
     (model) =>
@@ -1922,7 +1877,7 @@ function renderMediaMetadataAction(
   const article = surface === 'audio' ? 'an' : 'a';
   const mode = mediaExecution?.mode ?? 'enabled';
   if (mode === 'disabled') {
-    return `This is ${article} **${surface}** project, but Open Design-owned media execution is disabled for this run. Plan the creative brief only unless an external MCP media tool is explicitly configured. Do NOT call OD media generation tools and do NOT emit \`<artifact>\` HTML for media surfaces.`;
+    return `This is ${article} **${surface}** project, but media execution is disabled for this run. Plan the creative brief only. Do NOT call media generation tools and do NOT emit \`<artifact>\` HTML for media surfaces.`;
   }
   return `This is ${article} **${surface}** project. Plan the creative brief carefully, then dispatch via the **media generation contract** using ${command}. Do NOT emit \`<artifact>\` HTML for media surfaces.`;
 }

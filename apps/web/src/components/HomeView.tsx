@@ -2489,11 +2489,10 @@ function estimatePluginContextItemCount(
   const context = record.manifest?.od?.context;
   if (!context) return 0;
   const assetCount = context.assets?.length ?? 0;
-  const mcpCount = context.mcp?.length ?? 0;
   const claudePluginCount = context.claudePlugins?.length ?? 0;
   const atomCount = context.atoms?.length ?? 0;
   const craftCount = context.craft?.length ?? 0;
-  return assetCount + mcpCount + claudePluginCount + atomCount + craftCount;
+  return assetCount + claudePluginCount + atomCount + craftCount;
 }
 
 function hydratePluginInputs(

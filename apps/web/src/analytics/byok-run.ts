@@ -73,7 +73,6 @@ function baseRunProps(input: ByokRunBaseInput) {
     agent_provider_id: byokAgentProviderId(input.apiProtocol),
     // BYOK streams client-side with no skills/MCP execution layer.
     skill_id: input.skillId,
-    mcp_id: null,
     // No provider usage is parsed from the client stream yet — durations and
     // token usage are a follow-up. Honest 'unknown' rather than a fake count.
     token_count_source: 'unknown' as const,

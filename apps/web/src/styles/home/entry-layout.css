@@ -533,12 +533,8 @@
 
 /* ============================================================
    Icon-only topbar chips
-   Collapse the Star / Discord / model-switcher / Use-everywhere
-   chips to square icon buttons; the full label surfaces as a
-   downward hover tooltip. Keeps the entry topbar quiet and tidy.
    ============================================================ */
 .entry-main__topbar-chips--icon-only .entry-discord-badge,
-.entry-main__topbar-chips--icon-only .use-everywhere-chip,
 .entry-main__topbar-chips--icon-only .inline-switcher__chip {
   width: 32px;
   height: 32px;
@@ -559,14 +555,12 @@
 .entry-main__topbar-chips--icon-only .entry-discord-badge__label,
 .entry-main__topbar-chips--icon-only .entry-discord-badge__sep,
 .entry-main__topbar-chips--icon-only .entry-discord-badge__online,
-.entry-main__topbar-chips--icon-only .use-everywhere-chip__label,
 .entry-main__topbar-chips--icon-only .inline-switcher__chip-text,
 .entry-main__topbar-chips--icon-only .inline-switcher__chip-chevron {
   display: none;
 }
 
 /* Center the surviving icon wrappers inside the square. */
-.entry-main__topbar-chips--icon-only .use-everywhere-chip__icon,
 .entry-main__topbar-chips--icon-only .inline-switcher__chip-icon {
   margin: 0;
 }
@@ -4085,10 +4079,7 @@
   white-space: nowrap;
 }
 
-/* Workspace / team-edition entry. Neutral white-panel chip matching the
-   GitHub-star / Discord pills next to it; keeps its label visible (unlike the
-   icon-only discord/use-everywhere chips) because guiding the click is the
-   whole point. Tokens resolve in both light and dark themes. */
+/* Workspace entry. Neutral white-panel chip matching the adjacent controls. */
 .entry-workspace-chip {
   display: inline-flex;
   align-items: center;

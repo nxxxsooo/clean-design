@@ -12,14 +12,12 @@
 @import './styles/chat.css';
 @import './styles/workspace/mention-home.css';
 @import './styles/workspace/artifacts.css';
-@import './styles/workspace/connectors.css';
-@import './styles/workspace/drawer.css';
 @import './styles/workspace/design-files.css';
 @import './styles/workspace/design-browser.css';
 @import './styles/viewer/core.css';
 @import './styles/viewer/code.css';
 @import './styles/viewer/tools.css';
-@import './styles/viewer/composio.css';
+@import './styles/viewer/workspace-extras.css';
 @import './styles/viewer/theater.css';
 @import './styles/viewer/pets.css';
 @import './styles/viewer/library.css';

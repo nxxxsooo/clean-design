@@ -155,18 +155,18 @@ export interface HomeChatComposerClickProps {
     | 'example_open_project'
     // The "+" menu on the home composer (same control as the in-project
     // composer's `plus_*` events): opening it, inserting a
-    // connector/plugin/skill/mcp mention (`resource_kind` + `resource_id`), or
+    // plugin/skill mention (`resource_kind` + `resource_id`), or
     // jumping to the add-resource surface (`resource_kind`).
     | 'plus_menu_open'
     | 'plus_pick'
     | 'plus_add'
     // A "+"-menu submenu flyout opened (hover or click) — the funnel head
     // for "opened the list but picked nothing". `resource_kind` carries
-    // which list (connector / plugin / skill / mcp). The Design-toolbox row
+    // which list (plugin / skill). The Design-toolbox row
     // has its own `design_toolbox_open` and is excluded.
     | 'plus_submenu_open'
     // First keystroke in a submenu flyout's search box, once per open
-    // (`resource_kind`: plugin / skill / mcp). The query text is never sent.
+    // (`resource_kind`: plugin / skill). The query text is never sent.
     | 'plus_search'
     // The "how to download a .fig" help row beside the "+" menu's Figma
     // import entry. Mirrors the chat_panel composer's `figma_help`.
@@ -175,8 +175,8 @@ export interface HomeChatComposerClickProps {
     // (programmatically clicks the hero DS trigger). The actual apply stays
     // `design_system_apply_result` on the picker itself.
     | 'design_system_open'
-    // Removing a staged context chip above the composer (plugin / MCP /
-    // connector / workspace chips). Mirrors the chat_panel composer's
+    // Removing a staged context chip above the composer (plugin / skill /
+    // workspace chips). Mirrors the chat_panel composer's
     // `context_remove` so one dashboard counts removals across surfaces.
     | 'context_remove';
   // For `plus_pick` / `plus_add` / `context_remove`: which kind of resource
@@ -184,7 +184,7 @@ export interface HomeChatComposerClickProps {
   // local-code context sources (`resource_id`: 'reference-project' or
   // 'local-code' on pick; the staged chip id on remove — mirrors the
   // chat_panel composer so cross-surface funnels line up).
-  resource_kind?: 'connector' | 'plugin' | 'skill' | 'mcp' | 'workspace';
+  resource_kind?: 'plugin' | 'skill' | 'workspace';
   resource_id?: string;
   // For plugin / action / task chips, the specific id (e.g. `prototype`,
   // `from_figma`, `hyperframes`).
@@ -395,7 +395,6 @@ export interface AutomationsClickProps {
     | 'memory'
     | 'design-system'
     | 'skills'
-    | 'connectors'
     | 'compression'
     | 'release'
     | 'quality';
@@ -674,66 +673,6 @@ export interface DesignSystemEditClickProps {
   project_id?: string;
 }
 
-// INTEGRATIONS
-export interface IntegrationsTabClickProps {
-  page_name: 'integrations';
-  area: 'integrations_tab';
-  element: 'mcp' | 'connectors' | 'skills' | 'use_everywhere';
-}
-
-// Shared element vocabulary for the External MCP panel. McpClientSection
-// renders on two surfaces (Settings -> External MCP, Integrations -> MCP
-// tab); both click payloads draw from this enum so funnels line up.
-export type TrackingExternalMcpElement =
-  | 'add_server'
-  | 'pick_template'
-  | 'pick_blank'
-  | 'remove_server'
-  | 'saved';
-
-export interface IntegrationsMcpTabClickProps {
-  page_name: 'integrations';
-  area: 'mcp_tab';
-  element: TrackingExternalMcpElement;
-  // Catalog template id (hyphens mapped to underscores). Set for
-  // `pick_template`, and for `remove_server` when the removed row came
-  // from a template. Omitted for blank/custom rows.
-  template_id?: string;
-}
-
-export interface IntegrationsConnectorsTabClickProps {
-  page_name: 'integrations';
-  area: 'connectors_tab';
-  element:
-    | 'api_key_input'
-    | 'save_key'
-    | 'clear'
-    | 'get_api_key'
-    | 'gate_card'
-    | 'provider_chip'
-    | 'search_connectors';
-}
-
-export interface IntegrationsSkillsTabClickProps {
-  page_name: 'integrations';
-  area: 'skills_tab';
-  element: 'coming_soon';
-}
-
-export interface IntegrationsUseEverywhereTabClickProps {
-  page_name: 'integrations';
-  area: 'use_everywhere_tab';
-  element:
-    | 'overview'
-    | 'cli_od'
-    | 'mcp_server'
-    | 'http_api'
-    | 'skills_headless'
-    | 'configure_mcp_server'
-    | 'copy_guide_for_agent'
-    | 'copy';
-}
-
 // CHAT PANEL (studio)
 export interface ChatPanelClickProps {
   page_name: 'chat_panel';
@@ -779,7 +718,7 @@ export interface ComposerSessionModeClickProps {
 // The "设计百宝箱" (Design toolbox) flyout inside the composer's "+" menu.
 // `design_toolbox_open` fires when the panel is opened; `..._action` when a
 // predefined follow-up action is picked (`toolbox_action_id`); `..._resource`
-// when a skill / plugin / mcp / connector / file is inserted
+// when a skill, plugin, or file is inserted
 // (`resource_kind` + `resource_id`).
 export interface DesignToolboxClickProps {
   page_name: 'chat_panel';
@@ -792,9 +731,6 @@ export interface DesignToolboxClickProps {
   resource_kind?:
     | 'skill'
     | 'plugin'
-    | 'mcp'
-    | 'mcp-template'
-    | 'connector'
     | 'file';
   resource_id?: string;
   project_id?: string;
@@ -803,7 +739,7 @@ export interface DesignToolboxClickProps {
 // The rest of the in-project composer bottom bar (not the mode toggle or the
 // design toolbox, which have their own events above):
 //   - `plus_menu_open` / `plus_pick` / `plus_add`: the "+" menu — opening it,
-//     inserting a connector/plugin/mcp mention (`resource_kind` + `resource_id`),
+//     inserting a plugin/skill mention (`resource_kind` + `resource_id`),
 //     or jumping to the add-resource surface (`resource_kind`).
 //   - `design_system_switch`: picked a design system from the composer
 //     (`design_system_id`).
@@ -841,9 +777,7 @@ export interface ComposerBarClickProps {
     | 'agent_model_select'
     | 'context_remove';
   resource_kind?:
-    | 'connector'
     | 'plugin'
-    | 'mcp'
     | 'skill'
     | 'workspace'
     | 'attachment';
@@ -1387,10 +1321,6 @@ export type TrackingSettingsArea =
   | 'media_providers'
   | 'skills'
   | 'design_review'
-  | 'external_mcp'
-  | 'connectors'
-  | 'orbit'
-  | 'mcp_server'
   | 'language'
   | 'appearance'
   | 'notifications'
@@ -1454,20 +1384,6 @@ export interface SettingsMediaProvidersClickProps {
   element: 'reload' | 'key_input' | 'url_input' | 'clear';
   providers_id?: string;
   is_configured?: boolean;
-}
-
-export interface SettingsConnectorsClickProps {
-  page_name: TrackingSettingsPage;
-  area: 'connectors';
-  element:
-    | 'api_key_input'
-    | 'save_key'
-    | 'clear'
-    | 'get_api_key'
-    | 'gate_card'
-    | 'provider_chip'
-    | 'search_connectors';
-  connector_id?: string;
 }
 
 export interface SettingsLanguageClickProps {
@@ -1535,14 +1451,6 @@ export interface SettingsDesignReviewClickProps {
   has_active_project: boolean;
 }
 
-export interface SettingsExternalMcpClickProps {
-  page_name: TrackingSettingsPage;
-  area: 'external_mcp';
-  element: TrackingExternalMcpElement;
-  // Same semantics as IntegrationsMcpTabClickProps.template_id.
-  template_id?: string;
-}
-
 // Discriminated union of every supported ui_click payload.
 export type UiClickProps =
   | HomeNavClickProps
@@ -1585,11 +1493,6 @@ export type UiClickProps =
   | DesignSystemsPresetBrandPickerClickProps
   | DesignSystemEnrichClickProps
   | DesignSystemEditClickProps
-  | IntegrationsTabClickProps
-  | IntegrationsMcpTabClickProps
-  | IntegrationsConnectorsTabClickProps
-  | IntegrationsSkillsTabClickProps
-  | IntegrationsUseEverywhereTabClickProps
   | ChatPanelClickProps
   | ComposerSessionModeClickProps
   | DesignToolboxClickProps
@@ -1621,12 +1524,10 @@ export type UiClickProps =
   | SettingsByokProviderOptionClickProps
   | SettingsByokFieldClickProps
   | SettingsMediaProvidersClickProps
-  | SettingsConnectorsClickProps
   | SettingsLanguageClickProps
   | SettingsAppearanceClickProps
   | SettingsNotificationsClickProps
   | SettingsPetsClickProps
   | SettingsPrivacyClickProps
   | SettingsDesignReviewClickProps
-  | SettingsExternalMcpClickProps
   | OnboardingClickProps;
