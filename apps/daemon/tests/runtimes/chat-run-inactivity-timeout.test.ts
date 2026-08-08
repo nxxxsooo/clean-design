@@ -21,7 +21,6 @@ import {
   resolveAcpStageTimeoutMs,
   resolveChatRunInactivityTimeoutMs,
 } from '../../src/server.js';
-import { amrAgentDef } from '../../src/runtimes/defs/amr.js';
 import { copilotAgentDef } from '../../src/runtimes/defs/copilot.js';
 
 const ENV_KEY = 'OD_CHAT_RUN_INACTIVITY_TIMEOUT_MS';
@@ -177,12 +176,6 @@ describe('resolveAcpStageTimeoutMs', () => {
 describe('copilotAgentDef.inactivityTimeoutMs', () => {
   it('ships a 30-minute inactivity hint so Copilot silent-thinking phases do not trip the default watchdog (#2467)', () => {
     expect(copilotAgentDef.inactivityTimeoutMs).toBe(THIRTY_MINUTES_MS);
-  });
-});
-
-describe('amrAgentDef.inactivityTimeoutMs', () => {
-  it('ships a 30-minute inactivity hint so the outer chat watchdog matches ACP stage timeouts for slow upstream providers', () => {
-    expect(amrAgentDef.inactivityTimeoutMs).toBe(THIRTY_MINUTES_MS);
   });
 });
 

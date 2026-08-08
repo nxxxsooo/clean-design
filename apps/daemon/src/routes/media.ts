@@ -26,7 +26,7 @@ const LONG_MEDIA_PROXY_TIMEOUT_MS = 10 * 60 * 1000;
 const AIHUBMIX_CATALOG_TTL_MS = 5 * 60 * 1000;
 const aihubmixCatalogCache = new Map<string, { at: number; models: Array<{ id: string; label: string }> }>();
 
-export interface RegisterMediaRoutesDeps extends RouteDeps<'db' | 'design' | 'http' | 'paths' | 'ids' | 'auth' | 'media' | 'appConfig' | 'orbit' | 'nativeDialogs' | 'projectStore' | 'projectFiles' | 'conversations' | 'research'> {}
+export interface RegisterMediaRoutesDeps extends RouteDeps<'db' | 'design' | 'http' | 'paths' | 'ids' | 'auth' | 'media' | 'appConfig' | 'nativeDialogs' | 'projectStore' | 'projectFiles' | 'conversations' | 'research'> {}
 
 export type LegacyMediaRouteGrantDecision =
   | { ok: true; grant: ToolTokenGrant | null }
@@ -82,7 +82,6 @@ export function registerMediaRoutes(app: Express, ctx: RegisterMediaRoutesDeps) 
     typeof ctx.appConfig.onAppConfigWritten === 'function'
       ? ctx.appConfig.onAppConfigWritten
       : null;
-  const { orbitService } = ctx.orbit;
   const { openBrowser, openNativeFolderDialog } = ctx.nativeDialogs;
   const { getProject } = ctx.projectStore;
   const { insertConversation, upsertMessage } = ctx.conversations;
@@ -542,33 +541,6 @@ export function registerMediaRoutes(app: Express, ctx: RegisterMediaRoutesDeps) 
       /** @type {import('@open-design/contracts').RecentLinkedDirsResponse} */
       const body = { dirs: existing };
       res.json(body);
-    } catch (err: any) {
-      res
-        .status(500)
-        .json({ error: String(err && err.message ? err.message : err) });
-    }
-  });
-
-  app.get('/api/orbit/status', async (req, res) => {
-    if (!isLocalSameOrigin(req, getResolvedPort())) {
-      return res.status(403).json({ error: 'cross-origin request rejected' });
-    }
-    try {
-      res.json(await orbitService.status());
-    } catch (err: any) {
-      res
-        .status(500)
-        .json({ error: String(err && err.message ? err.message : err) });
-    }
-  });
-
-  app.post('/api/orbit/run', async (req, res) => {
-    if (!isLocalSameOrigin(req, getResolvedPort())) {
-      return res.status(403).json({ error: 'cross-origin request rejected' });
-    }
-    try {
-      const locale = typeof req.body?.locale === 'string' ? req.body.locale : null;
-      res.json(await orbitService.start('manual', { locale }));
     } catch (err: any) {
       res
         .status(500)

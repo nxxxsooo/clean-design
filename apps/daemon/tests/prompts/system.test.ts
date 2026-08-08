@@ -387,17 +387,6 @@ describe('composeSystemPrompt', () => {
       expect(prompt).toContain('When NOT to emit `<artifact>`');
     });
 
-    it('pins filesystem artifact handoff for AMR runs', () => {
-      const prompt = composeSystemPrompt({ agentId: 'amr' });
-      expect(prompt).toContain('## Filesystem handoff');
-      expect(prompt).toContain('filesystem execution profile');
-      expect(prompt).toContain("runtime's native tool-call interface");
-      expect(prompt).toContain('Never type a tool invocation into assistant text');
-      expect(prompt).toContain('This tool-call rule does not apply to Open Design UI markup');
-      expect(prompt).toContain('emit the complete `<question-form>...</question-form>` block directly');
-      expect(prompt).toContain('Do not output generated source code in a `<artifact type="text/html">...</artifact>` block.');
-    });
-
     it('prioritizes question forms over native tool calls when clarifying', () => {
       const prompt = composeSystemPrompt({ agentId: 'amr' });
       expect(prompt).toContain('## Clarifying questions mid-conversation');

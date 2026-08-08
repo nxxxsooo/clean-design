@@ -1,7 +1,6 @@
 import type { Express } from 'express';
 import type { SkillInfo } from './skills.js';
 import type { DesignSystemSummary } from './design-systems/index.js';
-import type { RoutineRoutesService } from './routes/routine.js';
 import type { OpenDesignPublicMetadataService } from './services/open-design-public-metadata.js';
 
 export interface HttpDeps {
@@ -55,10 +54,6 @@ export interface ResourceDeps {
   // a stored project.skillId points at either root.
   listAllSkillLikeEntries: () => Promise<Array<SkillInfo & { source?: string }>>;
   mimeFor: (filePath: string) => string;
-}
-
-export interface RoutineDeps {
-  routineService: RoutineRoutesService;
 }
 
 export interface ProjectPreviewScopeDeps {
@@ -118,16 +113,12 @@ export interface ServerContext {
   documents: any;
   auth: any;
   liveArtifacts: any;
-  deploy: any;
   media: any;
   appConfig: any;
-  orbit: any;
   nativeDialogs: any;
   research: any;
-  mcp: any;
   plugins: any;
   resources: ResourceDeps;
-  routines: RoutineDeps;
   projectPreviewScopes: ProjectPreviewScopeDeps;
   telemetry: TelemetryDeps;
   validation: any;

@@ -40,12 +40,7 @@ import {
   updateProject,
   upsertMessage,
 } from '../db.js';
-import { readVelaLoginStatus } from '../integrations/vela.js';
 import { getDetectedRuntimeVersions } from '../runtimes/detection.js';
-import {
-  deriveLangfuseDeliveryState,
-  readTelemetrySinkConfig,
-} from '../langfuse-trace.js';
 import { parseMediaExecutionPolicyInput } from '../media/policy.js';
 import { isManagedProjectCwd } from '../mcp-config.js';
 import {
@@ -61,7 +56,6 @@ import {
   SandboxImportedProjectError,
 } from '../projects.js';
 import {
-  amrUserIdForRunAnalytics,
   agentProviderIdForRunAnalytics,
   hasExplicitRequestedModelForAnalytics,
   runtimeTypeForRunAnalytics,

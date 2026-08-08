@@ -20,7 +20,6 @@ import {
   DEFAULT_STAGE_TIMEOUT_MS,
   ACP_ARTIFACT_ECHO_START_RE,
   ACP_RAW_EVENT_SHAPE_DIAGNOSTIC_LIMIT,
-  AMR_STDERR_RETRY_TAIL_LIMIT,
 } from './constants.js';
 import { errorMessage, asObject, extractAcpUpdateText } from './json.js';
 import {
@@ -35,15 +34,12 @@ import {
   choosePermissionOutcome,
 } from './rpc.js';
 import {
-  acpRawEventShape,
   isAcpCompletedStatus,
   isAcpTerminalFailureStatus,
   acpToolCallId,
   isAcpArtifactWriteLabel,
   isAcpArtifactWriteUpdate,
   acpArtifactWritePath,
-  promotedAmrRetryStatusPayload,
-  promotedAmrStderrPayload,
 } from './updates.js';
 import {
   findModelConfigOption,
@@ -70,7 +66,6 @@ export interface AttachAcpSessionOptions {
   clientVersion?: string;
   stageTimeoutMs?: number;
   executionProfile?: ExecutionProfile;
-  modelUnavailableErrorCode?: 'AMR_MODEL_UNAVAILABLE';
   // When set, resume an existing upstream session instead of creating a new
   // one: the handshake sends `session/load { sessionId }` (the durable handle
   // captured from a prior run via `getDurableSessionId()`) rather than
@@ -122,7 +117,6 @@ export function attachAcpSession({
   clientVersion = 'runtime-adapter',
   stageTimeoutMs = DEFAULT_STAGE_TIMEOUT_MS,
   executionProfile = 'filesystem',
-  modelUnavailableErrorCode,
   resumeSessionId,
   onCliReady,
   onSessionInit,
@@ -153,9 +147,7 @@ export function attachAcpSession({
   let emittedToolCall = false;
   let emittedConcreteToolEvent = false;
   let emittedTextBuffer = '';
-  let rawAcpShapeDiagnosticCount = 0;
   let artifactSuppressionDiagnosticCount = 0;
-  let amrStderrRetryTail = '';
   let finished = false;
   let fatal = false;
   let aborted = false;
@@ -206,26 +198,6 @@ export function attachAcpSession({
     stageTimer = null;
   };
 
-  const amrModelUnavailablePayload = (message: string) => ({
-    message,
-    error: {
-      code: 'AMR_MODEL_UNAVAILABLE',
-      message,
-      retryable: false,
-      details: { kind: 'amr_model', action: 'choose_model' },
-    },
-  });
-
-  const isModelUnavailableError = (message: string) => {
-    const value = message.toLowerCase();
-    return (
-      value.includes('model not found') ||
-      value.includes('providermodelnotfounderror') ||
-      value.includes('unknown model') ||
-      value.includes('invalid model')
-    );
-  };
-
   const failWithPayload = (payload: unknown) => {
     if (finished) return;
     finished = true;
@@ -237,30 +209,25 @@ export function attachAcpSession({
 
   const fail = (
     message: string,
-    options: { forceModelUnavailable?: boolean; details?: unknown; retryable?: boolean } = {},
+    options: { details?: unknown; retryable?: boolean } = {},
   ) => {
     if (finished) return;
     finished = true;
     fatal = true;
     clearStageTimer();
-    const useModelUnavailable =
-      modelUnavailableErrorCode &&
-      (options.forceModelUnavailable || isModelUnavailableError(message));
     send(
       'error',
-      useModelUnavailable
-        ? amrModelUnavailablePayload(message)
-        : options.details === undefined && options.retryable === undefined
-          ? { message }
-          : {
+      options.details === undefined && options.retryable === undefined
+        ? { message }
+        : {
+            message,
+            error: {
+              code: 'AGENT_EXECUTION_FAILED',
               message,
-              error: {
-                code: 'AGENT_EXECUTION_FAILED',
-                message,
-                retryable: options.retryable ?? false,
-                ...(options.details === undefined ? {} : { details: options.details }),
-              },
+              retryable: options.retryable ?? false,
+              ...(options.details === undefined ? {} : { details: options.details }),
             },
+          },
     );
     if (!child.killed) child.kill('SIGTERM');
   };
@@ -272,19 +239,6 @@ export function attachAcpSession({
     } catch (err) {
       fail(`stdin write failed: ${errorMessage(err)}`);
     }
-  };
-
-  const emitAcpRawShapeDiagnostic = (update: JsonObject) => {
-    if (!modelUnavailableErrorCode) return;
-    if (rawAcpShapeDiagnosticCount >= ACP_RAW_EVENT_SHAPE_DIAGNOSTIC_LIMIT) return;
-    rawAcpShapeDiagnosticCount += 1;
-    send('agent', {
-      type: 'diagnostic',
-      name: 'acp_raw_event_shape',
-      source: 'acp-json-rpc',
-      elapsedMs: Date.now() - runStartedAt,
-      shape: acpRawEventShape(update),
-    });
   };
 
   const emitVisibleTextDelta = (delta: string) => {
@@ -523,23 +477,14 @@ export function attachAcpSession({
     }
     const update = asObject(params?.update);
     if (obj.method === 'session/update' && update) {
-      if (modelUnavailableErrorCode) {
-        const promotedPayload = promotedAmrRetryStatusPayload(update);
-        if (promotedPayload) {
-          failWithPayload(promotedPayload);
-          return;
-        }
-      }
       if (update.sessionUpdate !== 'agent_message_chunk' && update.sessionUpdate !== 'agent_thought_chunk') {
         send('agent', {
           type: 'status',
           label: String(update.sessionUpdate || 'session_update'),
           elapsedMs: Date.now() - runStartedAt,
         });
-        emitAcpRawShapeDiagnostic(update);
       }
       if (update.sessionUpdate === 'agent_thought_chunk') {
-        emitAcpRawShapeDiagnostic(update);
         const text = extractAcpUpdateText(update);
         if (text) {
           if (!emittedThinkingStart) {
@@ -551,7 +496,6 @@ export function attachAcpSession({
         return;
       }
       if (update.sessionUpdate === 'agent_message_chunk') {
-        emitAcpRawShapeDiagnostic(update);
         const text = extractAcpUpdateText(update);
         if (text) {
           const isCumulativeSnapshot = text.startsWith(emittedTextBuffer);
@@ -767,30 +711,6 @@ export function attachAcpSession({
     }
     if (promptRequestId !== null && obj.id === promptRequestId) {
       const usage = formatUsage(result.usage);
-      if (!emittedVisibleTextChunk && !emittedConcreteToolEvent && modelUnavailableErrorCode) {
-        const outputTokens = usage?.output_tokens;
-        const hadCompletionTokens = typeof outputTokens === 'number' && outputTokens > 0;
-        if (hadCompletionTokens || emittedToolCall || emittedTextChunk) {
-          fail(
-            'ACP session completed after reporting model activity, but did not produce visible assistant text, concrete tool results, or artifacts.',
-            {
-              retryable: true,
-              details: {
-                kind: 'acp_no_visible_output',
-                output_tokens: outputTokens,
-                raw_tool_update_seen: emittedToolCall,
-                text_chunk_seen: emittedTextChunk,
-              },
-            },
-          );
-        } else {
-          fail(
-            'ACP session completed without producing any assistant text. Refresh the AMR model list, choose a supported model, and retry this run.',
-            { forceModelUnavailable: true },
-          );
-        }
-        return;
-      }
       finishCleanPrompt(result.usage);
       return;
     }
@@ -802,15 +722,6 @@ export function attachAcpSession({
   });
 
   stdout.on('data', (chunk: string) => parser.feed(chunk));
-  child.stderr?.setEncoding('utf8');
-  child.stderr?.on('data', (chunk: string) => {
-    if (!modelUnavailableErrorCode || finished) return;
-    amrStderrRetryTail = `${amrStderrRetryTail}${String(chunk)}`.slice(
-      -AMR_STDERR_RETRY_TAIL_LIMIT,
-    );
-    const promotedPayload = promotedAmrStderrPayload(amrStderrRetryTail);
-    if (promotedPayload) failWithPayload(promotedPayload);
-  });
   child.on('close', (code, signal) => {
     clearStageTimer();
     parser.flush();

@@ -352,21 +352,6 @@ describe('classifyRunFailure', () => {
     });
   });
 
-  it('promotes AMR exit 130 connection resets into upstream stream disconnects', () => {
-    expect(
-      classify(
-        'AGENT_EXIT_130',
-        'json-rpc id 4: Connection reset by server',
-      ),
-    ).toMatchObject({
-      failure_category: 'upstream_unavailable',
-      failure_detail: 'stream_disconnected',
-      failure_stage: 'first_token_wait',
-      retryable: true,
-      user_action: 'retry',
-    });
-  });
-
   it('promotes opencode API 4xx session errors out of process-exit fallback', () => {
     expect(
       classify(
@@ -429,50 +414,6 @@ describe('classifyRunFailure', () => {
       failure_stage: 'first_token_wait',
       retryable: false,
       user_action: 'none',
-    });
-  });
-
-  it('maps AMR model catalog outages to provider routing failures', () => {
-    expect(
-      classify(
-        'AGENT_EXIT_130',
-        'json-rpc id 2: AMR model catalog is unavailable.',
-      ),
-    ).toMatchObject({
-      failure_category: 'upstream_unavailable',
-      failure_detail: 'provider_routing_error',
-      failure_stage: 'first_token_wait',
-      retryable: true,
-      user_action: 'retry',
-    });
-  });
-
-  it('maps AMR model catalog credential failures to auth instead of retryable routing', () => {
-    expect(
-      classify(
-        'AGENT_EXECUTION_FAILED',
-        [
-          'json-rpc id 2: AMR model catalog is unavailable.',
-          'Error: list Link models: API request failed with status 401: invalid_api_key',
-        ].join('\n'),
-      ),
-    ).toMatchObject({
-      failure_category: 'auth',
-      failure_detail: 'auth_required',
-      failure_stage: 'session_init',
-      retryable: false,
-      user_action: 'login',
-    });
-  });
-
-  it('maps AMR insufficient balance to recharge guidance', () => {
-    expect(
-      classify('AMR_INSUFFICIENT_BALANCE', 'insufficient wallet balance'),
-    ).toMatchObject({
-      failure_category: 'insufficient_balance',
-      failure_detail: 'amr_insufficient_balance',
-      retryable: false,
-      user_action: 'recharge',
     });
   });
 
@@ -1375,74 +1316,6 @@ describe('execution_failed close-reason refinement', () => {
   });
 });
 
-// Reclassify AMR/vela upstream failures that currently fall into the opaque
-// `execution_failed` bucket. These carry the generic `AGENT_EXECUTION_FAILED`
-// error code, and the real cause is only in the (often Chinese) upstream error
-// text, so the English-only detectors miss them. Real production texts were
-// sampled from Langfuse (#3408 P1). Each must land in its true product-view
-// category instead of the engineering-view opaque bucket.
-describe('classifyRunFailure — AMR/vela reclassification out of execution_failed', () => {
-  it('classifies a vela Chinese pre-charge (insufficient balance) failure as insufficient_balance', () => {
-    const result = classify(
-      'AGENT_EXECUTION_FAILED',
-      '预扣费额度失败, 用户[141283]剩余额度: 💰0.040000, 需要预扣费额度: 💰0.060000 (request id: B202606220543379765673248268d9d6vVKaiRPCMA)',
-    );
-    expect(result?.failure_category).toBe('insufficient_balance');
-    expect(result?.failure_detail).toBe('amr_insufficient_balance');
-    expect(result?.user_action).toBe('recharge');
-  });
-
-  it('classifies structured AMR tier entitlement failures as upgrade-required analytics', () => {
-    const result = classify(
-      'AMR_TIER_UPGRADE_REQUIRED',
-      'AMR tier upgrade required',
-    );
-
-    expect(result).toMatchObject({
-      failure_category: 'entitlement_required',
-      failure_detail: 'amr_tier_upgrade_required',
-      failure_stage: 'session_init',
-      retryable: false,
-      user_action: 'upgrade',
-    });
-  });
-
-  it('classifies raw AMR tier entitlement texts as upgrade-required analytics', () => {
-    const result = classify(
-      'AGENT_EXECUTION_FAILED',
-      'HTTP 403 [code=tier_model_not_entitled] model access denied for current tier',
-    );
-
-    expect(result).toMatchObject({
-      failure_category: 'entitlement_required',
-      failure_detail: 'amr_tier_upgrade_required',
-      failure_stage: 'session_init',
-      retryable: false,
-      user_action: 'upgrade',
-    });
-  });
-
-  it('classifies a Chinese 429 rate-limit text as a retryable rate_limit_429', () => {
-    const result = classify(
-      'AGENT_EXECUTION_FAILED',
-      '429 您的账户已达到速率限制，请您控制请求频率',
-    );
-    expect(result?.failure_category).toBe('rate_limit');
-    expect(result?.failure_detail).toBe('rate_limit_429');
-    expect(result?.retryable).toBe(true);
-  });
-
-  it('classifies a vela "model not in allowed list" rejection as model_unavailable', () => {
-    const result = classify(
-      'AGENT_EXECUTION_FAILED',
-      'API Error: 400 model deepseek-v4-pro-202606 not in allowed list',
-    );
-    expect(result?.failure_category).toBe('model_unavailable');
-    expect(result?.failure_detail).toBe('model_not_found');
-    expect(result?.user_action).toBe('switch_model');
-  });
-});
-
 // The agent binary being absent at its resolved path also leaks into the opaque
 // execution_failed bucket (#3408 P1). Real production texts sampled from
 // Langfuse. These are an install/PATH problem, not an opaque engine failure.
@@ -1478,16 +1351,6 @@ describe('classifyRunFailure — batch A reclassification out of execution_faile
     expect(result?.failure_detail).toBe('prompt_too_large');
   });
 
-  it('classifies AMR request body limits as prompt_too_large', () => {
-    const result = classify(
-      'AGENT_EXECUTION_FAILED',
-      'json-rpc id 4: opencode event stream: {"properties":{"error":{"data":{"message":"[code=request_too_large] request body exceeds configured limit"}}}}',
-    );
-    expect(result?.failure_category).toBe('prompt_too_large');
-    expect(result?.failure_detail).toBe('request_too_large');
-    expect(result?.user_action).toBe('reduce_context');
-  });
-
   it('classifies an ACP "thread/start failed" as agent_protocol_error', () => {
     const result = classify(
       'AGENT_EXECUTION_FAILED',
@@ -1495,14 +1358,6 @@ describe('classifyRunFailure — batch A reclassification out of execution_faile
     );
     expect(result?.failure_category).toBe('process_exit');
     expect(result?.failure_detail).toBe('agent_protocol_error');
-  });
-
-  it('classifies a vela "login fail: carry the API secret key" as an auth failure', () => {
-    const result = classify(
-      'AGENT_EXECUTION_FAILED',
-      "login fail: Please carry the API secret key in the 'Authorization' field of the request header (1004)",
-    );
-    expect(result?.failure_category).toBe('auth');
   });
 
   it('classifies a local model server with no model loaded (LM Studio) as local_model_not_loaded', () => {
@@ -1739,34 +1594,6 @@ describe('classifyRunFailure — custom Anthropic endpoint disconnects', () => {
     const result = classify(
       'AGENT_CONNECTION_DROPPED',
       'Claude Code lost its connection to the configured custom Anthropic endpoint before the response finished.',
-    );
-    expect(result).toMatchObject({
-      failure_category: 'upstream_unavailable',
-      failure_detail: 'stream_disconnected',
-      retryable: true,
-      user_action: 'retry',
-    });
-  });
-});
-
-describe('classifyRunFailure — AMR sampled failures', () => {
-  it('classifies Windows opencode readiness crash status as process_crashed', () => {
-    const result = classify(
-      'AGENT_SIGNAL_SIGTERM',
-      'json-rpc id 2: start opencode server: opencode exited before readiness: exit status 0xc0000409',
-    );
-    expect(result).toMatchObject({
-      failure_category: 'process_exit',
-      failure_detail: 'process_crashed',
-      retryable: false,
-      user_action: 'none',
-    });
-  });
-
-  it('classifies AMR stream idle timeout as a disconnected upstream stream', () => {
-    const result = classify(
-      'AGENT_EXECUTION_FAILED',
-      'json-rpc id 4: opencode event stream: {"properties":{"error":{"data":{"message":"[code=upstream_error] stream idle timeout: no data received within configured window"}}}}',
     );
     expect(result).toMatchObject({
       failure_category: 'upstream_unavailable',
