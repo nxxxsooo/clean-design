@@ -36,9 +36,8 @@ flips per-file decisions through follow-up surfaces.
 ## Convergence
 
 The atom completes when `decision.json` has a non-empty `decision`.
-Acceptance writes `handoffKind: 'patch'` (or `'deployable-app'`
-when a successful build-test is on file) into the eventual
-artifact manifest; rejection rolls back the patch via `git restore`
+Acceptance writes `handoffKind: 'patch'` into the eventual artifact
+manifest; rejection rolls back the patch via `git restore`
 or the equivalent in the `code-import`-bound repo path.
 
 ## Anti-patterns the prompt fragment forbids

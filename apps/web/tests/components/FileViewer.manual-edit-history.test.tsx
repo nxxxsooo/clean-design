@@ -71,12 +71,6 @@ describe('FileViewer manual edit history regressions', () => {
     const savedSources: string[] = [];
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-      if (url.includes('/api/projects/project-1/deployments')) {
-        return new Response(JSON.stringify({ deployments: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
       if (url.includes('/api/projects/project-1/files') && init?.method === 'POST') {
         const payload = JSON.parse(String(init.body)) as { content: string };
         savedSources.push(payload.content);
@@ -159,12 +153,6 @@ describe('FileViewer manual edit history regressions', () => {
     const savedSources: string[] = [];
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-      if (url.includes('/api/projects/project-1/deployments')) {
-        return new Response(JSON.stringify({ deployments: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
       if (url.includes('/api/projects/project-1/files') && init?.method === 'POST') {
         const payload = JSON.parse(String(init.body)) as { content: string };
         persistedSource = payload.content;
@@ -222,12 +210,6 @@ describe('FileViewer manual edit history regressions', () => {
     const savedSources: string[] = [];
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-      if (url.includes('/api/projects/project-1/deployments')) {
-        return new Response(JSON.stringify({ deployments: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
       if (url.includes('/api/projects/project-1/files') && init?.method === 'POST') {
         const payload = JSON.parse(String(init.body)) as { content: string };
         savedSources.push(payload.content);
@@ -277,12 +259,6 @@ describe('FileViewer manual edit history regressions', () => {
     const initialSource = '<!doctype html><html><body><h1 data-od-id="hero">Hero</h1></body></html>';
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-      if (url.includes('/api/projects/project-1/deployments')) {
-        return new Response(JSON.stringify({ deployments: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
       if (url.includes('/api/projects/project-1/raw/preview.html')) {
         return new Response(initialSource, { status: 200 });
       }
@@ -322,12 +298,6 @@ describe('FileViewer manual edit history regressions', () => {
     const savedSources: string[] = [];
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof Request ? input.url : String(input);
-      if (url.includes('/api/projects/project-1/deployments')) {
-        return new Response(JSON.stringify({ deployments: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
       if (url.includes('/api/projects/project-1/files') && init?.method === 'POST') {
         const payload = JSON.parse(String(init.body)) as { content: string };
         persistedSource = payload.content;

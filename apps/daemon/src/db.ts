@@ -188,28 +188,6 @@ function migrate(db: SqliteDb): void {
     CREATE INDEX IF NOT EXISTS idx_tabs_project
       ON tabs(project_id, position);
 
-    CREATE TABLE IF NOT EXISTS deployments (
-      id TEXT PRIMARY KEY,
-      project_id TEXT NOT NULL,
-      file_name TEXT NOT NULL,
-      provider_id TEXT NOT NULL,
-      url TEXT NOT NULL,
-      deployment_id TEXT,
-      deployment_count INTEGER NOT NULL DEFAULT 1,
-      target TEXT NOT NULL DEFAULT 'preview',
-      status TEXT NOT NULL DEFAULT 'ready',
-      status_message TEXT,
-      reachable_at INTEGER,
-      provider_metadata_json TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      UNIQUE(project_id, file_name, provider_id),
-      FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_deployments_project
-      ON deployments(project_id, updated_at DESC);
-
     CREATE TABLE IF NOT EXISTS routines (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -338,19 +316,6 @@ function migrate(db: SqliteDb): void {
     db.exec(`ALTER TABLE preview_comments ADD COLUMN slide_index INTEGER`);
   }
   migratePreviewCommentsSlideKey(db);
-  const deploymentCols = db.prepare(`PRAGMA table_info(deployments)`).all() as DbRow[];
-  if (!deploymentCols.some((c: DbRow) => c.name === 'status')) {
-    db.exec(`ALTER TABLE deployments ADD COLUMN status TEXT NOT NULL DEFAULT 'ready'`);
-  }
-  if (!deploymentCols.some((c: DbRow) => c.name === 'status_message')) {
-    db.exec(`ALTER TABLE deployments ADD COLUMN status_message TEXT`);
-  }
-  if (!deploymentCols.some((c: DbRow) => c.name === 'reachable_at')) {
-    db.exec(`ALTER TABLE deployments ADD COLUMN reachable_at INTEGER`);
-  }
-  if (!deploymentCols.some((c: DbRow) => c.name === 'provider_metadata_json')) {
-    db.exec(`ALTER TABLE deployments ADD COLUMN provider_metadata_json TEXT`);
-  }
   // schedule_json holds the full RoutineSchedule object (kind discriminator
   // plus kind-specific fields like time/timezone/weekday). The legacy
   // schedule_kind/schedule_value columns are kept populated for query
@@ -439,160 +404,6 @@ function migratePreviewCommentsSlideKey(db: SqliteDb): void {
     CREATE INDEX IF NOT EXISTS idx_preview_comments_conversation
       ON preview_comments(project_id, conversation_id, updated_at DESC);
   `);
-}
-
-// ---------- deployments ----------
-
-const DEPLOYMENT_COLS = `id, project_id AS projectId, file_name AS fileName,
-  provider_id AS providerId, url, deployment_id AS deploymentId,
-  deployment_count AS deploymentCount, target, status,
-  status_message AS statusMessage, reachable_at AS reachableAt,
-  provider_metadata_json AS providerMetadataJson,
-  created_at AS createdAt, updated_at AS updatedAt`;
-
-export function listDeployments(db: SqliteDb, projectId: string) {
-  return (db
-    .prepare(
-      `SELECT ${DEPLOYMENT_COLS}
-         FROM deployments
-        WHERE project_id = ?
-        ORDER BY updated_at DESC`,
-    )
-    .all(projectId) as DbRow[])
-    .map(normalizeDeployment);
-}
-
-export function getDeployment(db: SqliteDb, projectId: string, fileName: string, providerId: string) {
-  const row = db
-    .prepare(
-      `SELECT ${DEPLOYMENT_COLS}
-         FROM deployments
-        WHERE project_id = ? AND file_name = ? AND provider_id = ?`,
-    )
-    .get(projectId, fileName, providerId) as DbRow | undefined;
-  return row ? normalizeDeployment(row) : null;
-}
-
-export function getDeploymentById(db: SqliteDb, projectId: string, id: string) {
-  const row = db
-    .prepare(
-      `SELECT ${DEPLOYMENT_COLS}
-         FROM deployments
-        WHERE project_id = ? AND id = ?`,
-    )
-    .get(projectId, id) as DbRow | undefined;
-  return row ? normalizeDeployment(row) : null;
-}
-
-export function upsertDeployment(db: SqliteDb, deployment: DbRow) {
-  const existing = getDeployment(
-    db,
-    deployment.projectId,
-    deployment.fileName,
-    deployment.providerId,
-  );
-  const now = Date.now();
-  const inputProviderMetadata =
-    deployment.providerMetadata === undefined
-      ? existing?.providerMetadata
-      : deployment.providerMetadata;
-  const providerMetadata =
-    deployment.cloudflarePages && typeof deployment.cloudflarePages === 'object'
-      ? {
-          ...(inputProviderMetadata && typeof inputProviderMetadata === 'object' && !Array.isArray(inputProviderMetadata)
-            ? inputProviderMetadata
-            : {}),
-          cloudflarePages: deployment.cloudflarePages,
-        }
-      : inputProviderMetadata;
-  const next = {
-    id: existing?.id ?? deployment.id,
-    projectId: deployment.projectId,
-    fileName: deployment.fileName,
-    providerId: deployment.providerId,
-    url: deployment.url,
-    deploymentId: deployment.deploymentId ?? null,
-    deploymentCount:
-      typeof deployment.deploymentCount === 'number'
-        ? deployment.deploymentCount
-        : (existing?.deploymentCount ?? 0) + 1,
-    target: deployment.target ?? 'preview',
-    status: deployment.status ?? existing?.status ?? 'ready',
-    statusMessage: deployment.statusMessage ?? null,
-    reachableAt: deployment.reachableAt ?? null,
-    providerMetadata,
-    createdAt: existing?.createdAt ?? deployment.createdAt ?? now,
-    updatedAt: deployment.updatedAt ?? now,
-  };
-  const providerMetadataJson = stringifyJsonObjectOrNull(next.providerMetadata);
-  db.prepare(
-    `INSERT INTO deployments
-       (id, project_id, file_name, provider_id, url, deployment_id,
-        deployment_count, target, status, status_message, reachable_at,
-        provider_metadata_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(project_id, file_name, provider_id) DO UPDATE SET
-       url = excluded.url,
-       deployment_id = excluded.deployment_id,
-       deployment_count = excluded.deployment_count,
-       target = excluded.target,
-       status = excluded.status,
-       status_message = excluded.status_message,
-       reachable_at = excluded.reachable_at,
-       provider_metadata_json = excluded.provider_metadata_json,
-       updated_at = excluded.updated_at`,
-  ).run(
-    next.id,
-    next.projectId,
-    next.fileName,
-    next.providerId,
-    next.url,
-    next.deploymentId,
-    next.deploymentCount,
-    next.target,
-    next.status,
-    next.statusMessage,
-    next.reachableAt,
-    providerMetadataJson,
-    next.createdAt,
-    next.updatedAt,
-  );
-  return getDeployment(db, next.projectId, next.fileName, next.providerId);
-}
-
-function normalizeDeployment(row: DbRow) {
-  const providerMetadata = parseJsonOrUndef(row.providerMetadataJson);
-  const normalizedProviderMetadata =
-    providerMetadata && typeof providerMetadata === 'object' && !Array.isArray(providerMetadata)
-      ? providerMetadata
-      : undefined;
-  return {
-    id: row.id,
-    projectId: row.projectId,
-    fileName: row.fileName,
-    providerId: row.providerId,
-    url: row.url,
-    deploymentId: row.deploymentId ?? undefined,
-    deploymentCount: Number(row.deploymentCount ?? 1),
-    target: row.target === 'production' ? 'production' : 'preview',
-    status: row.status || 'ready',
-    statusMessage: row.statusMessage ?? undefined,
-    reachableAt: row.reachableAt == null ? undefined : Number(row.reachableAt),
-    cloudflarePages:
-      normalizedProviderMetadata?.cloudflarePages &&
-      typeof normalizedProviderMetadata.cloudflarePages === 'object' &&
-      !Array.isArray(normalizedProviderMetadata.cloudflarePages)
-        ? normalizedProviderMetadata.cloudflarePages
-        : undefined,
-    providerMetadata: normalizedProviderMetadata,
-    createdAt: Number(row.createdAt),
-    updatedAt: Number(row.updatedAt),
-  };
-}
-
-function stringifyJsonObjectOrNull(value: unknown) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  return Object.keys(value).length > 0 ? JSON.stringify(value) : null;
 }
 
 // ---------- projects ----------

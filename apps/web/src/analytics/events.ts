@@ -120,7 +120,6 @@ import type {
   ContextLinkResultProps,
   SpeakerNotesSaveResultProps,
   ArtifactExportResultProps,
-  ArtifactDeployResultProps,
   SketchSaveResultProps,
   SketchExportResultProps,
   FeedbackSubmitResultProps,
@@ -960,14 +959,6 @@ export function trackArtifactExportResult(
   options?: { requestId?: string },
 ): void {
   send(track, 'artifact_export_result', props, options);
-}
-
-export function trackArtifactDeployResult(
-  track: Track,
-  props: ArtifactDeployResultProps,
-  options?: { requestId?: string },
-): void {
-  send(track, 'artifact_deploy_result', props, options);
 }
 
 export function trackFileVersionRestoreResult(

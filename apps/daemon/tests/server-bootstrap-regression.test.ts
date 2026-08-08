@@ -38,25 +38,6 @@ describe('server route inventory', () => {
     const routeKeys = routeInventory.map((route) => `${route.method} ${route.path}`);
     const fallbackIndex = routeKeys.indexOf('GET /*splat');
 
-    const automationRouteKeys = [
-      'GET /api/automation-source-packets',
-      'POST /api/automation-ingestions',
-      'GET /api/automation-source-packets/:id',
-      'GET /api/automation-proposals',
-      'POST /api/automation-proposals',
-      'GET /api/automation-proposals/:id',
-      'POST /api/automation-proposals/:id/apply',
-      'POST /api/automation-proposals/:id/reject',
-    ];
-    const velaRouteKeys = [
-      'GET /api/amr/models',
-      'GET /api/integrations/vela/status',
-      'ALL /api/integrations/vela/api-proxy/*splat',
-      'POST /api/integrations/vela/login',
-      'POST /api/integrations/vela/login/cancel',
-      'POST /api/integrations/vela/analytics-entry',
-      'POST /api/integrations/vela/logout',
-    ];
     const genuiRouteKeys = [
       'GET /api/runs/:runId/genui',
       'GET /api/projects/:projectId/genui',
@@ -76,12 +57,6 @@ describe('server route inventory', () => {
       'GET /api/runs/:id/agui',
       'POST /api/runs/:id/cancel',
       'POST /api/chat',
-    ];
-    const pluginEventRouteKeys = [
-      'GET /api/plugins/events/snapshot',
-      'GET /api/plugins/events/stats',
-      'POST /api/plugins/events/purge',
-      'GET /api/plugins/events',
     ];
     const pluginLifecycleRouteKeys = [
       'GET /api/plugins',
@@ -110,15 +85,6 @@ describe('server route inventory', () => {
       'GET /api/plugins/:id/asset/*splat',
       'GET /api/asset-cache',
     ];
-    const marketplaceRouteKeys = [
-      'GET /api/marketplaces',
-      'POST /api/marketplaces',
-      'GET /api/marketplaces/:id',
-      'DELETE /api/marketplaces/:id',
-      'POST /api/marketplaces/:id/refresh',
-      'POST /api/marketplaces/:id/trust',
-      'GET /api/marketplaces/:id/plugins',
-    ];
     const projectPluginRouteKeys = [
       'POST /api/projects/:id/plugins/install-folder',
       'POST /api/projects/:id/plugins/publish-github',
@@ -144,17 +110,6 @@ describe('server route inventory', () => {
       'DELETE /api/live-artifacts/:artifactId',
       'OPTIONS /api/live-artifacts/:artifactId/refresh',
       'POST /api/live-artifacts/:artifactId/refresh',
-    ];
-    const deployRouteKeys = [
-      'GET /api/deploy/config',
-      'PUT /api/deploy/config',
-      'GET /api/deploy/cloudflare-pages/zones',
-      'GET /api/projects/:id/deployments',
-      'POST /api/projects/:id/deploy',
-      'POST /api/projects/:id/deploy/preflight',
-    ];
-    const deploymentCheckRouteKeys = [
-      'POST /api/projects/:id/deployments/:deploymentId/check-link',
     ];
     const projectFileStringRouteKeys = [
       'GET /api/projects/:id/files',
@@ -217,8 +172,6 @@ describe('server route inventory', () => {
       'PUT /api/app-config',
       'POST /api/dir-exists',
       'GET /api/recent-dirs',
-      'GET /api/orbit/status',
-      'POST /api/orbit/run',
       'POST /api/system/open-external',
       'POST /api/dialog/open-folder',
       'POST /api/projects/:id/media/generate',
@@ -239,18 +192,12 @@ describe('server route inventory', () => {
       'GET /*splat',
     ]));
 
-    expect(routeKeys.filter((key) => automationRouteKeys.includes(key))).toEqual(automationRouteKeys);
-    expect(routeKeys.filter((key) => velaRouteKeys.includes(key))).toEqual(velaRouteKeys);
     expect(routeKeys.filter((key) => genuiRouteKeys.includes(key))).toEqual(genuiRouteKeys);
     expect(routeKeys.filter((key) => runRouteKeys.includes(key))).toEqual(runRouteKeys);
-    expect(routeKeys.filter((key) => pluginEventRouteKeys.includes(key))).toEqual(pluginEventRouteKeys);
     expect(routeKeys.filter((key) => pluginLifecycleRouteKeys.includes(key))).toEqual(pluginLifecycleRouteKeys);
     expect(routeKeys.filter((key) => pluginAssetRouteKeys.includes(key))).toEqual(pluginAssetRouteKeys);
-    expect(routeKeys.filter((key) => marketplaceRouteKeys.includes(key))).toEqual(marketplaceRouteKeys);
     expect(routeKeys.filter((key) => projectPluginRouteKeys.includes(key))).toEqual(projectPluginRouteKeys);
     expect(routeKeys.filter((key) => liveArtifactRouteKeys.includes(key))).toEqual(liveArtifactRouteKeys);
-    expect(routeKeys.filter((key) => deployRouteKeys.includes(key))).toEqual(deployRouteKeys);
-    expect(routeKeys.filter((key) => deploymentCheckRouteKeys.includes(key))).toEqual(deploymentCheckRouteKeys);
     expect(routeKeys.filter((key) => projectFileStringRouteKeys.includes(key))).toEqual(projectFileStringRouteKeys);
     expect(routeKeys.filter((key) => projectArchiveRouteKeys.includes(key))).toEqual(projectArchiveRouteKeys);
     expect(routeKeys.filter((key) => projectTemplateAndArtifactRouteKeys.includes(key))).toEqual(projectTemplateAndArtifactRouteKeys);
@@ -260,12 +207,8 @@ describe('server route inventory', () => {
 
     expect(fallbackIndex).toBeGreaterThan(-1);
     expect(routeKeys.indexOf('GET /api/health')).toBeLessThan(fallbackIndex);
-    expect(routeKeys.indexOf('POST /api/daemon/db/verify')).toBeLessThan(routeKeys.indexOf('GET /api/plugins/events/snapshot'));
     expect(routeKeys.indexOf('GET /api/plugins')).toBeLessThan(routeKeys.indexOf('GET /api/atoms'));
     expect(routeKeys.indexOf('GET /api/plugins/:id/preview')).toBeLessThan(fallbackIndex);
-    expect(routeKeys.indexOf('GET /api/automation-source-packets')).toBeLessThan(
-      routeKeys.indexOf('GET /api/skills'),
-    );
     expect(routeKeys.indexOf('USE /artifacts')).toBeLessThan(routeKeys.indexOf('USE /frames'));
     expect(routeKeys.filter((key) => key === 'USE /artifacts')).toHaveLength(1);
     expect(routeKeys.filter((key) => key === 'USE /frames')).toHaveLength(1);
@@ -277,7 +220,6 @@ describe('server route inventory', () => {
     expect(routeKeys.filter((key) => key === 'POST /api/runs')).toHaveLength(1);
     expect(routeKeys.filter((key) => key === 'POST /api/chat')).toHaveLength(1);
     expect(routeKeys.filter((key) => key === 'POST /api/media/tasks/:id/wait')).toHaveLength(1);
-    expect(routeKeys.filter((key) => key === 'GET /api/marketplaces')).toHaveLength(1);
     expect(routeKeys.filter((key) => key === 'POST /api/projects/:id/plugins/share-tasks')).toHaveLength(1);
     for (const [index, key] of routeKeys.entries()) {
       if (key.includes(' /api/')) {
@@ -305,17 +247,11 @@ describe('bootstrap route regressions', () => {
 
   it('keeps lightweight extracted-route responses stable without fixtures', async () => {
     const [
-      automationList,
-      automationMissing,
-      velaProxyUnknownPath,
       genuiRunList,
       genuiRunSurfaceMissing,
       devloopIterations,
       replayMissingSnapshot,
     ] = await Promise.all([
-      fetch(`${baseUrl}/api/automation-source-packets`),
-      fetch(`${baseUrl}/api/automation-source-packets/missing-packet`),
-      fetch(`${baseUrl}/api/integrations/vela/api-proxy/not-api-v1`),
       fetch(`${baseUrl}/api/runs/missing-run/genui`),
       fetch(`${baseUrl}/api/runs/missing-run/genui/missing-surface`),
       fetch(`${baseUrl}/api/runs/missing-run/devloop-iterations`),
@@ -325,15 +261,6 @@ describe('bootstrap route regressions', () => {
         body: JSON.stringify({}),
       }),
     ]);
-
-    expect(automationList.status).toBe(200);
-    expect(await automationList.json()).toEqual({ packets: [] });
-
-    expect(automationMissing.status).toBe(404);
-    expect(await automationMissing.json()).toEqual({ error: 'automation source packet not found' });
-
-    expect(velaProxyUnknownPath.status).toBe(404);
-    expect(await velaProxyUnknownPath.json()).toEqual({ error: 'unknown_amr_api_proxy_path' });
 
     expect(genuiRunList.status).toBe(200);
     expect(await genuiRunList.json()).toEqual({ runId: 'missing-run', surfaces: [] });

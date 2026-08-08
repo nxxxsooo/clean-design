@@ -6,7 +6,7 @@ import type { AnalyticsEventName } from './event-names.js';
 import type { DesignSystemApplyResultProps, DesignSystemCreateResultProps, DesignSystemEnrichResultProps, DesignSystemReviewResultProps, DesignSystemSourceIngestResultProps, DesignSystemStatusResultProps } from './design-systems.js';
 import type { OnboardingCompletedProps, OnboardingCompleteResultProps, OnboardingFirstGenerationCompletedProps, OnboardingFirstPromptSentProps, OnboardingPromptPrefilledProps, OnboardingRuntimeScanResultProps } from './onboarding.js';
 import type { PageViewProps } from './page-view.js';
-import type { ArtifactDeployResultProps, ArtifactExportResultProps, AssistantFeedbackClickProps, AssistantFeedbackReasonClickProps, AssistantFeedbackReasonSubmitProps, AssistantFeedbackReasonViewProps, ByokPreflightBlockedProps, ContextLinkResultProps, FeedbackSubmitResultProps, FileUploadResultProps, FileVersionRestoreResultProps, LangfuseReportResultProps, MediaGenerationResultProps, PackagedRuntimeFailedProps, PluginImportResultProps, PluginReplacementResultProps, ProjectCreateResultProps, RunCreatedProps, RunFinishedProps, RunRetryAttemptedProps, RunRetryFinishedProps, SettingsByokModelsFetchResultProps, SettingsByokTestResultProps, SettingsCliTestResultProps, SettingsViewProps, SketchExportResultProps, SketchSaveResultProps, SpeakerNotesSaveResultProps, UpdateApplyObservedProps, UpdateCheckResultProps, UpdateInstallResultProps } from './result-events.js';
+import type { ArtifactExportResultProps, AssistantFeedbackClickProps, AssistantFeedbackReasonClickProps, AssistantFeedbackReasonSubmitProps, AssistantFeedbackReasonViewProps, ByokPreflightBlockedProps, ContextLinkResultProps, FeedbackSubmitResultProps, FileUploadResultProps, FileVersionRestoreResultProps, LangfuseReportResultProps, MediaGenerationResultProps, PackagedRuntimeFailedProps, PluginImportResultProps, PluginReplacementResultProps, ProjectCreateResultProps, RunCreatedProps, RunFinishedProps, RunRetryAttemptedProps, RunRetryFinishedProps, SettingsByokModelsFetchResultProps, SettingsByokTestResultProps, SettingsCliTestResultProps, SettingsViewProps, SketchExportResultProps, SketchSaveResultProps, SpeakerNotesSaveResultProps, UpdateApplyObservedProps, UpdateCheckResultProps, UpdateInstallResultProps } from './result-events.js';
 import type { SurfaceViewProps } from './surface-view.js';
 import type { AmrAuthResultProps, UiClickProps } from './ui-click.js';
 // ---- Discriminated union of all event payloads ---------------------------
@@ -32,7 +32,6 @@ export type AnalyticsEventPayload =
   | { event: 'context_link_result'; props: ContextLinkResultProps }
   | { event: 'speaker_notes_save_result'; props: SpeakerNotesSaveResultProps }
   | { event: 'artifact_export_result'; props: ArtifactExportResultProps }
-  | { event: 'artifact_deploy_result'; props: ArtifactDeployResultProps }
   | { event: 'sketch_save_result'; props: SketchSaveResultProps }
   | { event: 'sketch_export_result'; props: SketchExportResultProps }
   | { event: 'file_version_restore_result'; props: FileVersionRestoreResultProps }

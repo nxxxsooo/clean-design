@@ -76,13 +76,12 @@ describe('runHandoffAtom — promotion ladder', () => {
     expect(b.manifest.handoffKind).toBe('patch');
   });
 
-  it("decision='accept' + both signals + docker exportTarget \u2192 'deployable-app'", async () => {
+  it("decision='accept' + both signals + exportTarget stays a verified patch", async () => {
     await writeDecision('accept');
     await writeBuildTestReport(true, true);
     const exportTarget: ArtifactExportTarget = { surface: 'docker', target: 'ghcr.io/od/x:1', exportedAt: 1 };
     const out = await runHandoffAtom({ cwd, manifest: baseManifest(), exportTarget });
-    expect(out.manifest.handoffKind).toBe('deployable-app');
-    expect(out.signals.deployable).toBe(true);
+    expect(out.manifest.handoffKind).toBe('patch');
     expect(out.manifest.exportTargets).toEqual([exportTarget]);
   });
 
@@ -95,7 +94,6 @@ describe('runHandoffAtom — promotion ladder', () => {
       exportTarget: { surface: 'figma', target: 'file/abc', exportedAt: 2 },
     });
     expect(out.manifest.handoffKind).toBe('patch');
-    expect(out.signals.deployable).toBe(false);
   });
 
   it('partial decision behaves like accept on the promotion ladder', async () => {
@@ -106,7 +104,7 @@ describe('runHandoffAtom — promotion ladder', () => {
       manifest: baseManifest(),
       exportTarget: { surface: 'cli', target: '/tmp/out', exportedAt: 3 },
     });
-    expect(out.manifest.handoffKind).toBe('deployable-app');
+    expect(out.manifest.handoffKind).toBe('patch');
   });
 
   it('no decision file \u2192 leaves handoffKind alone', async () => {
@@ -151,7 +149,6 @@ describe('runHandoffAtom — signals', () => {
       decision:     'accept',
       buildPassing: true,
       testsPassing: false,
-      deployable:   false,
     });
   });
 });

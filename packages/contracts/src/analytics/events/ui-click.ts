@@ -1214,10 +1214,8 @@ export interface DeckViewerClickProps {
 export interface ShareOptionPopoverClickProps {
   page_name: 'artifact';
   area: 'share_option_popover';
-  // Export/share formats, plus 'publish_required_guide' for the share-intent
-  // signal: the user opened Share wanting a link but the artifact isn't
-  // deployed yet, so only the "publish online first" guide row is shown.
-  element: TrackingExportFormat | 'publish_required_guide';
+  // Format selected from the local export menu.
+  element: TrackingExportFormat;
   artifact_id: string;
   artifact_kind: TrackingArtifactKind;
   project_id: string;

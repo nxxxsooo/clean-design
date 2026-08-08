@@ -58,8 +58,7 @@ export type ArtifactProvenanceRenderKind =
 export type ArtifactProvenanceHandoffKind =
   | 'design-only'
   | 'implementation-plan'
-  | 'patch'
-  | 'deployable-app';
+  | 'patch';
 
 export type ArtifactExportSurface =
   | 'cli'
@@ -70,25 +69,10 @@ export type ArtifactExportSurface =
   | 'figma'
   | 'code-agent';
 
-export type ArtifactDeployProvider =
-  | 'aws'
-  | 'gcp'
-  | 'azure'
-  | 'aliyun'
-  | 'tencent'
-  | 'huawei'
-  | 'self-hosted';
-
 export interface ArtifactExportTarget {
   surface:    ArtifactExportSurface;
   target:     string;
   exportedAt: number;
-}
-
-export interface ArtifactDeployTarget {
-  provider:    ArtifactDeployProvider;
-  location:    string;
-  deployedAt:  number;
 }
 
 export interface ArtifactManifest {
@@ -130,7 +114,6 @@ export interface ArtifactManifest {
   handoffKind?:  ArtifactProvenanceHandoffKind;
 
   exportTargets?: ArtifactExportTarget[];
-  deployTargets?: ArtifactDeployTarget[];
 }
 
 export interface SaveArtifactRequest {

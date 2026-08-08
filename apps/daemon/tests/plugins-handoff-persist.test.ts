@@ -96,7 +96,7 @@ describe('runAndPersistHandoff', () => {
     expect(b.manifest.handoffKind).toBe('implementation-plan');
   });
 
-  it('promotes to deployable-app when build/test signals + docker export combine', async () => {
+  it('records a verified patch when build/test signals and an export combine', async () => {
     await writeDecision('accept');
     await writeBuildTest(true, true);
     const result = await runAndPersistHandoff({
@@ -107,8 +107,7 @@ describe('runAndPersistHandoff', () => {
       },
       exportTarget: { surface: 'docker', target: 'ghcr.io/od/x:1', exportedAt: 1 },
     });
-    expect(result.manifest.handoffKind).toBe('deployable-app');
-    expect(result.signals.deployable).toBe(true);
+    expect(result.manifest.handoffKind).toBe('patch');
   });
 });
 

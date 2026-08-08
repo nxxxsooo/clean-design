@@ -3793,12 +3793,6 @@ describe('FileViewer tweaks toolbar', () => {
           ],
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       }
-      if (url.includes('/api/projects/project-1/deployments')) {
-        return new Response(JSON.stringify({ deployments: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
       if (url.includes('/api/projects/project-1/raw/assets/hero.png')) {
         return new Response(JSON.stringify({
           error: {
@@ -6940,7 +6934,6 @@ describe('LiveArtifactRefreshHistoryPanel', () => {
     expect(markup).toContain('已配置的数据源');
     expect(markup).toContain('类型');
     expect(markup).toContain('工具');
-    expect(markup).toContain('连接器');
     // Advanced debug metadata
     expect(markup).toContain('高级调试元数据');
     // English label that previously leaked through must NOT appear

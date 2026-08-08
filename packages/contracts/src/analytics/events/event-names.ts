@@ -39,7 +39,6 @@ export type AnalyticsEventName =
   | 'speaker_notes_save_result'
   // Artifact
   | 'artifact_export_result'
-  | 'artifact_deploy_result'
   | 'file_version_restore_result'
   // Feedback
   | 'feedback_submit_result'

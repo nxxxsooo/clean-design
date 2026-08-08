@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { ArtifactManifest } from '@open-design/contracts';
-import { isDeployableAppEligible, recordHandoff } from '../src/plugins/atoms/handoff.js';
+import { recordHandoff } from '../src/plugins/atoms/handoff.js';
 
 const baseManifest = (extra: Partial<ArtifactManifest> = {}): ArtifactManifest => ({
   version:  1,
@@ -39,14 +39,6 @@ describe('recordHandoff — append-only contracts', () => {
     expect(second.manifest.exportTargets?.length).toBe(1);
   });
 
-  it('appends deployTargets independently', () => {
-    const out = recordHandoff({
-      manifest: baseManifest(),
-      deployTarget: { provider: 'aws', location: 'arn:aws:ecs:...', deployedAt: 2 },
-    });
-    expect(out.changed).toEqual(['deployTargets']);
-    expect(out.manifest.deployTargets?.[0]?.provider).toBe('aws');
-  });
 });
 
 describe('recordHandoff — handoffKind monotonicity', () => {
@@ -59,11 +51,9 @@ describe('recordHandoff — handoffKind monotonicity', () => {
     expect(out.changed).toContain('handoffKind');
   });
 
-  it('promotes handoffKind along the axis design-only → implementation-plan → patch → deployable-app', () => {
+  it('promotes handoffKind along the axis design-only → implementation-plan → patch', () => {
     const a = recordHandoff({ manifest: baseManifest({ handoffKind: 'design-only' }), handoffKind: 'patch' });
     expect(a.manifest.handoffKind).toBe('patch');
-    const b = recordHandoff({ manifest: a.manifest, handoffKind: 'deployable-app' });
-    expect(b.manifest.handoffKind).toBe('deployable-app');
   });
 
   it('refuses to downgrade when enforceMonotonicHandoff is on (default)', () => {
@@ -74,26 +64,10 @@ describe('recordHandoff — handoffKind monotonicity', () => {
 
   it('allows downgrade when enforceMonotonicHandoff is false (rollback path)', () => {
     const a = recordHandoff({
-      manifest: baseManifest({ handoffKind: 'deployable-app' }),
-      handoffKind: 'patch',
+      manifest: baseManifest({ handoffKind: 'patch' }),
+      handoffKind: 'implementation-plan',
       enforceMonotonicHandoff: false,
     });
-    expect(a.manifest.handoffKind).toBe('patch');
-  });
-});
-
-describe('isDeployableAppEligible', () => {
-  it('requires both build + tests passing', () => {
-    const m = baseManifest({ exportTargets: [{ surface: 'docker', target: 'ghcr.io/od/x:1', exportedAt: 1 }] });
-    expect(isDeployableAppEligible({ manifest: m, buildPassing: true, testsPassing: true })).toBe(true);
-    expect(isDeployableAppEligible({ manifest: m, buildPassing: false, testsPassing: true })).toBe(false);
-    expect(isDeployableAppEligible({ manifest: m, buildPassing: true, testsPassing: false })).toBe(false);
-  });
-
-  it('requires at least one docker or cli exportTarget', () => {
-    const m = baseManifest({
-      exportTargets: [{ surface: 'figma', target: 'file/abc', exportedAt: 1 }],
-    });
-    expect(isDeployableAppEligible({ manifest: m, buildPassing: true, testsPassing: true })).toBe(false);
+    expect(a.manifest.handoffKind).toBe('implementation-plan');
   });
 });

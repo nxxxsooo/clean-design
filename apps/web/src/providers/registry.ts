@@ -13,8 +13,6 @@ import type {
   ProjectFileVersionResponse,
   ProjectFileVersionsResponse,
   RestoreProjectFileVersionResponse,
-  SocialShareRequest,
-  SocialShareResponse,
 } from '@open-design/contracts';
 import type {
   AgentInfo,
@@ -31,10 +29,6 @@ import type {
   PreviewComment,
   PreviewCommentStatus,
   PreviewCommentUpsertRequest,
-  CloudflarePagesDeploySelection,
-  CloudflarePagesZonesResponse,
-  DeployConfigResponse,
-  DeployProjectFileResponse,
   DesignSystemDetail,
   DesignSystemFileDetail,
   DesignSystemFileSummary,
@@ -51,7 +45,6 @@ import type {
   LiveArtifactRefreshLogEntry,
   LiveArtifactSummary,
   Project,
-  ProjectDeploymentsResponse,
   PromptTemplateDetail,
   PromptTemplateSummary,
   ProjectFile,
@@ -59,39 +52,13 @@ import type {
   RenameProjectFileResponse,
   SkillDetail,
   SkillSummary,
-  UpdateDeployConfigRequest,
 } from '../types';
 import type { ArtifactManifest } from '../artifacts/types';
-import { GENERIC_DEPLOY_ENVELOPE_CODES } from '../analytics/deploy-error-code';
 import { isCleanDesignDisabledAgent } from '@open-design/contracts';
 import {
   isOpenDesignHostAvailable,
   openHostExternalUrl,
 } from '@open-design/host';
-
-export const DEFAULT_DEPLOY_PROVIDER_ID = 'vercel-self';
-export const CLOUDFLARE_PAGES_PROVIDER_ID = 'cloudflare-pages';
-export const DEPLOY_PROVIDER_IDS = [
-  DEFAULT_DEPLOY_PROVIDER_ID,
-  CLOUDFLARE_PAGES_PROVIDER_ID,
-] as const;
-
-export type WebDeployProviderId = (typeof DEPLOY_PROVIDER_IDS)[number];
-
-export type WebDeployConfigResponse = DeployConfigResponse;
-export type WebUpdateDeployConfigRequest = UpdateDeployConfigRequest;
-export type WebDeploymentInfo = ProjectDeploymentsResponse['deployments'][number];
-export type WebDeployProjectFileResponse = DeployProjectFileResponse;
-export type WebCloudflarePagesDeploySelection = CloudflarePagesDeploySelection;
-export type WebCloudflarePagesZonesResponse = CloudflarePagesZonesResponse;
-
-export function isDeployProviderId(value: unknown): value is WebDeployProviderId {
-  return typeof value === 'string' && (DEPLOY_PROVIDER_IDS as readonly string[]).includes(value);
-}
-
-function deployProviderQuery(providerId?: WebDeployProviderId): string {
-  return providerId ? `?providerId=${encodeURIComponent(providerId)}` : '';
-}
 
 export async function fetchAgents(options?: { throwOnError?: boolean }): Promise<AgentInfo[]> {
   try {
@@ -914,141 +881,6 @@ export async function fetchSkillExample(
     const message = err instanceof Error ? err.message : 'network error';
     return { error: message };
   }
-}
-
-export async function fetchDeployConfig(
-  providerId?: WebDeployProviderId,
-): Promise<WebDeployConfigResponse | null> {
-  try {
-    const resp = await fetch(`/api/deploy/config${deployProviderQuery(providerId)}`);
-    if (!resp.ok) return null;
-    return (await resp.json()) as WebDeployConfigResponse;
-  } catch {
-    return null;
-  }
-}
-
-export async function updateDeployConfig(
-  input: WebUpdateDeployConfigRequest,
-): Promise<WebDeployConfigResponse | null> {
-  try {
-    const resp = await fetch('/api/deploy/config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    });
-    if (!resp.ok) {
-      const payload = (await resp.json().catch(() => null)) as
-        | { error?: { message?: string }; message?: string }
-        | null;
-      throw new Error(payload?.error?.message || payload?.message || `Could not save deploy config (${resp.status})`);
-    }
-    return (await resp.json()) as WebDeployConfigResponse;
-  } catch (err) {
-    if (err instanceof Error) throw err;
-    return null;
-  }
-}
-
-export async function fetchCloudflarePagesZones(): Promise<WebCloudflarePagesZonesResponse | null> {
-  try {
-    const resp = await fetch('/api/deploy/cloudflare-pages/zones');
-    if (!resp.ok) {
-      const payload = (await resp.json().catch(() => null)) as
-        | { error?: { message?: string }; message?: string }
-        | null;
-      throw new Error(payload?.error?.message || payload?.message || `Could not load Cloudflare zones (${resp.status})`);
-    }
-    return (await resp.json()) as WebCloudflarePagesZonesResponse;
-  } catch (err) {
-    if (err instanceof Error) throw err;
-    return null;
-  }
-}
-
-export async function fetchProjectDeployments(
-  projectId: string,
-): Promise<WebDeploymentInfo[]> {
-  try {
-    const resp = await fetch(`/api/projects/${encodeURIComponent(projectId)}/deployments`);
-    if (!resp.ok) return [];
-    const json = (await resp.json()) as ProjectDeploymentsResponse;
-    return (json.deployments ?? []) as WebDeploymentInfo[];
-  } catch {
-    return [];
-  }
-}
-
-export async function deployProjectFile(
-  projectId: string,
-  fileName: string,
-  providerId: WebDeployProviderId = DEFAULT_DEPLOY_PROVIDER_ID,
-  cloudflarePages?: WebCloudflarePagesDeploySelection,
-  target?: 'preview' | 'production',
-): Promise<WebDeployProjectFileResponse> {
-  const body = {
-    fileName,
-    providerId,
-    ...(cloudflarePages ? { cloudflarePages } : {}),
-    ...(target ? { target } : {}),
-  };
-  const resp = await fetch(`/api/projects/${encodeURIComponent(projectId)}/deploy`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) {
-    const payload = (await resp.json().catch(() => null)) as
-      | { error?: { message?: string; code?: string }; code?: string; message?: string }
-      | null;
-    const message = payload?.error?.message || payload?.message || `Deploy failed (${resp.status})`;
-    // Preserve a queryable failure code for analytics (`deployErrorCode` reads
-    // `.code` first). The daemon deploy route (apps/daemon/src/routes/deploy.ts)
-    // collapses every non-404 failure's code to a generic `BAD_REQUEST` (and 404
-    // to `FILE_NOT_FOUND`) while keeping the REAL provider HTTP status on the
-    // response and the real message in the body — so ignore those envelope codes
-    // and fall back to `HTTP_${resp.status}`, which then buckets as HTTP_403 /
-    // HTTP_429 / HTTP_500 instead of collapsing every failure into one code.
-    const rawCode = payload?.error?.code || payload?.code;
-    const code = rawCode && !GENERIC_DEPLOY_ENVELOPE_CODES.has(rawCode) ? rawCode : `HTTP_${resp.status}`;
-    throw Object.assign(new Error(message), { code });
-  }
-  return (await resp.json()) as WebDeployProjectFileResponse;
-}
-
-export async function checkDeploymentLink(
-  projectId: string,
-  deploymentId: string,
-): Promise<WebDeployProjectFileResponse> {
-  const resp = await fetch(
-    `/api/projects/${encodeURIComponent(projectId)}/deployments/${encodeURIComponent(deploymentId)}/check-link`,
-    { method: 'POST' },
-  );
-  if (!resp.ok) {
-    const payload = (await resp.json().catch(() => null)) as
-      | { error?: { message?: string }; message?: string }
-      | null;
-    throw new Error(payload?.error?.message || payload?.message || `Link check failed (${resp.status})`);
-  }
-  return (await resp.json()) as WebDeployProjectFileResponse;
-}
-
-export async function createSocialSharePayload(
-  input: SocialShareRequest,
-): Promise<SocialShareResponse> {
-  const resp = await fetch('/api/social-share', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-  if (!resp.ok) {
-    const payload = await resp.json().catch(() => null) as {
-      error?: { message?: string };
-      message?: string;
-    } | null;
-    throw new Error(payload?.error?.message || payload?.message || `Share payload failed (${resp.status})`);
-  }
-  return (await resp.json()) as SocialShareResponse;
 }
 
 // Project files — all paths are scoped under .od/projects/<id>/ on disk.

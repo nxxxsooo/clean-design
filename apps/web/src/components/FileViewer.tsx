@@ -2,26 +2,17 @@ import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type Cl
 import { createPortal, flushSync } from 'react-dom';
 import { Button, Input, Select } from '@open-design/components';
 import { APP_CHROME_FILE_ACTIONS_ID, APP_CHROME_FILE_ACTIONS_SELECTOR } from './AppChromeHeader';
-import {
-  buildSocialSharePayload,
-  OPEN_DESIGN_GITHUB_REPO_URL,
-  type ProjectFileVersion,
-  type SocialShareRequest,
-  type SocialShareResponse,
-} from '@open-design/contracts';
+import { type ProjectFileVersion } from '@open-design/contracts';
 import {
   anonymizeArtifactId,
   artifactKindToTracking,
   type TrackingFileVersionSource,
   type TrackingProjectKind,
-  type TrackingDeployProvider,
 } from '@open-design/contracts/analytics';
 import { useAnalytics } from '../analytics/provider';
 import { exportErrorCode } from '../analytics/export-error-code';
-import { deployErrorCode } from '../analytics/deploy-error-code';
 import {
   trackArtifactExportResult,
-  trackArtifactDeployResult,
   trackArtifactHeaderClick,
   trackArtifactToolbarClick,
   trackCommentPopoverClick,
@@ -52,14 +43,6 @@ import {
   fetchLiveArtifact,
   fetchLiveArtifactCode,
   fetchLiveArtifactRefreshes,
-  checkDeploymentLink,
-  CLOUDFLARE_PAGES_PROVIDER_ID,
-  createSocialSharePayload,
-  DEFAULT_DEPLOY_PROVIDER_ID,
-  deployProjectFile,
-  fetchCloudflarePagesZones,
-  fetchDeployConfig,
-  fetchProjectDeployments,
   fetchProjectFileVersion,
   fetchProjectFileVersions,
   fetchProjectFilePreview,
@@ -73,13 +56,6 @@ import {
   LiveArtifactRefreshError,
   refreshLiveArtifact,
   restoreProjectFileVersion,
-  updateDeployConfig,
-  type WebDeployConfigResponse,
-  type WebCloudflarePagesDeploySelection,
-  type WebDeploymentInfo,
-  type WebDeployProjectFileResponse,
-  type WebDeployProviderId,
-  type WebUpdateDeployConfigRequest,
   writeProjectTextFile,
   writeProjectTextFileDetailed,
 } from '../providers/registry';
@@ -166,11 +142,8 @@ import type {
 } from '../types';
 import { Icon } from './Icon';
 import { RemixIcon } from './RemixIcon';
-import { SocialShareGrid } from './SocialShareGrid';
 import { Toast } from './Toast';
 import { PreviewDrawOverlay, type DrawToolbarElement } from './PreviewDrawOverlay';
-
-const CLEAN_DESIGN_DEPLOY_ENABLED = false;
 import {
   buildBoardCommentAttachments,
   commentSnapshotEqual,
@@ -252,35 +225,6 @@ const IMAGE_EXPORT_FORMAT_OPTIONS: Array<{
   { value: 'jpeg', label: 'JPEG', extension: '.jpg' },
   { value: 'webp', label: 'WebP', extension: '.webp' },
 ];
-type DeployProviderOption = {
-  id: WebDeployProviderId;
-  labelKey: 'fileViewer.vercelProvider' | 'fileViewer.cloudflarePagesProvider';
-  tokenLink: string;
-  tokenLinkKey: 'fileViewer.vercelTokenGetLink' | 'fileViewer.cloudflareApiTokenGetLink';
-  tokenPlaceholderKey:
-    | 'fileViewer.vercelTokenPlaceholder'
-    | 'fileViewer.cloudflareApiTokenPlaceholder';
-  tokenReuseHintKey: 'fileViewer.vercelTokenReuseHint' | 'fileViewer.cloudflareApiTokenReuseHint';
-  tokenRequiredKey: 'fileViewer.vercelTokenRequired' | 'fileViewer.cloudflareApiTokenRequired';
-  tokenLabelKey:
-    | 'fileViewer.vercelToken'
-    | 'fileViewer.cloudflareApiToken';
-  accountIdLabelKey?: 'fileViewer.cloudflareAccountId';
-  accountIdHintKey?: 'fileViewer.cloudflareAccountIdHint';
-};
-type CloudflarePagesZoneOption = {
-  id: string;
-  name: string;
-  status?: string;
-  type?: string;
-};
-type DeployResultCard = {
-  id: string;
-  label: string;
-  url: string;
-  status: string;
-  message?: string;
-};
 const MAX_BRIDGE_COORDINATE = 1_000_000;
 // Powered-preview iframe attributes. `allow-same-origin` is what makes real
 // Workers / Web Storage / SharedArrayBuffer possible; it is safe here because
@@ -435,31 +379,6 @@ const MARKDOWN_COPY_BUTTON_CLASS = 'markdown-code-copy';
 const MARKDOWN_COPY_TOAST_CLASS = 'markdown-code-toast';
 const ABSOLUTE_MARKDOWN_IMAGE_SOURCE_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i;
 
-const DEPLOY_PROVIDER_OPTIONS: DeployProviderOption[] = [
-  {
-    id: DEFAULT_DEPLOY_PROVIDER_ID,
-    labelKey: 'fileViewer.vercelProvider',
-    tokenLink: 'https://vercel.com/account/settings/tokens',
-    tokenLinkKey: 'fileViewer.vercelTokenGetLink',
-    tokenPlaceholderKey: 'fileViewer.vercelTokenPlaceholder',
-    tokenReuseHintKey: 'fileViewer.vercelTokenReuseHint',
-    tokenRequiredKey: 'fileViewer.vercelTokenRequired',
-    tokenLabelKey: 'fileViewer.vercelToken',
-  },
-  {
-    id: CLOUDFLARE_PAGES_PROVIDER_ID,
-    labelKey: 'fileViewer.cloudflarePagesProvider',
-    tokenLink: 'https://dash.cloudflare.com/profile/api-tokens',
-    tokenLinkKey: 'fileViewer.cloudflareApiTokenGetLink',
-    tokenPlaceholderKey: 'fileViewer.cloudflareApiTokenPlaceholder',
-    tokenReuseHintKey: 'fileViewer.cloudflareApiTokenReuseHint',
-    tokenRequiredKey: 'fileViewer.cloudflareApiTokenRequired',
-    tokenLabelKey: 'fileViewer.cloudflareApiToken',
-    accountIdLabelKey: 'fileViewer.cloudflareAccountId',
-    accountIdHintKey: 'fileViewer.cloudflareAccountIdHint',
-  },
-];
-
 function mergeManualEditInspectorStyles(
   sourceStyles: ManualEditStyles,
   previewStyles: ManualEditStyles,
@@ -509,42 +428,6 @@ function canonicalManualEditStyleValue(key: keyof ManualEditStyles, value: strin
   const normalized = manualEditInspectorStyleValue(key, value).trim();
   if (!normalized) return '';
   return normalized.toLowerCase();
-}
-
-function getDeployProviderOption(providerId: WebDeployProviderId): DeployProviderOption {
-  return DEPLOY_PROVIDER_OPTIONS.find((option) => option.id === providerId) ?? DEPLOY_PROVIDER_OPTIONS[0]!;
-}
-
-function normalizeCloudflareDomainPrefixInput(raw: string): string {
-  return raw.trim().toLowerCase();
-}
-
-function isValidCloudflareDomainPrefixInput(raw: string): boolean {
-  const prefix = normalizeCloudflareDomainPrefixInput(raw);
-  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(prefix);
-}
-
-function deployResultState(status?: string): 'ready' | 'delayed' | 'protected' | 'failed' {
-  if (status === 'protected') return 'protected';
-  if (status === 'failed' || status === 'conflict') return 'failed';
-  if (status === 'link-delayed' || status === 'pending') return 'delayed';
-  return 'ready';
-}
-
-function publicShareUrlForDeployment(deployment?: WebDeploymentInfo | null): string {
-  if (!deployment) return '';
-  const cloudflare = deployment.cloudflarePages;
-  const customDomainUrl = cloudflare?.customDomain?.status === 'ready'
-    ? cloudflare.customDomain.url?.trim()
-    : '';
-  if (customDomainUrl) return customDomainUrl;
-  const pagesDevUrl = cloudflare?.pagesDev?.status === 'ready'
-    ? cloudflare.pagesDev.url?.trim()
-    : '';
-  if (pagesDevUrl) return pagesDevUrl;
-  return deployResultState(deployment.status) === 'ready'
-    ? deployment.url?.trim() || ''
-    : '';
 }
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
@@ -1044,50 +927,6 @@ function manualEditPreviewShellStyle(
     };
   }
   return previewScaleShellStyle(viewport, previewScale);
-}
-
-function deploymentTimestamp(deployment: WebDeploymentInfo): number {
-  const maybeDeployedAt = (deployment as WebDeploymentInfo & { deployedAt?: number | string }).deployedAt;
-  const candidates = [maybeDeployedAt, deployment.updatedAt, deployment.createdAt];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'number' && Number.isFinite(candidate)) return candidate;
-    if (typeof candidate === 'string') {
-      const parsed = Date.parse(candidate);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-  }
-  return 0;
-}
-
-function compareDeploymentsByNewest(a: WebDeploymentInfo, b: WebDeploymentInfo): number {
-  return deploymentTimestamp(b) - deploymentTimestamp(a);
-}
-
-function shareUrlForDeployment(deployment: WebDeploymentInfo): string {
-  const customDomain = deployment.providerId === CLOUDFLARE_PAGES_PROVIDER_ID
-    ? deployment.cloudflarePages?.customDomain
-    : undefined;
-  if (customDomain?.status === 'ready' && customDomain.url?.trim()) {
-    return customDomain.url.trim();
-  }
-  return deployment.url?.trim() || '';
-}
-
-function resolveShareUrl(rawUrl: string): string {
-  const trimmed = rawUrl.trim();
-  if (!trimmed) return '';
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (typeof window === 'undefined') return trimmed;
-  return new URL(trimmed, window.location.origin).toString();
-}
-
-function pickLatestShareDeployment(
-  deploymentsByProvider: Partial<Record<WebDeployProviderId, WebDeploymentInfo>>,
-): WebDeploymentInfo | null {
-  return Object.values(deploymentsByProvider)
-    .filter((deployment): deployment is WebDeploymentInfo =>
-      Boolean(deployment && shareUrlForDeployment(deployment) && deployResultState(deployment.status) !== 'failed'))
-    .sort(compareDeploymentsByNewest)[0] ?? null;
 }
 
 function manualEditFloatingPanelStyle(
@@ -3718,7 +3557,7 @@ function FileVersionManagerModal({
       {versionImageExportVersion ? (
         <div className="modal-backdrop viewer-modal-backdrop image-export-backdrop file-version-export-backdrop" role="presentation">
           <div
-            className="modal deploy-modal image-export-modal"
+            className="modal viewer-form-modal image-export-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby={versionImageExportTitleId}
@@ -3728,7 +3567,7 @@ function FileVersionManagerModal({
               <h2 id={versionImageExportTitleId}>{t('fileViewer.exportImage')}</h2>
               <p className="subtitle">{t('fileViewer.exportImageModalSubtitle')}</p>
             </div>
-            <div className="deploy-form image-export-form">
+            <div className="viewer-form image-export-form">
               <fieldset className="image-export-format-field">
                 <legend>{t('fileViewer.exportImageFormatLabel')}</legend>
                 <div className="image-export-format-options">
@@ -5977,9 +5816,7 @@ function HtmlViewer({
       | 'html'
       | 'image'
       | 'markdown'
-      | 'template'
-      | 'share_link'
-      | 'share_page',
+      | 'template',
     fn: () => Promise<unknown> | unknown,
   ) => {
     const requestId = analytics.newRequestId();
@@ -6236,7 +6073,6 @@ function HtmlViewer({
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
   const zoomMenuRef = useRef<HTMLDivElement | null>(null);
   const [presentMenuOpen, setPresentMenuOpen] = useState(false);
-  const [deployMenuOpen, setDeployMenuOpen] = useState(false);
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   // False when closed; otherwise records which entry opened the modal so the
   // surface_view impression can carry entry_from.
@@ -6259,45 +6095,6 @@ function HtmlViewer({
   }, [fileViewportKey]);
   const [templateDescription, setTemplateDescription] = useState('');
   const [templateSaveError, setTemplateSaveError] = useState<string | null>(null);
-  const [deployment, setDeployment] = useState<WebDeploymentInfo | null>(null);
-  const [deploymentsByProvider, setDeploymentsByProvider] = useState<Partial<Record<WebDeployProviderId, WebDeploymentInfo>>>({});
-  const [deployModalOpen, setDeployModalOpen] = useState(false);
-  const [deployModalIntent, setDeployModalIntent] = useState<'deploy' | 'social-share'>('deploy');
-  const closeDeployModal = useCallback(() => {
-    setDeployModalOpen(false);
-    setDeployModalIntent('deploy');
-  }, []);
-  const [deployConfig, setDeployConfig] = useState<WebDeployConfigResponse | null>(null);
-  const [deploying, setDeploying] = useState(false);
-  const [deployPhase, setDeployPhase] = useState<'idle' | 'deploying' | 'preparing-link'>('idle');
-  const [savingDeployConfig, setSavingDeployConfig] = useState(false);
-  const [deployError, setDeployError] = useState<string | null>(null);
-  const [deployResult, setDeployResult] = useState<WebDeployProjectFileResponse | null>(null);
-  const [copiedDeployLink, setCopiedDeployLink] = useState<string | null>(null);
-  const [deployProviderId, setDeployProviderId] = useState<WebDeployProviderId>(DEFAULT_DEPLOY_PROVIDER_ID);
-  const [deployTarget, setDeployTarget] = useState<'preview' | 'production'>('production');
-  const [projectSocialShare, setProjectSocialShare] = useState<SocialShareResponse | null>(null);
-  const [deployToken, setDeployToken] = useState('');
-  const [teamId, setTeamId] = useState('');
-  const [teamSlug, setTeamSlug] = useState('');
-  const [cloudflareAccountId, setCloudflareAccountId] = useState('');
-  const [cloudflareZones, setCloudflareZones] = useState<CloudflarePagesZoneOption[]>([]);
-  const [cloudflareZonesLoading, setCloudflareZonesLoading] = useState(false);
-  const [cloudflareZonesError, setCloudflareZonesError] = useState<string | null>(null);
-  const [cloudflareZoneId, setCloudflareZoneId] = useState('');
-  const [cloudflareDomainPrefix, setCloudflareDomainPrefix] = useState('');
-  const deployProviderLoadSeqRef = useRef(0);
-  const deployTokenInputRef = useRef<HTMLInputElement | null>(null);
-  useEffect(() => {
-    if (!deployModalOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      closeDeployModal();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [closeDeployModal, deployModalOpen]);
   const [inTabPresent, setInTabPresent] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   // Set to true permanently once `source` has been populated for the first
@@ -6666,8 +6463,6 @@ function HtmlViewer({
   }, [boardImages]);
   const [commentSavedToast, setCommentSavedToast] = useState<string | null>(null);
   const [templateSavedToast, setTemplateSavedToast] = useState<string | null>(null);
-  const [deploySavedToast, setDeploySavedToast] = useState<{ message: string; details: string } | null>(null);
-  const [deployActionToast, setDeployActionToast] = useState<string | null>(null);
   const [versionRestoredToast, setVersionRestoredToast] = useState<{ id: number; message: string } | null>(null);
   const versionRestoredToastIdRef = useRef(0);
   const [imageExportModalOpen, setImageExportModalOpen] = useState(false);
@@ -6697,8 +6492,6 @@ function HtmlViewer({
   const screenshotInFlightRef = useRef(false);
   const imageExportInFlightRef = useRef(false);
   const [exportToast, setExportToast] = useState<ExportToastState | null>(null);
-  const [shareLinkFeedback, setShareLinkFeedback] = useState<'copied' | 'failed' | null>(null);
-  const [shareGuideToast, setShareGuideToast] = useState<string | null>(null);
   const [selectedSideCommentIds, setSelectedSideCommentIds] = useState<Set<string>>(() => new Set());
   const [commentSidePanelCollapsed, setCommentSidePanelCollapsed] = useState(false);
   const [strokePoints, setStrokePoints] = useState<StrokePoint[]>([]);
@@ -6724,129 +6517,6 @@ function HtmlViewer({
     scheduleDesktopPreviewContentMeasure,
     zoomMode,
   ]);
-
-  function deploymentMapForCurrentFile(items: WebDeploymentInfo[]) {
-    const next: Partial<Record<WebDeployProviderId, WebDeploymentInfo>> = {};
-    for (const option of DEPLOY_PROVIDER_OPTIONS) {
-      const deploymentForProvider = items
-        .filter((item) => item.fileName === file.name && item.providerId === option.id && item.url?.trim())
-        .sort(compareDeploymentsByNewest)[0];
-      if (deploymentForProvider) next[option.id] = deploymentForProvider;
-    }
-    return next;
-  }
-
-  function syncDeployFormFromConfig(
-    providerId: WebDeployProviderId,
-    config: WebDeployConfigResponse | null,
-  ) {
-    const matchingConfig = config?.providerId === providerId ? config : null;
-    setDeployProviderId(providerId);
-    setDeployConfig(matchingConfig);
-    setDeployToken(matchingConfig?.tokenMask || '');
-    setTeamId(matchingConfig?.teamId || '');
-    setTeamSlug(matchingConfig?.teamSlug || '');
-    setCloudflareAccountId(matchingConfig?.accountId || '');
-    setCloudflareZoneId(matchingConfig?.cloudflarePages?.lastZoneId || '');
-    setCloudflareDomainPrefix(matchingConfig?.cloudflarePages?.lastDomainPrefix || '');
-    // The daemon's GET /api/deploy/config response currently hardcodes `target: 'preview'`
-    // as a placeholder (apps/daemon/src/deploy.ts publicDeployConfig /
-    // publicCloudflarePagesConfig) rather than persisting a real user preference, so it must
-    // not be used to seed the deploy-target selector's default. Default to 'production' to
-    // match the daemon's documented default for an omitted target on POST deploy, and to match
-    // pre-regression behavior.
-    setDeployTarget('production');
-  }
-
-  function cloudflareConfigHintsFromForm() {
-    const zone = cloudflareZones.find((item) => item.id === cloudflareZoneId);
-    const hints = {
-      ...(cloudflareZoneId.trim() ? { lastZoneId: cloudflareZoneId.trim() } : {}),
-      ...((zone?.name || deployConfig?.cloudflarePages?.lastZoneName)
-        ? { lastZoneName: zone?.name || deployConfig?.cloudflarePages?.lastZoneName }
-        : {}),
-      ...(cloudflareDomainPrefix.trim()
-        ? { lastDomainPrefix: normalizeCloudflareDomainPrefixInput(cloudflareDomainPrefix) }
-        : {}),
-    };
-    return Object.keys(hints).length > 0 ? hints : undefined;
-  }
-
-  function buildDeployConfigRequest(providerId: WebDeployProviderId): WebUpdateDeployConfigRequest {
-    const token = deployToken.trim();
-    if (providerId === CLOUDFLARE_PAGES_PROVIDER_ID) {
-      return {
-        providerId,
-        token,
-        accountId: cloudflareAccountId.trim(),
-        cloudflarePages: cloudflareConfigHintsFromForm(),
-      };
-    }
-    return {
-      providerId,
-      token,
-      teamId: teamId.trim(),
-      teamSlug: teamSlug.trim(),
-    };
-  }
-
-  async function loadDeployProvider(
-    providerId: WebDeployProviderId,
-    options?: { fallbackToExisting?: boolean },
-  ) {
-    const requestSeq = ++deployProviderLoadSeqRef.current;
-    setDeployProviderId(providerId);
-    const deployments = await fetchProjectDeployments(projectId);
-    const nextDeploymentsByProvider = deploymentMapForCurrentFile(deployments);
-    const exactDeployment = nextDeploymentsByProvider[providerId] ?? null;
-    const fallbackDeployment = options?.fallbackToExisting
-      ? Object.values(nextDeploymentsByProvider)[0] ?? null
-      : null;
-    const currentDeployment = exactDeployment ?? fallbackDeployment;
-    // Use the explicit providerId for config/form so a fallback deployment from
-    // another provider only fills the existing-URL display, never the form/credentials.
-    const config = await fetchDeployConfig(providerId);
-    if (requestSeq !== deployProviderLoadSeqRef.current) {
-      return { config: null, currentDeployment: null };
-    }
-    syncDeployFormFromConfig(providerId, config);
-    setDeploymentsByProvider(nextDeploymentsByProvider);
-    setDeployment(currentDeployment ?? null);
-    setDeployResult(currentDeployment ?? null);
-    if (providerId === CLOUDFLARE_PAGES_PROVIDER_ID && config?.configured) {
-      void loadCloudflareZones(config, { requestSeq });
-    }
-    return { config, currentDeployment };
-  }
-
-  async function loadCloudflareZones(
-    config: WebDeployConfigResponse | null = deployConfig,
-    options?: { requestSeq?: number },
-  ) {
-    if (!config?.configured || config.providerId !== CLOUDFLARE_PAGES_PROVIDER_ID) return;
-    const requestSeq = options?.requestSeq ?? deployProviderLoadSeqRef.current;
-    setCloudflareZonesLoading(true);
-    setCloudflareZonesError(null);
-    try {
-      const response = await fetchCloudflarePagesZones();
-      if (requestSeq !== deployProviderLoadSeqRef.current) return;
-      const zones = response?.zones ?? [];
-      setCloudflareZones(zones);
-      const hintedZoneId = response?.cloudflarePages?.lastZoneId || config.cloudflarePages?.lastZoneId || '';
-      const nextZoneId = hintedZoneId && zones.some((zone) => zone.id === hintedZoneId)
-        ? hintedZoneId
-        : zones[0]?.id || '';
-      setCloudflareZoneId(nextZoneId);
-      const hintedPrefix = response?.cloudflarePages?.lastDomainPrefix || config.cloudflarePages?.lastDomainPrefix || '';
-      if (hintedPrefix) setCloudflareDomainPrefix(hintedPrefix);
-    } catch (err) {
-      if (requestSeq !== deployProviderLoadSeqRef.current) return;
-      setCloudflareZones([]);
-      setCloudflareZonesError(err instanceof Error ? err.message : t('fileViewer.cloudflareZonesLoadFailed'));
-    } finally {
-      if (requestSeq === deployProviderLoadSeqRef.current) setCloudflareZonesLoading(false);
-    }
-  }
 
   // Slide deck nav state: the iframe posts the active index + total count
   // back to the host every time a slide settles. Host renders prev/next
@@ -7044,26 +6714,6 @@ function HtmlViewer({
     filesRefreshKey,
     shouldDeferPassivePreviewSource,
   ]);
-
-  useEffect(() => {
-    if (!CLEAN_DESIGN_DEPLOY_ENABLED) return;
-    let cancelled = false;
-    setDeployResult(null);
-    setDeployError(null);
-    setCopiedDeployLink(null);
-    setDeployPhase('idle');
-    void fetchProjectDeployments(projectId).then((items) => {
-      if (cancelled) return;
-      const nextDeploymentsByProvider = deploymentMapForCurrentFile(items);
-      const current = nextDeploymentsByProvider[deployProviderId] ?? null;
-      setDeploymentsByProvider(nextDeploymentsByProvider);
-      setDeployment(current ?? null);
-      setDeployResult(current ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [projectId, file.name, deployProviderId]);
 
   const routingHtmlSource = source ?? routingSource ?? lastGoodSourceForRoutingRef.current;
   const passiveLargeHtmlPreview = shouldDeferPassivePreviewSource && source === null;
@@ -9419,16 +9069,14 @@ function HtmlViewer({
   }, [agentToolsOpen]);
 
   useEffect(() => {
-    if (!deployMenuOpen && !downloadMenuOpen) return;
+    if (!downloadMenuOpen) return;
     const onDocClick = (e: MouseEvent) => {
       if (!shareRef.current) return;
       if (shareRef.current.contains(e.target as Node)) return;
-      setDeployMenuOpen(false);
       setDownloadMenuOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      setDeployMenuOpen(false);
       setDownloadMenuOpen(false);
     };
     document.addEventListener('mousedown', onDocClick);
@@ -9437,7 +9085,7 @@ function HtmlViewer({
       document.removeEventListener('mousedown', onDocClick);
       document.removeEventListener('keydown', onKey);
     };
-  }, [deployMenuOpen, downloadMenuOpen]);
+  }, [downloadMenuOpen]);
 
   useEffect(() => {
     if (!inTabPresent) return;
@@ -9640,256 +9288,6 @@ function HtmlViewer({
         setTimeout(() => setTemplateNote(null), 4000);
       }
     }
-  }
-
-  async function openDeployModal(
-    nextProviderId: WebDeployProviderId = deployProviderId,
-    intent: 'deploy' | 'social-share' = 'deploy',
-  ) {
-    setDeployMenuOpen(false);
-    setDeployModalOpen(true);
-    setDeployModalIntent(intent);
-    setDeployError(null);
-    setDeployActionToast(null);
-    setCopiedDeployLink(null);
-    setDeployPhase('idle');
-    await loadDeployProvider(nextProviderId, { fallbackToExisting: true });
-  }
-
-  async function openSocialShareFlow() {
-    const providerWithDeployment = DEPLOY_PROVIDER_OPTIONS.find(
-      (option) => deploymentsByProvider[option.id]?.url?.trim(),
-    )?.id;
-    await openDeployModal(providerWithDeployment ?? deployProviderId, 'social-share');
-  }
-
-  async function changeDeployProvider(nextProviderId: WebDeployProviderId) {
-    if (nextProviderId === deployProviderId) return;
-    setDeployError(null);
-    setDeployPhase('idle');
-    await loadDeployProvider(nextProviderId);
-  }
-
-  async function saveDeployConfig() {
-    setSavingDeployConfig(true);
-    setDeployError(null);
-    setDeployActionToast(null);
-    try {
-      if (deployProviderId === CLOUDFLARE_PAGES_PROVIDER_ID) {
-        if (!deployToken.trim()) {
-          setDeployActionToast(t('fileViewer.cloudflareApiTokenRequired'));
-          deployTokenInputRef.current?.focus();
-          return null;
-        }
-        if (!cloudflareAccountId.trim()) {
-          throw new Error(t('fileViewer.cloudflareAccountIdRequired'));
-        }
-      }
-      const config = await updateDeployConfig(buildDeployConfigRequest(deployProviderId));
-      if (!config || config.providerId !== deployProviderId) {
-        throw new Error(t('fileViewer.deployProviderConfigSaveFailed', { provider: deployProviderLabel }));
-      }
-      syncDeployFormFromConfig(deployProviderId, config);
-      if (deployProviderId === CLOUDFLARE_PAGES_PROVIDER_ID) {
-        await loadCloudflareZones(config);
-      }
-      return config;
-    } catch (err) {
-      setDeployError(err instanceof Error ? err.message : t('fileViewer.deployProviderConfigSaveFailed', { provider: deployProviderLabel }));
-      return null;
-    } finally {
-      setSavingDeployConfig(false);
-    }
-  }
-
-  function buildCloudflarePagesDeploySelection(): WebCloudflarePagesDeploySelection | undefined {
-    if (deployProviderId !== CLOUDFLARE_PAGES_PROVIDER_ID) return undefined;
-    const prefix = normalizeCloudflareDomainPrefixInput(cloudflareDomainPrefix);
-    if (!prefix) return undefined;
-    if (!isValidCloudflareDomainPrefixInput(prefix)) {
-      throw new Error(t('fileViewer.cloudflareDomainPrefixInvalid'));
-    }
-    const zone = cloudflareZones.find((item) => item.id === cloudflareZoneId);
-    if (!zone) {
-      throw new Error(t('fileViewer.cloudflareZoneRequired'));
-    }
-    return {
-      zoneId: zone.id,
-      zoneName: zone.name,
-      domainPrefix: prefix,
-    };
-  }
-
-  async function deployToSelectedProvider() {
-    setDeploying(true);
-    setDeployPhase('deploying');
-    setDeployError(null);
-    setDeployActionToast(null);
-    setCopiedDeployLink(null);
-    // Real-deploy analytics: report success only after the provider actually
-    // accepts the publish, failed on any hard error / missing config. This is
-    // distinct from the share-popover "opened" signal (artifact_export_result).
-    const deployStarted = performance.now();
-    const providerForTracking: TrackingDeployProvider =
-      deployProviderId === CLOUDFLARE_PAGES_PROVIDER_ID ? 'cloudflare_pages' : 'vercel';
-    const firstConfigure = !deployConfig?.configured;
-    let savedNewToken = false;
-    const fireDeployResult = (
-      result: 'success' | 'failed' | 'cancelled',
-      errorCode?: string,
-    ) => {
-      trackArtifactDeployResult(analytics.track, {
-        page_name: 'artifact',
-        area: 'deploy_modal',
-        artifact_id: anonymizeArtifactId({ projectId, fileName: file.name }),
-        artifact_kind: artifactKindToTracking({ fileKind: file.kind ?? null }),
-        provider: providerForTracking,
-        result,
-        saved_new_token: savedNewToken,
-        first_configure: firstConfigure,
-        ...(errorCode ? { error_code: errorCode } : {}),
-        deploy_duration_ms: Math.round(performance.now() - deployStarted),
-        project_id: projectId,
-        project_kind: projectKind,
-      });
-    };
-    try {
-      const cloudflarePagesSelection = buildCloudflarePagesDeploySelection();
-      const typedToken = deployToken.trim();
-      const hasNewToken = typedToken && typedToken !== deployConfig?.tokenMask;
-      savedNewToken = Boolean(hasNewToken);
-      const cloudflareHints = cloudflareConfigHintsFromForm();
-      const cloudflareHintsChanged = deployProviderId === CLOUDFLARE_PAGES_PROVIDER_ID && Boolean(
-        cloudflareHints?.lastZoneId !== deployConfig?.cloudflarePages?.lastZoneId ||
-        cloudflareHints?.lastZoneName !== deployConfig?.cloudflarePages?.lastZoneName ||
-        cloudflareHints?.lastDomainPrefix !== deployConfig?.cloudflarePages?.lastDomainPrefix,
-      );
-      const needsConfigSave =
-        hasNewToken ||
-        teamId.trim() !== (deployConfig?.teamId || '') ||
-        teamSlug.trim() !== (deployConfig?.teamSlug || '') ||
-        cloudflareAccountId.trim() !== (deployConfig?.accountId || '') ||
-        cloudflareHintsChanged ||
-        !deployConfig?.configured;
-      if (needsConfigSave) {
-        const nextConfig = await saveDeployConfig();
-        if (!nextConfig) {
-          // saveDeployConfig bailed (missing/invalid token, e.g. user clicked
-          // Deploy without entering a key) — count as a failed deploy attempt.
-          fireDeployResult('failed', 'CONFIG_REQUIRED');
-          return;
-        }
-        if (!nextConfig?.configured) {
-          const option = getDeployProviderOption(deployProviderId);
-          throw new Error(t(option.tokenRequiredKey, { provider: t(option.labelKey) }));
-        }
-      }
-      setDeployPhase('preparing-link');
-      const next = await deployProjectFile(
-        projectId,
-        file.name,
-        deployProviderId,
-        cloudflarePagesSelection,
-        deployProviderId === CLOUDFLARE_PAGES_PROVIDER_ID ? deployTarget : undefined,
-      );
-      setDeploymentsByProvider((current) => ({
-        ...current,
-        [next.providerId]: next,
-      }));
-      setDeployment(next);
-      setDeployResult(next);
-      if (deployResultState(next.status) !== 'failed') {
-        fireDeployResult('success');
-        setDeploySavedToast({
-          message: t('fileViewer.deploySuccessToast'),
-          details: t('fileViewer.deploySuccessToastDetails', {
-            provider: deployProviderLabel,
-            url: next.url,
-          }),
-        });
-      } else {
-        fireDeployResult('failed', `STATUS_${next.status ?? 'UNKNOWN'}`);
-      }
-    } catch (err) {
-      const option = getDeployProviderOption(deployProviderId);
-      const message = err instanceof Error
-        ? err.message
-        : t('fileViewer.deployProviderFailed', { provider: t(option.labelKey) });
-      const tokenRequired =
-        message === t(option.tokenRequiredKey, { provider: t(option.labelKey) });
-      if (tokenRequired) {
-        setDeployActionToast(message);
-        deployTokenInputRef.current?.focus();
-      } else {
-        setDeployError(message);
-      }
-      fireDeployResult(
-        'failed',
-        tokenRequired ? 'CONFIG_REQUIRED' : deployErrorCode(err),
-      );
-    } finally {
-      setDeploying(false);
-      setDeployPhase('idle');
-    }
-  }
-
-  async function retryDeploymentLink() {
-    const current = deployResult || deployment;
-    if (!current?.id) return;
-    setDeployError(null);
-    setDeployPhase('preparing-link');
-    try {
-      const next = await checkDeploymentLink(projectId, current.id);
-      setDeploymentsByProvider((items) => ({
-        ...items,
-        [next.providerId]: next,
-      }));
-      setDeployment(next);
-      setDeployResult(next);
-    } catch (err) {
-      setDeployError(err instanceof Error ? err.message : t('fileViewer.deployFailed'));
-    } finally {
-      setDeployPhase('idle');
-    }
-  }
-
-  async function copyDeployLink(url: string) {
-    const safeUrl = url.trim();
-    if (!safeUrl) return;
-    try {
-      await navigator.clipboard.writeText(safeUrl);
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = safeUrl;
-      textarea.setAttribute('readonly', 'true');
-      textarea.style.position = 'fixed';
-      textarea.style.top = '-1000px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-    }
-    setCopiedDeployLink(safeUrl);
-    window.setTimeout(() => {
-      setCopiedDeployLink((current) => (current === safeUrl ? null : current));
-    }, 1800);
-  }
-
-  async function copyShareLink(url: string) {
-    const safeUrl = url.trim();
-    if (!safeUrl) {
-      setShareLinkFeedback('failed');
-      setExportToast({ message: t('handoff.copyFailed'), tone: 'error' });
-      return false;
-    }
-    const ok = await copyToClipboard(safeUrl);
-    const feedback = ok ? 'copied' : 'failed';
-    setShareLinkFeedback(feedback);
-    if (!ok) setExportToast({ message: t('handoff.copyFailed'), tone: 'error' });
-    window.setTimeout(() => {
-      setShareLinkFeedback((current) => (current === feedback ? null : current));
-    }, 1800);
-    return ok;
   }
 
   function presentInThisTab() {
@@ -10285,7 +9683,6 @@ function HtmlViewer({
     artifactKind === 'html' ||
     rendererId === 'html';
   const canShare = source !== null && isShareableArtifact;
-  const canPublish = CLEAN_DESIGN_DEPLOY_ENABLED && canShare;
   const canDownload = source !== null && (isShareableArtifact || isMarkdownArtifact);
   // PPTX export is slide-based, so show it only for explicit decks plus
   // structured deck runtimes. Do not key this off plain `.slide`: ordinary
@@ -10368,14 +9765,8 @@ function HtmlViewer({
     return () => window.clearTimeout(timeout);
   }, [canShare, file.name, projectId]);
 
-  // Chat-side "Share" next-step action: when a new share request arrives, open
-  // the share menu (the toolbar's "Share" button → deploy menu, which holds the
-  // share-link items AND the "publish online" providers). This is the right
-  // surface for "share" — publishing is the prerequisite for a shareable link,
-  // and that publish step lives here; the download menu is export-to-disk, a
-  // different intent. The artifact source may still be loading when the request
-  // lands (the file was just auto-opened), so we defer until `canShare` flips
-  // true and only consume each nonce once.
+  // Online publishing is intentionally absent. A chat-side "Share" request
+  // opens the local export menu so the user can create a file or handoff packet.
   const consumedShareNonceRef = useRef<number | null>(null);
   useEffect(() => {
     const nonce = shareRequest?.nonce;
@@ -10385,8 +9776,7 @@ function HtmlViewer({
     consumedShareNonceRef.current = nonce;
     setExportReadyNudge(false);
     markExportReadyNudgeSeen(projectId, file.name);
-    setDownloadMenuOpen(false);
-    setDeployMenuOpen(true);
+    setDownloadMenuOpen(true);
   }, [shareRequest?.nonce, canShare, projectId, file.name]);
 
   // Parallel to shareRequest, but opens the Download / Export menu instead — the
@@ -10401,7 +9791,6 @@ function HtmlViewer({
     consumedDownloadNonceRef.current = nonce;
     setExportReadyNudge(false);
     markExportReadyNudgeSeen(projectId, file.name);
-    setDeployMenuOpen(false);
     setDownloadMenuOpen(true);
   }, [downloadRequest?.nonce, canShare, projectId, file.name]);
 
@@ -10432,15 +9821,7 @@ function HtmlViewer({
     fireArtifactHeaderClick('download_dropdown');
     setExportReadyNudge(false);
     markExportReadyNudgeSeen(projectId, file.name);
-    setDeployMenuOpen(false);
     setDownloadMenuOpen((v) => !v);
-  };
-  const openDeployMenu = () => {
-    fireArtifactHeaderClick('share_dropdown');
-    setExportReadyNudge(false);
-    markExportReadyNudgeSeen(projectId, file.name);
-    setDownloadMenuOpen(false);
-    setDeployMenuOpen((v) => !v);
   };
   const captureExportImageSnapshot = useCallback(async (
     options?: { wholeDeck?: boolean; context?: HtmlVersionExportContext | null },
@@ -10777,222 +10158,6 @@ function HtmlViewer({
       clearBoardComposer();
     }
   }, [activePreviewCommentId, boardMode, effectiveDeck, slideState?.active, visibleSideComments]);
-  const activeDeployment = deployResult || deployment;
-  const activeDeployedUrl = activeDeployment?.url?.trim() || '';
-  const activeDeploymentDelayed = activeDeployment?.status === 'link-delayed';
-  const activeDeploymentProtected = activeDeployment?.status === 'protected';
-  const activeCloudflarePages = activeDeployment?.providerId === CLOUDFLARE_PAGES_PROVIDER_ID
-    ? activeDeployment.cloudflarePages
-    : undefined;
-  const activeCloudflareCustomDomain = activeCloudflarePages?.customDomain;
-  const deployProvider = getDeployProviderOption(deployProviderId);
-  const deployProviderLabel = t(deployProvider.labelKey);
-  const selectedCloudflareZone = cloudflareZones.find((zone) => zone.id === cloudflareZoneId) ?? null;
-  const normalizedCloudflarePrefix = normalizeCloudflareDomainPrefixInput(cloudflareDomainPrefix);
-  const cloudflareHostnamePreview =
-    selectedCloudflareZone && normalizedCloudflarePrefix
-      ? `${normalizedCloudflarePrefix}.${selectedCloudflareZone.name}`
-      : '';
-  const deployResultCards: DeployResultCard[] = activeCloudflarePages
-    ? (() => {
-        const cards: DeployResultCard[] = [];
-        const pagesDevUrl = activeCloudflarePages.pagesDev?.url || activeDeployedUrl;
-        if (pagesDevUrl) {
-          cards.push({
-            id: 'pages-dev',
-            label: t('fileViewer.cloudflarePagesDevLinkLabel'),
-            url: pagesDevUrl,
-            status: activeCloudflarePages.pagesDev?.status || activeDeployment?.status || 'link-delayed',
-            message: activeCloudflarePages.pagesDev?.statusMessage,
-          });
-        }
-        if (activeCloudflareCustomDomain?.url) {
-          cards.push({
-            id: 'custom-domain',
-            label: t('fileViewer.cloudflareCustomDomainLinkLabel'),
-            url: activeCloudflareCustomDomain.url,
-            status: activeCloudflareCustomDomain.status,
-            message:
-              activeCloudflareCustomDomain.errorMessage ||
-              activeCloudflareCustomDomain.statusMessage,
-          });
-        }
-        return cards;
-      })()
-    : activeDeployedUrl
-      ? [{
-          id: 'default',
-          label: activeDeploymentProtected
-            ? t('fileViewer.deployLinkProtectedLabel')
-            : activeDeploymentDelayed
-              ? t('fileViewer.deployLinkPreparingLabel')
-              : t('fileViewer.deployResultLabel'),
-          url: activeDeployedUrl,
-          status: activeDeployment?.status || 'ready',
-          message: activeDeploymentProtected
-            ? t('fileViewer.deployLinkProtected')
-            : activeDeploymentDelayed
-              ? t('fileViewer.deployLinkDelayed')
-              : activeDeployment?.statusMessage,
-        }]
-      : [];
-  const deployActionLabelFor = (providerId: WebDeployProviderId) => {
-    const option = getDeployProviderOption(providerId);
-    const label = t(option.labelKey);
-    const hasActiveDeploymentForProvider = Boolean(deploymentsByProvider[providerId]?.url?.trim());
-    return hasActiveDeploymentForProvider
-      ? t('fileViewer.redeployToProvider', { provider: label })
-      : t('fileViewer.deployToProvider', { provider: label });
-  };
-  const deployedEntries = DEPLOY_PROVIDER_OPTIONS
-    .map((option) => deploymentsByProvider[option.id])
-    .filter((item): item is WebDeploymentInfo => Boolean(item?.url?.trim()));
-  const shareableDeploymentUrl =
-    DEPLOY_PROVIDER_OPTIONS.map((option) => deploymentsByProvider[option.id])
-      .map((item) => publicShareUrlForDeployment(item))
-      .find(Boolean) ?? '';
-  const socialShareBlockedDeployment =
-    shareableDeploymentUrl
-      ? null
-      : deployedEntries.find((item) => deployResultState(item.status) === 'protected' && !publicShareUrlForDeployment(item)) ??
-        deployedEntries.find((item) => !publicShareUrlForDeployment(item)) ??
-        null;
-  const socialShareBlockedState = socialShareBlockedDeployment
-    ? deployResultState(socialShareBlockedDeployment.status)
-    : null;
-  const socialShareDisplayUrl =
-    shareableDeploymentUrl || socialShareBlockedDeployment?.url?.trim() || activeDeployedUrl;
-  const socialShareUnavailableMessage =
-    socialShareBlockedState === 'protected'
-      ? t('fileViewer.deployLinkProtected')
-      : socialShareBlockedState === 'delayed'
-        ? t('fileViewer.deployLinkDelayed')
-        : t('socialShare.deployFirst');
-  const projectSocialShareRequest = useMemo<SocialShareRequest | null>(() => {
-    if (!socialShareDisplayUrl) return null;
-    const title = t('socialShare.projectTitle', { title: exportTitle });
-    const text = t('socialShare.projectText', {
-      title: exportTitle,
-      repo: OPEN_DESIGN_GITHUB_REPO_URL,
-    });
-    return {
-      kind: 'project-html',
-      locale,
-      url: socialShareDisplayUrl,
-      title,
-      text,
-      copyText: t('socialShare.projectCopyText', {
-        title: exportTitle,
-        url: socialShareDisplayUrl,
-        repo: OPEN_DESIGN_GITHUB_REPO_URL,
-      }),
-    };
-  }, [exportTitle, locale, socialShareDisplayUrl, t]);
-  const projectSocialShareFallback = useMemo(
-    () => (projectSocialShareRequest ? buildSocialSharePayload(projectSocialShareRequest) : null),
-    [projectSocialShareRequest],
-  );
-  // Gate the async payload load on a stable *content* key, not the memo's
-  // object identity. The request object can take a fresh identity on renders
-  // where its inputs are value-equal (e.g. while deployment polling re-sets
-  // state with a new map reference), and keying the effect on that identity
-  // made `setProjectSocialShare` re-fire every render — an infinite render
-  // loop once a deployment URL is available (#regression: ready-deploy share).
-  const projectSocialShareKey = projectSocialShareRequest
-    ? JSON.stringify(projectSocialShareRequest)
-    : '';
-  useEffect(() => {
-    setProjectSocialShare(null);
-    if (!projectSocialShareRequest) return;
-    let cancelled = false;
-    void createSocialSharePayload(projectSocialShareRequest)
-      .then((payload) => {
-        if (!cancelled) setProjectSocialShare(payload);
-      })
-      .catch(() => {
-        if (!cancelled) setProjectSocialShare(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectSocialShareKey]);
-  const activeProjectSocialShare = projectSocialShare ?? projectSocialShareFallback;
-  const socialShareMenuLabel =
-    activeProjectSocialShare
-      ? t('socialShare.projectSection')
-      : socialShareBlockedState === 'protected'
-        ? t('fileViewer.deployLinkProtectedLabel')
-        : socialShareBlockedState === 'delayed'
-        ? t('fileViewer.deployLinkPreparingLabel')
-          : t('socialShare.deployFirst');
-  const deployActionIconFor = (providerId: WebDeployProviderId) => {
-    if (providerId === 'cloudflare-pages') return 'pages-line';
-    return 'upload-cloud-line';
-  };
-  const latestShareDeployment = useMemo(
-    () => pickLatestShareDeployment(deploymentsByProvider),
-    [deploymentsByProvider],
-  );
-  const latestDeployedShareUrl = latestShareDeployment
-    ? shareUrlForDeployment(latestShareDeployment)
-    : '';
-  const latestShareState = latestShareDeployment
-    ? deployResultState(latestShareDeployment.status)
-    : null;
-  const sharePageUrl = useMemo(
-    () => resolveShareUrl(latestDeployedShareUrl),
-    [latestDeployedShareUrl],
-  );
-  const canCopyShareLink = !streaming && Boolean(sharePageUrl);
-  const canOpenSharePage = !streaming && Boolean(sharePageUrl) && latestShareState !== 'delayed';
-  const shareLinkStatusHint =
-    streaming
-      ? t('fileViewer.shareAfterGenerationComplete')
-      : latestShareState === 'delayed'
-      ? t('fileViewer.deployLinkDelayed')
-      : latestShareState === 'protected'
-        ? t('fileViewer.deployLinkProtected')
-        : '';
-  const shareUnavailableHint = streaming
-    ? t('fileViewer.shareAfterGenerationComplete')
-    : t('fileViewer.shareLinkRequiresDeploy');
-  const copyShareLinkLabel =
-    shareLinkFeedback === 'copied'
-      ? t('fileViewer.copied')
-      : shareLinkFeedback === 'failed'
-        ? t('handoff.copyFailed')
-        : t('fileViewer.copyShareLink');
-  const shareMenuLabel = t('fileViewer.shareLabel');
-  const deployMenuLabel = t('fileViewer.deployModalTitle') || 'Deploy';
-  const isSocialShareDeployModal = deployModalIntent === 'social-share';
-  const deployModalKicker = isSocialShareDeployModal
-    ? t('socialShare.projectSection')
-    : deployProviderLabel;
-  const deployModalTitle = isSocialShareDeployModal
-    ? t('socialShare.publishPageTitle')
-    : t('fileViewer.deployToProvider', { provider: deployProviderLabel });
-  const deployModalSubtitle = isSocialShareDeployModal
-    ? t('socialShare.publishPageSubtitle')
-    : t('fileViewer.deployModalSubtitle');
-  const deployButtonLabel =
-    deployPhase === 'deploying'
-      ? t('fileViewer.deployingToProvider', { provider: deployProviderLabel })
-      : deployPhase === 'preparing-link'
-        ? t('fileViewer.preparingPublicLink')
-        : isSocialShareDeployModal
-          ? t('socialShare.publishPageTitle')
-          : deployMenuLabel;
-  const copyDeployLabel = (url: string) =>
-    copiedDeployLink === url.trim()
-      ? t('fileViewer.copied')
-      : t('fileViewer.copyDeployLink');
-  const statusLabelFor = (state: ReturnType<typeof deployResultState>) => {
-    if (state === 'ready') return t('fileViewer.deployLinkReady');
-    if (state === 'protected') return t('fileViewer.deployLinkProtectedLabel');
-    if (state === 'failed') return t('fileViewer.deployLinkFailed');
-    return t('fileViewer.deployLinkPreparingLabel');
-  };
   const initialPreviewLoading = source === null && !sourceEverLoadedRef.current;
   const sourceModeLoading = mode === 'source' && source === null;
   const boardAvailable = mode === 'preview' && source !== null;
@@ -11828,157 +10993,6 @@ function HtmlViewer({
           ) : null}
           {canShare || canDownload ? (
             <div className="chrome-file-action-menus" ref={shareRef}>
-              {canPublish ? (
-                <div className="share-menu chrome-share-menu">
-                  <button
-                    type="button"
-                    className="chrome-action chrome-action-secondary chrome-action-with-label chrome-action-text-only"
-                    aria-haspopup="menu"
-                    aria-expanded={deployMenuOpen}
-                    aria-label={shareMenuLabel}
-                    onClick={openDeployMenu}
-                  >
-                    <span>{shareMenuLabel}</span>
-                  </button>
-                  {deployMenuOpen ? (
-                    <div className="share-menu-popover" role="menu">
-                      <div className="share-menu-section-label" role="presentation">
-                        {t('fileViewer.shareMenuShareLink')}
-                      </div>
-                      {sharePageUrl ? (
-                        <>
-                          <button
-                            type="button"
-                            className="share-menu-item"
-                            role="menuitem"
-                            disabled={!canCopyShareLink}
-                            title={!canCopyShareLink ? shareUnavailableHint : shareLinkStatusHint || undefined}
-                            onClick={() => {
-                              if (!canCopyShareLink || !sharePageUrl) return;
-                              fireShareExport('share_link', async () => {
-                                const ok = await copyShareLink(sharePageUrl);
-                                if (!ok) throw new Error('copy_share_link_failed');
-                              });
-                            }}
-                          >
-                            <span className="share-menu-icon"><RemixIcon name="file-copy-line" size={15} /></span>
-                            <span className="share-menu-text">
-                              <span>{copyShareLinkLabel}</span>
-                              {shareLinkStatusHint ? (
-                                <small>{shareLinkStatusHint}</small>
-                              ) : null}
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            className="share-menu-item"
-                            role="menuitem"
-                            disabled={!canOpenSharePage}
-                            title={!canOpenSharePage ? shareLinkStatusHint || shareUnavailableHint : shareLinkStatusHint || undefined}
-                            onClick={() => {
-                              if (!canOpenSharePage || !sharePageUrl) return;
-                              setDeployMenuOpen(false);
-                              fireShareExport('share_page', () => {
-                                window.open(sharePageUrl, '_blank', 'noopener');
-                              });
-                            }}
-                          >
-                            <span className="share-menu-icon"><RemixIcon name="external-link-line" size={15} /></span>
-                            <span className="share-menu-text">
-                              <span>{t('fileViewer.openSharePage')}</span>
-                              {shareLinkStatusHint ? (
-                                <small>{shareLinkStatusHint}</small>
-                              ) : null}
-                            </span>
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          className="share-menu-item share-menu-guide"
-                          role="menuitem"
-                          title={shareUnavailableHint}
-                          onClick={() => {
-                            // Share-intent-but-blocked signal: user wants a
-                            // share link but nothing is deployed yet.
-                            trackShareOptionPopoverClick(
-                              analytics.track,
-                              {
-                                page_name: 'artifact',
-                                area: 'share_option_popover',
-                                artifact_id: anonymizeArtifactId({ projectId, fileName: file.name }),
-                                artifact_kind: artifactKindToTracking({ fileKind: file.kind ?? null }),
-                                element: 'publish_required_guide',
-                                project_id: projectId,
-                                project_kind: projectKind,
-                              },
-                              { requestId: analytics.newRequestId() },
-                            );
-                            setShareGuideToast(shareUnavailableHint);
-                          }}
-                        >
-                          <span className="share-menu-icon"><RemixIcon name="link" size={15} /></span>
-                          <span className="share-menu-text">
-                            <span>
-                              {streaming
-                                ? t('fileViewer.shareAfterGenerationComplete')
-                                : t('fileViewer.shareLinkPublishGuide')}
-                            </span>
-                          </span>
-                        </button>
-                      )}
-                      <div className="share-menu-divider" />
-                      <div className="share-menu-section-label" role="presentation">
-                        {t('fileViewer.shareMenuPublishOnline')}
-                      </div>
-                      {DEPLOY_PROVIDER_OPTIONS.map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          className="share-menu-item"
-                          role="menuitem"
-                          onClick={() => {
-                            // Just open the deploy modal. The real publish is
-                            // tracked by artifact_deploy_result from
-                            // deployToSelectedProvider — no "popover opened"
-                            // export event here.
-                            void openDeployModal(option.id);
-                          }}
-                        >
-                          <span className="share-menu-icon">
-                            <RemixIcon name={deployActionIconFor(option.id)} size={15} />
-                          </span>
-                          <span>{deployActionLabelFor(option.id)}</span>
-                        </button>
-                      ))}
-                      <div className="share-menu-divider" />
-                      <div className="share-menu-section-label" role="presentation">
-                        {t('socialShare.projectSection')}
-                      </div>
-                      <button
-                        type="button"
-                        className="share-menu-item"
-                        role="menuitem"
-                        onClick={() => {
-                          setDeployMenuOpen(false);
-                          // Deploy-then-share also routes through the deploy
-                          // modal; the real publish is tracked by
-                          // artifact_deploy_result, not an export event.
-                          void openSocialShareFlow();
-                        }}
-                      >
-                        <span className="share-menu-icon">
-                          <RemixIcon
-                            name={activeProjectSocialShare ? 'share-forward-line' : 'upload-cloud-line'}
-                            size={15}
-                          />
-                        </span>
-                        <span>{socialShareMenuLabel}</span>
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
               {canDownload ? (
                 <div className="share-menu chrome-share-menu">
                   <button
@@ -12614,7 +11628,7 @@ function HtmlViewer({
       {pptxExportModalOpen && typeof document !== 'undefined' ? createPortal(
         <div className="modal-backdrop viewer-modal-backdrop image-export-backdrop" role="presentation">
           <div
-            className="modal deploy-modal image-export-modal"
+            className="modal viewer-form-modal image-export-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby={pptxExportTitleId}
@@ -12624,7 +11638,7 @@ function HtmlViewer({
               <h2 id={pptxExportTitleId}>{t('fileViewer.exportPptx')}</h2>
               <p className="subtitle">{t('fileViewer.exportPptxModalSubtitle')}</p>
             </div>
-            <div className="deploy-form image-export-form">
+            <div className="viewer-form image-export-form">
               <fieldset className="image-export-format-field">
                 <legend>{t('fileViewer.exportImageFormatLabel')}</legend>
                 <div className="pptx-export-mode-options">
@@ -12705,7 +11719,7 @@ function HtmlViewer({
           role="presentation"
         >
           <div
-            className="modal deploy-modal image-export-modal"
+            className="modal viewer-form-modal image-export-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby={imageExportTitleId}
@@ -12715,7 +11729,7 @@ function HtmlViewer({
               <h2 id={imageExportTitleId}>{t('fileViewer.exportImage')}</h2>
               <p className="subtitle">{t('fileViewer.exportImageModalSubtitle')}</p>
             </div>
-            <div className="deploy-form image-export-form">
+            <div className="viewer-form image-export-form">
               <fieldset className="image-export-format-field">
                 <legend>{t('fileViewer.exportImageFormatLabel')}</legend>
                 <div className="image-export-format-options">
@@ -12741,7 +11755,7 @@ function HtmlViewer({
                 </div>
               </fieldset>
               {imageExportError ? (
-                <p className="deploy-error" role="alert">{imageExportError}</p>
+                <p className="viewer-form-error" role="alert">{imageExportError}</p>
               ) : null}
             </div>
             <div className="modal-foot">
@@ -12774,13 +11788,13 @@ function HtmlViewer({
       ) : null}
       {templateModalOpen && typeof document !== 'undefined' ? createPortal(
         <div className="modal-backdrop viewer-modal-backdrop" role="presentation">
-          <div className="modal deploy-modal" role="dialog" aria-modal="true">
+          <div className="modal viewer-form-modal" role="dialog" aria-modal="true">
             <div className="modal-head">
               <div className="kicker">TEMPLATE</div>
               <h2>{t('fileViewer.saveAsTemplate')}</h2>
               <p className="subtitle">{t('fileViewer.templateDescPrompt')}</p>
             </div>
-            <div className="deploy-form">
+            <div className="viewer-form">
               <label className="field" htmlFor={templateNameId}>
                 <span className="field-label">{t('fileViewer.templateNamePrompt')}</span>
                 <input
@@ -12802,7 +11816,7 @@ function HtmlViewer({
                   onChange={(e) => setTemplateDescription(e.target.value)}
                 />
               </label>
-              {templateSaveError ? <p className="deploy-error">{templateSaveError}</p> : null}
+              {templateSaveError ? <p className="viewer-form-error">{templateSaveError}</p> : null}
             </div>
             <div className="modal-foot">
               <button
@@ -12834,369 +11848,6 @@ function HtmlViewer({
         </div>,
         document.body,
       ) : null}
-      {CLEAN_DESIGN_DEPLOY_ENABLED && deployModalOpen && typeof document !== 'undefined' ? createPortal(
-        <div
-          className="modal-backdrop viewer-modal-backdrop deploy-flow-backdrop"
-          role="presentation"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) closeDeployModal();
-          }}
-        >
-          <div className="modal deploy-modal deploy-flow-modal" role="dialog" aria-modal="true">
-            <div className="deploy-flow-modal__scroll">
-              <div className="modal-head">
-                <div className="kicker">{deployModalKicker}</div>
-                <h2>{deployModalTitle}</h2>
-                <p className="subtitle">{deployModalSubtitle}</p>
-              </div>
-              <div className="deploy-form">
-                <div className={`deploy-social-share${activeProjectSocialShare ? '' : ' is-locked'}${socialShareBlockedState ? ` is-${socialShareBlockedState}` : ''}`}>
-                  <div className="deploy-social-share__head">
-                    <div className="deploy-social-share__label">
-                      {t('socialShare.projectSection')}
-                    </div>
-                    {socialShareDisplayUrl ? (
-                      <a
-                        className="deploy-social-share__url"
-                        href={socialShareDisplayUrl}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                      >
-                        {socialShareDisplayUrl}
-                      </a>
-                    ) : null}
-                  </div>
-                  {!activeProjectSocialShare || socialShareBlockedState ? (
-                    <p className="hint">{socialShareUnavailableMessage}</p>
-                  ) : null}
-                  {activeProjectSocialShare ? (
-                    <SocialShareGrid
-                      share={activeProjectSocialShare}
-                      onAfterShare={closeDeployModal}
-                    />
-                  ) : null}
-                  {socialShareBlockedDeployment?.url ? (
-                    <div className="deploy-social-share__actions">
-                      <button
-                        type="button"
-                        className="viewer-action"
-                        onClick={() => {
-                          void copyDeployLink(socialShareBlockedDeployment.url);
-                        }}
-                      >
-                        <Icon name="copy" size={14} />
-                        <span>{copyDeployLabel(socialShareBlockedDeployment.url)}</span>
-                      </button>
-                      {activeDeployment?.id === socialShareBlockedDeployment.id ? (
-                        <button
-                          type="button"
-                          className="viewer-action"
-                          disabled={deployPhase === 'preparing-link'}
-                          onClick={() => {
-                            void retryDeploymentLink();
-                          }}
-                        >
-                          {deployPhase === 'preparing-link'
-                            ? t('fileViewer.preparingPublicLink')
-                            : t('fileViewer.retryLink')}
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              <label className="deploy-provider-field">
-                <span className="deploy-field-title">{t('fileViewer.deployProviderLabel')}</span>
-                <select
-                  value={deployProviderId}
-                  onChange={(e) => {
-                    void changeDeployProvider(e.target.value as WebDeployProviderId);
-                  }}
-                >
-                  {DEPLOY_PROVIDER_OPTIONS.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {t(option.labelKey)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {deployProviderId === CLOUDFLARE_PAGES_PROVIDER_ID ? (
-                <label className="deploy-target-field">
-                  <span className="deploy-field-title">{t('fileViewer.deployTargetLabel')}</span>
-                  <select
-                    value={deployTarget}
-                    onChange={(e) => {
-                      setDeployTarget(e.target.value as 'preview' | 'production');
-                    }}
-                  >
-                    <option value="preview">{t('fileViewer.deployTargetPreview')}</option>
-                    <option value="production">{t('fileViewer.deployTargetProduction')}</option>
-                  </select>
-                </label>
-              ) : null}
-              <div className="field-label-row deploy-token-label-row">
-                <label htmlFor="deploy-token" className="deploy-field-title required">{t(deployProvider.tokenLabelKey)}</label>
-                <a
-                  href={deployProvider.tokenLink}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
-                  {t(deployProvider.tokenLinkKey)}
-                </a>
-              </div>
-              <div className="deploy-token-input-row">
-                <input
-                  ref={deployTokenInputRef}
-                  id="deploy-token"
-                  type="password"
-                  value={deployToken}
-                  placeholder={t(deployProvider.tokenPlaceholderKey, { provider: deployProviderLabel })}
-                  onChange={(e) => setDeployToken(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="ghost-link button-like"
-                  disabled={savingDeployConfig}
-                  onClick={() => {
-                    void saveDeployConfig();
-                  }}
-                >
-                  {savingDeployConfig ? t('fileViewer.savingConfig') : t('fileViewer.save')}
-                </button>
-              </div>
-              {deployConfig?.configured || deployProviderId === CLOUDFLARE_PAGES_PROVIDER_ID ? (
-                <div className="deploy-token-hints">
-                  {deployConfig?.configured ? (
-                    <p className="hint">{t(deployProvider.tokenReuseHintKey, { provider: deployProviderLabel })}</p>
-                  ) : null}
-                  {deployProviderId === CLOUDFLARE_PAGES_PROVIDER_ID ? (
-                    <p className="hint">{t('fileViewer.cloudflareApiTokenScopeHint')}</p>
-                  ) : null}
-                </div>
-              ) : null}
-              {deployProviderId === CLOUDFLARE_PAGES_PROVIDER_ID ? (
-                <>
-                  <div className="deploy-field-grid single-field">
-                    <label>
-                      <span className="deploy-field-title required">{t('fileViewer.cloudflareAccountId')}</span>
-                      <input
-                        value={cloudflareAccountId}
-                        onChange={(e) => setCloudflareAccountId(e.target.value)}
-                      />
-                      <span className="field-hint">{t('fileViewer.cloudflareAccountIdHint')}</span>
-                    </label>
-                  </div>
-                  <div className="deploy-field-grid cloudflare-domain-grid">
-                    <label>
-                      <span className="deploy-field-title">{t('fileViewer.cloudflareDomainPrefixLabel')}</span>
-                      <input
-                        value={cloudflareDomainPrefix}
-                        placeholder={t('fileViewer.cloudflareDomainPrefixPlaceholder')}
-                        onChange={(e) => setCloudflareDomainPrefix(e.target.value)}
-                      />
-                    </label>
-                    <div className="deploy-field-control">
-                      <span className="deploy-field-title-row">
-                        <label className="deploy-field-title" htmlFor="cloudflare-zone-select">
-                          {t('fileViewer.cloudflareZoneLabel')}
-                        </label>
-                        <button
-                          type="button"
-                          className="ghost-link deploy-field-inline-action"
-                          disabled={cloudflareZonesLoading || !deployConfig?.configured}
-                          onClick={() => {
-                            void loadCloudflareZones();
-                          }}
-                        >
-                          <RemixIcon name="refresh-line" size={13} />
-                          {cloudflareZonesLoading ? t('fileViewer.cloudflareZonesLoading') : t('fileViewer.cloudflareZonesRefresh')}
-                        </button>
-                      </span>
-                      <select
-                        id="cloudflare-zone-select"
-                        value={cloudflareZoneId}
-                        disabled={cloudflareZonesLoading || (!deployConfig?.configured && !cloudflareZones.length)}
-                        onChange={(e) => setCloudflareZoneId(e.target.value)}
-                      >
-                        {cloudflareZones.length === 0 ? (
-                          <option value="">{t('fileViewer.cloudflareZonePlaceholder')}</option>
-                        ) : null}
-                        {cloudflareZones.map((zone) => (
-                          <option key={zone.id} value={zone.id}>
-                            {zone.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  {cloudflareZonesError ? (
-                    <p className="deploy-error">{cloudflareZonesError}</p>
-                  ) : cloudflareZonesLoading ? (
-                    <p className="hint">{t('fileViewer.cloudflareZonesLoading')}</p>
-                  ) : deployConfig?.configured && cloudflareZones.length === 0 ? (
-                    <p className="hint">{t('fileViewer.cloudflareZonesEmpty')}</p>
-                  ) : null}
-                  {cloudflareDomainPrefix.trim() && !isValidCloudflareDomainPrefixInput(cloudflareDomainPrefix) ? (
-                    <p className="deploy-error">{t('fileViewer.cloudflareDomainPrefixInvalid')}</p>
-                  ) : cloudflareHostnamePreview ? (
-                    <p className="hint">
-                      {t('fileViewer.cloudflareHostnamePreview', { hostname: cloudflareHostnamePreview })}
-                    </p>
-                  ) : null}
-                </>
-              ) : (
-                <div className="deploy-field-grid">
-                  <label>
-                    <span className="deploy-field-title">{t('fileViewer.vercelTeamId')}</span>
-                    <input
-                      value={teamId}
-                      placeholder={t('fileViewer.optional')}
-                      onChange={(e) => setTeamId(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <span className="deploy-field-title">{t('fileViewer.vercelTeamSlug')}</span>
-                    <input
-                      value={teamSlug}
-                      placeholder={t('fileViewer.optional')}
-                      onChange={(e) => setTeamSlug(e.target.value)}
-                    />
-                  </label>
-                </div>
-              )}
-              {deployError ? <p className="deploy-error">{deployError}</p> : null}
-              {!deployError
-                && deployPhase === 'idle'
-                && deployResultCards.length > 0
-                && deployResultState(activeDeployment?.status) === 'ready' ? (
-                <p className="hint" role="status">
-                  {t('fileViewer.deployLinkReady')} · {t('fileViewer.deployResultLabel')}
-                </p>
-              ) : null}
-              {deployResultCards.length > 0 ? (
-                <div className={`deploy-result-block ${deployResultState(activeDeployment?.status)}`}>
-                  <div className="deploy-result-summary">
-                    <div className="deploy-result-summary-head">
-                      <div className="deploy-result-label">{t('fileViewer.deployResultLabel')}</div>
-                      <div className={`deploy-result-badge ${deployResultState(activeDeployment?.status)}`}>
-                        {statusLabelFor(deployResultState(activeDeployment?.status))}
-                      </div>
-                    </div>
-                    {activeDeployment?.statusMessage ? (
-                      <p className="deploy-result-message">{activeDeployment.statusMessage}</p>
-                    ) : null}
-                    <div className="deploy-result-links">
-                      {deployResultCards.map((card) => {
-                        const state = deployResultState(card.status);
-                        const canRetry = state === 'delayed' || state === 'protected';
-                        const isDisabled = state === 'protected' || state === 'failed';
-                        return (
-                          <div key={card.id} className={`deploy-result-link ${state}`}>
-                            <div className="deploy-result-link-main">
-                              <div className="deploy-result-link-head">
-                                <span className="deploy-result-link-label">{card.label}</span>
-                                <span className={`deploy-result-link-state ${state}`}>{statusLabelFor(state)}</span>
-                              </div>
-                              {card.message ? (
-                                <p className="deploy-result-link-message">{card.message}</p>
-                              ) : null}
-                              <a
-                                className="deploy-result-url"
-                                href={card.url}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                              >
-                                {card.url}
-                              </a>
-                            </div>
-                            <div className="deploy-result-actions">
-                              {canRetry ? (
-                                <button
-                                  type="button"
-                                  className="viewer-action"
-                                  disabled={deployPhase === 'preparing-link'}
-                                  onClick={() => {
-                                    void retryDeploymentLink();
-                                  }}
-                                >
-                                  {deployPhase === 'preparing-link'
-                                    ? t('fileViewer.preparingPublicLink')
-                                    : t('fileViewer.retryLink')}
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                className="viewer-action"
-                                onClick={() => {
-                                  void copyDeployLink(card.url);
-                                }}
-                              >
-                                <Icon name="copy" size={14} />
-                                <span>{copyDeployLabel(card.url)}</span>
-                              </button>
-                              <a
-                                className={`ghost-link ${isDisabled ? 'disabled' : ''}`}
-                                href={isDisabled ? undefined : card.url}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                aria-disabled={isDisabled}
-                              >
-                                <Icon name="upload" size={14} />
-                                {t('fileViewer.open')}
-                              </a>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-              </div>
-            </div>
-            <div className="modal-foot">
-              <button
-                type="button"
-                className="ghost-link button-like"
-                onClick={closeDeployModal}
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                className="viewer-action primary"
-                disabled={deploying || savingDeployConfig || deployPhase !== 'idle'}
-                onClick={() => {
-                  void deployToSelectedProvider();
-                }}
-              >
-                {deployButtonLabel}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      ) : null}
-      {deploySavedToast && typeof document !== 'undefined' ? createPortal(
-        <Toast
-          message={deploySavedToast.message}
-          details={deploySavedToast.details}
-          tone="success"
-          placement="top"
-          ttlMs={3600}
-          onDismiss={() => setDeploySavedToast(null)}
-        />,
-        document.body,
-      ) : null}
-      {deployActionToast && typeof document !== 'undefined' ? createPortal(
-        <Toast
-          message={deployActionToast}
-          placement="top"
-          ttlMs={2400}
-          role="alert"
-          onDismiss={() => setDeployActionToast(null)}
-        />,
-        document.body,
-      ) : null}
       {versionRestoredToast && typeof document !== 'undefined' ? createPortal(
         <Toast
           key={versionRestoredToast.id}
@@ -13205,15 +11856,6 @@ function HtmlViewer({
           placement="top"
           ttlMs={2400}
           onDismiss={() => setVersionRestoredToast(null)}
-        />,
-        document.body,
-      ) : null}
-      {shareGuideToast && typeof document !== 'undefined' ? createPortal(
-        <Toast
-          message={shareGuideToast}
-          placement="top"
-          ttlMs={2200}
-          onDismiss={() => setShareGuideToast(null)}
         />,
         document.body,
       ) : null}

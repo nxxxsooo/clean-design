@@ -145,8 +145,8 @@ describe('code-migration pipeline — full atom chain', () => {
     expect(review.removed).toBe(1);
     expect(review.files).toEqual(['components/Button.tsx']);
 
-    // 8. handoff. With accept + both build/test signals AND a 'cli'
-    //    exportTarget, the manifest promotes to 'deployable-app'.
+    // 8. handoff. Acceptance plus build/test evidence records a verified
+    //    patch and preserves the local export target.
     const initialManifest: ArtifactManifest = {
       version:  1,
       kind:     'react-component',
@@ -163,8 +163,7 @@ describe('code-migration pipeline — full atom chain', () => {
     expect(handoff.signals.decision).toBe('accept');
     expect(handoff.signals.buildPassing).toBe(true);
     expect(handoff.signals.testsPassing).toBe(true);
-    expect(handoff.signals.deployable).toBe(true);
-    expect(handoff.manifest.handoffKind).toBe('deployable-app');
+    expect(handoff.manifest.handoffKind).toBe('patch');
     expect(handoff.manifest.exportTargets?.[0]?.surface).toBe('cli');
   });
 
@@ -185,6 +184,5 @@ describe('code-migration pipeline — full atom chain', () => {
       },
     });
     expect(handoff.manifest.handoffKind).toBe('design-only');
-    expect(handoff.signals.deployable).toBe(false);
   });
 });

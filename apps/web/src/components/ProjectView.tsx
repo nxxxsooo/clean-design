@@ -1687,7 +1687,7 @@ export function ProjectView({
   const [browserOpenRequest, setBrowserOpenRequest] = useState<BrowserOpenRequest | null>(null);
   // Like `openRequest`, but additionally asks the preview workspace to open the
   // file's Share/Export menu. Drives the "Share" next-step action: it reuses the
-  // existing export/deploy surface rather than introducing a new share backend.
+  // existing local export surface rather than introducing a separate backend.
   const [shareRequest, setShareRequest] = useState<{ name: string; nonce: number } | null>(null);
   // Parallel to shareRequest, but opens the workspace's Download/Export menu.
   const [downloadRequest, setDownloadRequest] = useState<{ name: string; nonce: number } | null>(null);

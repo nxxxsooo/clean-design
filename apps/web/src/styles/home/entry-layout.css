@@ -625,9 +625,6 @@
   background: var(--bg-panel);
   box-shadow: var(--shadow-lg, 0 14px 36px rgba(0, 0, 0, 0.14));
 }
-.entry-settings-social-share {
-  padding: 0 3px;
-}
 .entry-settings-menu__section {
   display: flex;
   flex-direction: column;

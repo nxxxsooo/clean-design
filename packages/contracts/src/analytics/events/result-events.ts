@@ -564,32 +564,6 @@ export interface SketchExportResultProps {
   project_id: string;
 }
 
-export type TrackingDeployProvider = 'vercel' | 'cloudflare_pages';
-
-// Fired from the deploy modal when a real publish attempt resolves — NOT when
-// the modal merely opens (that path is `artifact_export_result` with
-// export_format vercel/cloudflare_pages and only means "popover opened").
-// `result` is 'success' once the provider accepts the deploy (the link may
-// still be delayed/protected), 'failed' on a hard error or missing config.
-export interface ArtifactDeployResultProps {
-  page_name: 'artifact';
-  area: 'deploy_modal';
-  artifact_id: string;
-  artifact_kind: TrackingArtifactKind;
-  provider: TrackingDeployProvider;
-  result: TrackingExportResult;
-  // True when this attempt saved a new/changed token (the user actually
-  // entered a key this run), so "configured a key AND deployed" is queryable.
-  saved_new_token: boolean;
-  // True when the provider had no saved, configured credentials before this
-  // attempt — i.e. this is a first-time setup-and-deploy.
-  first_configure: boolean;
-  error_code?: string;
-  deploy_duration_ms: number;
-  project_id: string;
-  project_kind: TrackingProjectKind | null;
-}
-
 // Outcome of an HTML file version restore from the version history modal.
 // Fires once per confirmed restore attempt (after the restore API settles) —
 // opening the confirm popover or cancelling it only reports ui_click.

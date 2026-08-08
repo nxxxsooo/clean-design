@@ -21,8 +21,6 @@ import type {
   ConnectionTestRequest,
   ConnectionTestResponse,
   Conversation,
-  DeployConfigResponse,
-  DeployProjectFileResponse,
   DesignSystemDetail,
   DesignSystemFileDetail,
   DesignSystemFileSummary,
@@ -48,7 +46,6 @@ import type {
   MediaAspect,
   OrbitRunSummary,
   OrbitStatusResponse,
-  ProjectDeploymentsResponse,
   ProviderTestRequest,
   PersistedAgentEvent,
   ProviderModelOption,
@@ -87,13 +84,9 @@ import type {
   InstallSkillResponse,
   InstallDesignSystemResponse,
   UninstallResponse,
-  UpdateDeployConfigRequest,
 } from '@open-design/contracts';
 
 export type {
-  CloudflarePagesDeploySelection,
-  CloudflarePagesDeploymentInfo,
-  CloudflarePagesZonesResponse,
   ChatCommentSelectionKind,
   OrbitRunSummary,
   OrbitStatusResponse,
@@ -542,8 +535,6 @@ export type {
   ConnectionTestRequest,
   ConnectionTestResponse,
   Conversation,
-  DeployConfigResponse,
-  DeployProjectFileResponse,
   DesignSystemDetail,
   DesignSystemFileDetail,
   DesignSystemFileSummary,
@@ -566,7 +557,6 @@ export type {
   LiveArtifactStatus,
   LiveArtifactSummary,
   MediaAspect,
-  ProjectDeploymentsResponse,
   Project,
   ProjectPlatform,
   PreviewComment,
@@ -597,7 +587,6 @@ export type {
   InstallSkillResponse,
   InstallDesignSystemResponse,
   UninstallResponse,
-  UpdateDeployConfigRequest,
 };
 
 export type OpenTabsState = ProjectTabsState;

@@ -175,10 +175,6 @@ export type TrackingArtifactKind =
   | 'doc'
   | 'unknown';
 
-// NOTE: vercel / cloudflare_pages are intentionally NOT here. Deploy attempts
-// used to ride artifact_export_result with those formats, but that only ever
-// meant "deploy popover opened", never a real publish. Real deploys are now
-// tracked exclusively by artifact_deploy_result (see TrackingDeployProvider).
 export type TrackingExportFormat =
   | 'pdf'
   | 'pptx'
@@ -186,9 +182,7 @@ export type TrackingExportFormat =
   | 'html'
   | 'image'
   | 'markdown'
-  | 'template'
-  | 'share_link'
-  | 'share_page';
+  | 'template';
 
 export type TrackingResult = 'success' | 'failed';
 export type TrackingRunResult = 'success' | 'failed' | 'cancelled';

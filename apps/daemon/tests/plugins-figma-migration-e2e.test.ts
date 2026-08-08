@@ -125,7 +125,6 @@ describe('figma-migration pipeline — full atom chain', () => {
       exportTarget: { surface: 'figma', target: 'file/ABC123', exportedAt: 1 },
     });
     expect(handoff.manifest.handoffKind).toBe('implementation-plan');
-    expect(handoff.signals.deployable).toBe(false);
 
     // Verify the figma export target landed on the manifest.
     expect(handoff.manifest.exportTargets?.[0]?.surface).toBe('figma');

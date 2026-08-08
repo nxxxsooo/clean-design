@@ -959,13 +959,6 @@ describe('FileViewer srcDoc reload — prevSourceBeforeReloadRef race conditions
         );
       }
 
-      // Deployments — not relevant but FileViewer fetches this on mount.
-      if (url.includes('/api/projects/project-1/deployments')) {
-        return new Response(
-          JSON.stringify({ deployments: [] }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        );
-      }
 
       // Raw source GET — the same URL is used by three distinct callers:
       //   (a) Initial load effect: cacheBust=<mtime>-<reloadKey>-<filesRefreshKey>
