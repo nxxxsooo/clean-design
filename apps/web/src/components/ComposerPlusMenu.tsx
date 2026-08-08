@@ -9,9 +9,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import type {
-  ConnectorDetail,
   InstalledPluginRecord,
-  McpServerConfig,
   SkillSummary,
 } from '@open-design/contracts';
 import { useI18n, useT } from '../i18n';
@@ -149,21 +147,11 @@ function getFlyoutWidth(submenu: PlusMenuSubmenu | null): number {
 }
 
 export interface ComposerPlusMenuProps {
-  /** Legacy inputs accepted for source compatibility; local-only builds never render them. */
-  connectors?: ConnectorDetail[];
-  onPickConnector?: (connector: ConnectorDetail) => void;
-  onAddConnector?: () => void;
-
   /** Installed plugin options shown under the "Plugins" submenu. */
   plugins: InstalledPluginRecord[];
   onPickPlugin: (plugin: InstalledPluginRecord) => void;
   /** Opens the plugin registry; omit to hide the add row. */
   onAddPlugin?: () => void;
-
-  /** Legacy inputs accepted for source compatibility; local-only builds never render them. */
-  mcpServers?: McpServerConfig[];
-  onPickMcp?: (server: McpServerConfig) => void;
-  onAddMcp?: () => void;
 
   /** Available skills shown under the "Skills" submenu. */
   skills?: SkillSummary[];
@@ -203,9 +191,8 @@ export interface ComposerPlusMenuProps {
 
   /**
    * Notified when the menu opens. The project composer uses this to latch its
-   * lazy plugin / MCP / connector fetches, so the Plugins / Connectors / MCP
-   * submenus aren't empty when the "+" menu is the first thing clicked on a
-   * cold composer.
+   * lazy plugin fetches, so the Plugins submenu is populated when the "+"
+   * menu is the first thing clicked on a cold composer.
    */
   onOpen?: () => void;
 

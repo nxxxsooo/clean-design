@@ -17,5 +17,4 @@ export const kiloAgentDef = {
     fallbackModels: [DEFAULT_MODEL_OPTION],
     buildArgs: () => ['acp'],
     streamFormat: 'acp-json-rpc',
-    externalMcpInjection: 'acp-merge',
 } satisfies RuntimeAgentDef;

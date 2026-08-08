@@ -52,14 +52,10 @@ describe('ComposerPlusMenu skills flyout', () => {
 
     render(
       <ComposerPlusMenu
-        connectors={[]}
-        onPickConnector={() => undefined}
         plugins={[]}
         onPickPlugin={() => undefined}
         skills={[prototypeSkill, deckSkill]}
         onPickSkill={onPickSkill}
-        mcpServers={[]}
-        onPickMcp={() => undefined}
         onAttachFiles={() => undefined}
         triggerTestId="plus-trigger"
       />,

@@ -60,7 +60,6 @@ export const reasonixAgentDef = {
     buildArgs: () => ['acp'],
     streamFormat: 'acp-json-rpc',
     mcpDiscovery: 'mature-acp',
-    externalMcpInjection: 'acp-merge',
     acpMcpEnvFormat: 'map',
     env: {
       REASONIX_ACP_SYSTEM_APPEND: DESIGN_INSTRUCTIONS,

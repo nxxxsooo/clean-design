@@ -145,7 +145,6 @@ function renderComposer(
       onEnsureProject={async () => 'project-1'}
       onSend={vi.fn()}
       onStop={vi.fn()}
-      onOpenMcpSettings={vi.fn()}
       skills={[DESIGN_TASTE_SKILL, GSAP_SKILL]}
       activeWorkspaceContext={{
         id: 'file:index.html',
@@ -273,13 +272,15 @@ describe('ChatComposer design toolbox', () => {
 
     await waitFor(() => {
       expect(composerText()).toContain('@creative-director');
-      expect(composerText()).toContain('Global resource index');
+      expect(composerText()).toContain('Local resources');
       expect(composerText()).toContain('spreadsheet-ops');
       expect(composerText()).toContain('Research Asset Plugin');
       expect(composerText()).not.toContain('Higgsfield Video MCP');
       expect(composerText()).not.toContain('Figma');
       expect(composerText()).toContain('data/proof.csv');
       expect(composerText()).toContain('Do not only use design toolbox recommendations');
+      expect(composerText()).not.toContain('MCP');
+      expect(composerText()).not.toContain('connectors');
     });
     expect(fetchMock).not.toHaveBeenCalledWith('/api/mcp/servers');
     expect(fetchMock).not.toHaveBeenCalledWith('/api/connectors');

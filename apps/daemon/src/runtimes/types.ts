@@ -137,36 +137,6 @@ export type RuntimeAgentDef = {
   supportsImagePaths?: boolean;
   maxPromptArgBytes?: number;
   mcpDiscovery?: string;
-  // How the daemon forwards the user's `.od/mcp-config.json` external MCP
-  // servers to this runtime at spawn time. The shape of the injection
-  // is one of three strategies, each of which the server.ts spawn
-  // pipeline knows how to apply:
-  //
-  //   'claude-mcp-json'      — write `.mcp.json` into the managed
-  //                            project cwd (Claude Code auto-loads it).
-  //   'acp-merge'            — merge stdio entries into the existing
-  //                            `mcpServers` array of an ACP launch
-  //                            descriptor (Hermes / Kimi / Kilo / Kiro
-  //                            / Vibe / Devin).
-  //   'opencode-env-content' — serialise to OpenCode's `mcp` config
-  //                            schema and hand it through
-  //                            `OPENCODE_CONFIG_CONTENT` in the spawn
-  //                            env.
-  //   'mimo-env-content'      — same schema as opencode-env-content
-  //                            but emitted as `MIMOCODE_CONFIG_CONTENT`
-  //                            under MiMo's env namespace.
-  //
-  // Leave undefined for adapters that have no native MCP transport
-  // wired yet (codex, cursor-agent, copilot, qoder, pi). The
-  // settings UI reads this field to surface an explicit "external MCP
-  // is not forwarded to <agent>; configure servers in <agent>'s own
-  // config file instead" hint, replacing the previous silent-failure
-  // UX from issue #2142.
-  externalMcpInjection?:
-    | 'claude-mcp-json'
-    | 'acp-merge'
-    | 'opencode-env-content'
-    | 'mimo-env-content';
   installUrl?: string;
   docsUrl?: string;
   // When `false`, the Settings model picker hides the "Custom (fill below)"

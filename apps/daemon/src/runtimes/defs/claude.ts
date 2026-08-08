@@ -93,6 +93,5 @@ export const claudeAgentDef = {
     // Claude Code auto-loads `.mcp.json` from the project cwd at spawn,
     // so the daemon writes the user's external MCP servers there before
     // launching (server.ts handles the cwd guard).
-    externalMcpInjection: 'claude-mcp-json',
     resumesSessionViaCli: true,
 } satisfies RuntimeAgentDef;

@@ -24,6 +24,5 @@ export const byokOpenCodeAgentDef = {
   promptViaStdin: true,
   streamFormat: 'json-event-stream',
   eventParser: 'opencode',
-  externalMcpInjection: 'opencode-env-content',
   supportsCustomModel: true,
 } satisfies RuntimeAgentDef;

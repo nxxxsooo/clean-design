@@ -17,5 +17,4 @@ export const vibeAgentDef = {
     fallbackModels: [DEFAULT_MODEL_OPTION],
     buildArgs: () => [],
     streamFormat: 'acp-json-rpc',
-    externalMcpInjection: 'acp-merge',
 } satisfies RuntimeAgentDef;

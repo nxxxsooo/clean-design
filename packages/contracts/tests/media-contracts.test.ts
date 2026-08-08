@@ -94,7 +94,6 @@ describe('media execution contracts', () => {
       agentId: 'codex',
       status: 'succeeded',
       mediaExecution: { mode: 'enabled' },
-      toolBundle: { mcpServers: [] },
     });
     expect(exampleChatRunStatusResponse.eventsLogPath).toBeNull();
     expect(exampleProjectExportManifestResponse.schema).toBe(PROJECT_EXPORT_MANIFEST_SCHEMA);

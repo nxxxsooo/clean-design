@@ -4966,23 +4966,6 @@ function MediaProvidersSection({
   );
 }
 
-// Per-client install paths. Each entry's `snippet` is what the user
-// copies; some clients also support a richer `deeplink` flow that
-// triggers a one-click install with an in-client approval dialog.
-//
-// Schemas drift between clients in deliberate ways. VS Code keys
-// servers under "servers" with a required "type" field; Zed uses
-// "context_servers"; Cursor, Kiro, Windsurf, and Antigravity share
-// "mcpServers"; Claude Code is best served by its CLI which writes
-// to the local config for you. Verified against each tool's official
-// docs in May 2026.
-//
-// Important: every snippet uses absolute paths to the daemon's current
-// Node-compatible runtime and built cli.js, fetched at runtime. macOS
-// and Linux ship a system /usr/bin/od (octal-dump) that shadows any
-// `od` we might add to PATH, and most Clean Design users run from
-// source where `od` is not installed globally. The installer panel
-// must NOT reference bare `od`.
 // Appearance settings remain local to the renderer.
 
 const THEMES: Array<{ value: AppTheme; labelKey: 'settings.themeSystem' | 'settings.themeLight' | 'settings.themeDark'; icon?: 'sun' | 'moon' }> = [

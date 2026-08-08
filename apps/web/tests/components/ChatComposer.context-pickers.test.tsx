@@ -154,7 +154,6 @@ function composerElement(
       onEnsureProject={async () => 'project-1'}
       onSend={vi.fn()}
       onStop={vi.fn()}
-      onOpenMcpSettings={vi.fn()}
       skills={skills}
       {...overrides}
     />

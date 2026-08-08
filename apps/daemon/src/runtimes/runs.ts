@@ -4,10 +4,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { todoSnapshotHasUnfinishedWork } from '@open-design/contracts';
 import { normalizeMediaExecutionPolicyForRun } from '../media/policy.js';
-import {
-  normalizeRunToolBundleForRun,
-  summarizeRunToolBundle,
-} from '../run-tool-bundle.js';
 import { createRunLifecycleTracer } from '../run-lifecycle-tracer.js';
 import { projectWorkspaceProvenance } from '../workspace-contract.js';
 
@@ -119,7 +115,6 @@ export function createChatRunService({
       pluginId:
         typeof meta.pluginId === 'string' && meta.pluginId ? meta.pluginId : null,
       mediaExecution: normalizeMediaExecutionPolicyForRun(meta.mediaExecution),
-      toolBundle: normalizeRunToolBundleForRun(meta.toolBundle),
       browserUse: meta.browserUse && typeof meta.browserUse === 'object' ? meta.browserUse : null,
       sessionMode:
         meta.sessionMode === 'chat' || meta.sessionMode === 'design' || meta.sessionMode === 'plan'
@@ -293,7 +288,6 @@ export function createChatRunService({
     eventsLogPath: run.eventsLogPath ?? null,
     workspace: projectWorkspaceProvenance(run.projectMetadata),
     mediaExecution: run.mediaExecution ?? normalizeMediaExecutionPolicyForRun(null),
-    toolBundle: summarizeRunToolBundle(run.toolBundle),
     ...(run.promptCache ? { promptCache: run.promptCache } : {}),
     ...(run.nativeSessionRecovery ? { nativeSessionRecovery: run.nativeSessionRecovery } : {}),
     ...(run.browserUse ? { browserUse: run.browserUse } : {}),

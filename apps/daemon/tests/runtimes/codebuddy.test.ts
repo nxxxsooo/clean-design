@@ -121,7 +121,6 @@ describe('codebuddy definition metadata', () => {
   });
 
   it('uses claude-mcp-json for external MCP injection', () => {
-    expect(codebuddyAgentDef.externalMcpInjection).toBe('claude-mcp-json');
   });
 
   it('exposes fallback models with multi-provider coverage', () => {

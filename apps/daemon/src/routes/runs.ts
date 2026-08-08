@@ -31,11 +31,9 @@ import {
 } from '../db.js';
 import { getDetectedRuntimeVersions } from '../runtimes/detection.js';
 import { parseMediaExecutionPolicyInput } from '../media/policy.js';
-import { isManagedProjectCwd } from '../mcp-config.js';
 import { getInstalledPlugin, resolvePluginSnapshot } from '../plugins/index.js';
 import {
   assertSandboxProjectRootAvailable,
-  isSafeId,
   listFiles,
   resolveProjectDir,
   SandboxImportedProjectError,
@@ -45,10 +43,6 @@ import type { RunEventForFailureClassification } from '../run-failure-classifica
 import { classifyRunFailure } from '../run-failure-classification.js';
 import { runResultFromStatus } from '../run-result.js';
 import type { RunStatusForAnalytics } from '../run-result.js';
-import {
-  parseRunToolBundleForRequest,
-  validateRunToolBundleForAgent,
-} from '../run-tool-bundle.js';
 import type { DetectedAgent, RuntimeAgentDef } from '../runtimes/types.js';
 import {
   buildOpenCodeByokProviderConfig,
@@ -62,8 +56,6 @@ type ApiRequest = Request<Record<string, string>, unknown, JsonRecord>;
 type ApiResponse = Response<unknown>;
 type ProjectMetadata = (Partial<ContractProjectMetadata> & JsonRecord) | null | undefined;
 type AgentCliEnv = Parameters<typeof agentCliEnvForAgent>[0];
-type RunDeliveryTarget = 'managed-project' | 'external-project' | 'none';
-
 interface ProjectRecord {
   id: string;
   name: string;
@@ -433,23 +425,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
     reconcileAssistantMessageOnRunEnd,
   } = ctx.messages;
 
-  function runToolBundleDeliveryTargetForProject(
-    projectId: unknown,
-    metadata: ProjectMetadata,
-  ): RunDeliveryTarget {
-    if (typeof projectId !== 'string' || !projectId || !isSafeId(projectId)) {
-      return 'none';
-    }
-    try {
-      const cwd = resolveProjectDir(PROJECTS_DIR, projectId, metadata, {
-        allowUnavailableSandboxImportedProject: true,
-      });
-      return isManagedProjectCwd(cwd, PROJECTS_DIR) ? 'managed-project' : 'external-project';
-    } catch {
-      return 'none';
-    }
-  }
-
   app.post('/api/runs', async (req: ApiRequest, res: ApiResponse) => {
     if (ctx.lifecycle.isDaemonShuttingDown()) {
       return sendApiError(res, 503, 'UPSTREAM_UNAVAILABLE', 'daemon is shutting down');
@@ -458,10 +433,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
     const mediaExecution = parseMediaExecutionPolicyInput(requestBody.mediaExecution);
     if (!mediaExecution.ok) {
       return sendApiError(res, 400, 'BAD_REQUEST', mediaExecution.message);
-    }
-    const toolBundle = parseRunToolBundleForRequest(requestBody.toolBundle);
-    if (!toolBundle.ok) {
-      return sendApiError(res, 400, 'BAD_REQUEST', toolBundle.message);
     }
     if (!hasCompleteByokOpenCodeConfig(requestBody)) {
       return sendApiError(
@@ -520,7 +491,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
     const meta: RunCreateMeta = {
       ...requestBody,
       mediaExecution: mediaExecution.policy,
-      toolBundle: toolBundle.bundle,
     };
     if (resolvedSnapshot?.ok) {
       meta.appliedPluginSnapshotId = resolvedSnapshot.snapshotId;
@@ -574,19 +544,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
         'VALIDATION_FAILED',
         BYOK_OPENCODE_PROVIDER_REQUIRED_MESSAGE,
       );
-    }
-    const toolBundleSupport = validateRunToolBundleForAgent(
-      toolBundle.bundle,
-      typeof meta.agentId === 'string' ? getAgentDef(meta.agentId) : null,
-      {
-        deliveryTarget: runToolBundleDeliveryTargetForProject(
-          meta.projectId,
-          runProject?.metadata,
-        ),
-      },
-    );
-    if (!toolBundleSupport.ok) {
-      return sendApiError(res, 400, 'BAD_REQUEST', toolBundleSupport.message);
     }
     if (runProject?.metadata) {
       meta.projectMetadata = runProject.metadata;
@@ -914,10 +871,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
     if (!mediaExecution.ok) {
       return sendApiError(res, 400, 'BAD_REQUEST', mediaExecution.message);
     }
-    const toolBundle = parseRunToolBundleForRequest(requestBody.toolBundle);
-    if (!toolBundle.ok) {
-      return sendApiError(res, 400, 'BAD_REQUEST', toolBundle.message);
-    }
     let chatProject: ProjectRecord | null = null;
     if (typeof requestBody.projectId === 'string' && requestBody.projectId) {
       try {
@@ -929,19 +882,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
         }
         throw err;
       }
-    }
-    const toolBundleSupport = validateRunToolBundleForAgent(
-      toolBundle.bundle,
-      typeof requestBody.agentId === 'string' ? getAgentDef(requestBody.agentId) : null,
-      {
-        deliveryTarget: runToolBundleDeliveryTargetForProject(
-          requestBody.projectId,
-          chatProject?.metadata,
-        ),
-      },
-    );
-    if (!toolBundleSupport.ok) {
-      return sendApiError(res, 400, 'BAD_REQUEST', toolBundleSupport.message);
     }
     // A chat run may only attach to a conversation owned by its own project.
     // Without this guard, pairing projectId=A with a conversationId owned by
@@ -958,7 +898,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
     const meta = {
       ...requestBody,
       mediaExecution: mediaExecution.policy,
-      toolBundle: toolBundle.bundle,
       ...(chatProject?.metadata ? { projectMetadata: chatProject.metadata } : {}),
     };
     if (!hasCompleteByokOpenCodeConfig(meta)) {

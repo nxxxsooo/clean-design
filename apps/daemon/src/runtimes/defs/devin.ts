@@ -42,5 +42,4 @@ export const devinAgentDef = {
       'acp',
     ],
     streamFormat: 'acp-json-rpc',
-    externalMcpInjection: 'acp-merge',
 } satisfies RuntimeAgentDef;

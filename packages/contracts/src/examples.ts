@@ -7,7 +7,6 @@ import type {
   AutomationTemplate,
   MemoryTreeNode,
 } from './api/automations';
-import type { ConnectorDetail } from './api/connectors';
 import {
   PROJECT_EXPORT_MANIFEST_SCHEMA,
   buildProjectRawFileUrl,
@@ -90,7 +89,6 @@ export const exampleChatRunStatusResponse: ChatRunStatusResponse = {
   errorCode: null,
   eventsLogPath: null,
   mediaExecution: DEFAULT_MEDIA_EXECUTION_POLICY,
-  toolBundle: { mcpServers: [] },
   promptCache: {
     stablePromptHash: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
     hit: false,
@@ -289,38 +287,4 @@ export const exampleLiveArtifactUpdateInput: LiveArtifactUpdateInput = {
   title: 'Launch Metrics Dashboard',
   pinned: true,
   preview: { type: 'html', entry: 'index.html' },
-};
-
-export const exampleConnectorDetail: ConnectorDetail = {
-  id: 'github',
-  name: 'GitHub',
-  provider: 'composio',
-  category: 'developer',
-  description: 'Search repositories, issues, pull requests, commits, and releases from a connected GitHub account via Composio.',
-  status: 'available',
-  toolCount: 1,
-  tools: [
-    {
-      name: 'github.search_issues_and_pull_requests',
-      title: 'Search issues and pull requests',
-      description: 'Search issues and pull requests across repositories visible to the connected account.',
-      inputSchemaJson: { type: 'object', additionalProperties: true },
-      outputSchemaJson: { type: 'object', additionalProperties: true },
-      safety: {
-        sideEffect: 'read',
-        approval: 'auto',
-        reason: 'Tool name, scope, or description indicates explicit read-only behavior.',
-      },
-      refreshEligible: true,
-      curation: {
-        useCases: ['personal_daily_digest'],
-        reason: 'Curated for recent personal GitHub activity in a daily digest.',
-      },
-    },
-  ],
-  auth: { provider: 'composio', configured: false },
-  allowedToolNames: ['github.search_issues_and_pull_requests'],
-  curatedToolNames: ['github.search_issues_and_pull_requests'],
-  featuredToolNames: ['github.search_issues_and_pull_requests'],
-  minimumApproval: 'auto',
 };

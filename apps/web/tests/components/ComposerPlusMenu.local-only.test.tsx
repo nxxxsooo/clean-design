@@ -24,17 +24,6 @@ describe('ComposerPlusMenu local-only surface', () => {
         onPickPlugin={vi.fn()}
         skills={[]}
         onPickSkill={vi.fn()}
-        connectors={[{
-          id: 'slack',
-          name: 'Slack',
-          provider: 'remote',
-          category: 'communication',
-          status: 'connected',
-          tools: [],
-        }]}
-        onPickConnector={vi.fn()}
-        mcpServers={[{ id: 'remote', enabled: true, transport: 'stdio', command: 'remote' }]}
-        onPickMcp={vi.fn()}
         onAttachFiles={vi.fn()}
         triggerTestId="plus-trigger"
       />,

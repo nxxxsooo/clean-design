@@ -83,5 +83,4 @@ export const opencodeAgentDef = {
     // user-configured external MCP servers to a single `opencode run`
     // invocation without polluting the user's saved config files. See
     // <https://opencode.ai/docs/config> and issue #2142.
-    externalMcpInjection: 'opencode-env-content',
 } satisfies RuntimeAgentDef;

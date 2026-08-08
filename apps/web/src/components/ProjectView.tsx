@@ -411,9 +411,7 @@ interface Props {
   onRefreshAgents: () => void;
   onThemeChange?: (theme: AppConfig['theme']) => void;
   onOpenSettings: (section?: SettingsSection) => void;
-  onOpenMcpSettings?: () => void;
   onBrowsePlugins?: () => void;
-  onOpenConnectors?: () => void;
   // Pet wiring forwarded to the chat composer so users can adopt /
   // wake / tuck a pet without leaving the project view.
   onAdoptPetInline?: (petId: string) => void;
@@ -937,8 +935,6 @@ function isStoredRunContextSelection(value: unknown): value is RunContextSelecti
   return (
     (record.skillIds === undefined || isStoredStringArray(record.skillIds)) &&
     (record.pluginIds === undefined || isStoredStringArray(record.pluginIds)) &&
-    (record.mcpServerIds === undefined || isStoredStringArray(record.mcpServerIds)) &&
-    (record.connectorIds === undefined || isStoredStringArray(record.connectorIds)) &&
     (
       record.workspaceItems === undefined ||
       (Array.isArray(record.workspaceItems) &&
@@ -1323,9 +1319,7 @@ export function ProjectView({
   onRefreshAgents,
   onThemeChange,
   onOpenSettings,
-  onOpenMcpSettings,
   onBrowsePlugins,
-  onOpenConnectors,
   onAdoptPetInline,
   onTogglePet,
   onOpenPetSettings,

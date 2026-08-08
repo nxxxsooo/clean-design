@@ -6,7 +6,6 @@ export const MODAL_WINDOW_DRAG_BACKDROP_SELECTOR = [
   '.modal-backdrop',
   '.new-project-modal-backdrop',
   '.automation-modal-backdrop',
-  '.use-everywhere-modal-backdrop',
   '.plugin-details-modal-backdrop',
   '.plugins-import-modal__backdrop',
   '.ds-modal-backdrop',

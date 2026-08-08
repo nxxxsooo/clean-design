@@ -756,7 +756,6 @@ test('kimi args use ACP so composed prompts do not travel through argv', () => {
   assert.equal(kimi.streamFormat, 'acp-json-rpc');
   assert.equal(kimi.eventParser, undefined);
   assert.equal(kimi.mcpDiscovery, 'mature-acp');
-  assert.equal(kimi.externalMcpInjection, 'acp-merge');
   assert.equal(kimi.maxPromptArgBytes, undefined);
 });
 

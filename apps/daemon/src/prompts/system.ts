@@ -199,21 +199,6 @@ type ProjectMetadata = {
     title?: string | null;
     description?: string | null;
   }> | null;
-  contextMcpServers?: Array<{
-    id?: string | null;
-    label?: string | null;
-    transport?: string | null;
-    url?: string | null;
-    command?: string | null;
-  }> | null;
-  contextConnectors?: Array<{
-    id?: string | null;
-    name?: string | null;
-    provider?: string | null;
-    category?: string | null;
-    status?: string | null;
-    accountLabel?: string | null;
-  }> | null;
 };
 type ProjectTemplate = { name: string; description?: string | null; files: Array<{ name: string; content: string }> };
 type AudioVoiceOption = {
@@ -1693,9 +1678,6 @@ function renderMetadataBlock(
     lines.push(
       '- **intent**: live-artifact — the user chose New live artifact. The first output should be a live artifact/dashboard/report, not a one-off static mockup. Prefer the `live-artifact` skill workflow when available, keep source data compact, and register through the daemon live-artifact tool path once that wrapper/tooling is available.',
     );
-    lines.push(
-      '- **connector-source rule**: if the user names a connector/source (for example Notion) and daemon connector tools are available, list connectors before asking where the data comes from. When the named connector is `connected`, use its read-only tools and ask follow-up questions only for missing topic/page/database details, multiple equally plausible matches, or an unconnected/missing connector.',
-    );
   }
   if (metadata.kind === 'brand') {
     lines.push(
@@ -1852,44 +1834,6 @@ function renderMetadataBlock(
         ? ` — ${plugin.description.trim()}`
         : '';
       lines.push(`- ${title}${id ? ` (\`${id}\`)` : ''}${description}`);
-    }
-  }
-
-  if (Array.isArray(metadata.contextMcpServers) && metadata.contextMcpServers.length > 0) {
-    lines.push('');
-    lines.push('### @ MCP context');
-    lines.push(
-      'The user selected these MCP servers as context. Prefer their tools when mounted and relevant before asking where data should come from.',
-    );
-    for (const server of metadata.contextMcpServers) {
-      const id = typeof server.id === 'string' ? server.id : '';
-      const label = typeof server.label === 'string' && server.label.trim().length > 0
-        ? server.label.trim()
-        : id;
-      if (!id && !label) continue;
-      const transport = typeof server.transport === 'string' && server.transport.trim().length > 0
-        ? ` — ${server.transport.trim()}`
-        : '';
-      lines.push(`- ${label}${id ? ` (\`${id}\`)` : ''}${transport}`);
-    }
-  }
-
-  if (Array.isArray(metadata.contextConnectors) && metadata.contextConnectors.length > 0) {
-    lines.push('');
-    lines.push('### @ connector context');
-    lines.push(
-      'The user selected these connectors as context. Use daemon connector tools through the OD CLI wrapper when data from these sources is needed; do not ask the user to identify a source that is already selected.',
-    );
-    for (const connector of metadata.contextConnectors) {
-      const id = typeof connector.id === 'string' ? connector.id : '';
-      const name = typeof connector.name === 'string' && connector.name.trim().length > 0
-        ? connector.name.trim()
-        : id;
-      if (!id && !name) continue;
-      const meta = [connector.provider, connector.status, connector.accountLabel]
-        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-        .join(' · ');
-      lines.push(`- ${name}${id ? ` (\`${id}\`)` : ''}${meta ? ` — ${meta}` : ''}`);
     }
   }
 

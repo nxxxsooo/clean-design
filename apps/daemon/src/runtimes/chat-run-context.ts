@@ -25,8 +25,6 @@ export interface WorkspaceContextItem {
 export interface RunContextSelection {
   skillIds?: string[];
   pluginIds?: string[];
-  mcpServerIds?: string[];
-  connectorIds?: string[];
   workspaceItems?: WorkspaceContextItem[];
 }
 
@@ -43,8 +41,6 @@ type MetadataContextRef = {
 
 type ProjectMetadataContext = {
   contextPlugins?: unknown;
-  contextMcpServers?: unknown;
-  contextConnectors?: unknown;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -104,8 +100,6 @@ export function normalizeRunContextSelection(value: unknown): RunContextSelectio
   return {
     skillIds: stringList(value.skillIds),
     pluginIds: stringList(value.pluginIds),
-    mcpServerIds: stringList(value.mcpServerIds),
-    connectorIds: stringList(value.connectorIds),
     workspaceItems: normalizeWorkspaceContextItems(value.workspaceItems),
   };
 }
@@ -114,11 +108,9 @@ export function mergeRunContextSelections(...contexts: unknown[]): RunContextSel
   const merged: Required<RunContextSelection> = {
     skillIds: [],
     pluginIds: [],
-    mcpServerIds: [],
-    connectorIds: [],
     workspaceItems: [],
   };
-  const listKeys = ['skillIds', 'pluginIds', 'mcpServerIds', 'connectorIds'] as const;
+  const listKeys = ['skillIds', 'pluginIds'] as const;
   const workspaceSeen = new Set<string>();
   for (const context of contexts) {
     const normalized = normalizeRunContextSelection(context);
@@ -155,8 +147,6 @@ export function projectMetadataContextSelection(metadata: unknown): RunContextSe
   );
   return {
     pluginIds: idsFromRefs(contextMetadata.contextPlugins),
-    mcpServerIds: idsFromRefs(contextMetadata.contextMcpServers),
-    connectorIds: idsFromRefs(contextMetadata.contextConnectors),
   };
 }
 

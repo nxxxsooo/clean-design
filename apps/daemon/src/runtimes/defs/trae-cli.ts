@@ -19,5 +19,4 @@ export const traeCliAgentDef = {
     buildArgs: () => ['acp', 'serve', '--yolo'],
     streamFormat: 'acp-json-rpc',
     mcpDiscovery: 'mature-acp',
-    externalMcpInjection: 'acp-merge',
 } satisfies RuntimeAgentDef;

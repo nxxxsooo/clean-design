@@ -344,7 +344,6 @@ describe('NewProjectPanel design system defaults', () => {
         onDeleteTemplate={vi.fn()}
         promptTemplates={[]}
         onCreate={onCreate}
-        connectors={[]}
       />,
     );
 

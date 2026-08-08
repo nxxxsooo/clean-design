@@ -30,18 +30,16 @@ describe('chat run context helpers', () => {
     ]);
   });
 
-  it('merges project metadata context before per-run context without duplicate ids', () => {
+  it('merges local plugin context without duplicate ids', () => {
     expect(mergeRunContextSelections(
-      { pluginIds: ['brand-kit'], connectorIds: ['figma'] },
-      { pluginIds: ['brand-kit', 'motion'], mcpServerIds: ['browser'] },
+      { pluginIds: ['brand-kit'] },
+      { pluginIds: ['brand-kit', 'motion'] },
     )).toEqual({
       pluginIds: ['brand-kit', 'motion'],
-      mcpServerIds: ['browser'],
-      connectorIds: ['figma'],
     });
   });
 
-  it('renders selected workspace and connector context for the agent prompt', () => {
+  it('renders selected workspace context for the agent prompt', () => {
     const prompt = renderRunContextPrompt(
       {
         workspaceItems: [
@@ -52,22 +50,11 @@ describe('chat run context helpers', () => {
             tabId: 'terminal-tab',
           },
         ],
-        connectorIds: ['figma'],
       },
-      {
-        contextConnectors: [
-          {
-            id: 'figma',
-            name: 'Figma',
-            provider: 'figma',
-            status: 'connected',
-          },
-        ],
-      },
+      {},
     );
 
     expect(prompt).toContain('## Selected run context');
     expect(prompt).toContain('terminal: Dev server (`term-1`)');
-    expect(prompt).not.toContain('Selected connectors');
   });
 });

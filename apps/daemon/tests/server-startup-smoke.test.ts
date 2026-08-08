@@ -268,7 +268,7 @@ describe('daemon startup route smoke', () => {
       body: JSON.stringify({
         projectId: 'startup-invalid-run',
         message: 'This run should be rejected before spawning an agent.',
-        toolBundle: 'invalid-tool-bundle',
+        mediaExecution: { mode: 'invalid-mode' },
       }),
     });
 
@@ -276,7 +276,7 @@ describe('daemon startup route smoke', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: {
         code: 'BAD_REQUEST',
-        message: expect.stringContaining('toolBundle'),
+        message: expect.stringContaining('mediaExecution'),
       },
     });
   });

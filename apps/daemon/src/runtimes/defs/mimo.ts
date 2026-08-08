@@ -22,5 +22,4 @@ export const mimoAgentDef = {
   // env namespace instead of OPENCODE_. The daemon serialises the
   // enabled MCP servers into MIMOCODE_CONFIG_CONTENT following the
   // same structure as OPENCODE_CONFIG_CONTENT.
-  externalMcpInjection: 'mimo-env-content',
 } satisfies RuntimeAgentDef;

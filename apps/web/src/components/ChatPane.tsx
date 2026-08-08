@@ -559,13 +559,8 @@ interface Props {
   // after the daemon kicks off `osascript`/`x-terminal-emulator`/
   // `cmd /c start` so the UI can disable the button while in flight.
   onLaunchAntigravityOauth?: () => Promise<void>;
-  // Same dialog, but landing on the External MCP tab. Forwarded to the
-  // composer's `/mcp` slash and MCP picker button.
-  onOpenMcpSettings?: () => void;
-  // The composer "+" menu's "add plugin" / "add connector" rows route to the
-  // home plugin-registry / connector-integration surfaces.
+  // The composer "+" menu's "add plugin" row routes to the local plugin surface.
   onBrowsePlugins?: () => void;
-  onOpenConnectors?: () => void;
   // True when this project is a GitHub-backed design system whose repository
   // evidence has not fully landed. Surfaces a "Connect your repo" CTA in the
   // empty chat state alongside the starter examples.
@@ -826,9 +821,7 @@ export function ChatPane({
   showByokRecoveryAction = false,
   onSwitchToLocalCli,
   onLaunchAntigravityOauth,
-  onOpenMcpSettings,
   onBrowsePlugins,
-  onOpenConnectors,
   connectRepoNeeded,
   githubConnected,
   onConnectRepo,
@@ -1934,9 +1927,7 @@ export function ChatPane({
       }}
       onStop={onStop}
       onOpenSettings={onOpenSettings}
-      onOpenMcpSettings={onOpenMcpSettings}
       onBrowsePlugins={onBrowsePlugins}
-      onOpenConnectors={onOpenConnectors}
       petConfig={petConfig}
       onAdoptPet={onAdoptPet}
       onTogglePet={onTogglePet}
@@ -3330,7 +3321,7 @@ function summarizeQueuedPrompt(item: QueuedSendItem, t: TranslateFn): string {
 }
 
 // Surfaces what a queued turn carries — attachments, visual marks, and the
-// staged plugin / skill / MCP / connector context from its meta — as compact
+// staged plugin, skill, and workspace context from its meta as compact
 // chips so the user can see (and trust) what will be sent without expanding it.
 // Counts use the same plain-English style as the rest of this strip.
 function QueuedSendMetaChips({ item }: { item: QueuedSendItem }) {
@@ -3339,8 +3330,6 @@ function QueuedSendMetaChips({ item }: { item: QueuedSendItem }) {
   const marks = item.commentAttachments?.length ?? 0;
   const plugins = item.meta?.appliedPluginSnapshot ? 1 : ctx?.pluginIds?.length ?? 0;
   const skills = ctx?.skillIds?.length ?? 0;
-  const mcp = ctx?.mcpServerIds?.length ?? 0;
-  const connectors = ctx?.connectorIds?.length ?? 0;
   const workspace = ctx?.workspaceItems?.length ?? 0;
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const chips: Array<{ key: string; label: string }> = [];
@@ -3348,8 +3337,6 @@ function QueuedSendMetaChips({ item }: { item: QueuedSendItem }) {
   if (marks > 0) chips.push({ key: 'marks', label: plural(marks, 'mark') });
   if (plugins > 0) chips.push({ key: 'plugins', label: plural(plugins, 'plugin') });
   if (skills > 0) chips.push({ key: 'skills', label: plural(skills, 'skill') });
-  if (mcp > 0) chips.push({ key: 'mcp', label: `${mcp} MCP` });
-  if (connectors > 0) chips.push({ key: 'connectors', label: plural(connectors, 'connector') });
   if (workspace > 0) chips.push({ key: 'workspace', label: plural(workspace, 'workspace context') });
   if (chips.length === 0) return null;
   return (
