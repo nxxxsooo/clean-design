@@ -54,7 +54,7 @@ interface Props {
 }
 
 function displayAgentName(agent: Pick<AgentInfo, 'id' | 'name'>): string {
-  return agent.id === 'amr' ? 'Open Design' : agent.name;
+  return agent.id === 'amr' ? 'Clean Design' : agent.name;
 }
 
 /**
@@ -188,7 +188,7 @@ export function AvatarMenu({
   const amrProfile = config.agentCliEnv?.amr?.OPEN_DESIGN_AMR_PROFILE;
 
   // Fetch the live account (plan tier + wallet balance) when the popover opens,
-  // whenever the Open Design runtime is installed — so the Open Design agent row
+  // whenever the Clean Design runtime is installed — so the Clean Design agent row
   // can show the real plan/balance even when another agent is currently active.
   const [amrAccount, setAmrAccount] = useState<VelaLoginStatus | null>(null);
   const [amrWalletSnapshot, setAmrWalletSnapshot] =
@@ -427,7 +427,7 @@ export function AvatarMenu({
               <div className="avatar-section-label">{t('avatar.codeAgent')}</div>
               {installedAgents.map((a) => {
                 const selected = config.agentId === a.id;
-                // Open Design row carries the account (balance + plan) inline,
+                // Clean Design row carries the account (balance + plan) inline,
                 // plus Upgrade and Console actions, so it is a container rather
                 // than a single select button (which can't nest buttons/links).
                 if (a.id === 'amr') {

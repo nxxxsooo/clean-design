@@ -137,7 +137,7 @@ describe("renderer crash-loop breaker wiring", () => {
     expect(runtimeSource).toContain("openExternal");
     expect(runtimeSource).toContain("window.openDesignDesktop");
     expect(runtimeSource).toContain("exportDiagnostics");
-    expect(runtimeSource).toContain("support@open-design.ai");
+    expect(runtimeSource).toContain("mingjian@mjshao.fun");
     expect(runtimeSource).toContain("buildCrashMailtoUrl");
     // Report body prefilled with the version/OS/exit code a triager needs.
     expect(runtimeSource).toContain("buildCrashReportUrl");
@@ -147,10 +147,10 @@ describe("renderer crash-loop breaker wiring", () => {
 
 describe("isSupportMailtoUrl", () => {
   test("allows a mailto to the support address carrying only subject/body", () => {
-    expect(isSupportMailtoUrl("mailto:support@open-design.ai")).toBe(true);
-    expect(isSupportMailtoUrl("mailto:support@open-design.ai?subject=Crash&body=hi")).toBe(true);
+    expect(isSupportMailtoUrl("mailto:mingjian@mjshao.fun")).toBe(true);
+    expect(isSupportMailtoUrl("mailto:mingjian@mjshao.fun?subject=Crash&body=hi")).toBe(true);
     // Address comparison is case-insensitive.
-    expect(isSupportMailtoUrl("mailto:Support@Open-Design.AI")).toBe(true);
+    expect(isSupportMailtoUrl("mailto:Mingjian@Mjshao.Fun")).toBe(true);
   });
 
   test("rejects any other address or scheme so widening open-external can't be abused", () => {
@@ -165,18 +165,18 @@ describe("isSupportMailtoUrl", () => {
   test("rejects extra recipients/headers smuggled through the query (to/cc/bcc/unknown)", () => {
     // The address alone passes pathname, so the query must be validated too or a
     // compromised renderer could add recipients through the open-external bridge.
-    expect(isSupportMailtoUrl("mailto:support@open-design.ai?bcc=attacker@example.com")).toBe(false);
-    expect(isSupportMailtoUrl("mailto:support@open-design.ai?cc=attacker@example.com")).toBe(false);
-    expect(isSupportMailtoUrl("mailto:support@open-design.ai?to=attacker@example.com")).toBe(false);
-    expect(isSupportMailtoUrl("mailto:support@open-design.ai?subject=x&bcc=attacker@example.com")).toBe(false);
-    expect(isSupportMailtoUrl("mailto:support@open-design.ai?whatever=1")).toBe(false);
+    expect(isSupportMailtoUrl("mailto:mingjian@mjshao.fun?bcc=attacker@example.com")).toBe(false);
+    expect(isSupportMailtoUrl("mailto:mingjian@mjshao.fun?cc=attacker@example.com")).toBe(false);
+    expect(isSupportMailtoUrl("mailto:mingjian@mjshao.fun?to=attacker@example.com")).toBe(false);
+    expect(isSupportMailtoUrl("mailto:mingjian@mjshao.fun?subject=x&bcc=attacker@example.com")).toBe(false);
+    expect(isSupportMailtoUrl("mailto:mingjian@mjshao.fun?whatever=1")).toBe(false);
   });
 
   test("rejects a CR/LF-injected subject/body that could smuggle a mail header", () => {
     // %0D%0A decodes to CRLF; a "Bcc:" line after it would add a recipient.
     expect(
-      isSupportMailtoUrl("mailto:support@open-design.ai?subject=ok%0D%0ABcc:attacker@example.com"),
+      isSupportMailtoUrl("mailto:mingjian@mjshao.fun?subject=ok%0D%0ABcc:attacker@example.com"),
     ).toBe(false);
-    expect(isSupportMailtoUrl("mailto:support@open-design.ai?body=line1%0Aline2")).toBe(false);
+    expect(isSupportMailtoUrl("mailto:mingjian@mjshao.fun?body=line1%0Aline2")).toBe(false);
   });
 });

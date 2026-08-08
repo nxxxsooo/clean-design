@@ -149,7 +149,7 @@ describe('web-clone example-card tracking', () => {
     fireEvent.click(await screen.findByTestId('home-hero-rail-web-clone'));
     const siteCard = (await screen.findAllByTestId('home-hero-prompt-example'))[0]!;
     const logo = siteCard.querySelector<HTMLImageElement>('.home-hero__site-badge img');
-    expect(logo?.getAttribute('src')).toBe('/logo.svg');
+    expect(logo?.getAttribute('src')).toBe('/logo.png');
     expect(logo?.getAttribute('loading')).toBe('eager');
     expect(logo?.getAttribute('fetchpriority')).toBe('high');
   });
@@ -162,7 +162,7 @@ describe('web-clone example-card tracking', () => {
     fireEvent.click(await screen.findByTestId('home-hero-rail-web-clone'));
     const siteCard = (await screen.findAllByTestId('home-hero-prompt-example'))[0]!;
     const localLogo = siteCard.querySelector<HTMLImageElement>('.home-hero__site-badge img');
-    expect(localLogo?.getAttribute('src')).toBe('/logo.svg');
+    expect(localLogo?.getAttribute('src')).toBe('/logo.png');
 
     fireEvent.error(localLogo!);
     const remoteFallback = siteCard.querySelector<HTMLImageElement>('.home-hero__site-badge img');

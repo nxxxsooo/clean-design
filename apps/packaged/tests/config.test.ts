@@ -10,7 +10,7 @@ import {
 describe('resolvePackagedNamespaceBaseRoot', () => {
   it('lets a historical handoff preserve the already-resolved namespace base root', () => {
     const inheritedRoot = join('C:', 'tools-pack', 'runtime', 'namespaces');
-    const bakedRoot = join('C:', 'Users', 'Nexu', 'AppData', 'Roaming', 'Open Design', 'namespaces');
+    const bakedRoot = join('C:', 'Users', 'Nexu', 'AppData', 'Roaming', 'Clean Design', 'namespaces');
 
     expect(resolvePackagedNamespaceBaseRoot(bakedRoot, join('C:', 'fallback'), {
       [PACKAGED_NAMESPACE_BASE_ROOT_ENV]: inheritedRoot,

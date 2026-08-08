@@ -7,10 +7,10 @@
 
 ## 2. Product Identity and Lifecycle
 
-- [ ] 2.1 Replace user-visible application identity with Clean Design across renderer, desktop, packaged runtime, and macOS packaging
-- [ ] 2.2 Apply bundle ID, URI scheme, IPC root, data-root, and process-stamp isolation with focused identity tests
-- [ ] 2.3 Remove global CLI installation and silent/headless bootstrap paths while preserving local CLI generation adapters
-- [ ] 2.4 Verify packaged sidecar startup, loopback binding, normal quit cleanup, and coexistence with Open Design paths
+- [x] 2.1 Replace user-visible application identity with Clean Design across renderer, desktop, packaged runtime, and macOS packaging
+- [x] 2.2 Apply bundle ID, URI scheme, IPC root, data-root, and process-stamp isolation with focused identity tests
+- [x] 2.3 Remove global CLI installation and silent/headless bootstrap paths while preserving local CLI generation adapters
+- [x] 2.4 Verify packaged sidecar startup, loopback binding, normal quit cleanup, and coexistence with Open Design paths
 
 ## 3. Local-Only Service Boundary
 

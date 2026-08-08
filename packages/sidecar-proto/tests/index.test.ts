@@ -11,6 +11,7 @@ import {
   normalizeNamespace,
   normalizeSidecarStamp,
   OPEN_DESIGN_SIDECAR_CONTRACT,
+  SIDECAR_DEFAULTS,
   SIDECAR_MESSAGES,
   SIDECAR_SOURCES,
   SIDECAR_STAMP_FIELDS,
@@ -24,7 +25,7 @@ import {
 
 const validStamp = {
   app: APP_KEYS.WEB,
-  ipc: "/tmp/open-design/ipc/contract-check/web.sock",
+  ipc: "/tmp/clean-design/ipc/contract-check/web.sock",
   mode: "dev" as const,
   namespace: "contract-check",
   source: SIDECAR_SOURCES.TOOLS_DEV,
@@ -45,6 +46,11 @@ describe("open-design sidecar contract", () => {
     expect(Object.values(DESKTOP_UPDATE_CHANNELS)).toEqual(["beta", "betas", "prerelease", "preview", "stable"]);
     expect(OPEN_DESIGN_SIDECAR_CONTRACT.updateModes).toBe(DESKTOP_UPDATE_MODES);
     expect(OPEN_DESIGN_SIDECAR_CONTRACT.updateStates).toBe(DESKTOP_UPDATE_STATES);
+  });
+
+  it("isolates Clean Design IPC endpoints from the upstream product", () => {
+    expect(SIDECAR_DEFAULTS.ipcBase).toBe("/tmp/clean-design/ipc");
+    expect(SIDECAR_DEFAULTS.windowsPipePrefix).toBe("clean-design");
   });
 
   it("accepts the explicit namespace contract", () => {

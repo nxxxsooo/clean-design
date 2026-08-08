@@ -46,11 +46,11 @@ function makeConfig(root: string, namespace: string): ToolPackConfig {
 describe("resolveMacInstallIdentity", () => {
   it("keeps stable builds on the canonical mac identity", () => {
     expect(resolveMacInstallIdentity(makeConfig("/work", "release-stable"))).toMatchObject({
-      appId: "io.open-design.desktop",
-      installerTitle: "Open Design",
-      productName: "Open Design",
-      publicAppBundleName: "Open Design.app",
-      systemAppBundleName: "Open Design.app",
+      appId: "fun.mjshao.clean-design",
+      installerTitle: "Clean Design",
+      productName: "Clean Design",
+      publicAppBundleName: "Clean Design.app",
+      systemAppBundleName: "Clean Design.app",
     });
   });
 
@@ -58,28 +58,28 @@ describe("resolveMacInstallIdentity", () => {
     const config = makeConfig("/work", "release-beta");
 
     expect(resolveMacInstallIdentity(config)).toEqual({
-      appId: "io.open-design.desktop.beta",
-      executableName: "Open Design Beta",
-      installerTitle: "Open Design Beta",
-      productName: "Open Design Beta",
-      publicAppBundleName: "Open Design Beta.app",
-      systemAppBundleName: "Open Design Beta.app",
+      appId: "fun.mjshao.clean-design.beta",
+      executableName: "Clean Design Beta",
+      installerTitle: "Clean Design Beta",
+      productName: "Clean Design Beta",
+      publicAppBundleName: "Clean Design Beta.app",
+      systemAppBundleName: "Clean Design Beta.app",
     });
-    expect(resolveMacPaths(config).appPath).toMatch(/Open Design Beta\.app$/);
+    expect(resolveMacPaths(config).appPath).toMatch(/Clean Design Beta\.app$/);
   });
 
   it("uses first-class preview app identity for preview release namespaces", () => {
     const config = makeConfig("/work", "release-preview");
 
     expect(resolveMacInstallIdentity(config)).toEqual({
-      appId: "io.open-design.desktop.preview",
-      executableName: "Open Design Preview",
-      installerTitle: "Open Design Preview",
-      productName: "Open Design Preview",
-      publicAppBundleName: "Open Design Preview.app",
-      systemAppBundleName: "Open Design Preview.app",
+      appId: "fun.mjshao.clean-design.preview",
+      executableName: "Clean Design Preview",
+      installerTitle: "Clean Design Preview",
+      productName: "Clean Design Preview",
+      publicAppBundleName: "Clean Design Preview.app",
+      systemAppBundleName: "Clean Design Preview.app",
     });
-    expect(resolveMacPaths(config).appPath).toMatch(/Open Design Preview\.app$/);
+    expect(resolveMacPaths(config).appPath).toMatch(/Clean Design Preview\.app$/);
   });
 
   it("uses first-class prerelease app identity for prerelease release versions and namespaces", () => {
@@ -90,17 +90,17 @@ describe("resolveMacInstallIdentity", () => {
     const prereleaseNamespaceConfig = makeConfig("/work", "release-prerelease");
 
     expect(resolveMacInstallIdentity(prereleaseVersionConfig)).toEqual({
-      appId: "io.open-design.desktop.prerelease",
-      executableName: "Open Design Prerelease",
-      installerTitle: "Open Design Prerelease",
-      productName: "Open Design Prerelease",
-      publicAppBundleName: "Open Design Prerelease.app",
-      systemAppBundleName: "Open Design Prerelease.app",
+      appId: "fun.mjshao.clean-design.prerelease",
+      executableName: "Clean Design Prerelease",
+      installerTitle: "Clean Design Prerelease",
+      productName: "Clean Design Prerelease",
+      publicAppBundleName: "Clean Design Prerelease.app",
+      systemAppBundleName: "Clean Design Prerelease.app",
     });
-    expect(resolveMacPaths(prereleaseVersionConfig).appPath).toMatch(/Open Design Prerelease\.app$/);
+    expect(resolveMacPaths(prereleaseVersionConfig).appPath).toMatch(/Clean Design Prerelease\.app$/);
     expect(resolveMacInstallIdentity(prereleaseNamespaceConfig)).toMatchObject({
-      productName: "Open Design Prerelease",
-      publicAppBundleName: "Open Design Prerelease.app",
+      productName: "Clean Design Prerelease",
+      publicAppBundleName: "Clean Design Prerelease.app",
     });
   });
 });

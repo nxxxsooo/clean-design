@@ -241,7 +241,7 @@ export function signDesktopImportToken(
  * An HTTP 5xx main-frame document is a failed load. Electron resolves
  * `loadURL` for any response that carries a body — `did-fail-load` fires
  * only for net::ERR_* failures — so an error document (e.g. the packaged
- * od:// proxy's synthetic 502) parks the renderer on a dead page the
+ * cleandesign:// proxy's synthetic 502) parks the renderer on a dead page the
  * recovery loop never sees. Route it into the same renderer-failed
  * reload path as a network failure. Electron reports non-HTTP
  * navigations with 0 / -1, which must never trip this.
@@ -262,7 +262,7 @@ const MIN_SPLASH_MS = 2000;
 // While the splash is up, the real web app loads in a hidden main window. We
 // reveal it only once the web bundle reports it has actually mounted (it sets
 // `data-od-app-mounted="1"` on first paint of the real UI), so the user never
-// sees the web's own "Loading Open Design…" shell flash between the splash and
+// sees the web's own "Loading Clean Design…" shell flash between the splash and
 // the app. Poll cadence + a hard ceiling so a missing mount signal can never
 // strand the user on the splash forever.
 const WEB_MOUNT_POLL_MS = 80;
@@ -279,7 +279,7 @@ const DESKTOP_PET_WINDOW_HEIGHT = 300;
 const DESKTOP_PET_WINDOW_MARGIN = 24;
 const UPDATER_STATUS_EVENT = "od:update:status-changed";
 const UPDATER_OPEN_DIALOG_EVENT = "od:update:open-dialog";
-const DESIGN_BROWSER_PARTITION = "persist:open-design-design-browser";
+const DESIGN_BROWSER_PARTITION = "persist:clean-design-design-browser";
 const UPDATER_IPC_CHANNELS = [
   "od:update:status",
   "od:update:check",
@@ -371,7 +371,7 @@ export type DesktopRuntimeOptions = {
   discoverUrl(): Promise<string | null>;
   /**
    * Round-7 (lefarcen P2 @ runtime.ts:336): packaged desktop loads the
-   * renderer from `od://app/`, which only resolves through Electron's
+   * renderer from `cleandesign://app/`, which only resolves through Electron's
    * registered protocol handler in the renderer context. Main-process
    * `globalThis.fetch` (Node/undici) ignores that handler, so any
    * `fetch(webUrl + '/api/...')` from main fails in packaged builds.
@@ -474,7 +474,7 @@ export type PickAndImportFolderDeps = {
   /**
    * Round-7 (lefarcen P2 @ runtime.ts:336): the helper now POSTs to the
    * sidecar daemon's real `http://127.0.0.1:<port>` URL rather than the
-   * renderer-only `od://app/` webUrl. Renamed from `webUrl` to make the
+   * renderer-only `cleandesign://app/` webUrl. Renamed from `webUrl` to make the
    * boundary explicit — main-process Node fetch must hit a real http
    * URL, never a custom Electron protocol scheme. tools-dev callers
    * pass the same value they used to pass for `webUrl` (its web URL is
@@ -858,7 +858,7 @@ function createPendingHtml(): string {
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Open Design</title>
+    <title>Clean Design</title>
     <style>
       html,
       body {
@@ -1012,14 +1012,14 @@ interface RendererCrashScreenContext {
   exitCode: number | null;
 }
 
-const CRASH_REPORT_ISSUES_URL = "https://github.com/nexu-io/open-design/issues/new";
-const SUPPORT_EMAIL = "support@open-design.ai";
+const CRASH_REPORT_ISSUES_URL = "https://github.com/nxxxsooo/clean-design/issues/new";
+const SUPPORT_EMAIL = "mingjian@mjshao.fun";
 
 // Narrow allowlist for the crash screen's "Email us" action: only a mailto
 // addressed to our own support address, carrying nothing but the crash-screen's
 // own `subject`/`body`, opens. Validating just protocol+pathname is not enough —
-// `mailto:support@open-design.ai?bcc=attacker@example.com` (or `?to=`/`?cc=`)
-// keeps `pathname === "support@open-design.ai"` yet smuggles extra recipients
+// `mailto:mingjian@mjshao.fun?bcc=attacker@example.com` (or `?to=`/`?cc=`)
+// keeps `pathname === "mingjian@mjshao.fun"` yet smuggles extra recipients
 // and headers through to `shell.openExternal`. Because this predicate widens the
 // renderer-exposed `shell:open-external` bridge past http, a compromised
 // renderer could otherwise launch the mail client with arbitrary recipients, so
@@ -1066,7 +1066,7 @@ function buildCrashReportUrl(ctx: RendererCrashScreenContext): string {
   const title = `Desktop app keeps crashing (renderer ${ctx.reason})`;
   const body = [
     "**What happened**",
-    "The Open Design desktop window crashed several times in a row and showed the recovery screen.",
+    "The Clean Design desktop window crashed several times in a row and showed the recovery screen.",
     "",
     "**What I was doing when it started** (please add any detail):",
     "",
@@ -1085,9 +1085,9 @@ function buildCrashReportUrl(ctx: RendererCrashScreenContext): string {
 // Prefilled mailto for the "Email us" action — same auto-filled diagnostics as
 // the issue, for users who'd rather email than open a GitHub account.
 function buildCrashMailtoUrl(ctx: RendererCrashScreenContext): string {
-  const subject = `Open Design keeps crashing (renderer ${ctx.reason})`;
+  const subject = `Clean Design keeps crashing (renderer ${ctx.reason})`;
   const body = [
-    "The Open Design desktop app crashed several times in a row on my device.",
+    "The Clean Design desktop app crashed several times in a row on my device.",
     "",
     "(If possible, attach the diagnostics file you saved with the “Save logs…” button.)",
     "",
@@ -1105,7 +1105,7 @@ function createRendererCrashHtml(ctx: RendererCrashScreenContext): string {
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Open Design</title>
+    <title>Clean Design</title>
     <style>
       /* Palette mirrors the app's neutral design tokens (apps/web tokens.css):
          warm off-white + near-black, no accent color — matching the black/white
@@ -1201,7 +1201,7 @@ function createRendererCrashHtml(ctx: RendererCrashScreenContext): string {
   </head>
   <body>
     <div class="panel">
-      <p class="title">Open Design keeps closing on this device</p>
+      <p class="title">Clean Design keeps closing on this device</p>
       <p class="body">The app window crashed several times in a row, so it has paused to avoid getting stuck reloading.</p>
       <p class="body">It will try to recover on its own in a few minutes.</p>
       <div class="actions">
@@ -1211,7 +1211,7 @@ function createRendererCrashHtml(ctx: RendererCrashScreenContext): string {
       <p class="hint" id="diag-note">Saved logs include a crash memory snapshot so we can find the cause. Nothing is sent unless you choose to share it.</p>
       <p class="status" id="status" aria-live="polite"></p>
       <p class="email" id="email-line">Prefer email? <a href="#" id="email">Contact ${SUPPORT_EMAIL}</a></p>
-      <p class="hint">If this keeps happening, quitting and reinstalling Open Design usually resolves it.</p>
+      <p class="hint">If this keeps happening, quitting and reinstalling Clean Design usually resolves it.</p>
     </div>
     <script>
       (function () {
@@ -1299,7 +1299,7 @@ const SPLASH_STAGE_SEQUENCE: readonly SplashBootStage[] = [
 ];
 
 const SPLASH_STAGE_LABELS: Record<SplashBootStage, string> = {
-  starting: "Starting Open Design",
+  starting: "Starting Clean Design",
   engine: "Starting the local engine",
   engineReady: "Local engine ready",
   interface: "Preparing the interface",
@@ -1419,7 +1419,7 @@ export function createSplashWindow(): SplashWindowHandle {
     height: 900,
     resizable: false,
     show: true,
-    title: "Open Design",
+    title: "Clean Design",
     width: 1280,
     webPreferences: {
       contextIsolation: true,
@@ -1490,7 +1490,7 @@ export function isAllowedChildWindowUrl(url: string): boolean {
     // `od:` is the packaged Electron entry's privileged scheme
     // registered by `apps/packaged/src/protocol.ts` and proxied to the
     // local web sidecar. Without this branch, any in-app
-    // `<a target="_blank" href="/api/...">` resolves to `od://app/...`
+    // `<a target="_blank" href="/api/...">` resolves to `cleandesign://app/...`
     // in packaged builds, falls through `setWindowOpenHandler` to
     // `{ action: "deny" }`, and the click is silently dropped — that
     // was the Orbit "Open artifact" no-op reported in #911. Allowing
@@ -1506,7 +1506,7 @@ export function isAllowedChildWindowUrl(url: string): boolean {
     // and the user sees a "Popup blocked" alert.
     return (
       parsed.protocol === "blob:" ||
-      parsed.protocol === "od:" ||
+      parsed.protocol === "cleandesign:" ||
       (parsed.protocol === "about:" && parsed.pathname === "blank")
     );
   } catch {
@@ -1836,7 +1836,7 @@ async function reportRendererCrash(
     // discoverDaemonUrl returns the real http://127.0.0.1:<port> URL the
     // sidecar daemon listens on. In tools-dev callers omit it and fall back
     // to discoverUrl (which is also http in dev). In packaged builds it's
-    // mandatory because the renderer-only `od://app/` scheme isn't
+    // mandatory because the renderer-only `cleandesign://app/` scheme isn't
     // reachable from main-process Node fetch.
     const baseUrl = (await (options.discoverDaemonUrl?.() ?? options.discoverUrl())) ?? null;
     if (!baseUrl) return;
@@ -1946,7 +1946,7 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
         return { ok: false, reason: "desktop auth secret not registered" };
       }
       // Round-7 (lefarcen P2): packaged builds report the renderer URL
-      // (`od://app/`) over `discoverUrl`, but Node-side fetch can't
+      // (`cleandesign://app/`) over `discoverUrl`, but Node-side fetch can't
       // resolve a custom Electron protocol scheme. Prefer the daemon
       // sidecar's real http URL when packaged exposes it; tools-dev
       // omits `discoverDaemonUrl` and we fall back to the web URL
@@ -2062,7 +2062,7 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
   // openPath(projectId) for projects whose resolvedDir came from that
   // trusted flow."
   ipcMain.handle("shell:open-path", async (_event, projectId: string) => {
-    // Round-7 (lefarcen P2): same packaged od:// → daemon URL pivot as
+    // Round-7 (lefarcen P2): same packaged cleandesign:// → daemon URL pivot as
     // the dialog:pick-and-import handler above.
     const apiBaseUrl =
       (options.discoverDaemonUrl ? await options.discoverDaemonUrl() : null) ??
@@ -2115,7 +2115,7 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
 
   const consoleEntries: DesktopConsoleEntry[] = [];
   const petWindow = createDesktopPetWindow(preloadPath, options.osLocale);
-  const windowTitle = options.windowTitle ?? "Open Design";
+  const windowTitle = options.windowTitle ?? "Clean Design";
   const window = new BrowserWindow({
     height: 900,
     icon: resolveDesktopIconPath(),
@@ -2128,7 +2128,7 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
     // Starts hidden: the splash window is what the user sees while the real web
     // app loads in here. We reveal this window only once the app has actually
     // mounted (see `revealWhenReady` below), so there is never a flash of the
-    // web's own "Loading Open Design…" shell.
+    // web's own "Loading Clean Design…" shell.
     show: false,
     title: windowTitle,
     autoHideMenuBar: true,
@@ -2262,7 +2262,7 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
   });
   // `did-fail-load` never fires for an HTTP error *document* — a 5xx response
   // with a body is a successful load to Electron — so a 502 page (e.g. the
-  // packaged od:// proxy's exhaustion fallback) would otherwise sit on screen
+  // packaged cleandesign:// proxy's exhaustion fallback) would otherwise sit on screen
   // until a manual reload. `did-navigate` is main-frame-only and carries the
   // HTTP status (-1 for non-HTTP navigations); in-page SPA routing emits
   // `did-navigate-in-page` instead, so app navigation never trips this.
@@ -2282,7 +2282,7 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
   const unsubscribeUpdater = options.updater?.subscribe(() => sendUpdaterStatus()) ?? (() => undefined);
   const requireMainWindowSender = (event: Electron.IpcMainInvokeEvent): void => {
     if (event.sender !== window.webContents) {
-      throw new Error("host IPC is only available to the main Open Design window");
+      throw new Error("host IPC is only available to the main Clean Design window");
     }
   };
   const discoverUpdateDaemonBaseUrl = async (): Promise<string> => {
@@ -2607,7 +2607,7 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
 
   // Hold the splash until BOTH (a) the web bundle reports it has mounted — it
   // sets `data-od-app-mounted="1"` on first paint of the real UI — so we never
-  // reveal the web's own dark "Loading Open Design…" shell, and (b) the splash
+  // reveal the web's own dark "Loading Clean Design…" shell, and (b) the splash
   // has been up at least MIN_SPLASH_MS so the brand clip plays through. A hard
   // ceiling guarantees the user is never stranded on the splash if the mount
   // signal never arrives.

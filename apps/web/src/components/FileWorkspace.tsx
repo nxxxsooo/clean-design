@@ -506,7 +506,7 @@ const COMMUNITY_PAGE_PRESETS: ProjectPagePreset[] = [
   {
     id: 'community-open-design-landing',
     category: 'prototype',
-    title: pageText('Open Design Landing', 'Open Design 落地页', 'Open Design 落地頁'),
+    title: pageText('Clean Design Landing', 'Clean Design 落地页', 'Clean Design 落地頁'),
     description: pageText(
       'Editorial landing page with a strong hero, proof points, and product narrative.',
       '带强主视觉、信任证明和产品叙事的编辑风落地页。',
@@ -6306,7 +6306,7 @@ function initialPrototypePage(title: string, body = DEFAULT_PROTOTYPE_PAGE_BODY)
   <main>
     <section class="hero">
       <div>
-        <div class="eyebrow">Open Design</div>
+        <div class="eyebrow">Clean Design</div>
         <h1>${safeTitle}</h1>
         <p>${safeBody}</p>
       </div>
@@ -6448,7 +6448,7 @@ function initialSlidesPage(title: string, body = DEFAULT_SLIDES_PAGE_BODY): stri
   <div class="deck-shell">
     <main class="deck-stage" id="deck-stage">
       <section class="slide active cover" data-screen-label="01 Cover">
-        <div class="kicker">Open Design deck</div>
+        <div class="kicker">Clean Design deck</div>
         <h1>${safeTitle}</h1>
         <p class="body">${safeBody}</p>
         <div class="num">01</div>
@@ -6586,7 +6586,7 @@ function initialDocumentPage(title: string, body = DEFAULT_DOCUMENT_PAGE_BODY): 
 </head>
 <body>
   <article>
-    <div class="meta">Open Design document</div>
+    <div class="meta">Clean Design document</div>
     <h1>${safeTitle}</h1>
     <p>${safeBody}</p>
     <h2>Purpose</h2>

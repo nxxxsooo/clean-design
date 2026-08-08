@@ -6,9 +6,6 @@
   "type": "module",
   "description": "Local-first visual design studio with deterministic prompt handoff.",
   "license": "Apache-2.0",
-  "bin": {
-    "od": "./apps/daemon/bin/od.mjs"
-  },
   "scripts": {
     "postinstall": "node ./scripts/postinstall.mjs",
     "bootstrap": "node ./scripts/postinstall.mjs",

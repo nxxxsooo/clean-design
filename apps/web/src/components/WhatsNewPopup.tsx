@@ -44,7 +44,7 @@ const cardIn: Variants = {
 type CardModel = {
   /** Highlight identity — recorded as "seen" so the card shows once per id. */
   id: string;
-  /** Running app version, shown as the "Open Design x.y.z" eyebrow. */
+  /** Running app version, shown as the "Clean Design x.y.z" eyebrow. */
   appVersion: string;
   /** The release headline, rendered as the main serif title. */
   title: string;
@@ -161,7 +161,7 @@ export function WhatsNewPopup({ active }: { active: boolean }) {
           exit="exit"
         >
           <div className={styles.header}>
-            <span className={styles.eyebrow}>Open Design {card.appVersion}</span>
+            <span className={styles.eyebrow}>Clean Design {card.appVersion}</span>
             <Button
               aria-label={t('whatsNew.dismissAria')}
               className={styles.close}

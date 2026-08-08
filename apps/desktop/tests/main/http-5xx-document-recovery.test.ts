@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { isRendererFailureHttpStatus } from "../../src/main/runtime.js";
 
-// An HTTP 5xx document (e.g. the packaged od:// proxy's synthetic 502) is a
+// An HTTP 5xx document (e.g. the packaged cleandesign:// proxy's synthetic 502) is a
 // *successful* load to Electron: `loadURL` resolves and `did-fail-load` fires
 // only for net::ERR_* failures. Without dedicated wiring the renderer parks on
 // the error page forever, the mount marker never appears, and the splash

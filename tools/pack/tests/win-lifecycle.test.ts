@@ -93,7 +93,7 @@ describe("inspectPackedWinApp", () => {
         if (payload.type === SIDECAR_MESSAGES.STATUS) {
           if (ipc.includes("daemon")) return { state: "running", url: "http://127.0.0.1:1234" };
           if (ipc.includes("web")) return { state: "running", url: "http://127.0.0.1:5678" };
-          return { state: "running", url: "od://app/" };
+          return { state: "running", url: "cleandesign://app/" };
         }
         if (payload.type === SIDECAR_MESSAGES.EVAL) {
           throw new Error("IPC request timed out: test-pipe");
@@ -103,7 +103,7 @@ describe("inspectPackedWinApp", () => {
 
       const result = await inspectPackedWinApp(createConfig(root), { expr: "document.title" });
 
-      expect(result.status).toEqual({ state: "running", url: "od://app/" });
+      expect(result.status).toEqual({ state: "running", url: "cleandesign://app/" });
       expect(result.daemonStatus).toEqual({ state: "running", url: "http://127.0.0.1:1234" });
       expect(result.webStatus).toEqual({ state: "running", url: "http://127.0.0.1:5678" });
       expect(result.eval).toEqual({
@@ -192,7 +192,7 @@ describe("inspectPackedWinApp", () => {
         if (payload.type === SIDECAR_MESSAGES.STATUS) {
           if (ipc.includes("daemon")) return { state: "running", url: "http://127.0.0.1:1234" };
           if (ipc.includes("web")) return { state: "running", url: "http://127.0.0.1:5678" };
-          return { state: "running", url: "od://app/" };
+          return { state: "running", url: "cleandesign://app/" };
         }
         if (payload.type === SIDECAR_MESSAGES.SHUTDOWN) return { accepted: true };
         throw new Error(`unexpected IPC message: ${String(payload.type)}`);
@@ -209,7 +209,7 @@ describe("inspectPackedWinApp", () => {
       expect(result.attempts).toHaveLength(2);
       expect(result.attempts[0]?.start.status).toBeNull();
       expect(result.attempts[0]?.statusPoll.samples).toHaveLength(2);
-      expect(result.attempts[0]?.statusPoll.samples[0]?.status).toEqual({ state: "running", url: "od://app/" });
+      expect(result.attempts[0]?.statusPoll.samples[0]?.status).toEqual({ state: "running", url: "cleandesign://app/" });
       expect(spawnBackgroundProcess).toHaveBeenCalledTimes(2);
       expect(process.env.OD_JSON_IPC_TRACE).toBe("already-on");
     } finally {

@@ -340,7 +340,7 @@ if (latestBetas != null) {
 const releaseVersion = `${packagedVersion}-betas.${releaseNumber}`;
 const branch = process.env.GITHUB_REF_NAME ?? "";
 const commit = process.env.GITHUB_SHA ?? "";
-const releaseName = `Open Design Betas ${releaseVersion}`;
+const releaseName = `Clean Design Betas ${releaseVersion}`;
 
 console.log(`[release-betas] channel: betas`);
 console.log(`[release-betas] base version: ${packagedVersion}`);

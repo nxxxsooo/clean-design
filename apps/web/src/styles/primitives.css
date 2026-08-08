@@ -329,12 +329,8 @@ code {
 }
 
 /* -------- Brand glyph ------------------------------------------------ */
-/* Monochrome Open Design brand mark. The glyph ships as /brand-icon.svg and
-   is masked with --text-strong so it reads as ink in light mode and cream in
-   dark mode. Consumers set their own size and placement. */
+/* Clean Design mark. Consumers set their own size and placement. */
 .od-brand-glyph {
   display: inline-block;
-  background-color: var(--text-strong);
-  -webkit-mask: url(/brand-icon.svg) center / contain no-repeat;
-  mask: url(/brand-icon.svg) center / contain no-repeat;
+  background: url(/logo.png) center / contain no-repeat;
 }

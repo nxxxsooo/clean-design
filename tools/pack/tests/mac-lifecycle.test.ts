@@ -103,7 +103,7 @@ describe("startPackedMacApp", () => {
     try {
       const config = makeConfig(root);
       const paths = resolveMacPaths(config);
-      const executablePath = join(paths.installedAppPath, "Contents", "MacOS", "Open Design");
+      const executablePath = join(paths.installedAppPath, "Contents", "MacOS", "Clean Design");
       const delegatedPid = 5678;
 
       await mkdir(join(paths.installedAppPath, "Contents", "MacOS"), { recursive: true });
@@ -134,7 +134,7 @@ describe("startPackedMacApp", () => {
     try {
       const config = makeConfig(root);
       const paths = resolveMacPaths(config);
-      const executablePath = join(paths.installedAppPath, "Contents", "MacOS", "Open Design");
+      const executablePath = join(paths.installedAppPath, "Contents", "MacOS", "Clean Design");
 
       await mkdir(join(paths.installedAppPath, "Contents", "MacOS"), { recursive: true });
       await writeFile(executablePath, "#!/bin/sh\nexit 1\n", "utf8");
@@ -160,7 +160,7 @@ describe("startPackedMacApp", () => {
     try {
       const config = makeConfig(root);
       const paths = resolveMacPaths(config);
-      const executablePath = join(paths.installedAppPath, "Contents", "MacOS", "Open Design");
+      const executablePath = join(paths.installedAppPath, "Contents", "MacOS", "Clean Design");
 
       await mkdir(join(paths.installedAppPath, "Contents", "MacOS"), { recursive: true });
       await writeFile(executablePath, "#!/bin/sh\nexit 0\n", "utf8");
@@ -186,7 +186,7 @@ describe("startPackedMacApp", () => {
     try {
       const config = makeConfig(root);
       const paths = resolveMacPaths(config);
-      const executablePath = join(paths.installedAppPath, "Contents", "MacOS", "Open Design");
+      const executablePath = join(paths.installedAppPath, "Contents", "MacOS", "Clean Design");
       const bundledConfigPath = join(paths.installedAppPath, "Contents", "Resources", "open-design-config.json");
 
       await mkdir(join(paths.installedAppPath, "Contents", "MacOS"), { recursive: true });
@@ -225,7 +225,7 @@ describe("startPackedMacApp", () => {
     try {
       const config = makeConfig(root, { namespace: "release-preview" });
       const paths = resolveMacPaths(config);
-      const executablePath = join(paths.installedAppPath, "Contents", "MacOS", "Open Design Preview");
+      const executablePath = join(paths.installedAppPath, "Contents", "MacOS", "Clean Design Preview");
 
       await mkdir(join(paths.installedAppPath, "Contents", "MacOS"), { recursive: true });
       await writeFile(executablePath, "#!/bin/sh\nexit 0\n", "utf8");

@@ -1,6 +1,6 @@
 import { protocol } from "electron";
 
-const OD_SCHEME = "od";
+const OD_SCHEME = "cleandesign";
 const OD_ENTRY_URL = `${OD_SCHEME}://app/`;
 type OdProtocolFetch = (request: Request) => Promise<Response>;
 
@@ -47,7 +47,7 @@ const defaultRetryDelay = (ms: number): Promise<void> =>
  * window renders: undici can throw mid-fetch from socket internals (the
  * `setTypeOfService EINVAL` family of issue #895) even while the web
  * sidecar is healthy, and when that happens on the top navigation
- * (`od://app/`) the synthetic 502 from `buildProxyErrorResponse` IS the
+ * (`cleandesign://app/`) the synthetic 502 from `buildProxyErrorResponse` IS the
  * whole window — the React app never mounts and nothing reloads it.
  * GET/HEAD carry no body, so re-issuing the Request per attempt is safe;
  * non-idempotent methods keep single-attempt semantics. Responses that
@@ -79,7 +79,7 @@ async function fetchOdTargetWithTransientRetry(
       const waitMs = backoffMs * attempt;
       // Main-process console output lands in the packaged desktop logs, so
       // real-world transient frequency stays diagnosable.
-      console.warn("[open-design packaged] od:// proxy fetch failed; retrying", {
+      console.warn("[open-design packaged] cleandesign:// proxy fetch failed; retrying", {
         attempt,
         attempts,
         message: error instanceof Error ? error.message : String(error),
@@ -113,7 +113,7 @@ function buildProxyErrorResponse(error: unknown, target: string): Response {
 }
 
 /**
- * Inner request handler for the `od://` Electron protocol — every
+ * Inner request handler for the `cleandesign://` Electron protocol — every
  * renderer fetch flows through here and gets proxied to the local web
  * sidecar via Node's global `fetch` (which is undici under the hood).
  *

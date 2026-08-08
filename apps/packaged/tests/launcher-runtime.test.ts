@@ -82,16 +82,16 @@ describe("resolvePackagedLauncherRuntime", () => {
         root,
         version: "1.2.3-beta.5",
       });
-      const resourcesPath = join(versionPaths.payloadRoot, "Open Design Beta.app", "Contents", "Resources");
+      const resourcesPath = join(versionPaths.payloadRoot, "Clean Design Beta.app", "Contents", "Resources");
       const payloadExecutablePath = join(
         versionPaths.payloadRoot,
-        "Open Design Beta.app",
+        "Clean Design Beta.app",
         "Contents",
         "MacOS",
-        "Open Design Beta",
+        "Clean Design Beta",
       );
       await mkdir(join(resourcesPath, "open-design", "bin"), { recursive: true });
-      await mkdir(join(versionPaths.payloadRoot, "Open Design Beta.app", "Contents", "MacOS"), { recursive: true });
+      await mkdir(join(versionPaths.payloadRoot, "Clean Design Beta.app", "Contents", "MacOS"), { recursive: true });
       await mkdir(join(resourcesPath, "prebundled", "daemon"), { recursive: true });
       await mkdir(join(resourcesPath, "prebundled", "web"), { recursive: true });
       await writeFile(join(resourcesPath, "open-design", "bin", "node"), "");
@@ -113,8 +113,8 @@ describe("resolvePackagedLauncherRuntime", () => {
         `${JSON.stringify({
           channel: "beta",
           entry: {
-            cwd: "payload/Open Design Beta.app",
-            executable: "payload/Open Design Beta.app/Contents/MacOS/Open Design Beta",
+            cwd: "payload/Clean Design Beta.app",
+            executable: "payload/Clean Design Beta.app/Contents/MacOS/Clean Design Beta",
           },
           namespace: config.namespace,
           payloadRoot: "payload",
@@ -138,7 +138,7 @@ describe("resolvePackagedLauncherRuntime", () => {
         join(paths.installationRoot, "launcher", "channels", "beta", "namespaces", config.namespace, "install.json"),
         `${JSON.stringify({
           channel: "beta",
-          launchPath: "/Applications/Open Design Beta.app",
+          launchPath: "/Applications/Clean Design Beta.app",
           namespace: config.namespace,
           schemaVersion: LAUNCHER_SCHEMA_VERSION,
         })}\n`,
@@ -149,7 +149,7 @@ describe("resolvePackagedLauncherRuntime", () => {
       expect(runtime.source).toBe("payload");
       expect(runtime.desktopExecutablePath).toBe(payloadExecutablePath);
       expect(runtime.electronNodeCommand).toBeNull();
-      expect(runtime.installedLaunchPath).toBe("/Applications/Open Design Beta.app");
+      expect(runtime.installedLaunchPath).toBe("/Applications/Clean Design Beta.app");
       expect(runtime.targetVersion).toBe("1.2.3-beta.5");
       expect(runtime.config.appVersion).toBe("1.2.3-beta.5");
       expect(runtime.config.resourceRoot).toBe(join(resourcesPath, "open-design"));
@@ -231,10 +231,10 @@ describe("resolvePackagedLauncherRuntime", () => {
         "versions",
         secondPayload.version,
         "payload",
-        "Open Design Beta.app",
+        "Clean Design Beta.app",
         "Contents",
         "MacOS",
-        "Open Design Beta",
+        "Clean Design Beta",
       );
       await mkdir(currentPackageRuntime.launcherPaths.stateRoot, { recursive: true });
       await writeFile(
@@ -318,7 +318,7 @@ describe("resolvePackagedLauncherRuntime", () => {
         version: "1.2.3-beta.5",
       });
       const resourcesPath = join(versionPaths.versionRoot, "payload", "resources");
-      const payloadExePath = join(versionPaths.versionRoot, "payload", "Open Design.exe");
+      const payloadExePath = join(versionPaths.versionRoot, "payload", "Clean Design.exe");
       const webStandaloneRoot = join(resourcesPath, "open-design-web-standalone");
       await mkdir(join(resourcesPath, "prebundled", "daemon"), { recursive: true });
       await mkdir(join(resourcesPath, "prebundled", "web"), { recursive: true });
@@ -342,7 +342,7 @@ describe("resolvePackagedLauncherRuntime", () => {
           channel: "beta",
           entry: {
             cwd: "payload",
-            executable: "payload/Open Design.exe",
+            executable: "payload/Clean Design.exe",
           },
           namespace: config.namespace,
           payloadRoot: "payload",

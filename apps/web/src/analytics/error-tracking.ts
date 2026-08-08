@@ -143,8 +143,8 @@ const FETCH_FAILURE_MESSAGES = new Set([
 //   - a `file://` path inside the macOS app bundle, i.e. it contains
 //     `.app/Contents/Resources` (source-mapped frames; scrub.ts rewrites
 //     these for privacy — see `scrubFilePath`). We match the bundle marker
-//     rather than a channel-specific app name so `Open Design Beta.app` /
-//     `Open Design Preview.app` builds are covered too.
+//     rather than a channel-specific app name so `Clean Design Beta.app` /
+//     `Clean Design Preview.app` builds are covered too.
 function isPackagedFramePath(path: string): boolean {
   return path.startsWith('od://') || path.includes('.app/Contents/Resources');
 }

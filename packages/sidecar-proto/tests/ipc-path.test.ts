@@ -4,11 +4,11 @@ import { isWindowsNamedPipePath, normalizeIpcPath } from "../src/index.js";
 
 describe("normalizeIpcPath", () => {
   it("returns absolute POSIX paths unchanged", () => {
-    expect(normalizeIpcPath("/tmp/open-design/ipc/ns/web.sock")).toBe("/tmp/open-design/ipc/ns/web.sock");
+    expect(normalizeIpcPath("/tmp/clean-design/ipc/ns/web.sock")).toBe("/tmp/clean-design/ipc/ns/web.sock");
   });
 
   it("returns Windows named-pipe paths unchanged without absolute-path checking", () => {
-    expect(normalizeIpcPath("\\\\.\\pipe\\open-design-ns-web")).toBe("\\\\.\\pipe\\open-design-ns-web");
+    expect(normalizeIpcPath("\\\\.\\pipe\\clean-design-ns-web")).toBe("\\\\.\\pipe\\clean-design-ns-web");
   });
 
   it("returns drive-letter absolute Windows paths unchanged", () => {
@@ -26,12 +26,12 @@ describe("normalizeIpcPath", () => {
   });
 
   it("throws when the path has leading or trailing whitespace", () => {
-    expect(() => normalizeIpcPath(" /tmp/open-design/ipc/ns/web.sock")).toThrow(/whitespace/);
-    expect(() => normalizeIpcPath("/tmp/open-design/ipc/ns/web.sock\n")).toThrow(/whitespace/);
+    expect(() => normalizeIpcPath(" /tmp/clean-design/ipc/ns/web.sock")).toThrow(/whitespace/);
+    expect(() => normalizeIpcPath("/tmp/clean-design/ipc/ns/web.sock\n")).toThrow(/whitespace/);
   });
 
   it("throws when the path contains a null byte", () => {
-    expect(() => normalizeIpcPath("/tmp/open-design/ipc/ns/web.sock\0extra")).toThrow(/null bytes/);
+    expect(() => normalizeIpcPath("/tmp/clean-design/ipc/ns/web.sock\0extra")).toThrow(/null bytes/);
   });
 
   it("throws when a POSIX path is not absolute", () => {
@@ -42,14 +42,14 @@ describe("normalizeIpcPath", () => {
 
 describe("isWindowsNamedPipePath", () => {
   it("returns true for paths starting with \\\\.\\pipe\\", () => {
-    expect(isWindowsNamedPipePath("\\\\.\\pipe\\open-design-ns-web")).toBe(true);
+    expect(isWindowsNamedPipePath("\\\\.\\pipe\\clean-design-ns-web")).toBe(true);
     expect(isWindowsNamedPipePath("\\\\.\\pipe\\")).toBe(true);
   });
 
   it("returns false for POSIX, drive-letter, or non-string inputs", () => {
-    expect(isWindowsNamedPipePath("/tmp/open-design/ipc/ns/web.sock")).toBe(false);
+    expect(isWindowsNamedPipePath("/tmp/clean-design/ipc/ns/web.sock")).toBe(false);
     expect(isWindowsNamedPipePath("C:\\Users\\ipc\\web.sock")).toBe(false);
-    expect(isWindowsNamedPipePath("\\\\.\\Pipe\\open-design")).toBe(false);
+    expect(isWindowsNamedPipePath("\\\\.\\Pipe\\clean-design")).toBe(false);
     expect(isWindowsNamedPipePath(null)).toBe(false);
     expect(isWindowsNamedPipePath(undefined)).toBe(false);
     expect(isWindowsNamedPipePath(123)).toBe(false);

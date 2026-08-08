@@ -285,7 +285,7 @@ async function main(): Promise<void> {
     },
     // Round-7 (lefarcen P2 @ runtime.ts:336): packaged main-process
     // fetch targets the daemon sidecar's real http URL — never the
-    // od://app/ renderer URL, which Node/undici cannot resolve through
+    // cleandesign://app/ renderer URL, which Node/undici cannot resolve through
     // Electron's protocol handler.
     async discoverDaemonUrl() {
       return sidecars.daemon.url;

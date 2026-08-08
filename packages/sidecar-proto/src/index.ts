@@ -63,13 +63,15 @@ export const SIDECAR_STAMP_FIELDS = ["app", "mode", "namespace", "ipc", "source"
 
 export const SIDECAR_DEFAULTS = Object.freeze({
   host: "127.0.0.1",
-  ipcBase: "/tmp/open-design/ipc",
+  ipcBase: "/tmp/clean-design/ipc",
   namespace: "default",
   projectTmpDirName: ".tmp",
-  windowsPipePrefix: "open-design",
+  windowsPipePrefix: "clean-design",
 } as const);
 
-export const OPEN_DESIGN_PRODUCT_NAME = "Open Design";
+export const CLEAN_DESIGN_PRODUCT_NAME = "Clean Design";
+// Compatibility export for upstream-derived internal packages.
+export const OPEN_DESIGN_PRODUCT_NAME = CLEAN_DESIGN_PRODUCT_NAME;
 
 export function resolveWindowsReleaseNamespaceToken(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, "-");

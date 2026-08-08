@@ -31,15 +31,15 @@ import {
 } from '../src/startup-telemetry.js';
 
 // Verbatim daemon log tail from issue #4638.
-const ISSUE_4638_LOG = `Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'better-sqlite3' imported from /Applications/Open Design.app/Contents/Resources/app/prebundled/daemon/chunks/server-PULTSXNL.mjs
+const ISSUE_4638_LOG = `Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'better-sqlite3' imported from /Applications/Clean Design.app/Contents/Resources/app/prebundled/daemon/chunks/server-PULTSXNL.mjs
     at Object.getPackageJSONURL (node:internal/modules/package_json_reader:301:9)
 [open-design packaged] exited app=daemon pid=45305 code=1 signal=none`;
 
 // Verbatim shape of what waitForStatus throws (sidecars.ts:206-208).
 const DAEMON_EXIT_MESSAGE =
-  'daemon exited before reporting status (code=1, signal=none); see /Users/liudetao/Library/Application Support/Open Design/namespaces/release-stable/logs/daemon/latest.log for details';
+  'daemon exited before reporting status (code=1, signal=none); see /Users/liudetao/Library/Application Support/Clean Design/namespaces/release-stable/logs/daemon/latest.log for details';
 const WEB_EXIT_MESSAGE =
-  'daemon exited before reporting status (code=1, signal=none); see /Users/liudetao/Library/Application Support/Open Design/namespaces/release-stable/logs/web/latest.log for details';
+  'daemon exited before reporting status (code=1, signal=none); see /Users/liudetao/Library/Application Support/Clean Design/namespaces/release-stable/logs/web/latest.log for details';
 
 describe('parseDaemonLogTail', () => {
   it('extracts the error code and missing module from the #4638 log', () => {
@@ -75,7 +75,7 @@ describe('classifyStartupFailure', () => {
     // is backslash-separated. A naive "/web/" check would misreport this as
     // daemon-start — the one platform split this field exists for.
     const winWebMessage =
-      'daemon exited before reporting status (code=1, signal=none); see C:\\Users\\Alice\\AppData\\Roaming\\Open Design\\namespaces\\release-stable\\logs\\web\\latest.log for details';
+      'daemon exited before reporting status (code=1, signal=none); see C:\\Users\\Alice\\AppData\\Roaming\\Clean Design\\namespaces\\release-stable\\logs\\web\\latest.log for details';
     expect(classifyStartupFailure(new Error(winWebMessage), false).failureKind).toBe('web-start');
   });
 
@@ -107,7 +107,7 @@ describe('classifyStartupFailure', () => {
 describe('scrubUserPaths', () => {
   it('redacts the user home directory but keeps the rest of the path', () => {
     const scrubbed = scrubUserPaths(
-      '/Users/liudetao/Library/Application Support/Open Design/namespaces/release-stable/logs/daemon/latest.log',
+      '/Users/liudetao/Library/Application Support/Clean Design/namespaces/release-stable/logs/daemon/latest.log',
     );
     expect(scrubbed).not.toContain('liudetao');
     expect(scrubbed).toContain('/Users/<redacted>/Library/Application Support');
@@ -627,7 +627,7 @@ describe('errno triplet privacy', () => {
 
   it('reduces a path-bearing Windows syscall to the operation token', () => {
     const err = Object.assign(new Error('spawn UNKNOWN'), {
-      syscall: 'spawn C:\\Users\\Alice Smith\\AppData\\Open Design\\vela.exe',
+      syscall: 'spawn C:\\Users\\Alice Smith\\AppData\\Clean Design\\vela.exe',
     });
     expect(readErrnoFields(err).syscall).toBe('spawn');
   });

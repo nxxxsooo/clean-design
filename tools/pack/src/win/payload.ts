@@ -29,7 +29,7 @@ export type WinLauncherPayloadManifest = {
   channel: string;
   entry: {
     cwd: "payload";
-    executable: "payload/Open Design.exe";
+    executable: "payload/Clean Design.exe";
   };
   namespace: string;
   payloadRoot: "payload";
@@ -47,7 +47,7 @@ export function buildWinLauncherPayloadManifest(input: {
     channel: input.channel,
     entry: {
       cwd: "payload",
-      executable: "payload/Open Design.exe",
+      executable: "payload/Clean Design.exe",
     },
     namespace: input.namespace,
     payloadRoot: "payload",
@@ -124,7 +124,7 @@ export async function buildWinLauncherPayloadArchive(
     await mkdir(join(overlayRoot, "payload", "resources"), { recursive: true });
     await writeFile(join(overlayRoot, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
     if (input.includeExecutable) {
-      await cp(join(builtApp.unpackedRoot, "Open Design.exe"), join(overlayRoot, "payload", "Open Design.exe"));
+      await cp(join(builtApp.unpackedRoot, "Clean Design.exe"), join(overlayRoot, "payload", "Clean Design.exe"));
     }
     await writeFile(
       join(overlayRoot, "payload", "resources", "open-design-config.json"),
@@ -328,9 +328,9 @@ export async function validateWinLauncherPayloadArchive(input: {
     requirePayloadManifestValue(manifest.platform, "platform", "win32");
     requirePayloadManifestValue(manifest.payloadRoot, "payloadRoot", "payload");
     requirePayloadManifestValue(manifest.entry?.cwd, "entry.cwd", "payload");
-    requirePayloadManifestValue(manifest.entry?.executable, "entry.executable", "payload/Open Design.exe");
+    requirePayloadManifestValue(manifest.entry?.executable, "entry.executable", "payload/Clean Design.exe");
 
-    await stat(join(extractRoot, archiveRelativePath("payload/Open Design.exe")));
+    await stat(join(extractRoot, archiveRelativePath("payload/Clean Design.exe")));
     await stat(join(extractRoot, archiveRelativePath("payload/resources/open-design-config.json")));
     return { manifest, payloadPath, valid: true };
   } finally {

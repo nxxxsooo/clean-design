@@ -120,7 +120,7 @@ const EXIT_RE =
 const STATUS_TIMEOUT_RE = /^timed out waiting for sidecar status at /;
 
 // Node's message for a spawn that never became a process (`spawn UNKNOWN`,
-// `spawn C:\…\Open Design.exe ENOENT`). Message shape is the fallback; the
+// `spawn C:\…\Clean Design.exe ENOENT`). Message shape is the fallback; the
 // error object's `syscall` is the primary signal since it survives an empty
 // message.
 const SPAWN_RE = /^spawn\b/;

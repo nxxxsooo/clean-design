@@ -4,7 +4,7 @@
 // upload, agent task, design-system staging, AI generation) with a source
 // badge, a kind badge, and back-links. Captures from the browser extension
 // stream in live over the `/api/library/events` SSE feed. The OD Clipper is
-// zero-config — it connects automatically whenever Open Design is running
+// zero-config — it connects automatically whenever Clean Design is running
 // locally, so there is no pairing step here.
 //
 // Each card thumbnail is kind-aware (image / video / html / font / color) and
@@ -1115,7 +1115,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
             rel="noreferrer"
           >
             <Icon name="download" size={15} />
-            Get the Open Design Web Clipper
+            Get the Clean Design Web Clipper
           </a>
         </div>
       </header>
@@ -1285,7 +1285,7 @@ export function LibrarySection({ active, onOpenProject }: Props) {
         <div className={styles.empty}>
           <p>No assets yet.</p>
           <p className={styles.emptyHint}>
-            Clip from any page with the Open Design Web Clipper, run{' '}
+            Clip from any page with the Clean Design Web Clipper, run{' '}
             <code>od library import &lt;file&gt;</code>, or upload inside a project — everything
             lands here.
           </p>

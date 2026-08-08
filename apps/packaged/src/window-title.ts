@@ -4,7 +4,7 @@ import {
   releaseInstallIdentity,
 } from "@open-design/release";
 
-const DEFAULT_WINDOW_TITLE = "Open Design";
+const DEFAULT_WINDOW_TITLE = "Clean Design";
 
 export function resolvePackagedWindowTitle(config: { appVersion: string | null; namespace: string }): string {
   const channel =

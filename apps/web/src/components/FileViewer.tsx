@@ -10479,7 +10479,7 @@ function HtmlViewer({
     await waitForAnimationFrame();
     // Prefer the daemon's off-screen render (desktop only): viewport-independent
     // and, rendering the artifact alone in a hidden window, it can never capture
-    // Open Design's own UI. `wholeDeck` (Export as image) stitches every slide
+    // Clean Design's own UI. `wholeDeck` (Export as image) stitches every slide
     // top-to-bottom into one long image — matching the slide count the viewer
     // reports; otherwise (Copy screenshot, Mark/Draw capture) it grabs the
     // CURRENT slide, mirroring what's on screen. An ordinary page is its

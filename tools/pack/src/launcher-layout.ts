@@ -81,7 +81,7 @@ export function resolveToolPackLauncherPayloadLayout(
   const archivePath = join(
     config.roots.output.namespaceRoot,
     "payload",
-    `Open Design-${namespaceToken}-payload.${payloadArchiveExtension(config.platform)}`,
+    `Clean Design-${namespaceToken}-payload.${payloadArchiveExtension(config.platform)}`,
   );
   return {
     archivePath,

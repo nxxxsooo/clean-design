@@ -144,7 +144,7 @@ function buildCard(): FeishuCard {
     config: { wide_screen_mode: true },
     header: {
       template: headerTemplate(),
-      title: { tag: "plain_text", content: `🚀 Open Design ${channelLabel} ${version}` },
+      title: { tag: "plain_text", content: `🚀 Clean Design ${channelLabel} ${version}` },
     },
     elements,
   };

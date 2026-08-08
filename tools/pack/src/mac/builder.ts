@@ -109,7 +109,7 @@ export async function runElectronBuilder(
     executableName: identity.executableName,
     extraMetadata: {
       main: "./main.cjs",
-      name: "open-design-packaged-app",
+      name: "clean-design-packaged-app",
       productName: identity.productName,
       version: packageVersion,
     },
@@ -137,10 +137,16 @@ export async function runElectronBuilder(
     npmRebuild: false,
     productName: identity.productName,
     icon: macResources.icon,
+    protocols: [
+      {
+        name: PRODUCT_NAME,
+        schemes: ["cleandesign"],
+      },
+    ],
     publish: [
       {
         provider: "generic",
-        url: "https://updates.invalid/open-design",
+        url: "https://updates.invalid/clean-design",
       },
     ],
   };

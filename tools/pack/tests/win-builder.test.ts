@@ -23,7 +23,7 @@ function createPaths(root: string): WinPaths {
     assembledMainEntryPath: join(namespaceRoot, "assembled", "app", "main.cjs"),
     assembledPackageJsonPath: join(namespaceRoot, "assembled", "app", "package.json"),
     assembledPrebundledRoot: join(namespaceRoot, "assembled", "app", "prebundled"),
-    blockmapPath: join(namespaceRoot, "builder", "Open Design-second-setup.exe.blockmap"),
+    blockmapPath: join(namespaceRoot, "builder", "Clean Design-second-setup.exe.blockmap"),
     builtManifestPath: join(namespaceRoot, "built-app.json"),
     daemonCliPrebundleEntrypointPath: join(namespaceRoot, "prebundle-entrypoints", "daemon-cli.js"),
     daemonCliPrebundlePath: join(namespaceRoot, "assembled", "app", "prebundled", "daemon", "daemon-cli.mjs"),
@@ -31,13 +31,13 @@ function createPaths(root: string): WinPaths {
     daemonPrebundleRoot: join(namespaceRoot, "assembled", "app", "prebundled", "daemon"),
     daemonSidecarPrebundleEntrypointPath: join(namespaceRoot, "prebundle-entrypoints", "daemon-sidecar.js"),
     daemonSidecarPrebundlePath: join(namespaceRoot, "assembled", "app", "prebundled", "daemon", "daemon-sidecar.mjs"),
-    exePath: join(namespaceRoot, "builder", "Open Design-second.exe"),
-    installDir: join(namespaceRoot, "runtime", "install", "Open Design"),
-    installedExePath: join(namespaceRoot, "runtime", "install", "Open Design", "Open Design.exe"),
+    exePath: join(namespaceRoot, "builder", "Clean Design-second.exe"),
+    installDir: join(namespaceRoot, "runtime", "install", "Clean Design"),
+    installedExePath: join(namespaceRoot, "runtime", "install", "Clean Design", "Clean Design.exe"),
     installerBasePayloadPath: join(namespaceRoot, "installer", "payload-base.7z"),
     installerOverlayPayloadPath: join(namespaceRoot, "installer", "payload-overlay.7z"),
     installerScriptPath: join(namespaceRoot, "installer", "installer.nsi"),
-    launcherPayloadPath: join(namespaceRoot, "payload", "Open Design-second-payload.7z"),
+    launcherPayloadPath: join(namespaceRoot, "payload", "Clean Design-second-payload.7z"),
     publicDesktopShortcutPath: join(namespaceRoot, "desktop", "public.lnk"),
     latestYmlPath: join(namespaceRoot, "builder", "latest.yml"),
     installMarkerPath: join(namespaceRoot, "logs", "install.marker.json"),
@@ -48,20 +48,20 @@ function createPaths(root: string): WinPaths {
     packagedMainPrebundleMetaPath: join(namespaceRoot, "prebundle-meta", "packaged-main.meta.json"),
     packagedMainPrebundlePath: join(namespaceRoot, "assembled", "app", "prebundled", "packaged-main.mjs"),
     resourceRoot: join(namespaceRoot, "resources", "open-design"),
-    setupPath: join(namespaceRoot, "builder", "Open Design-second-setup.exe"),
-    setupZipPath: join(namespaceRoot, "builder", "Open Design-second-portable.zip"),
+    setupPath: join(namespaceRoot, "builder", "Clean Design-second-setup.exe"),
+    setupZipPath: join(namespaceRoot, "builder", "Clean Design-second-portable.zip"),
     startMenuShortcutPath: join(namespaceRoot, "start-menu.lnk"),
     tarballsRoot: join(namespaceRoot, "tarballs"),
     userDesktopShortcutPath: join(namespaceRoot, "desktop", "user.lnk"),
     uninstallMarkerPath: join(namespaceRoot, "logs", "uninstall.marker.json"),
     uninstallTimingPath: join(namespaceRoot, "logs", "uninstall.timing.json"),
-    uninstallerPath: join(namespaceRoot, "runtime", "install", "Open Design", "Uninstall.exe"),
+    uninstallerPath: join(namespaceRoot, "runtime", "install", "Clean Design", "Uninstall.exe"),
     webStandaloneHookAuditPath: join(namespaceRoot, "web-standalone-after-pack-audit.json"),
     webStandaloneHookConfigPath: join(namespaceRoot, "web-standalone-after-pack-config.json"),
     webSidecarPrebundleMetaPath: join(namespaceRoot, "prebundle-meta", "web-sidecar.meta.json"),
     webSidecarPrebundlePath: join(namespaceRoot, "assembled", "app", "prebundled", "web-sidecar.mjs"),
     winIconPath: join(namespaceRoot, "resources", "win", "icon.ico"),
-    unpackedExePath: join(namespaceRoot, "builder", "win-unpacked", "Open Design.exe"),
+    unpackedExePath: join(namespaceRoot, "builder", "win-unpacked", "Clean Design.exe"),
     unpackedRoot: join(namespaceRoot, "builder", "win-unpacked"),
   };
 }
@@ -74,7 +74,7 @@ describe("materializeCachedUnpackedForInstaller", () => {
 
     try {
       await mkdir(join(cachedUnpackedRoot, "resources"), { recursive: true });
-      await writeFile(join(cachedUnpackedRoot, "Open Design.exe"), await createVersionedExecutable("0.5.0-beta.1"));
+      await writeFile(join(cachedUnpackedRoot, "Clean Design.exe"), await createVersionedExecutable("0.5.0-beta.1"));
       await writeFile(
         join(cachedUnpackedRoot, "resources", "open-design-config.json"),
         `${JSON.stringify({ namespace: "first", version: 1 })}\n`,
@@ -106,7 +106,7 @@ describe("materializeCachedUnpackedForInstaller", () => {
       await expect(readFile(join(paths.unpackedRoot, "resources", "open-design-config.json"), "utf8")).resolves.toContain(
         '"appVersion":"0.5.0-beta.2"',
       );
-      await expect(readWinExecutableVersionSnapshot(join(paths.unpackedRoot, "Open Design.exe"))).resolves.toMatchObject({
+      await expect(readWinExecutableVersionSnapshot(join(paths.unpackedRoot, "Clean Design.exe"))).resolves.toMatchObject({
         fixedFileVersion: "0.5.0.0",
         fixedProductVersion: "0.5.0.0",
         stringTables: [
@@ -253,9 +253,9 @@ async function createVersionedExecutable(packagedVersion: string): Promise<Buffe
   version.setStringValues(
     { codepage: 1200, lang: 1033 },
     {
-      FileDescription: "Open Design",
+      FileDescription: "Clean Design",
       FileVersion: packagedVersion,
-      ProductName: "Open Design",
+      ProductName: "Clean Design",
       ProductVersion: "0.5.0.0",
     },
   );

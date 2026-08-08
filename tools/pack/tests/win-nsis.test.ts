@@ -77,7 +77,7 @@ describe("writeNsisInclude", () => {
       await writeNsisInclude(config, paths);
       const written = await readFile(includePath, "utf8");
 
-      expect(written).toContain('$APPDATA\\Open Design\\namespaces\\test-namespace\\data\\observations\\installer');
+      expect(written).toContain('$APPDATA\\Clean Design\\namespaces\\test-namespace\\data\\observations\\installer');
     } finally {
       await rm(root, { force: true, recursive: true });
     }

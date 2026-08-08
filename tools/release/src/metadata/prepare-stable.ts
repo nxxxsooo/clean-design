@@ -589,7 +589,7 @@ if (latestStable != null && compareReleaseBaseVersions(packagedParsed, latestSta
 }
 
 let releaseVersion = packagedVersion;
-let releaseName = `Open Design ${packagedVersion}`;
+let releaseName = `Clean Design ${packagedVersion}`;
 let prereleaseNumber = "";
 let stateSource = channel === "prerelease" ? "R2 metadata.json" : "GitHub Releases";
 
@@ -631,7 +631,7 @@ if (channel === "prerelease") {
 
   prereleaseNumber = String(nextPrereleaseNumber);
   releaseVersion = formatReleaseVersion("prerelease", packagedVersion, nextPrereleaseNumber);
-  releaseName = `Open Design Prerelease ${releaseVersion}`;
+  releaseName = `Clean Design Prerelease ${releaseVersion}`;
   log(`latest prerelease: ${latestPrerelease.prereleaseVersion}`);
 } else {
   const stablePrerelease = await validateStablePrereleaseMetadata({

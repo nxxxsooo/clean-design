@@ -44,7 +44,7 @@ function formatWritablePathError(options: {
   const message = error instanceof Error ? error.message : String(error);
   const parentPath = dirname(attemptedPath);
   const diagLines = [
-    `Open Design could not create or write to:`,
+    `Clean Design could not create or write to:`,
     attemptedPath,
     "",
     `Current user: ${currentUser}`,

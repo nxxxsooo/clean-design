@@ -728,7 +728,7 @@ export function browserUsePrompt(action: BrowserUseAction, context: BrowserUsePr
   return [
     '@agent-browser',
     '',
-    'Use the selected Open Design Browser tab as the bound target.',
+    'Use the selected Clean Design Browser tab as the bound target.',
     'Browser tab context:',
     `- tab: ${tabLabel}`,
     `- title: ${title}`,

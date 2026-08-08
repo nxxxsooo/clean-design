@@ -1,4 +1,4 @@
-export const PRODUCT_NAME = "Open Design";
+export const PRODUCT_NAME = "Clean Design";
 
 export const INTERNAL_PACKAGES = [
   { directory: "packages/release", name: "@open-design/release" },
@@ -22,7 +22,7 @@ export const INTERNAL_PACKAGES = [
 
 export const DESKTOP_LOG_ECHO_ENV = "OD_DESKTOP_LOG_ECHO";
 export const WEB_STANDALONE_HOOK_CONFIG_ENV = "OD_TOOLS_PACK_WEB_STANDALONE_HOOK_CONFIG";
-export const WEB_STANDALONE_RESOURCE_NAME = "open-design-web-standalone";
+export const WEB_STANDALONE_RESOURCE_NAME = "clean-design-web-standalone";
 export const ELECTRON_BUILDER_ASAR = false;
 export const ELECTRON_BUILDER_BUILD_DEPENDENCIES_FROM_SOURCE = false;
 export const ELECTRON_REBUILD_MODE = "sequential" as const;

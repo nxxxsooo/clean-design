@@ -6,7 +6,7 @@
 
 // AMR model-gateway console wallet (account, balance, recharge).
 // `source=open_design` tags the landing page_view so vela analytics can
-// attribute the visit to Open Design (per-product revenue/traffic attribution).
+// attribute the visit to Clean Design (per-product revenue/traffic attribution).
 export const AMR_CONSOLE_URL =
   'https://open-design.ai/amr/wallet?source=open_design';
 export const AMR_RECHARGE_URL = AMR_CONSOLE_URL;
@@ -294,7 +294,7 @@ const AGENT_AGNOSTIC_DETAIL_FAILURE_UI: Record<string, RunFailureUi> = {
   // The bundled agent binary needs a CPU instruction set (AVX2) this device
   // doesn't have, so it crashes on launch — retrying reproduces the crash and
   // switching hosted models doesn't help (the runtime binary is the problem).
-  // The fix is updating Open Design to a build that bundles a compatible
+  // The fix is updating Clean Design to a build that bundles a compatible
   // (baseline) runtime, so show guidance copy without a dead Retry button.
   cpu_unsupported: {
     primaryAction: 'none',
@@ -339,7 +339,7 @@ export function resolveRunFailureUi(
         primaryAction: 'authorize',
         // PRD「需要登录」type — shared title with the non-AMR sign-in case.
         titleKey: 'chat.runError.title.signInRequired',
-        // "Open Design 智能体尚未登录，前往登录即可正常使用" — single CTA, no
+        // "Clean Design 智能体尚未登录，前往登录即可正常使用" — single CTA, no
         // AMR promotion (the agent already IS AMR). The authorize action reuses
         // the inline AmrLoginPill (sign-in + auto-retry on success).
         messageKey: 'chat.runError.signInMessage.amr',

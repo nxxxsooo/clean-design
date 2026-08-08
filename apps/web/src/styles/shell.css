@@ -1143,7 +1143,7 @@
   color: var(--accent-strong);
 }
 
-/* Open Design agent row carries account info + actions inline. */
+/* Clean Design agent row carries account info + actions inline. */
 .avatar-amr-row {
   gap: 8px;
 }

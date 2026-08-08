@@ -146,7 +146,7 @@ export type DesktopMainOptions = {
   discoverWebUrl?: () => Promise<string | null>;
   /**
    * Round-7 (lefarcen P2 @ runtime.ts:336): packaged builds report the
-   * renderer URL (`od://app/`) over `discoverWebUrl`, but Node-side
+   * renderer URL (`cleandesign://app/`) over `discoverWebUrl`, but Node-side
    * fetch can't resolve a custom Electron protocol. Optional. When
    * provided, runtime API calls (`/api/import/folder`,
    * `/api/projects/:id`) target this URL instead. tools-dev callers
@@ -528,7 +528,7 @@ function installDesktopMenu(
           {
             label: "Documentation",
             click() {
-              void shell.openExternal("https://github.com/nexu-io/open-design#readme");
+              void shell.openExternal("https://github.com/nxxxsooo/clean-design#readme");
             },
           },
           { type: "separator" },
@@ -541,7 +541,7 @@ function installDesktopMenu(
           {
             label: "Report Issue",
             click() {
-              void shell.openExternal("https://github.com/nexu-io/open-design/issues/new");
+              void shell.openExternal("https://github.com/nxxxsooo/clean-design/issues/new");
             },
           },
           {

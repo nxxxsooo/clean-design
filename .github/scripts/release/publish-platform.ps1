@@ -69,7 +69,7 @@ Write-Utf8File -Path (Join-Path $releaseDir "latest.yml") -Content @(
   "path: `"$publicOrigin/$versionPrefix/$installerName`""
   "sha512: `"$installerSha512`""
   "releaseDate: `"$releaseDate`""
-  "releaseNotes: `"Open Design beta $releaseVersion$assetSuffix`""
+  "releaseNotes: `"Clean Design beta $releaseVersion$assetSuffix`""
 )
 
 $artifacts = [ordered]@{

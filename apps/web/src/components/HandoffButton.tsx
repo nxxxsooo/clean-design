@@ -83,7 +83,7 @@ const CLI_ORDER = [
 ];
 
 const FALLBACK_CLI_TARGETS: CliTarget[] = [
-  { id: 'amr', name: 'Open Design', bin: 'vela', available: false },
+  { id: 'amr', name: 'Clean Design', bin: 'vela', available: false },
   { id: 'claude', name: 'Claude Code', bin: 'claude', available: false },
   { id: 'codex', name: 'Codex CLI', bin: 'codex', available: false },
   { id: 'opencode', name: 'OpenCode', bin: 'opencode-cli', available: false },
@@ -161,7 +161,7 @@ function writePreferredFramework(id: string): void {
 }
 
 function cliDisplayName(agent: Pick<CliTarget, 'id' | 'name'>): string {
-  return agent.id === 'amr' ? 'Open Design' : agent.name;
+  return agent.id === 'amr' ? 'Clean Design' : agent.name;
 }
 
 function mergeCliTargets(agents: AgentInfo[] | undefined): CliTarget[] {

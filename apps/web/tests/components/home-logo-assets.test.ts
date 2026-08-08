@@ -6,36 +6,24 @@ const read = (relative: string) =>
 
 const homeHeroSource = read('../../src/components/HomeHero.tsx');
 const entryNavRailSource = read('../../src/components/EntryNavRail.tsx');
-const logoSvg = read('../../public/logo.svg');
-const brandIconSvg = read('../../public/brand-icon.svg');
+const primitivesCss = read('../../src/styles/primitives.css');
+const logoPng = readFileSync(new URL('../../public/logo.png', import.meta.url));
+const appIconPng = readFileSync(new URL('../../public/app-icon.png', import.meta.url));
 
-// The current Open Design brand glyph is the ink superellipse tile introduced
-// with the landing-page rebrand (landing PR #3444): its outline starts with
-// this path command in every export of the mark.
-const CURRENT_GLYPH_PATH_PREFIX = 'M41 0.726562';
-// The retired glyph was a 444x444 dark tile (#202020) whose cursor arrow was
-// drawn as a separate path starting at this command.
-const RETIRED_GLYPH_MARKERS = ['#202020', 'M212.059', 'width="444"'];
+function isPng(value: Buffer): boolean {
+  return value.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+}
 
 describe('Home logo assets', () => {
-  it('ships the current brand glyph in the public logo assets', () => {
-    expect(logoSvg).toContain(CURRENT_GLYPH_PATH_PREFIX);
-    expect(brandIconSvg).toContain(CURRENT_GLYPH_PATH_PREFIX);
-    for (const marker of RETIRED_GLYPH_MARKERS) {
-      expect(logoSvg).not.toContain(marker);
-      expect(brandIconSvg).not.toContain(marker);
-    }
+  it('ships bitmap Clean Design marks for the browser and desktop', () => {
+    expect(isPng(logoPng)).toBe(true);
+    expect(isPng(appIconPng)).toBe(true);
   });
 
-  it('keeps brand-icon.svg maskable (theme color comes from CSS)', () => {
-    expect(brandIconSvg).toContain('currentColor');
-  });
-
-  it('renders the brand glyph on both Home entry surfaces', () => {
+  it('renders the Clean Design mark on both Home entry surfaces', () => {
+    expect(primitivesCss).toContain('url(/logo.png)');
+    expect(primitivesCss).not.toContain('brand-icon.svg');
     expect(homeHeroSource).toContain('od-brand-glyph');
-    expect(homeHeroSource).not.toContain('src="/app-icon.svg"');
-
     expect(entryNavRailSource).toContain('od-brand-glyph');
-    expect(entryNavRailSource).not.toContain('src="/app-icon.svg"');
   });
 });

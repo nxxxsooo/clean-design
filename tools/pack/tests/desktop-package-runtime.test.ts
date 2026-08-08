@@ -8,6 +8,13 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..")
 const desktopPackageRoot = join(repoRoot, "apps", "desktop");
 const packagedSourcePath = join(repoRoot, "apps", "packaged", "src", "index.ts");
 
+function readPackageJson(relativePath: string): {
+  bin?: Record<string, string>;
+  exports?: Record<string, unknown>;
+} {
+  return JSON.parse(readFileSync(join(repoRoot, relativePath), "utf8"));
+}
+
 function readDesktopPackageJson(): {
   exports?: Record<string, { default?: string; types?: string }>;
   files?: string[];
@@ -37,5 +44,15 @@ describe("desktop package runtime shape", () => {
       expect(source).toContain('"apps", "desktop", "dist", "main", "preload.cjs"');
       expect(source).toContain('join(paths.assembledAppRoot, "preload.cjs")');
     }
+  });
+
+  it("does not expose global od or packaged headless entrypoints", () => {
+    expect(readPackageJson("package.json").bin).toBeUndefined();
+    expect(readPackageJson("apps/daemon/package.json").bin).toBeUndefined();
+    expect(readPackageJson("apps/packaged/package.json").exports).not.toHaveProperty("./headless");
+
+    const buildConfig = readFileSync(join(repoRoot, "apps", "packaged", "esbuild.config.mjs"), "utf8");
+    expect(buildConfig).not.toContain("src/headless.ts");
+    expect(buildConfig).not.toContain("dist/headless.mjs");
   });
 });

@@ -7,7 +7,7 @@ const AGENT_LABELS: Record<string, string> = {
   gemini: 'Gemini',
   kiro: 'Kiro',
   opencode: 'OpenCode',
-  amr: 'Open Design',
+  amr: 'Clean Design',
   'cursor-agent': 'Cursor',
   cursor: 'Cursor',
   qwen: 'Qwen',
