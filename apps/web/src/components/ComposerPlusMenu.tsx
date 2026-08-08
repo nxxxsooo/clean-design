@@ -43,16 +43,14 @@ const PLUS_MENU_FLYOUT_MAX_HEIGHT = 320;
 export type PlusMenuPlacementPreference = 'auto' | 'down' | 'up';
 type PlusMenuFlyoutPlacement = 'right' | 'left' | 'contained';
 type PlusMenuFlyoutVerticalPlacement = 'down' | 'up';
-export type PlusMenuSubmenu = 'connectors' | 'plugins' | 'skills' | 'mcp' | 'toolbox';
+export type PlusMenuSubmenu = 'plugins' | 'skills' | 'toolbox';
 
 // Analytics mapping for the submenu flyouts: which resource list each
 // submenu carries. `toolbox` is intentionally absent — the project composer
 // tracks it separately as `design_toolbox_open`.
 export const PLUS_SUBMENU_RESOURCE_KIND = {
-  connectors: 'connector',
   plugins: 'plugin',
   skills: 'skill',
-  mcp: 'mcp',
 } as const;
 type PlusMenuPopupStyle = CSSProperties & Record<'--plus-menu-flyout-max-height', string>;
 
@@ -151,10 +149,9 @@ function getFlyoutWidth(submenu: PlusMenuSubmenu | null): number {
 }
 
 export interface ComposerPlusMenuProps {
-  /** Connector context options shown under the "Connectors" submenu. */
-  connectors: ConnectorDetail[];
-  onPickConnector: (connector: ConnectorDetail) => void;
-  /** Opens the connector integration surface; omit to hide the add row. */
+  /** Legacy inputs accepted for source compatibility; local-only builds never render them. */
+  connectors?: ConnectorDetail[];
+  onPickConnector?: (connector: ConnectorDetail) => void;
   onAddConnector?: () => void;
 
   /** Installed plugin options shown under the "Plugins" submenu. */
@@ -163,10 +160,9 @@ export interface ComposerPlusMenuProps {
   /** Opens the plugin registry; omit to hide the add row. */
   onAddPlugin?: () => void;
 
-  /** Enabled MCP servers shown under the "MCP" submenu. */
-  mcpServers: McpServerConfig[];
-  onPickMcp: (server: McpServerConfig) => void;
-  /** Opens MCP settings; omit to hide the add row. */
+  /** Legacy inputs accepted for source compatibility; local-only builds never render them. */
+  mcpServers?: McpServerConfig[];
+  onPickMcp?: (server: McpServerConfig) => void;
   onAddMcp?: () => void;
 
   /** Available skills shown under the "Skills" submenu. */
@@ -226,7 +222,7 @@ export interface ComposerPlusMenuProps {
    * that flyout's search box. Carries which list was searched, never the
    * query text.
    */
-  onSearchUsed?: (submenu: 'plugins' | 'skills' | 'mcp') => void;
+  onSearchUsed?: (submenu: 'plugins' | 'skills') => void;
 
   /**
    * Home opens below the trigger like Claude Design's project picker, while
@@ -246,11 +242,6 @@ function pluginMatches(
   // Match the localized title too, so a Chinese search hits a plugin whose
   // raw `title` is English but whose `title_i18n` is the displayed name.
   return `${localizedTitle} ${plugin.title} ${plugin.id}`.toLowerCase().includes(needle);
-}
-
-function mcpMatches(server: McpServerConfig, needle: string): boolean {
-  if (!needle) return true;
-  return `${server.label ?? ''} ${server.id}`.toLowerCase().includes(needle);
 }
 
 function menuSkillMatches(
@@ -279,17 +270,11 @@ function menuSkillMatches(
  * project-only design-toolbox row.
  */
 export function ComposerPlusMenu({
-  connectors,
-  onPickConnector,
-  onAddConnector,
   plugins,
   onPickPlugin,
   onAddPlugin,
   skills = [],
   onPickSkill,
-  mcpServers,
-  onPickMcp,
-  onAddMcp,
   onAttachFiles,
   attachLoading,
   onReferenceProject,
@@ -459,7 +444,7 @@ export function ComposerPlusMenu({
     if (
       !searchUsedRef.current &&
       value.trim() &&
-      (submenu === 'plugins' || submenu === 'skills' || submenu === 'mcp')
+      (submenu === 'plugins' || submenu === 'skills')
     ) {
       searchUsedRef.current = true;
       onSearchUsed?.(submenu);
@@ -530,9 +515,6 @@ export function ComposerPlusMenu({
         ),
       )
     : skills;
-  const filteredMcp = needle
-    ? mcpServers.filter((s) => mcpMatches(s, needle))
-    : mcpServers;
   // The preview mirrors the hovered row, falling back to the first visible
   // plugin so the panel is populated the moment the submenu opens. When a
   // search prunes the hovered row out of view, the fallback re-anchors it.
@@ -707,57 +689,6 @@ export function ComposerPlusMenu({
 
           <PlusMenuGroup label={t('chat.plus.group.other')} hideLabel>
           <PlusSubmenuRow
-            label={t('chat.plus.connectors')}
-            icon="link"
-            open={submenu === 'connectors'}
-            testId="composer-plus-connectors"
-            onOpen={(row) => openSubmenu('connectors', row)}
-            onClose={scheduleCloseSubmenu}
-            flyoutStyle={flyoutStyle}
-          >
-            <div className="plus-menu__list">
-              {connectors.length === 0 ? (
-                <div className="plus-menu__empty">{t('homeHero.noConnectors')}</div>
-              ) : (
-                connectors.map((connector) => (
-                  <button
-                    key={connector.id}
-                    type="button"
-                    role="menuitem"
-                    className="plus-menu__item"
-                    // Keep focus on the editor so the pick handler's
-                    // insertMention lands at the caret, not the draft end.
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      close();
-                      onPickConnector(connector);
-                    }}
-                  >
-                    <Icon name="link" size={14} className="plus-menu__item-icon" />
-                    <span>{connector.name}</span>
-                  </button>
-                ))
-              )}
-            </div>
-            {onAddConnector ? (
-              <>
-                <div className="plus-menu__divider" />
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="plus-menu__item"
-                  onClick={() => {
-                    close();
-                    onAddConnector();
-                  }}
-                >
-                  <Icon name="plus" size={14} className="plus-menu__item-icon" />
-                  <span>{t('homeHero.addConnectors')}</span>
-                </button>
-              </>
-            ) : null}
-          </PlusSubmenuRow>
-          <PlusSubmenuRow
             label={t('chat.plus.plugins')}
             icon="sparkles"
             open={submenu === 'plugins'}
@@ -889,64 +820,6 @@ export function ComposerPlusMenu({
               </div>
             </PlusSubmenuRow>
           ) : null}
-          <PlusSubmenuRow
-            label={t('chat.plus.mcp')}
-            icon="link"
-            open={submenu === 'mcp'}
-            testId="composer-plus-mcp"
-            onOpen={(row) => openSubmenu('mcp', row)}
-            onClose={scheduleCloseSubmenu}
-            flyoutStyle={flyoutStyle}
-          >
-            <div className="plus-menu__search">
-              <Icon name="search" size={13} />
-              <input
-                value={query}
-                onChange={(event) => handleQueryChange(event.target.value)}
-                placeholder="MCP"
-                aria-label="MCP"
-              />
-            </div>
-            <div className="plus-menu__list">
-              {filteredMcp.length === 0 ? (
-                <div className="plus-menu__empty">{t('homeHero.noMcp')}</div>
-              ) : (
-                filteredMcp.map((server) => (
-                  <button
-                    key={server.id}
-                    type="button"
-                    role="menuitem"
-                    className="plus-menu__item"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => {
-                      close();
-                      onPickMcp(server);
-                    }}
-                  >
-                    <Icon name="link" size={14} className="plus-menu__item-icon" />
-                    <span>{server.label || server.id}</span>
-                  </button>
-                ))
-              )}
-            </div>
-            {onAddMcp ? (
-              <>
-                <div className="plus-menu__divider" />
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="plus-menu__item"
-                  onClick={() => {
-                    close();
-                    onAddMcp();
-                  }}
-                >
-                  <Icon name="plus" size={14} className="plus-menu__item-icon" />
-                  <span>{t('homeHero.addMcp')}</span>
-                </button>
-              </>
-            ) : null}
-          </PlusSubmenuRow>
           {renderToolbox ? (
             <PlusSubmenuRow
               label={toolboxLabel ?? t('chat.designToolbox.tooltip')}

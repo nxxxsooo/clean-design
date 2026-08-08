@@ -25,7 +25,7 @@ import {
   type PreviewView,
 } from '../PreviewModal';
 import { PluginMetaSections } from './PluginMetaSections';
-import { buildPluginShareUrl, PluginShareMenu } from './PluginShareMenu';
+import { PluginShareMenu } from './PluginShareMenu';
 import { buildPluginUseMenu, pluginUsePrimaryAction } from './pluginUseMenu';
 import type { PluginUseAction } from '../plugins-home/useActions';
 
@@ -233,11 +233,6 @@ export function PluginMediaDetail({
       subtitle={description || undefined}
       views={views}
       exportTitleFor={() => localizedTitle}
-      shareTarget={{
-        title: localizedTitle,
-        description: description || undefined,
-        url: buildPluginShareUrl(record),
-      }}
       onClose={onClose}
       sidebar={{
         label: pluginInfoLabel,

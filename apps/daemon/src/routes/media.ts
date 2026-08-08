@@ -488,7 +488,6 @@ export function registerMediaRoutes(app: Express, ctx: RegisterMediaRoutesDeps) 
     }
     try {
       const config = await writeAppConfig(RUNTIME_DATA_DIR, req.body);
-      orbitService.configure(config.orbit);
       onAppConfigWritten?.(config);
       res.json({ config });
     } catch (err: any) {

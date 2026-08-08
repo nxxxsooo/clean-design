@@ -95,6 +95,7 @@ export function EntrySettingsMenu({
               type="button"
               role="menuitem"
               className="entry-settings-menu__select-trigger"
+              aria-haspopup="menu"
               aria-expanded={languageOpen}
               onClick={() => setLanguageOpen((value) => !value)}
             >

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useT } from '../i18n';
-import { copyToClipboard } from '../lib/copy-to-clipboard';
 import {
   exportAsHtml,
   exportAsImage,
@@ -99,94 +98,14 @@ export interface PreviewPrimaryAction {
   menu?: PreviewPrimaryActionMenuItem[];
 }
 
-export interface PreviewShareTarget {
-  title?: string;
-  description?: string;
-  url?: string | null;
-}
-
-type SocialSharePlatform =
-  | 'x'
-  | 'reddit'
-  | 'facebook'
-  | 'linkedin'
-  | 'instagram'
-  | 'xiaohongshu';
-
-// Every clickable item inside the merged Share popover — social intents,
-// copy actions and file exports. Callers receive these verbatim as
-// analytics `element` values (already snake_case).
+// Every clickable item inside the local export popover. Callers receive
+// these verbatim as analytics `element` values (already snake_case).
 export type PreviewSharePopoverItem =
-  | SocialSharePlatform
-  | 'copy_link'
-  | 'copy_share_text'
   | 'pdf'
   | 'zip'
   | 'html'
   | 'image'
   | 'open_in_new_tab';
-
-const SOCIAL_SHARE_PLATFORMS: Array<{
-  platform: SocialSharePlatform;
-  labelKey:
-    | 'preview.shareToX'
-    | 'preview.shareToReddit'
-    | 'preview.shareToFacebook'
-    | 'preview.shareToLinkedIn'
-    | 'preview.shareToInstagram'
-    | 'preview.shareToXiaohongshu';
-  mark: string;
-  mode: 'intent' | 'copy-open';
-  entryUrl?: string;
-}> = [
-  { platform: 'x', labelKey: 'preview.shareToX', mark: 'X', mode: 'intent' },
-  { platform: 'reddit', labelKey: 'preview.shareToReddit', mark: 'R', mode: 'intent' },
-  { platform: 'facebook', labelKey: 'preview.shareToFacebook', mark: 'f', mode: 'intent' },
-  { platform: 'linkedin', labelKey: 'preview.shareToLinkedIn', mark: 'in', mode: 'intent' },
-  {
-    platform: 'instagram',
-    labelKey: 'preview.shareToInstagram',
-    mark: 'IG',
-    mode: 'copy-open',
-    entryUrl: 'https://www.instagram.com/',
-  },
-  {
-    platform: 'xiaohongshu',
-    labelKey: 'preview.shareToXiaohongshu',
-    mark: '小',
-    mode: 'copy-open',
-    entryUrl: 'https://www.xiaohongshu.com/',
-  },
-];
-
-function buildSocialShareUrl(
-  platform: SocialSharePlatform,
-  args: { url: string; title: string; text: string },
-): string | null {
-  const params = new URLSearchParams();
-  switch (platform) {
-    case 'x':
-      params.set('url', args.url);
-      params.set('text', args.text);
-      return `https://twitter.com/intent/tweet?${params.toString()}`;
-    case 'reddit':
-      params.set('url', args.url);
-      params.set('title', args.title);
-      return `https://www.reddit.com/submit?${params.toString()}`;
-    case 'facebook':
-      params.set('u', args.url);
-      params.set('quote', args.text);
-      return `https://www.facebook.com/sharer/sharer.php?${params.toString()}`;
-    case 'linkedin':
-      params.set('url', args.url);
-      return `https://www.linkedin.com/sharing/share-offsite/?${params.toString()}`;
-    case 'instagram':
-    case 'xiaohongshu':
-      return null;
-  }
-  const exhaustive: never = platform;
-  return exhaustive;
-}
 
 interface Props {
   title: string;
@@ -220,19 +139,13 @@ interface Props {
   // affordance reads consistently across HTML / design-system / media
   // variants.
   headerExtras?: ReactNode;
-  // Social-share target for the active preview. Callers must pass an explicit
-  // recipient-openable URL before the modal exposes copy/social actions.
-  shareTarget?: PreviewShareTarget;
   // Optional analytics callbacks. Fires when the user clicks the
   // chrome-level affordances (fullscreen, share trigger, stage-edge sidebar
   // handle). Callers wire these to their surface's tracking helper.
   onFullscreenClick?: () => void;
   onShareClick?: () => void;
   onSidebarToggleClick?: (open: boolean) => void;
-  // Fires when the user picks any share-popover item — social platforms,
-  // "copy_link" / "copy_share_text" and the file exports ("pdf" / "zip" /
-  // "html" / "image" / "open_in_new_tab"). Used by callers that want to
-  // track popover-level clicks separately from the share trigger.
+  // Fires when the user picks a file export.
   onSharePopoverItemClick?: (item: PreviewSharePopoverItem) => void;
 }
 
@@ -252,7 +165,6 @@ export function PreviewModal({
   designWidth = 1280,
   primaryAction,
   headerExtras,
-  shareTarget,
   onFullscreenClick,
   onShareClick,
   onSidebarToggleClick,
@@ -265,10 +177,6 @@ export function PreviewModal({
   const [activeId, setActiveId] = useState<string>(initial);
   const [templateShareOpen, setTemplateShareOpen] = useState(false);
   const [primaryMenuOpen, setPrimaryMenuOpen] = useState(false);
-  const [copyShareFeedback, setCopyShareFeedback] = useState<{
-    key: string;
-    ok: boolean;
-  } | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(
     sidebar?.defaultOpen ?? false,
@@ -456,28 +364,6 @@ export function PreviewModal({
   );
   const exportTitle = exportTitleFor(activeView?.id ?? '');
   const canExportFiles = Boolean(activeHtml);
-  const previewShareTitle = shareTarget?.title || exportTitle || title;
-  const previewShareUrl = '';
-  const previewShareText = t('preview.shareTextDefault', { title: previewShareTitle });
-  const previewShareCopy = previewShareUrl
-    ? `${previewShareText}\n${previewShareUrl}`
-    : previewShareText;
-  const previewShareUrlDisplay = previewShareUrl
-    .replace(/^https?:\/\//, '')
-    .replace(/\/$/, '');
-  const socialShareTargets = useMemo(
-    () => SOCIAL_SHARE_PLATFORMS.map((item) => ({
-      ...item,
-      href: item.mode === 'intent' && previewShareUrl
-        ? buildSocialShareUrl(item.platform, {
-          url: previewShareUrl,
-          title: previewShareText,
-          text: previewShareText,
-        })
-        : item.entryUrl ?? '',
-    })),
-    [previewShareText, previewShareUrl],
-  );
 
   // Always fit the design viewport to the full stage width — scaling up
   // as well as down — so the preview fills the stage edge-to-edge with
@@ -521,30 +407,9 @@ export function PreviewModal({
     setFullscreen(false);
   }
 
-  async function copyPreviewShare(text: string, key: string): Promise<boolean> {
-    if (!text) return false;
-    const ok = await copyToClipboard(text);
-    setCopyShareFeedback({ key, ok });
-    window.setTimeout(() => {
-      setCopyShareFeedback((current) => (
-        current?.key === key ? null : current
-      ));
-    }, 1600);
-    return ok;
-  }
-
-  function openShareDestination(url: string, pendingWindow?: Window | null) {
-    if (pendingWindow) {
-      pendingWindow.opener = null;
-      pendingWindow.location.href = url;
-      return;
-    }
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }
-
   const showTabs = views.length > 1;
   const showTemplateShareMenu = !isCustomView;
-  const canOpenTemplateShareMenu = canExportFiles || Boolean(previewShareUrl);
+  const canOpenTemplateShareMenu = canExportFiles;
 
   return (
     <div
@@ -678,140 +543,12 @@ export function PreviewModal({
                     }}
                     disabled={!canOpenTemplateShareMenu}
                   >
-                    <Icon name="share" size={12} />
-                    <span>{t('preview.shareMenu')}</span>
+                    <Icon name="download" size={12} />
+                    <span>{t('preview.shareExportGroup')}</span>
                     <Icon name="chevron-down" size={12} />
                   </button>
                   {templateShareOpen ? (
                     <div className="share-menu-popover template-share-popover" role="menu">
-                      <div className="template-share-summary">
-                        <span className="template-share-summary__eyebrow">
-                          {t('preview.shareTemplateBadge')}
-                        </span>
-                        <strong>{previewShareTitle}</strong>
-                        {previewShareUrlDisplay ? (
-                          <span>{previewShareUrlDisplay}</span>
-                        ) : null}
-                      </div>
-                      {previewShareUrl ? (
-                        <>
-                          <section className="template-share-section">
-                            <div className="template-share-section__label">
-                              {t('preview.shareSocialGroup')}
-                            </div>
-                            <div className="template-share-platform-grid">
-                              {socialShareTargets.map((item) => (
-                                <a
-                                  key={item.platform}
-                                  className={`template-share-platform template-share-platform--${item.platform}`}
-                                  role="menuitem"
-                                  href={item.href || undefined}
-                                  target={item.href ? '_blank' : undefined}
-                                  rel={item.href ? 'noreferrer noopener' : undefined}
-                                  aria-disabled={item.href ? undefined : 'true'}
-                                  tabIndex={item.href ? undefined : -1}
-                                  onClick={(event) => {
-                                    if (!item.href) {
-                                      event.preventDefault();
-                                      return;
-                                    }
-                                    onSharePopoverItemClick?.(item.platform);
-                                    if (item.mode === 'copy-open') {
-                                      event.preventDefault();
-                                      const shareWindow = window.open('about:blank', '_blank');
-                                      const feedbackKey = `social-${item.platform}`;
-                                      void copyPreviewShare(previewShareCopy, feedbackKey).then((ok) => {
-                                        if (!ok || !item.href) {
-                                          shareWindow?.close();
-                                          return;
-                                        }
-                                        setTemplateShareOpen(false);
-                                        openShareDestination(item.href, shareWindow);
-                                      });
-                                      return;
-                                    }
-                                    setTemplateShareOpen(false);
-                                  }}
-                                >
-                                  <span className="template-share-platform__mark">
-                                    {item.mark}
-                                  </span>
-                                  <span>
-                                    {copyShareFeedback?.key === `social-${item.platform}`
-                                      ? copyShareFeedback.ok
-                                        ? t('preview.shareCopied')
-                                        : t('preview.shareCopyFailed')
-                                      : t(item.labelKey)}
-                                  </span>
-                                </a>
-                              ))}
-                            </div>
-                          </section>
-                          <section className="template-share-section">
-                            <div className="template-share-section__label">
-                              {t('preview.shareCopyGroup')}
-                            </div>
-                            <button
-                              type="button"
-                              className="share-menu-item"
-                              role="menuitem"
-                              onClick={() => {
-                                onSharePopoverItemClick?.('copy_link');
-                                void copyPreviewShare(previewShareUrl, 'link');
-                              }}
-                            >
-                              <span className="share-menu-icon">
-                                <Icon
-                                  name={
-                                    copyShareFeedback?.key === 'link'
-                                      ? copyShareFeedback.ok
-                                        ? 'check'
-                                        : 'close'
-                                      : 'link'
-                                  }
-                                  size={14}
-                                />
-                              </span>
-                              <span>
-                                {copyShareFeedback?.key === 'link'
-                                  ? copyShareFeedback.ok
-                                    ? t('preview.shareCopied')
-                                    : t('preview.shareCopyFailed')
-                                  : t('preview.copyTemplateLink')}
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              className="share-menu-item"
-                              role="menuitem"
-                              onClick={() => {
-                                onSharePopoverItemClick?.('copy_share_text');
-                                void copyPreviewShare(previewShareCopy, 'text');
-                              }}
-                            >
-                              <span className="share-menu-icon">
-                                <Icon
-                                  name={
-                                    copyShareFeedback?.key === 'text'
-                                      ? copyShareFeedback.ok
-                                        ? 'check'
-                                        : 'close'
-                                      : 'copy'
-                                  }
-                                  size={14}
-                                />
-                              </span>
-                              <span>
-                                {copyShareFeedback?.key === 'text'
-                                  ? copyShareFeedback.ok
-                                    ? t('preview.shareCopied')
-                                    : t('preview.shareCopyFailed')
-                                  : t('preview.copyShareText')}
-                              </span>
-                            </button>
-                          </section>
-                        </>
-                      ) : null}
                       {canExportFiles ? (
                         <section className="template-share-section">
                           <div className="template-share-section__label">

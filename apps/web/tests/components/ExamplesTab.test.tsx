@@ -320,8 +320,8 @@ describe('ExamplesTab', () => {
     expect(modal.classList.contains('ds-modal-fullscreen')).toBe(false);
     expect(within(dialog).getByRole('button', { name: /Fullscreen/i })).toBeTruthy();
 
-    const shareButton = within(dialog).getByRole('button', { name: /Share/i });
-    fireEvent.click(shareButton);
+    const exportButton = within(dialog).getByRole('button', { name: /Export files/i });
+    fireEvent.click(exportButton);
     fireEvent.click(within(dialog).getByRole('menuitem', { name: /Export as PDF/i }));
     expect(exportAsPdf).toHaveBeenCalledWith(
       '<main><h1>live-dashboard preview</h1></main>',
@@ -329,21 +329,21 @@ describe('ExamplesTab', () => {
       { deck: false },
     );
 
-    fireEvent.click(shareButton);
+    fireEvent.click(exportButton);
     fireEvent.click(within(dialog).getByRole('menuitem', { name: /Download as \.zip/i }));
     expect(exportAsZip).toHaveBeenCalledWith(
       '<main><h1>live-dashboard preview</h1></main>',
       'live-dashboard',
     );
 
-    fireEvent.click(shareButton);
+    fireEvent.click(exportButton);
     fireEvent.click(within(dialog).getByRole('menuitem', { name: /Export as standalone HTML/i }));
     expect(exportAsHtml).toHaveBeenCalledWith(
       '<main><h1>live-dashboard preview</h1></main>',
       'live-dashboard',
     );
 
-    fireEvent.click(shareButton);
+    fireEvent.click(exportButton);
     fireEvent.click(within(dialog).getByRole('menuitem', { name: /Open in new tab/i }));
     expect(openSandboxedPreviewInNewTab).toHaveBeenCalledWith(
       '<main><h1>live-dashboard preview</h1></main>',

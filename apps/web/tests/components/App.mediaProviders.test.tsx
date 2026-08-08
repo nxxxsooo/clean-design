@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installMockOpenDesignHost } from '@open-design/host/testing';
 
 import { App } from '../../src/App';
 import type { AppConfig } from '../../src/types';
@@ -32,8 +33,15 @@ vi.mock('../../src/router', () => ({
 }));
 
 vi.mock('../../src/components/EntryView', () => ({
-  EntryView: ({ onOpenSettings }: { onOpenSettings: (section?: 'execution' | 'media') => void }) => (
+  EntryView: ({
+    agents,
+    onOpenSettings,
+  }: {
+    agents: Array<{ id: string }>;
+    onOpenSettings: (section?: 'execution' | 'media') => void;
+  }) => (
     <div>
+      <div data-testid="visible-agent-ids">{agents.map((agent) => agent.id).join(',')}</div>
       <button type="button" onClick={() => onOpenSettings('media')}>
         Open media settings
       </button>
@@ -57,16 +65,19 @@ vi.mock('../../src/components/SettingsDialog', () => ({
   SettingsDialog: ({
     initial,
     initialSection,
+    mediaProvidersNotice,
     onPersist,
     onClose,
   }: {
     initial: AppConfig;
     initialSection?: string;
+    mediaProvidersNotice?: string | null;
     onPersist: (next: AppConfig) => void;
     onClose: () => void;
   }) => (
     <div role="dialog" aria-label="Settings dialog">
       <div>Section: {initialSection}</div>
+      {mediaProvidersNotice ? <div>{mediaProvidersNotice}</div> : null}
       <button
         type="button"
         onClick={() =>
@@ -146,6 +157,8 @@ const mockedMergeDaemonConfig = vi.mocked(mergeDaemonConfig);
 const mockedSaveConfig = vi.mocked(saveConfig);
 const mockedSyncConfigToDaemon = vi.mocked(syncConfigToDaemon);
 const mockedSyncMediaProvidersToDaemon = vi.mocked(syncMediaProvidersToDaemon);
+const MEDIA_CREDENTIAL_REF = 'credential://media_openai_key';
+let restoreHost: (() => void) | null = null;
 
 const baseConfig: AppConfig = {
   mode: 'api',
@@ -167,6 +180,25 @@ const baseConfig: AppConfig = {
 
 describe('App media provider sync flows', () => {
   beforeEach(() => {
+    restoreHost = installMockOpenDesignHost({
+      host: {
+        credentials: {
+          list: async () => ({ ok: true, credentials: [] }),
+          save: async (input) => ({
+            ok: true,
+            credential: {
+              ref: MEDIA_CREDENTIAL_REF,
+              slot: input.slot,
+              kind: input.kind,
+              label: input.label,
+              mask: '****-key',
+              updatedAt: '2026-08-09T00:00:00.000Z',
+            },
+          }),
+          delete: async () => ({ ok: true, deleted: true }),
+        },
+      },
+    });
     mockedDaemonIsLive.mockResolvedValue(true);
     mockedFetchAgentsStream.mockResolvedValue([]);
     mockedFetchSkills.mockResolvedValue([]);
@@ -188,6 +220,8 @@ describe('App media provider sync flows', () => {
   });
 
   afterEach(() => {
+    restoreHost?.();
+    restoreHost = null;
     cleanup();
     vi.unstubAllGlobals();
     vi.clearAllMocks();
@@ -209,9 +243,18 @@ describe('App media provider sync flows', () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(mockedSyncMediaProvidersToDaemon).toHaveBeenCalledWith(configuredProviders, {
-        daemonProviders: {},
-      });
+      expect(mockedSyncMediaProvidersToDaemon).toHaveBeenCalledWith(
+        {
+          openai: {
+            apiKey: MEDIA_CREDENTIAL_REF,
+            apiKeyConfigured: true,
+            apiKeyTail: '-key',
+            baseUrl: 'https://api.openai.com/v1',
+            model: '',
+          },
+        },
+        { daemonProviders: {} },
+      );
     });
   });
 
@@ -235,7 +278,9 @@ describe('App media provider sync flows', () => {
       expect(mockedSyncMediaProvidersToDaemon).toHaveBeenCalledWith(
         {
           openai: {
-            apiKey: 'media-key',
+            apiKey: MEDIA_CREDENTIAL_REF,
+            apiKeyConfigured: true,
+            apiKeyTail: '-key',
             baseUrl: 'https://api.openai.com/v1',
             model: '',
           },
@@ -249,7 +294,9 @@ describe('App media provider sync flows', () => {
         onboardingCompleted: true,
         mediaProviders: {
           openai: {
-            apiKey: 'media-key',
+            apiKey: MEDIA_CREDENTIAL_REF,
+            apiKeyConfigured: true,
+            apiKeyTail: '-key',
             baseUrl: 'https://api.openai.com/v1',
             model: '',
           },
@@ -261,7 +308,9 @@ describe('App media provider sync flows', () => {
         onboardingCompleted: true,
         mediaProviders: {
           openai: {
-            apiKey: 'media-key',
+            apiKey: MEDIA_CREDENTIAL_REF,
+            apiKeyConfigured: true,
+            apiKeyTail: '-key',
             baseUrl: 'https://api.openai.com/v1',
             model: '',
           },
@@ -269,5 +318,76 @@ describe('App media provider sync flows', () => {
       }),
       expect.objectContaining({ throwOnError: true }),
     );
+  });
+
+  it('filters removed service agents before rendering the workspace', async () => {
+    mockedFetchAgentsStream.mockResolvedValue([
+      {
+        id: 'amr',
+        name: 'AMR',
+        bin: 'vela',
+        available: true,
+        version: '1.0.0',
+        models: [],
+      },
+      {
+        id: 'codex',
+        name: 'Codex CLI',
+        bin: 'codex',
+        available: true,
+        version: '1.0.0',
+        models: [],
+      },
+      {
+        id: 'byok-opencode',
+        name: 'OpenCode BYOK',
+        bin: 'opencode',
+        available: true,
+        version: '1.0.0',
+        models: [],
+      },
+    ]);
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('visible-agent-ids').textContent).toBe('codex');
+    });
+  });
+
+  it('fails closed when plaintext credential migration cannot use the desktop vault', async () => {
+    restoreHost?.();
+    const saveCredential = vi.fn(async () => ({
+      ok: false as const,
+      reason: 'secure-storage-unavailable' as const,
+    }));
+    restoreHost = installMockOpenDesignHost({
+      host: {
+        credentials: {
+          list: async () => ({ ok: true, credentials: [] }),
+          save: saveCredential,
+          delete: async () => ({ ok: true, deleted: true }),
+        },
+      },
+    });
+    mockedLoadConfig.mockReturnValue({
+      ...baseConfig,
+      mediaProviders: {
+        openai: {
+          apiKey: 'must-not-persist',
+          baseUrl: 'https://api.openai.com/v1',
+          model: '',
+        },
+      },
+    });
+
+    render(<App />);
+
+    await waitFor(() => expect(saveCredential).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Open media settings' }));
+    expect(await screen.findByText(/Could not load media provider settings/)).toBeTruthy();
+    expect(mockedSaveConfig).not.toHaveBeenCalled();
+    expect(mockedSyncConfigToDaemon).not.toHaveBeenCalled();
+    expect(mockedSyncMediaProvidersToDaemon).not.toHaveBeenCalled();
   });
 });

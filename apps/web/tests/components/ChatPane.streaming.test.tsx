@@ -384,7 +384,7 @@ describe('ChatPane streaming state', () => {
     expect(copied).toContain('error_code: AGENT_EXECUTION_FAILED');
     expect(copied).toContain('project_id: project-1');
     expect(copied).toContain('conversation_id: conv-1');
-    expect(copied).toMatch(/^json-rpc id 4: Connection reset by server\n\nOpen Design run error diagnostics/);
+    expect(copied).toMatch(/^json-rpc id 4: Connection reset by server\n\nClean Design run error diagnostics/);
     expect(copied).not.toContain('raw_error:');
     expect(copied).not.toContain('\nerror:\n');
   });
@@ -401,7 +401,7 @@ describe('ChatPane streaming state', () => {
       agentId: 'amr',
     });
 
-    expect(text).toMatch(/^json-rpc id 4: Connection reset by server\n\nOpen Design run error diagnostics/);
+    expect(text).toMatch(/^json-rpc id 4: Connection reset by server\n\nClean Design run error diagnostics/);
     expect(text).not.toContain('raw_error:');
     expect(text).toContain('error_code: UPSTREAM_UNAVAILABLE');
     expect(text).not.toContain('\nerror:\n');
@@ -419,7 +419,7 @@ describe('ChatPane streaming state', () => {
       agentId: 'amr',
     });
 
-    expect(text).toMatch(/^Connection dropped\. Try again\.\n\nOpen Design run error diagnostics/);
+    expect(text).toMatch(/^Connection dropped\. Try again\.\n\nClean Design run error diagnostics/);
     expect(text).not.toContain('raw_error:');
     expect(text).toContain('error_code: AGENT_CONNECTION_DROPPED');
     expect(text).not.toContain('\nerror:\n');

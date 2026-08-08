@@ -1,9 +1,5 @@
 import {
-  useCallback,
-  useEffect,
-  useState,
   type Dispatch,
-  type ReactNode,
   type SetStateAction,
 } from 'react';
 import type { ChatSessionMode, ConnectorDetail } from '@open-design/contracts';
@@ -33,17 +29,7 @@ import type {
 // component lets future rebases against upstream `EntryView` (props,
 // connector lifecycle, exported helpers) stay close to a no-op here.
 import { EntryShell } from './EntryShell';
-import type { IntegrationTab } from './IntegrationsView';
 import type { CreateInput, ImportClaudeDesignOutcome } from './NewProjectPanel';
-import {
-  CONNECTOR_CALLBACK_MESSAGE_TYPE,
-  listenForConnectorsChanged,
-} from './connectors-events';
-import { fetchConnectorCatalogSnapshot } from './connectors-state';
-import type {
-  PluginShareAction,
-  PluginShareProjectOutcome,
-} from '../state/projects';
 
 type EntryCreateProjectInput = Omit<CreateInput, 'metadata'> & {
   metadata?: CreateInput['metadata'];
@@ -75,17 +61,12 @@ interface Props {
   promptTemplates: PromptTemplateSummary[];
   defaultDesignSystemId: string | null;
   agents: AgentInfo[];
-  // Forwarded to EntryShell → OnboardingView so the AMR cloud card can show a
-  // detecting/skeleton state while the cold-start agent stream is in flight.
-  agentsLoading?: boolean;
   // Execution / model-switching context forwarded to the EntryShell so the
   // sticky top-bar can expose the active CLI/BYOK + model and persist
   // changes through the same channels as the project view.
   config: AppConfig;
   providerModelsCache?: Record<string, ProviderModelOption[]>;
   onProviderModelsCacheChange?: Dispatch<SetStateAction<Record<string, ProviderModelOption[]>>>;
-  integrationInitialTab?: IntegrationTab;
-  composioConfigLoading?: boolean;
   daemonLive: boolean;
   onModeChange: (mode: ExecMode) => void;
   onAgentChange: (id: string) => void;
@@ -117,11 +98,6 @@ interface Props {
   projectsLoading?: boolean;
   promptTemplatesLoading?: boolean;
   onCreateProject: (input: EntryCreateProjectInput) => Promise<boolean> | boolean | void;
-  onCreatePluginShareProject: (
-    pluginId: string,
-    action: PluginShareAction,
-    locale?: string,
-  ) => Promise<PluginShareProjectOutcome>;
   onImportClaudeDesign: (
     file: File,
   ) => Promise<ImportClaudeDesignOutcome | void> | ImportClaudeDesignOutcome | void;
@@ -137,10 +113,7 @@ interface Props {
   onCreateDesignSystem?: () => void;
   onOpenDesignSystem?: (id: string) => void;
   onDesignSystemsRefresh?: () => Promise<void> | void;
-  onPersistComposioKey: (composio: AppConfig['composio']) => Promise<void> | void;
   onOpenSettings: (section?: 'execution' | 'media' | 'composio' | 'orbit' | 'integrations' | 'mcpClient' | 'language' | 'appearance' | 'notifications' | 'pet' | 'projectLocations' | 'library' | 'about' | 'memory' | 'designSystems') => void;
-  onCompleteOnboarding: () => void;
-  artifactUpgradeSlot?: ReactNode;
 }
 
 export function isTrustedConnectorCallbackOrigin(origin: string, currentOrigin?: string): boolean {
@@ -246,12 +219,9 @@ export function EntryView({
   promptTemplates,
   defaultDesignSystemId,
   agents,
-  agentsLoading,
   config,
   providerModelsCache,
   onProviderModelsCacheChange,
-  integrationInitialTab,
-  composioConfigLoading = false,
   daemonLive,
   onModeChange,
   onAgentChange,
@@ -270,7 +240,6 @@ export function EntryView({
   projectsLoading = false,
   promptTemplatesLoading: _promptTemplatesLoading = false,
   onCreateProject,
-  onCreatePluginShareProject,
   onImportClaudeDesign,
   onImportFolder,
   onImportFolderResponse,
@@ -284,76 +253,8 @@ export function EntryView({
   onCreateDesignSystem,
   onOpenDesignSystem,
   onDesignSystemsRefresh,
-  onPersistComposioKey,
   onOpenSettings,
-  onCompleteOnboarding,
-  artifactUpgradeSlot,
 }: Props) {
-  const [connectors, setConnectors] = useState<ConnectorDetail[]>([]);
-  const [connectorsLoading, setConnectorsLoading] = useState(false);
-
-  const reloadConnectorCatalog = useCallback(async (options: { refreshDiscovery?: boolean } = {}) => {
-    setConnectors(await fetchConnectorCatalogSnapshot(options));
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    // Fetch connectors on mount so the New project modal can show
-    // already-configured connectors without waiting for the user to
-    // open the Settings → Connectors surface.
-    setConnectorsLoading(true);
-    (async () => {
-      const next = await fetchConnectorCatalogSnapshot();
-      if (cancelled) return;
-      setConnectors(next);
-      setConnectorsLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      const data = event.data;
-      if (!data || typeof data !== 'object' || (data as { type?: unknown }).type !== CONNECTOR_CALLBACK_MESSAGE_TYPE) return;
-      if (!isTrustedConnectorCallbackOrigin(event.origin)) return;
-      void reloadConnectorCatalog({ refreshDiscovery: true });
-    }
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [reloadConnectorCatalog]);
-
-  useEffect(() => {
-    function onConnectorsChanged() {
-      void reloadConnectorCatalog({ refreshDiscovery: true });
-    }
-    return listenForConnectorsChanged(onConnectorsChanged);
-  }, [reloadConnectorCatalog]);
-
-  // When the OAuth flow is handed off to the user's system browser (desktop
-  // shell opens connector auth URLs externally rather than in an Electron
-  // popup), the callback page has no `window.opener` to postMessage back to.
-  // Refresh connector statuses whenever the window regains focus so the UI
-  // picks up a just-completed connection without manual intervention.
-  useEffect(() => {
-    function refreshAfterReturn() {
-      void reloadConnectorCatalog({ refreshDiscovery: true });
-    }
-    function onVisibilityChange() {
-      if (document.visibilityState !== 'visible') return;
-      refreshAfterReturn();
-    }
-    window.addEventListener('focus', refreshAfterReturn);
-    window.addEventListener('pageshow', refreshAfterReturn);
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      window.removeEventListener('focus', refreshAfterReturn);
-      window.removeEventListener('pageshow', refreshAfterReturn);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
-  }, [reloadConnectorCatalog]);
-
   return (
     <EntryShell
       skills={skills}
@@ -364,10 +265,8 @@ export function EntryView({
       onDeleteTemplate={onDeleteTemplate}
       promptTemplates={promptTemplates}
       defaultDesignSystemId={defaultDesignSystemId}
-      connectors={connectors}
-      connectorsLoading={connectorsLoading}
-      {...(integrationInitialTab ? { integrationInitialTab } : {})}
-      composioConfigLoading={composioConfigLoading}
+      connectors={[]}
+      connectorsLoading={false}
       skillsLoading={skillsLoading}
       designSystemsLoading={designSystemsLoading}
       projectsLoading={projectsLoading}
@@ -375,7 +274,6 @@ export function EntryView({
       providerModelsCache={providerModelsCache}
       onProviderModelsCacheChange={onProviderModelsCacheChange}
       agents={agents}
-      {...(agentsLoading !== undefined ? { agentsLoading } : {})}
       daemonLive={daemonLive}
       onModeChange={onModeChange}
       onAgentChange={onAgentChange}
@@ -390,7 +288,6 @@ export function EntryView({
       onRefreshAgents={onRefreshAgents}
       onThemeChange={onThemeChange}
       onCreateProject={onCreateProject}
-      onCreatePluginShareProject={onCreatePluginShareProject}
       onImportClaudeDesign={onImportClaudeDesign}
       {...(onImportFolder ? { onImportFolder } : {})}
       {...(onImportFolderResponse ? { onImportFolderResponse } : {})}
@@ -404,10 +301,7 @@ export function EntryView({
       onCreateDesignSystem={onCreateDesignSystem}
       onOpenDesignSystem={onOpenDesignSystem}
       onDesignSystemsRefresh={onDesignSystemsRefresh}
-      onPersistComposioKey={onPersistComposioKey}
       onOpenSettings={onOpenSettings}
-      onCompleteOnboarding={onCompleteOnboarding}
-      artifactUpgradeSlot={artifactUpgradeSlot}
     />
   );
 }

@@ -765,7 +765,7 @@ export const zhTW: Dict = {
   "homeHero.contextSurfaces": "情境介面",
   "homeHero.loadingContext": "正在載入上下文…",
   "homeHero.noResults": "找不到「{query}」的結果。",
-  "homeHero.searchPrompt": "搜尋檔案、外掛、技能、MCP 伺服器與連接器。",
+  "homeHero.searchPrompt": "搜尋檔案、外掛與技能。",
   "homeHero.parameters": "{n} 個參數",
   "homeHero.details": "詳細資料",
   "homeHero.toRun": "執行",
@@ -2540,8 +2540,7 @@ export const zhTW: Dict = {
   "chat.mentionTabConnectors": "連接器",
   "chat.mentionTabFiles": "設計檔案",
   "chat.mentionNoResults": "找不到「{query}」的結果。",
-  "chat.mentionSearchPrompt":
-    "搜尋設計檔案、分頁、外掛、技能、MCP 伺服器和連接器。",
+  "chat.mentionSearchPrompt": "搜尋設計檔案、分頁、外掛與技能。",
   "chat.mentionSectionTabs": "分頁",
   "chat.mentionSectionPlugins": "外掛",
   "chat.mentionSectionSkills": "技能",

@@ -247,7 +247,7 @@ interface Props {
   recommendationSlot?: ReactNode;
 }
 
-type HomeMentionTab = 'all' | 'files' | 'plugins' | 'skills' | 'mcp' | 'connectors';
+type HomeMentionTab = 'all' | 'files' | 'plugins' | 'skills';
 
 // In the combined "All" overview, every surface is capped to a handful of top
 // matches so no single section floods the picker. The dedicated "Design files"
@@ -504,38 +504,20 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
         : [],
     [locale, mentionActive, mentionQuery, skillOptions],
   );
-  const mcpMatches = useMemo(
-    () =>
-      mentionActive
-        ? mcpOptions.filter((server) => mcpServerMatchesQuery(server, mentionQuery)).slice(0, 6)
-        : [],
-    [mcpOptions, mentionActive, mentionQuery],
-  );
-  const connectorMatches = useMemo(
-    () =>
-      mentionActive
-        ? connectorOptions.filter((connector) => connectorMatchesQuery(connector, mentionQuery)).slice(0, 6)
-        : [],
-    [connectorOptions, mentionActive, mentionQuery],
-  );
   const pickerOpen = active && mentionActive;
   const tabs: Array<{ id: HomeMentionTab; label: string; count: number }> = [
     // The All overview previews at most HOME_MENTION_ALL_TAB_PREVIEW files, so
     // its badge counts the previewed slice — not the full staged total — to keep
     // the count aligned with what that tab actually renders. The dedicated files
     // tab below lists every match and reports the true total.
-    { id: 'all', label: t('common.all'), count: Math.min(fileMatches.length, HOME_MENTION_ALL_TAB_PREVIEW) + pluginMatches.length + skillMatches.length + mcpMatches.length + connectorMatches.length },
+    { id: 'all', label: t('common.all'), count: Math.min(fileMatches.length, HOME_MENTION_ALL_TAB_PREVIEW) + pluginMatches.length + skillMatches.length },
     { id: 'files', label: t('chat.mentionTabFiles'), count: fileMatches.length },
     { id: 'plugins', label: t('entry.navPlugins'), count: pluginMatches.length },
     { id: 'skills', label: t('homeHero.skills'), count: skillMatches.length },
-    { id: 'mcp', label: 'MCP', count: mcpMatches.length },
-    { id: 'connectors', label: 'Connectors', count: connectorMatches.length },
   ];
   const showFiles = mentionTab === 'all' || mentionTab === 'files';
   const showPlugins = mentionTab === 'all' || mentionTab === 'plugins';
   const showSkills = mentionTab === 'all' || mentionTab === 'skills';
-  const showMcp = mentionTab === 'all' || mentionTab === 'mcp';
-  const showConnectors = mentionTab === 'all' || mentionTab === 'connectors';
   const visibleSections: HomeMentionSection[] = [
     showFiles
       ? {
@@ -581,41 +563,12 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
           })),
         }
       : null,
-    showMcp
-      ? {
-          id: 'mcp',
-          label: 'MCP',
-          options: mcpMatches.map((server) => ({
-            id: `mcp-${server.id}`,
-            icon: 'link',
-            title: server.label || server.id,
-            description: server.url || server.command || server.id,
-            meta: server.transport,
-            onPick: () => pickMcp(server),
-          })),
-        }
-      : null,
-    showConnectors
-      ? {
-          id: 'connectors',
-          label: 'Connectors',
-          options: connectorMatches.map((connector) => ({
-            id: `connector-${connector.id}`,
-            icon: 'link',
-            title: connector.name,
-            description: connector.description || connector.provider || connector.id,
-            meta: connector.accountLabel ?? connector.provider,
-            onPick: () => pickConnector(connector),
-          })),
-        }
-      : null,
   ].filter((section): section is HomeMentionSection => Boolean(section?.options.length));
   const visiblePickerOptions = visibleSections.flatMap((section) => section.options);
   const visibleLoading =
-    (mentionTab === 'all' && (pluginsLoading || skillsLoading || mcpLoading)) ||
+    (mentionTab === 'all' && (pluginsLoading || skillsLoading)) ||
     (mentionTab === 'plugins' && pluginsLoading) ||
-    (mentionTab === 'skills' && skillsLoading) ||
-    (mentionTab === 'mcp' && mcpLoading);
+    (mentionTab === 'skills' && skillsLoading);
   const promptMentionEntities = useMemo(
     () =>
       buildHomeMentionEntities({
@@ -1750,26 +1703,6 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
                   resource_kind: PLUS_SUBMENU_RESOURCE_KIND[submenu],
                 });
               }}
-              connectors={connectorOptions}
-              onPickConnector={(connector) => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_pick',
-                  resource_kind: 'connector',
-                  resource_id: connector.id,
-                });
-                pickConnector(connector);
-              }}
-              onAddConnector={() => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_add',
-                  resource_kind: 'connector',
-                });
-                onAddConnector();
-              }}
               plugins={pluginOptions}
               onPickPlugin={(record) => {
                 trackHomeChatComposerClick(analytics.track, {
@@ -1800,26 +1733,6 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
                   resource_id: skill.id,
                 });
                 pickSkill(skill);
-              }}
-              mcpServers={mcpOptions}
-              onPickMcp={(server) => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_pick',
-                  resource_kind: 'mcp',
-                  resource_id: server.id,
-                });
-                pickMcp(server);
-              }}
-              onAddMcp={() => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_add',
-                  resource_kind: 'mcp',
-                });
-                onAddMcp();
               }}
               onAttachFiles={() => {
                 trackHomeChatComposerClick(analytics.track, {

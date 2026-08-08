@@ -985,6 +985,7 @@
 
 /* -------- Avatar menu (replaces in-topbar agent picker) ------------- */
 .avatar-menu { position: relative; }
+.avatar-menu-divider { height: 1px; margin: 4px 6px; background: var(--border-soft); }
 .avatar-agent-trigger {
   width: 58px;
   height: 32px;

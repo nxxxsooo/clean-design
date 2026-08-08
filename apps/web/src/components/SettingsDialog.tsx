@@ -78,7 +78,6 @@ import {
   KNOWN_PROVIDERS,
   hasAnyConfiguredProvider,
   mergeDaemonMediaProviders,
-  saveConfig,
   syncComposioConfigToDaemon,
   syncConfigToDaemon,
   syncMediaProvidersToDaemon,
@@ -141,21 +140,6 @@ import { isVisualStabilityMode } from '../utils/visualStability';
 import { byokProviderRequiresApiKey } from '../utils/byokProvider';
 import { XaiOAuthControl } from './XaiOAuthControl';
 import type { MediaProvider } from '../media/models';
-import { Toast } from './Toast';
-import {
-  checkForUpdaterUpdate,
-  deriveUpdaterModel,
-  downloadUpdaterUpdate,
-  openUpdaterInstaller,
-  quitAfterUpdaterInstallerOpen,
-  readUpdaterStatus,
-  restartSafetyFromActionResult,
-  restartSafetyFromUpdaterStatus,
-  subscribeToUpdaterStatus,
-  type UpdaterActionResult,
-  type UpdaterModel,
-  type UpdaterRestartSafety,
-} from '../lib/updater';
 import { PetSettings } from './pet/PetSettings';
 import { McpClientSection } from './McpClientSection';
 import { DesignSystemsSection } from './DesignSystemsSection';
@@ -230,6 +214,8 @@ export type SettingsSection =
 
 const LOCAL_ONLY_DISABLED_SETTINGS = new Set<SettingsSection>([
   'composio',
+  'orbit',
+  'routines',
   'integrations',
   'mcpClient',
   'privacy',
@@ -252,155 +238,6 @@ interface ByokProviderPreset {
 // card into view on the execution section and plays a highlight (plus a
 // sign-in coachmark when the user has not authorized AMR yet).
 export type SettingsHighlight = 'amr' | null;
-
-const OPEN_DESIGN_RELEASES_URL = 'https://github.com/nexu-io/open-design/releases';
-
-type AboutUpdatePrimaryAction = 'check' | 'download' | 'install' | 'quit';
-type AboutUpdateTone = 'neutral' | 'success' | 'warning' | 'error';
-
-export interface AboutUpdateControl {
-  primaryAction: AboutUpdatePrimaryAction | null;
-  primaryLabelKey: keyof Dict | null;
-  showReleaseLink: boolean;
-  statusKey: keyof Dict;
-  statusTone: AboutUpdateTone;
-  statusVars?: Record<string, string | number>;
-}
-
-export function deriveAboutUpdateControl(
-  model: UpdaterModel,
-  appVersionInfo: AppVersionInfo | null,
-): AboutUpdateControl {
-  if (appVersionInfo?.packaged === false) {
-    return {
-      primaryAction: null,
-      primaryLabelKey: null,
-      showReleaseLink: true,
-      statusKey: 'settings.updateStatusDevelopment',
-      statusTone: 'neutral',
-    };
-  }
-
-  if (model.environment !== 'desktop' || !model.enabled || !model.supported) {
-    return {
-      primaryAction: null,
-      primaryLabelKey: null,
-      showReleaseLink: true,
-      statusKey: 'settings.updateStatusUnsupported',
-      statusTone: 'warning',
-    };
-  }
-
-  switch (model.status?.state) {
-    case 'checking':
-      return {
-        primaryAction: null,
-        primaryLabelKey: 'updater.checking',
-        showReleaseLink: true,
-        statusKey: 'settings.updateStatusChecking',
-        statusTone: 'neutral',
-      };
-    case 'not-available':
-      return {
-        primaryAction: 'check',
-        primaryLabelKey: 'settings.updateRecheck',
-        showReleaseLink: true,
-        statusKey: 'settings.updateStatusUpToDate',
-        statusTone: 'success',
-      };
-    case 'available':
-      return {
-        primaryAction: model.canDownload ? 'download' : null,
-        primaryLabelKey: model.canDownload ? 'updater.download' : null,
-        showReleaseLink: true,
-        statusKey: model.availableVersion
-          ? 'settings.updateStatusAvailable'
-          : 'settings.updateStatusAvailableUnknown',
-        statusTone: 'warning',
-        ...(model.availableVersion ? { statusVars: { version: model.availableVersion } } : {}),
-      };
-    case 'downloading': {
-      const percent = model.downloadProgress?.percent;
-      return {
-        primaryAction: null,
-        primaryLabelKey: 'updater.downloading',
-        showReleaseLink: true,
-        statusKey: typeof percent === 'number'
-          ? 'settings.updateStatusDownloadingPercent'
-          : 'settings.updateStatusDownloading',
-        statusTone: 'neutral',
-        ...(typeof percent === 'number' ? { statusVars: { percent } } : {}),
-      };
-    }
-    case 'downloaded': {
-      if (model.installerOpened && model.canQuitAfterInstallerOpen) {
-        return {
-          primaryAction: 'quit',
-          primaryLabelKey: 'updater.quitButton',
-          showReleaseLink: false,
-          statusKey: model.updateKind === 'payload' ? 'updater.installingRestart' : 'updater.opening',
-          statusTone: 'neutral',
-        };
-      }
-      const canInstallUpdate = model.canOpenInstaller || model.canApplyInPlace;
-      return {
-        primaryAction: canInstallUpdate ? 'install' : null,
-        primaryLabelKey: canInstallUpdate
-          ? model.updateKind === 'payload'
-            ? 'updater.installRestart'
-            : 'settings.updateNow'
-          : null,
-        showReleaseLink: true,
-        statusKey: model.availableVersion
-          ? 'settings.updateStatusReady'
-          : 'settings.updateStatusReadyUnknown',
-        statusTone: 'success',
-        ...(model.availableVersion ? { statusVars: { version: model.availableVersion } } : {}),
-      };
-    }
-    case 'installing':
-      return {
-        primaryAction: null,
-        primaryLabelKey: 'updater.installingRestart',
-        showReleaseLink: false,
-        statusKey: 'settings.updateStatusInstalling',
-        statusTone: 'neutral',
-      };
-    case 'error': {
-      const canRetryInstall = model.status.downloadPath != null
-        && (model.canOpenInstaller || model.canApplyInPlace);
-      const primaryAction: AboutUpdatePrimaryAction = canRetryInstall
-        ? 'install'
-        : model.availableVersion != null && model.canDownload
-          ? 'download'
-          : 'check';
-      return {
-        primaryAction,
-        primaryLabelKey: 'settings.updateRetry',
-        showReleaseLink: true,
-        statusKey: 'updater.failed',
-        statusTone: 'error',
-      };
-    }
-    case 'unsupported':
-      return {
-        primaryAction: null,
-        primaryLabelKey: null,
-        showReleaseLink: true,
-        statusKey: 'settings.updateStatusUnsupported',
-        statusTone: 'warning',
-      };
-    case 'idle':
-    default:
-      return {
-        primaryAction: 'check',
-        primaryLabelKey: 'settings.updateCheck',
-        showReleaseLink: true,
-        statusKey: 'settings.updateStatusNotChecked',
-        statusTone: 'neutral',
-      };
-  }
-}
 
 interface Props {
   initial: AppConfig;
@@ -1452,7 +1289,6 @@ export function SettingsDialog({
   initialSection = 'execution',
   initialHighlight = null,
   onPersist,
-  onSilentUpdatePreferenceChange,
   onPersistComposioKey,
   composioConfigLoading = false,
   onClose,
@@ -1810,131 +1646,6 @@ export function SettingsDialog({
   const [agentCustomModelIds, setAgentCustomModelIds] = useState<
     ReadonlySet<string>
   >(() => new Set());
-  const [aboutUpdaterModel, setAboutUpdaterModel] = useState<UpdaterModel>(() => deriveUpdaterModel(null));
-  const [aboutUpdateActionBusy, setAboutUpdateActionBusy] = useState(false);
-  const [aboutUpdateQuitFailed, setAboutUpdateQuitFailed] = useState(false);
-  const [aboutToast, setAboutToast] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    const unsubscribe = subscribeToUpdaterStatus((status) => {
-      if (!mounted) return;
-      const nextModel = deriveUpdaterModel(status, { hostAvailable: true });
-      setAboutUpdaterModel(nextModel);
-      if (!nextModel.installerOpened) setAboutUpdateQuitFailed(false);
-    });
-    void readUpdaterStatus({ payload: { source: 'settings-about:mount' } }).then((result) => {
-      if (!mounted) return;
-      const nextModel = result.ok ? result.model : deriveUpdaterModel(null, { hostAvailable: false });
-      setAboutUpdaterModel(nextModel);
-      if (!nextModel.installerOpened) setAboutUpdateQuitFailed(false);
-    });
-    return () => {
-      mounted = false;
-      unsubscribe();
-    };
-  }, []);
-
-  const aboutUpdateControl = useMemo(() => {
-    const control = deriveAboutUpdateControl(aboutUpdaterModel, appVersionInfo);
-    if (!aboutUpdateQuitFailed || !aboutUpdaterModel.installerOpened) return control;
-    return {
-      ...control,
-      primaryAction: 'quit' as const,
-      primaryLabelKey: 'updater.quitButton' as const,
-      showReleaseLink: false,
-      statusKey: 'updater.quitFailedTitle' as const,
-      statusTone: 'warning' as const,
-    };
-  }, [aboutUpdateQuitFailed, aboutUpdaterModel, appVersionInfo]);
-
-  // Restart-safety preflight denials stay hard-blocked in Settings → About
-  // (the force path lives in the app-menu UpdateDialog), but the toast must
-  // explain the active-run situation instead of a generic failure.
-  const aboutUpdaterToastText = useCallback(
-    (safety: UpdaterRestartSafety | null, fallback: string): string => {
-      if (safety == null) return fallback;
-      return safety.state === 'blocked'
-        ? t('updater.activeRunsBody', { count: safety.activeRunCount })
-        : t('updater.activeRunsUnknownBody');
-    },
-    [t],
-  );
-
-  const applyAboutUpdaterResult = useCallback((result: UpdaterActionResult): boolean => {
-    if (!result.ok) {
-      setAboutToast(t('settings.updateActionFailed'));
-      return false;
-    }
-    setAboutUpdaterModel(result.model);
-    if (result.model.errorMessage != null) {
-      const safety = restartSafetyFromUpdaterStatus(result.status);
-      setAboutToast(aboutUpdaterToastText(safety, t('settings.updateActionFailed')));
-      return false;
-    }
-    return true;
-  }, [aboutUpdaterToastText, t]);
-
-  const handleAboutUpdateAction = useCallback(async () => {
-    if (aboutUpdateActionBusy || aboutUpdaterModel.busy || aboutUpdateControl.primaryAction == null) return;
-    setAboutUpdateActionBusy(true);
-    setAboutUpdateQuitFailed(false);
-    let quitAttempted = false;
-    try {
-      const options = { payload: { source: 'settings-about' } };
-      if (aboutUpdateControl.primaryAction === 'check') {
-        applyAboutUpdaterResult(await checkForUpdaterUpdate(options));
-      } else if (aboutUpdateControl.primaryAction === 'download') {
-        applyAboutUpdaterResult(await downloadUpdaterUpdate(options));
-      } else if (aboutUpdateControl.primaryAction === 'quit') {
-        quitAttempted = true;
-        const quitResult = await quitAfterUpdaterInstallerOpen(options);
-        if (!quitResult.ok) {
-          setAboutUpdateQuitFailed(true);
-          setAboutToast(aboutUpdaterToastText(restartSafetyFromActionResult(quitResult), t('updater.quitFailedTitle')));
-        }
-      } else {
-        const installed = applyAboutUpdaterResult(await openUpdaterInstaller(options));
-        if (installed) {
-          quitAttempted = true;
-          const quitResult = await quitAfterUpdaterInstallerOpen(options);
-          if (!quitResult.ok) {
-            setAboutUpdateQuitFailed(true);
-            setAboutToast(aboutUpdaterToastText(restartSafetyFromActionResult(quitResult), t('updater.quitFailedTitle')));
-          }
-        }
-      }
-    } catch {
-      if (quitAttempted) setAboutUpdateQuitFailed(true);
-      setAboutToast(t('settings.updateActionFailed'));
-    } finally {
-      setAboutUpdateActionBusy(false);
-    }
-  }, [
-    aboutUpdateActionBusy,
-    aboutUpdateControl.primaryAction,
-    aboutUpdaterModel.busy,
-    aboutUpdaterToastText,
-    applyAboutUpdaterResult,
-    t,
-  ]);
-
-  const handleOpenReleaseNotes = useCallback(() => {
-    void openExternalUrl(OPEN_DESIGN_RELEASES_URL);
-  }, []);
-
-  // Precise inverse of App.handleCompleteOnboarding: flip
-  // onboardingCompleted back to false, mirror it to localStorage and the
-  // daemon through the same config-persist path, then route the user into
-  // the first-run flow so they can replay setup (including brand extraction).
-  const handleResetOnboarding = useCallback(() => {
-    const next: AppConfig = { ...cfg, onboardingCompleted: false };
-    setCfg(next);
-    saveConfig(next);
-    void syncConfigToDaemon(next);
-    onClose();
-    navigateRoute({ kind: 'home', view: 'onboarding' });
-  }, [cfg, onClose]);
 
   // Imperative handle for the External MCP section. The dialog footer Save
   // routes through this when the MCP tab is active so the user can press the
@@ -3044,8 +2755,6 @@ export function SettingsDialog({
   // Silent-update toggles use a dedicated non-optimistic path; skip the next
   // autosave effect tick so we do not double-write through handleConfigPersist.
   const suppressNextAutosaveRef = useRef(false);
-  const silentUpdateWriteTokenRef = useRef(0);
-  const [silentUpdateBusy, setSilentUpdateBusy] = useState(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const autosaveSavedTimerRef = useRef<number | null>(null);
   const autosaveRetryTimerRef = useRef<number | null>(null);
@@ -5677,7 +5386,7 @@ export function SettingsDialog({
 
           {activeSection === 'memory' ? (
             <MemorySection
-              onOpenConnectors={() => setActiveSection('composio')}
+              onOpenConnectors={() => setActiveSection('execution')}
               chatAgentId={cfg.mode === 'daemon' ? cfg.agentId ?? null : null}
               chatModel={selectedMemoryChatModel}
             />
@@ -5696,46 +5405,7 @@ export function SettingsDialog({
                       <div className="settings-about-version-left">
                         <dt>{t('settings.appVersion')}</dt>
                         <span className="settings-about-version-num">{appVersionInfo.version}</span>
-                        <dd
-                          aria-live="polite"
-                          className={`settings-about-update-status settings-about-update-status--${aboutUpdateControl.statusTone}`}
-                        >
-                          {t(aboutUpdateControl.statusKey, aboutUpdateControl.statusVars)}
-                        </dd>
                       </div>
-                    </div>
-                    <div className="settings-about-update-actions">
-                      {aboutUpdateControl.primaryLabelKey ? (
-                        <button
-                          type="button"
-                          className={`settings-about-update-button${
-                            aboutUpdateControl.primaryAction === 'download'
-                              || aboutUpdateControl.primaryAction === 'install'
-                              || aboutUpdateControl.primaryAction === 'quit'
-                              ? ' settings-about-update-button--primary'
-                              : ''
-                          }`}
-                          disabled={
-                            aboutUpdateActionBusy
-                            || aboutUpdaterModel.busy
-                            || aboutUpdateControl.primaryAction == null
-                          }
-                          onClick={handleAboutUpdateAction}
-                        >
-                          {aboutUpdateActionBusy
-                            ? t('common.loading')
-                            : t(aboutUpdateControl.primaryLabelKey)}
-                        </button>
-                      ) : null}
-                      {aboutUpdateControl.showReleaseLink ? (
-                        <button
-                          type="button"
-                          className="settings-about-release-link"
-                          onClick={handleOpenReleaseNotes}
-                        >
-                          {t('settings.updateViewReleases')}
-                        </button>
-                      ) : null}
                     </div>
                   </div>
                   <div>
@@ -5762,74 +5432,6 @@ export function SettingsDialog({
               ) : (
                 <div className="empty-card">{t('settings.versionUnavailable')}</div>
               )}
-              <div className="settings-about-diagnostics settings-about-silent-updates">
-                <label className="settings-about-toggle">
-                  <input
-                    checked={cfg.allowSilentUpdates === true}
-                    data-testid="settings-allow-silent-updates"
-                    disabled={silentUpdateBusy}
-                    type="checkbox"
-                    onChange={(event) => {
-                      // Capture before setState: React clears event.currentTarget
-                      // after the handler returns, and the functional updater can
-                      // run later when SettingsDialog already has pending lanes
-                      // (about-updater status, autosave indicator, etc.).
-                      const allowSilentUpdates = event.currentTarget.checked;
-                      const previous = cfg.allowSilentUpdates;
-                      // Dedicated non-optimistic path: do not flush through
-                      // handleConfigPersist (which setConfig before daemon write).
-                      // Serialize via busy + write token so a slow earlier save
-                      // cannot re-apply UI after a later toggle.
-                      const writeToken = ++silentUpdateWriteTokenRef.current;
-                      suppressNextAutosaveRef.current = true;
-                      setCfg((current) => ({
-                        ...current,
-                        allowSilentUpdates,
-                      }));
-                      if (onSilentUpdatePreferenceChange == null) return;
-                      setSilentUpdateBusy(true);
-                      void (async () => {
-                        try {
-                          await onSilentUpdatePreferenceChange(allowSilentUpdates);
-                          if (writeToken !== silentUpdateWriteTokenRef.current) return;
-                          // Only advance the baseline for this daemon-owned field.
-                          // Spreading autosaveLatestRef would stamp any concurrent
-                          // draft (theme, accent, …) as already saved and let the
-                          // generic autosave skip a real onPersist for that edit.
-                          autosaveLastSavedRef.current = {
-                            ...autosaveLastSavedRef.current,
-                            allowSilentUpdates,
-                          };
-                          setAutosaveStatus('saved');
-                          if (autosaveSavedTimerRef.current != null) {
-                            window.clearTimeout(autosaveSavedTimerRef.current);
-                          }
-                          autosaveSavedTimerRef.current = window.setTimeout(() => {
-                            autosaveSavedTimerRef.current = null;
-                            setAutosaveStatus((curr) => (curr === 'saved' ? 'idle' : curr));
-                          }, 1800);
-                        } catch {
-                          if (writeToken !== silentUpdateWriteTokenRef.current) return;
-                          suppressNextAutosaveRef.current = true;
-                          setCfg((current) => ({
-                            ...current,
-                            allowSilentUpdates: previous,
-                          }));
-                          setAutosaveStatus('error');
-                        } finally {
-                          if (writeToken === silentUpdateWriteTokenRef.current) {
-                            setSilentUpdateBusy(false);
-                          }
-                        }
-                      })();
-                    }}
-                  />
-                  <span className="settings-about-toggle-copy">
-                    <span>{t('settings.allowSilentUpdates')}</span>
-                    <span className="hint">{t('settings.allowSilentUpdatesDesc')}</span>
-                  </span>
-                </label>
-              </div>
               <div className="settings-about-diagnostics">
                 <div className="settings-about-diagnostics-text">
                   <h4>{t('diagnostics.exportTitle')}</h4>
@@ -5837,22 +5439,7 @@ export function SettingsDialog({
                 </div>
                 <ExportDiagnosticsRow />
               </div>
-              <div className="settings-about-diagnostics">
-                <div className="settings-about-diagnostics-text">
-                  <h4>{t('settings.resetOnboarding')}</h4>
-                  <p className="hint">{t('settings.resetOnboardingDesc')}</p>
-                </div>
-                <Button onClick={handleResetOnboarding}>
-                  {t('settings.resetOnboardingButton')}
-                </Button>
-              </div>
             </section>
-          ) : null}
-          {aboutToast ? (
-            <Toast
-              message={aboutToast}
-              onDismiss={() => setAboutToast(null)}
-            />
           ) : null}
           </div>
         </div>

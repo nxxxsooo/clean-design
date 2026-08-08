@@ -762,7 +762,7 @@ export const zhCN: Dict = {
   "homeHero.contextSurfaces": "上下文来源",
   "homeHero.loadingContext": "正在加载上下文…",
   "homeHero.noResults": "没有找到“{query}”的结果。",
-  "homeHero.searchPrompt": "搜索文件、插件、技能、MCP 服务器和连接器。",
+  "homeHero.searchPrompt": "搜索文件、插件和技能。",
   "homeHero.parameters": "{n} 个参数",
   "homeHero.details": "详情",
   "homeHero.toRun": "运行",
@@ -2530,8 +2530,7 @@ export const zhCN: Dict = {
   "chat.mentionTabConnectors": "连接器",
   "chat.mentionTabFiles": "设计文件",
   "chat.mentionNoResults": "没有找到“{query}”的结果。",
-  "chat.mentionSearchPrompt":
-    "搜索设计文件、标签页、插件、技能、MCP 服务器和连接器。",
+  "chat.mentionSearchPrompt": "搜索设计文件、标签页、插件和技能。",
   "chat.mentionSectionTabs": "标签页",
   "chat.mentionSectionPlugins": "插件",
   "chat.mentionSectionSkills": "技能",

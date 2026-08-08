@@ -365,16 +365,12 @@ describe('ChatComposer context pickers', () => {
       'Tabs',
       'Plugins',
       'Skills',
-      'MCP',
-      'Connectors',
     ]);
     expect(screen.getByRole('tab', { name: 'Plugins' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Skills' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'MCP' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'Connectors' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Design files' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: 'Tabs' })).toBeTruthy();
-    expect(screen.getByText('Search Design Files, tabs, plugins, skills, MCP servers, and connectors.')).toBeTruthy();
+    expect(screen.getByText('Search Design Files, tabs, plugins, and skills.')).toBeTruthy();
   });
 
   it('localizes @ panel tabs and empty states in Chinese mode', async () => {
@@ -393,16 +389,12 @@ describe('ChatComposer context pickers', () => {
       '标签页',
       '插件',
       '技能',
-      'MCP',
-      '连接器',
     ]);
     expect(screen.getByRole('tab', { name: '插件' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: '技能' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: 'MCP' })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: '连接器' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: '设计文件' })).toBeTruthy();
     expect(screen.getByRole('tab', { name: '标签页' })).toBeTruthy();
-    expect(screen.getByText('搜索设计文件、标签页、插件、技能、MCP 服务器和连接器。')).toBeTruthy();
+    expect(screen.getByText('搜索设计文件、标签页、插件和技能。')).toBeTruthy();
 
     await typeAndSettle('@missing');
 
@@ -1002,27 +994,6 @@ describe('ChatComposer context pickers', () => {
     );
   });
 
-  it('selects an MCP server from @ search and keeps the inline token visible', async () => {
-    renderComposer();
-    await flushMounts();
-
-    await typeAndSettle('@sl');
-
-    await waitFor(() => expect(screen.getByText('Slack MCP')).toBeTruthy());
-    fireEvent.click(screen.getByText('Slack MCP'));
-
-    await waitFor(() => expect(composerText()).toBe('@Slack MCP '));
-    const pill = screen
-      .getByTestId('chat-composer-input')
-      .querySelector('.composer-inline-mention');
-    expect(pill?.textContent).toBe('@Slack MCP');
-    expect(pill?.getAttribute('data-mention-kind')).toBe('mcp');
-    expect(screen.getByTestId('staged-contexts').textContent).toContain('@Slack MCP');
-
-    fireEvent.click(screen.getByLabelText('Remove Slack MCP'));
-    await waitFor(() => expect(composerText().trim()).toBe(''));
-    expect(screen.queryByTestId('staged-contexts')).toBeNull();
-  });
 
   it('applies a skill from @ search and reports the active project skill', async () => {
     const onProjectSkillChange = vi.fn();

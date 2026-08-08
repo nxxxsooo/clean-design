@@ -5,7 +5,6 @@ import type {
   TrackingRunFailureUserAction,
 } from '@open-design/contracts/analytics';
 
-import { classifyAmrAccountFailure } from './integrations/vela-errors.js';
 import { classifyAgentServiceFailure } from './runtimes/auth.js';
 import type { RunResult, RunStatusForAnalytics } from './run-result.js';
 
@@ -159,8 +158,8 @@ function isHardQuotaText(text: string): boolean {
     .test(text);
 }
 
-// A transient, retryable rate limit (distinct from a hard quota). vela/upstream
-// returns this in Chinese ("速率限制" / "请求频率"), which the English-only
+// A transient, retryable rate limit can also be returned in Chinese
+// ("速率限制" / "请求频率"), which the English-only
 // quota check above misses, so it currently leaks into execution_failed.
 function isRateLimitText(text: string): boolean {
   return /(速率限制|控制请求频率|请求(?:过于)?频繁|rate[ _-]?limit|too many requests)/i
@@ -631,43 +630,14 @@ export function classifyRunFailure(
   const errorCode = normalizeCode(input.errorCode ?? input.status.errorCode);
   const text = collectFailureText(input);
   const retryableHint = latestRetryable(input.events);
-  const amrFailure = classifyAmrAccountFailure(text);
   const byokOpenCodeProviderNotFound = isByokOpenCodeProviderNotFoundText(
     input.agentId,
     text,
   );
 
   if (
-    errorCode === 'AMR_INSUFFICIENT_BALANCE' ||
-    amrFailure?.code === 'AMR_INSUFFICIENT_BALANCE'
-  ) {
-    return classification(
-      'insufficient_balance',
-      'amr_insufficient_balance',
-      'session_init',
-      false,
-      'recharge',
-    );
-  }
-
-  if (
-    errorCode === 'AMR_TIER_UPGRADE_REQUIRED' ||
-    amrFailure?.code === 'AMR_TIER_UPGRADE_REQUIRED'
-  ) {
-    return classification(
-      'entitlement_required',
-      'amr_tier_upgrade_required',
-      'session_init',
-      false,
-      'upgrade',
-    );
-  }
-
-  if (
-    errorCode === 'AMR_AUTH_REQUIRED' ||
     errorCode === 'AGENT_AUTH_REQUIRED' ||
-    errorCode === 'UNAUTHORIZED' ||
-    amrFailure?.code === 'AMR_AUTH_REQUIRED'
+    errorCode === 'UNAUTHORIZED'
   ) {
     return classification(
       'auth',
@@ -689,9 +659,7 @@ export function classifyRunFailure(
     );
   }
 
-  const modelDetail = errorCode === 'AMR_MODEL_UNAVAILABLE'
-    ? 'model_not_found'
-    : modelUnavailableDetail(text);
+  const modelDetail = modelUnavailableDetail(text);
   if (modelDetail) {
     return classification(
       'model_unavailable',

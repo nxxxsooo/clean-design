@@ -40,7 +40,6 @@ import { projectRawUrl, uploadProjectFiles, openFolderDialog, fetchRecentLinkedD
 import { WorkingDirPicker } from './WorkingDirPicker';
 import { duplicatePluginAsProject, patchProject } from "../state/projects";
 import { navigate } from '../router';
-import { fetchMcpServers } from "../state/mcp";
 import type { McpServerConfig, McpTemplate } from "../state/mcp";
 import { listPlugins } from "../state/projects";
 import type { AppConfig, ChatAttachment, ChatCommentAttachment, Project, ProjectFile, ProjectMetadata, SkillSummary } from "../types";
@@ -101,12 +100,14 @@ import {
 import { CaretFloatingLayer } from './composer/CaretFloatingLayer';
 import { ANNOTATION_EVENT, type AnnotationEventDetail } from "./PreviewDrawOverlay";
 import { DesignSystemSwitchPicker } from "./DesignSystemSwitchPicker";
-import { listenForConnectorsChanged } from './connectors-events';
-import { fetchConnectorCatalogSnapshot } from './connectors-state';
 import { PlaceholderCarousel } from './home-hero/PlaceholderCarousel';
 import type { PlaceholderScenario } from './home-hero/placeholderScenarios';
 
 type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
+
+const EMPTY_MCP_SERVERS: McpServerConfig[] = [];
+const EMPTY_MCP_TEMPLATES: McpTemplate[] = [];
+const EMPTY_CONNECTORS: ConnectorDetail[] = [];
 
 interface TrackedWorkspaceLinkedDir {
   dir: string;
@@ -532,9 +533,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     // External MCP servers configured by the user. Fetched lazily on mount;
     // shown in the slash-command palette so `/mcp <id>` inserts a hint into
     // the prompt that nudges the model to use that server's tools.
-    const [mcpServers, setMcpServers] = useState<McpServerConfig[]>([]);
-    const [mcpTemplates, setMcpTemplates] = useState<McpTemplate[]>([]);
-    const [connectors, setConnectors] = useState<ConnectorDetail[]>([]);
+    const mcpServers = EMPTY_MCP_SERVERS;
+    const mcpTemplates = EMPTY_MCP_TEMPLATES;
+    const connectors = EMPTY_CONNECTORS;
     // Installed plugins, fetched lazily for the tools-menu Plugins tab and
     // the @-mention picker. Both surfaces share the same list so applying
     // a plugin from either path lands on the same project context.
@@ -720,27 +721,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
       }
     }, [composerEngaged, draft, mention, slash]);
 
-    // Lazy-fetch the user's external MCP servers list (once engaged) so the
-    // `/mcp …` slash palette and the composer's MCP button popover have
-    // something to render. We deliberately do not reactively re-fetch when
-    // the user toggles servers from Settings — the dialog refreshes itself,
-    // and the chat composer rehydrates next time the user re-opens it. A
-    // background poll would be cheap but unnecessary for the typical
-    // edit-once-then-chat workflow.
-    useEffect(() => {
-      if (!composerEngaged) return;
-      let cancelled = false;
-      void (async () => {
-        const data = await fetchMcpServers();
-        if (cancelled || !data) return;
-        setMcpServers(data.servers);
-        setMcpTemplates(data.templates);
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }, [composerEngaged]);
-
     // Skills now come from the parent (App.tsx → ProjectView → ChatPane → ChatComposer)
     // pre-filtered by enabled/disabled state. We no longer fetch a fresh list
     // here to avoid showing skills the user has disabled via Settings.
@@ -758,33 +738,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
         cancelled = true;
       };
     }, [projectId, composerEngaged]);
-
-    useEffect(() => {
-      if (!composerEngaged) return;
-      let cancelled = false;
-      void fetchConnectorCatalogSnapshot().then((rows) => {
-        if (cancelled) return;
-        setConnectors(rows.filter((connector) => connector.status === 'connected'));
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, [composerEngaged]);
-
-    useEffect(() => {
-      if (!composerEngaged) return;
-      let cancelled = false;
-      async function refreshConnectors() {
-        const rows = await fetchConnectorCatalogSnapshot({ refreshDiscovery: true });
-        if (cancelled) return;
-        setConnectors(rows.filter((connector) => connector.status === 'connected'));
-      }
-      const stopListening = listenForConnectorsChanged(() => void refreshConnectors());
-      return () => {
-        cancelled = true;
-        stopListening();
-      };
-    }, [composerEngaged]);
 
     useEffect(() => {
       const inlinePlugin = inlineBackedPluginRef.current;
@@ -2839,19 +2792,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                   resource_kind: PLUS_SUBMENU_RESOURCE_KIND[submenu],
                 });
               }}
-              connectors={connectors}
-              onPickConnector={(connector) => {
-                trackComposerBar({
-                  element: 'plus_pick',
-                  resource_kind: 'connector',
-                  resource_id: connector.id,
-                });
-                insertConnectorMention(connector);
-              }}
-              onAddConnector={() => {
-                trackComposerBar({ element: 'plus_add', resource_kind: 'connector' });
-                onOpenConnectors?.();
-              }}
               plugins={pluginsForComposer}
               onPickPlugin={(record) => {
                 trackComposerBar({
@@ -2873,19 +2813,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                   resource_id: skill.id,
                 });
                 void insertSkillMention(skill);
-              }}
-              mcpServers={enabledMcpServers}
-              onPickMcp={(server) => {
-                trackComposerBar({
-                  element: 'plus_pick',
-                  resource_kind: 'mcp',
-                  resource_id: server.id,
-                });
-                insertMcpMention(server);
-              }}
-              onAddMcp={() => {
-                trackComposerBar({ element: 'plus_add', resource_kind: 'mcp' });
-                onOpenMcpSettings?.();
               }}
               onAttachFiles={() => {
                 trackChatPanelClick(analytics.track, {
@@ -5311,8 +5238,6 @@ function MentionPopover({
     { id: 'tabs', label: t('chat.mentionTabTabs') },
     { id: 'plugins', label: t('chat.mentionTabPlugins') },
     { id: 'skills', label: t('chat.mentionTabSkills') },
-    { id: 'mcp', label: t('chat.mentionTabMcp') },
-    { id: 'connectors', label: t('chat.mentionTabConnectors') },
   ];
   const showTabs = tab === 'all' || tab === 'tabs';
   const showFiles = tab === 'all' || tab === 'files';

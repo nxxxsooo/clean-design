@@ -10,20 +10,12 @@ import { deriveUploadCohort } from './analytics/upload-tracking';
 import { setPendingDesignSystemCreateEntry } from './analytics/ds-create-entry';
 import { detectClientType } from './analytics/identity';
 import {
-  stashOnboardingEntryForProject,
-  type OnboardingEntry,
-} from './onboarding/onboarding-entry';
-import {
-  deriveConfigureGlobals,
   projectKindFromMetadataToTracking,
   fidelityToTracking,
 } from '@open-design/contracts/analytics';
-import type { AmrModelsResponse, ChatSessionMode, RunContextSelection } from '@open-design/contracts';
+import type { ChatSessionMode, RunContextSelection } from '@open-design/contracts';
 import { DEFAULT_UNSELECTED_SCENARIO_PLUGIN_ID } from '@open-design/contracts';
 import { EntryView } from './components/EntryView';
-import type { IntegrationTab } from './components/IntegrationsView';
-import { MarketplaceView } from './components/MarketplaceView';
-import { PluginDetailView } from './components/PluginDetailView';
 import type { CreateInput, ImportClaudeDesignOutcome } from './components/NewProjectPanel';
 import { MemoryToast } from './components/MemoryToast';
 import { Toast } from './components/Toast';
@@ -49,7 +41,6 @@ import {
   type SettingsSection,
   type SettingsHighlight,
 } from './components/SettingsDialog';
-import { PrivacyConsentModal } from './components/PrivacyConsentModal';
 import {
   daemonIsLive,
   fetchAppVersionInfo,
@@ -62,22 +53,16 @@ import {
   uploadProjectFiles,
   replaceProjectWorkingDir,
 } from './providers/registry';
-import { openFirstPartyExternalLinkFromClick } from './first-party-external-link';
 import {
   RUNS_CHANGED_EVENT,
-  fetchAmrModels,
-  fetchVelaLoginStatus,
   listProjectRuns,
-  type VelaLoginStatus,
 } from './providers/daemon';
-import { AMR_LOGIN_STATUS_EVENT } from './components/amrLoginPolling';
 import { navigate, useRoute } from './router';
 import {
   fetchDaemonConfig,
   DEFAULT_PET,
   fetchMediaProvidersFromDaemon,
   hasAnyConfiguredProvider,
-  fetchComposioConfigFromDaemon,
   loadConfig,
   mergeDaemonConfig,
   mergeDaemonMediaProviders,
@@ -91,14 +76,10 @@ import { createSilentUpdatePreferenceWriter } from './state/silent-update-prefer
 import { applyAppearanceToDocument } from './state/appearance';
 import { protectConfigCredentials } from './state/credentials';
 import { isMacPlatform } from './utils/platform';
-import {
-  amrArtifactUpgradeHomeMockOffer,
-  type AmrArtifactUpgradeHomeOffer,
-} from './runtime/amr-artifact-upgrade';
+import { isVisibleLocalCliAgent } from './utils/visibleAgents';
 import {
   createDesignSystemProjectFromProject,
   createProject,
-  createPluginShareProject,
   deleteProject as deleteProjectApi,
   duplicateProject,
   getProject,
@@ -110,10 +91,6 @@ import {
   patchProject,
 } from './state/projects';
 import { useModalWindowDragGuard } from './hooks/useModalWindowDragGuard';
-import type {
-  PluginShareAction,
-  PluginShareProjectOutcome,
-} from './state/projects';
 import type { OpenDesignHostProjectImportSuccess } from '@open-design/host';
 import { useI18n } from './i18n';
 import { liveArtifactTabId } from './types';
@@ -144,20 +121,13 @@ type AppCreateProjectInput = Omit<CreateInput, 'metadata'> & {
   initialRunContext?: RunContextSelection | null;
   conversationMode?: ChatSessionMode;
   autoSendFirstMessage?: boolean;
-  /** The home submit already ran the Clean Design Cloud balance gate (and the
-   *  user acknowledged any soft warning), so the project's first auto-send
-   *  must not re-gate — re-prompting a decision the user just made. */
-  amrGatePrechecked?: boolean;
   requestId?: string;
   pendingFiles?: File[];
   userWorkingDirToken?: string;
   linkedDirs?: string[] | null;
-  onboardingEntry?: OnboardingEntry;
 };
 
 const APP_CONFIG_CHANGED_EVENT = 'open-design:app-config-changed';
-const AMR_AGENT_ID = 'amr';
-const AMR_PROFILE_ENV_KEY = 'OPEN_DESIGN_AMR_PROFILE';
 const AGENT_FOCUS_REFRESH_THROTTLE_MS = 10_000;
 
 export function shouldSyncMediaProvidersOnSave(
@@ -180,11 +150,6 @@ function normalizeSavedComposioConfig(config: AppConfig['composio']): AppConfig[
   return { ...(config ?? {}) };
 }
 
-function amrProfileForConfig(config: AppConfig): string | null {
-  const profile = config.agentCliEnv?.[AMR_AGENT_ID]?.[AMR_PROFILE_ENV_KEY];
-  return typeof profile === 'string' && profile ? profile : null;
-}
-
 function mergeLinkedDirsIntoMetadata(
   metadata: ProjectMetadata | undefined,
   linkedDirs?: string[] | null,
@@ -196,29 +161,6 @@ function mergeLinkedDirsIntoMetadata(
     ...baseMetadata,
     linkedDirs: Array.from(new Set([...(baseMetadata.linkedDirs ?? []), ...nextDirs])),
   };
-}
-
-function sameAgentModelChoice(
-  left: AgentModelChoice | undefined,
-  right: AgentModelChoice | undefined,
-): boolean {
-  return (left?.model ?? null) === (right?.model ?? null)
-    && (left?.reasoning ?? null) === (right?.reasoning ?? null);
-}
-
-function clearStaleAmrModelChoiceOnProfileChange(
-  previous: AppConfig,
-  next: AppConfig,
-): AppConfig {
-  if (amrProfileForConfig(previous) === amrProfileForConfig(next)) return next;
-
-  const previousChoice = previous.agentModels?.[AMR_AGENT_ID];
-  const nextChoice = next.agentModels?.[AMR_AGENT_ID];
-  if (!nextChoice || !sameAgentModelChoice(previousChoice, nextChoice)) return next;
-
-  const nextAgentModels = { ...(next.agentModels ?? {}) };
-  delete nextAgentModels[AMR_AGENT_ID];
-  return { ...next, agentModels: nextAgentModels };
 }
 
 type ProjectListRequest = {
@@ -290,24 +232,7 @@ export function resolveSettingsCloseConfig(
   return base.onboardingCompleted ? base : { ...base, onboardingCompleted: true };
 }
 
-function mergeAmrModelsIntoAgents(
-  agents: AgentInfo[],
-  amrModels: AmrModelsResponse | null,
-): AgentInfo[] {
-  if (!amrModels || amrModels.models.length === 0) return agents;
-  return agents.map((agent) => {
-    if (agent.id !== 'amr') return agent;
-    const shouldPreferAgentModels =
-      amrModels.source === 'preset' &&
-      Array.isArray(agent.models) &&
-      agent.models.length > 0;
-    if (shouldPreferAgentModels) return agent;
-    return { ...agent, models: amrModels.models, modelsSource: 'live' };
-  });
-}
-
 const CANONICAL_AGENT_ORDER = [
-  'amr',
   'claude',
   'codex',
   'devin',
@@ -337,6 +262,7 @@ const CANONICAL_AGENT_ORDER_INDEX = new Map<string, number>(
 
 function orderAgentsByRegistry(agents: AgentInfo[]): AgentInfo[] {
   return agents
+    .filter(isVisibleLocalCliAgent)
     .map((agent, index) => ({ agent, index }))
     .sort((left, right) => {
       const leftRank =
@@ -352,6 +278,9 @@ function orderAgentsByRegistry(agents: AgentInfo[]): AgentInfo[] {
 }
 
 function upsertAgent(agents: AgentInfo[], agent: AgentInfo): AgentInfo[] {
+  if (!isVisibleLocalCliAgent(agent)) {
+    return agents.filter((item) => item.id !== agent.id);
+  }
   const index = agents.findIndex((item) => item.id === agent.id);
   if (index === -1) return [...agents, agent];
   const next = agents.slice();
@@ -389,15 +318,6 @@ function AppInner() {
   const iframeKeepAlivePool = useIframeKeepAlivePool();
   const clientType = useMemo(() => detectClientType(), []);
   useModalWindowDragGuard();
-  useEffect(() => {
-    const onFirstPartyExternalLink = (event: MouseEvent) => openFirstPartyExternalLinkFromClick(
-      event,
-      (url) => { void openExternalUrl(url); },
-    );
-    // React handlers append AMR attribution while the event bubbles; bridge the final URL afterwards.
-    document.addEventListener('click', onFirstPartyExternalLink);
-    return () => document.removeEventListener('click', onFirstPartyExternalLink);
-  }, []);
   // Observability marker. `apps/web/src/observability/white-screen.ts`
   // keys its "app actually mounted" success condition on this attribute
   // because the dynamic-import loading shell (`<div class="od-loading-shell">
@@ -418,14 +338,6 @@ function AppInner() {
   latestPersistedConfigRef.current = config;
   const settingsDraftConfigRef = useRef<AppConfig | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [amrArtifactUpgradeHomeMockConfig] = useState<AmrArtifactUpgradeHomeOffer | null>(
-    () => process.env.NODE_ENV === 'development' && typeof window !== 'undefined'
-      ? amrArtifactUpgradeHomeMockOffer(window.location.search)
-      : null,
-  );
-  const amrArtifactUpgradeHomeMock = amrArtifactUpgradeHomeMockConfig !== null;
-  const [amrArtifactUpgradeHomeOffer, setAmrArtifactUpgradeHomeOffer] =
-    useState<AmrArtifactUpgradeHomeOffer | null>(() => amrArtifactUpgradeHomeMockConfig);
   // Surfaced when a Home-picked working dir could not be applied to a freshly
   // created project (expired/invalid desktop token, daemon rejection). Without
   // this the failure was swallowed and the user believed their folder was in
@@ -435,14 +347,10 @@ function AppInner() {
   const [settingsWelcome, setSettingsWelcome] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSection>('execution');
   const [settingsHighlight, setSettingsHighlight] = useState<SettingsHighlight>(null);
-  const [integrationInitialTab, setIntegrationInitialTab] = useState<IntegrationTab>('mcp');
   const [daemonLive, setDaemonLive] = useState(false);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
-  const amrModelsRef = useRef<AmrModelsResponse | null>(null);
-  const amrPollGenerationRef = useRef(0);
   const agentStreamRequestSeqRef = useRef(0);
   const agentFocusRefreshLastRunRef = useRef(Date.now());
-  const [amrPollRestartToken, setAmrPollRestartToken] = useState(0);
   const [providerModelsCache, setProviderModelsCache] = useState<
     Record<string, ProviderModelOption[]>
   >({});
@@ -505,15 +413,6 @@ function AppInner() {
   // gate silent-update default seeding: a failed/null fetch must not be treated
   // as "no preference yet" or we would overwrite a daemon-backed opt-out.
   const [daemonAppConfigReady, setDaemonAppConfigReady] = useState(false);
-  // Narrower flag dedicated to the Composio API key hydration. The key is
-  // persisted by the daemon (and only reflected back via apiKeyConfigured
-  // + apiKeyTail), so after a dev-server restart there is a window where
-  // the dialog can render an empty Composio input even though a saved key
-  // exists. Settings → Connectors uses this to render a skeleton over the
-  // input + buttons instead of an empty input that the user might
-  // mistake for "no key saved" — and to disable Save/Clear so a misclick
-  // can't overwrite the saved state with `''` before hydration lands.
-  const [composioConfigLoading, setComposioConfigLoading] = useState(true);
   const route = useRoute();
   const analytics = useAnalytics();
 
@@ -524,11 +423,6 @@ function AppInner() {
 
   const isCurrentAgentStreamRequest = useCallback((requestId: number) => {
     return agentStreamRequestSeqRef.current === requestId;
-  }, []);
-
-  const restartAmrPolling = useCallback(() => {
-    amrPollGenerationRef.current += 1;
-    setAmrPollRestartToken((current) => current + 1);
   }, []);
 
   // v2 schema removed the standalone `app_launch` event; the initial
@@ -634,99 +528,6 @@ function AppInner() {
     return true;
   }, []);
 
-  // Propagate the Privacy toggle through to PostHog without a reload —
-  // posthog-js's opt_out_capturing flips a localStorage flag that makes
-  // every subsequent capture() a no-op. When the user opts back in we
-  // call opt_in_capturing to resume.
-  useEffect(() => {
-    analytics.setConsent(config.telemetry?.metrics === true);
-  }, [analytics.setConsent, config.telemetry?.metrics]);
-
-  // Sync PostHog's distinct_id with the anonymous installationId, both on
-  // first opt-in (when the daemon stamps a fresh id) and on Delete-my-data
-  // rotation (when PrivacySection.tsx generates a new one). posthog-js
-  // caches the previous id in localStorage; identify() alone would stitch
-  // the two ids together, so applyIdentity() does reset() first to
-  // guarantee the new session is fully decoupled from the deleted one.
-  useEffect(() => {
-    if (config.telemetry?.metrics !== true) return;
-    analytics.setIdentity(config.installationId ?? null);
-  }, [analytics.setIdentity, config.installationId, config.telemetry?.metrics]);
-
-  // App-level AMR sign-in state — declared here because the configure
-  // globals effect below reads it; the sync effects live next to the
-  // other AMR plumbing further down.
-  const [amrLoginStatus, setAmrLoginStatus] = useState<VelaLoginStatus | null>(null);
-  const resolvedAmrPlan =
-    amrLoginStatus?.account?.plan?.trim()
-    || amrLoginStatus?.user?.plan?.trim()
-    || null;
-  // Child surfaces report status snapshots, not login events. Deduplicate the
-  // signed-in transition here: restarting the model poll for every Settings
-  // snapshot updates `agents`, which makes Settings fetch status again and
-  // creates a status -> models -> agents request loop.
-  const amrLoginStatusRef = useRef<VelaLoginStatus | null>(null);
-  const applyAmrLoginStatus = useCallback((
-    status: VelaLoginStatus,
-    options: { forceModelRefresh?: boolean; restartOnSignIn?: boolean } = {},
-  ) => {
-    const wasLoggedIn = amrLoginStatusRef.current?.loggedIn === true;
-    amrLoginStatusRef.current = status;
-    setAmrLoginStatus(status);
-    if (
-      status.loggedIn === true
-      && (
-        options.forceModelRefresh === true
-        || (options.restartOnSignIn === true && !wasLoggedIn)
-      )
-    ) {
-      restartAmrPolling();
-    }
-  }, [restartAmrPolling]);
-
-  // v2 analytics requires every event to carry the configure-state
-  // triplet (has_available_configure_cli / configure_type /
-  // configure_availability). We push it into the PostHog global register
-  // whenever the user's execution-mode config or the detected agent list
-  // changes; the next capture inherits the fresh values, so dashboards
-  // can segment by execution setup without per-helper boilerplate.
-  //
-  // Gated on `agentsLoading` so the cold-start probe (`fetchAgentsStream()`
-  // lands asynchronously after this effect's first run) does not stamp
-  // the first home/projects/plugins page_view with
-  // has_available_configure_cli=false / configure_availability=unavailable
-  // on machines that DO have an installed CLI. While the probe is in
-  // flight we leave the boot defaults ('unknown'/'unknown') in place,
-  // matching what the helper would return for an empty agent list with
-  // no mode pinned.
-  useEffect(() => {
-    if (agentsLoading) return;
-    const byokConfigured = (() => {
-      const protocols = config.apiProtocolConfigs;
-      if (!protocols) return Boolean(config.apiKey?.trim());
-      return Object.values(protocols).some(
-        (cfg) => Boolean(cfg?.apiKey?.trim()),
-      );
-    })();
-    const globals = deriveConfigureGlobals({
-      mode: config.mode,
-      agentId: config.agentId,
-      agents: agents.map((a) => ({ id: a.id, available: a.available })),
-      byokConfigured,
-      amrAuthorized: amrLoginStatus?.loggedIn === true,
-    });
-    analytics.setConfigureGlobals(globals);
-  }, [
-    analytics.setConfigureGlobals,
-    agentsLoading,
-    amrLoginStatus,
-    config.mode,
-    config.agentId,
-    config.apiKey,
-    config.apiProtocolConfigs,
-    agents,
-  ]);
-
   // Sync theme preference to the <html> element so CSS variables pick it up.
   // useLayoutEffect (vs useEffect) fires before the browser paints, so a
   // live theme switch in Settings applies atomically — no 1-frame flash of
@@ -737,130 +538,6 @@ function AppInner() {
       accentColor: config.accentColor,
     });
   }, [config.theme, config.accentColor]);
-
-  // Tell the daemon what the user is currently looking at, so the MCP
-  // server can surface it as `get_active_context` to a coding agent in
-  // another repo. Best-effort fire-and-forget; the daemon holds it in
-  // memory with a short TTL and the MCP layer falls back to
-  // {active:false} if this hasn't run.
-  const activeProjectId = route.kind === 'project' ? route.projectId : null;
-  const activeFileName = route.kind === 'project' ? route.fileName : null;
-  // Gate the privacy banner on three things:
-  //   1. Daemon config has hydrated (privacyDecisionAt is daemon-owned).
-  //   2. The user has not yet made a privacy decision.
-  //   3. Onboarding is complete (Skip and design-system creation both flip
-  //      onboardingCompleted to true; see handleCompleteOnboarding wiring).
-  // Once onboarding is done the banner is allowed on any route — including
-  // the project view the design-system finish path drops the user into, so
-  // they can read and acknowledge the disclosure while the first generation
-  // is running. Settings is irrelevant to visibility; the banner sits above
-  // the modal-backdrop layer in index.css so opening Settings does not hide
-  // it.
-  const showPrivacyConsent = false;
-  useEffect(() => {
-    const body = activeProjectId
-      ? { projectId: activeProjectId, fileName: activeFileName }
-      : { active: false };
-    fetch('/api/active', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }).catch(() => {
-      // Daemon down or transient network — not worth surfacing.
-    });
-  }, [activeProjectId, activeFileName]);
-
-  useEffect(() => {
-    if (!daemonLive) return;
-    let cancelled = false;
-    let timer: number | null = null;
-    const pollGeneration = amrPollGenerationRef.current + 1;
-    amrPollGenerationRef.current = pollGeneration;
-    const pollDelayMs = 1_000;
-    const maxPresetPolls = 10;
-    let presetPolls = 0;
-
-    const applyAmrModels = async () => {
-      const result = await fetchAmrModels();
-      if (
-        cancelled ||
-        amrPollGenerationRef.current !== pollGeneration ||
-        !result ||
-        !Array.isArray(result.models) ||
-        result.models.length === 0
-      ) {
-        return;
-      }
-      amrModelsRef.current = result;
-      setAgents((current) => mergeAmrModelsIntoAgents(current, result));
-      const shouldPollPreset =
-        result.source === 'preset' &&
-        !result.remoteError &&
-        presetPolls < maxPresetPolls;
-      if (shouldPollPreset) {
-        presetPolls += 1;
-        timer = window.setTimeout(() => {
-          void applyAmrModels();
-        }, pollDelayMs);
-      }
-    };
-
-    void applyAmrModels();
-    return () => {
-      cancelled = true;
-      if (timer !== null) window.clearTimeout(timer);
-    };
-  }, [amrPollRestartToken, daemonLive]);
-
-  // App-level AMR sign-in state. Feeds two analytics globals: the
-  // `amr` configure_type bucket (deriveConfigureGlobals below) and the
-  // `user_id` public param (the AMR account id is the only join key
-  // between this PostHog project and the AMR-side one). Child surfaces
-  // push status changes up via onAmrLoginStatusChange; the global
-  // AMR_LOGIN_STATUS_EVENT covers logins finishing in surfaces that
-  // unmounted before their poll settled.
-  useEffect(() => {
-    let cancelled = false;
-    const sync = async (
-      options: { refresh?: boolean } = {},
-      restartOnSignIn = false,
-    ) => {
-      const status = await fetchVelaLoginStatus(options);
-      if (!cancelled && status) {
-        applyAmrLoginStatus(status, {
-          forceModelRefresh: options.refresh === true,
-          restartOnSignIn,
-        });
-      }
-    };
-    void sync();
-    const onStatusEvent = () => {
-      void sync({}, true);
-    };
-    const onReturnToApp = () => {
-      if (document.visibilityState === 'hidden') return;
-      void sync({ refresh: true });
-    };
-    window.addEventListener(AMR_LOGIN_STATUS_EVENT, onStatusEvent);
-    window.addEventListener('focus', onReturnToApp);
-    document.addEventListener('visibilitychange', onReturnToApp);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(AMR_LOGIN_STATUS_EVENT, onStatusEvent);
-      window.removeEventListener('focus', onReturnToApp);
-      document.removeEventListener('visibilitychange', onReturnToApp);
-    };
-  }, [applyAmrLoginStatus, daemonLive]);
-
-  useEffect(() => {
-    analytics.setUserId(
-      amrLoginStatus?.loggedIn === true ? amrLoginStatus.user?.id ?? null : null,
-    );
-  }, [analytics.setUserId, amrLoginStatus]);
-
-  const handleAmrLoginStatusChange = useCallback((status: VelaLoginStatus | null) => {
-    if (status) applyAmrLoginStatus(status, { restartOnSignIn: true });
-  }, [applyAmrLoginStatus]);
 
   // Bootstrap — detect daemon, then fan out independent fetches so each
   // entry-view tab can render the moment its own data lands. Earlier this
@@ -884,10 +561,6 @@ function AppInner() {
         setPromptTemplatesLoading(false);
         setDaemonConfigLoaded(true);
         setDaemonAppConfigReady(false);
-        // Composio hydration also depends on the daemon. With no daemon
-        // we just keep whatever localStorage already held; drop the
-        // skeleton so the Settings → Connectors input reflects state.
-        setComposioConfigLoading(false);
         return;
       }
 
@@ -896,22 +569,12 @@ function AppInner() {
         signal: agentStreamAbort.signal,
         onAgent: (agent) => {
           if (cancelled || !isCurrentAgentStreamRequest(agentRequestId)) return;
-          setAgents((current) =>
-            mergeAmrModelsIntoAgents(
-              upsertAgent(current, agent),
-              amrModelsRef.current,
-            ),
-          );
+          setAgents((current) => upsertAgent(current, agent));
         },
       })
         .then((list) => {
           if (cancelled || !isCurrentAgentStreamRequest(agentRequestId)) return;
-          setAgents(
-            mergeAmrModelsIntoAgents(
-              orderAgentsByRegistry(list),
-              amrModelsRef.current,
-            ),
-          );
+          setAgents(orderAgentsByRegistry(list));
         })
         .catch((err) => {
           if (
@@ -980,17 +643,12 @@ function AppInner() {
         setAppVersionInfo(info);
       });
 
-      // Daemon-persisted config + composio config + media provider config land
-      // together so the welcome-modal decision and daemon-backed settings
-      // apply in one merge, avoiding a flash where local-only state is shown
-      // before daemon overrides it.
+      // Daemon-persisted config and local media-provider config land together.
       void Promise.all([
         fetchDaemonConfig(),
-        fetchComposioConfigFromDaemon(),
         fetchMediaProvidersFromDaemon(),
-      ]).then(([
+      ]).then(async ([
         daemonConfig,
-        daemonComposioConfig,
         daemonMediaProvidersResult,
       ]) => {
         if (cancelled) return;
@@ -1017,17 +675,12 @@ function AppInner() {
           baseConfig.mediaProviders,
           daemonMediaProvidersLoaded,
         );
-        const next = mergeDaemonMediaProviders(
-          clearStaleAmrModelChoiceOnProfileChange(
-            baseConfig,
-            mergeDaemonConfig(baseConfig, daemonConfig),
-          ),
+        const merged = mergeDaemonMediaProviders(
+          mergeDaemonConfig(baseConfig, daemonConfig),
           daemonMediaProvidersLoaded,
         );
-        const hasLocalComposioKey = Boolean(next.composio?.apiKey?.trim());
-        if (!hasLocalComposioKey && daemonComposioConfig) {
-          next.composio = daemonComposioConfig;
-        }
+        const next = await protectConfigCredentials(merged, baseConfig);
+        if (cancelled) return;
         saveConfig(next);
         if (
           daemonMediaProvidersResult.status === 'ok' &&
@@ -1042,28 +695,20 @@ function AppInner() {
         // endpoint. If daemon already had values the merge above used them;
         // writing back is idempotent and keeps both sides in sync.
         void syncConfigToDaemon(next);
-        void syncComposioConfigToDaemon(next.composio);
         latestPersistedConfigRef.current = next;
         setConfig(next);
-
-        // Route first-run users through the global onboarding panel.
-        // The onboarding panel and the privacy banner have independent
-        // lifecycles: onboarding keys off `onboardingCompleted`, the
-        // banner keys off `privacyDecisionAt`. They may coexist on the
-        // first launch; the banner sits above the modal layer so it
-        // stays actionable regardless of the active view.
-        if (!next.onboardingCompleted) {
-          navigate({ kind: 'home', view: 'onboarding' }, { replace: true });
-        }
         setDaemonConfigLoaded(true);
         // Only a non-null GET payload means we actually observed daemon prefs.
         setDaemonAppConfigReady(daemonConfig != null);
-        // Composio key hydration is part of this same daemon-config
-        // fetch — by the time we land here the daemon has either
-        // returned the saved-key shape (apiKeyConfigured + tail) or
-        // it errored and we kept whatever localStorage already held. Either
-        // way it is safe to drop the skeleton.
-        setComposioConfigLoading(false);
+      }).catch(() => {
+        if (cancelled) return;
+        // Do not persist or sync plaintext fallback config when secure
+        // credential migration is unavailable.
+        setDaemonMediaProviders(null);
+        setDaemonMediaProvidersFetchState('error');
+        setMediaProvidersNotice(t('settings.mediaProviderLoadError'));
+        setDaemonConfigLoaded(true);
+        setDaemonAppConfigReady(false);
       });
     })();
     return () => {
@@ -1083,17 +728,8 @@ function AppInner() {
   // probe — by the time this runs, daemonConfig has already overlaid the
   // user's previous choice, so we only fill an empty slot.
   //
-  // First-run onboarding is the one time we must NOT do this: the onboarding
-  // flow is the sole authority for the initial agent pick (AMR is the
-  // recommended default there), and AMR (vela) detection is asynchronous. If
-  // this fallback fires during onboarding while AMR is still being detected it
-  // snaps the slot to the registry-first *detected* agent (Claude) and
-  // persists it to the daemon, which then races and clobbers the user's AMR
-  // selection on the next launch. Gate on onboardingCompleted so this only
-  // backfills an empty slot for returning users.
   useEffect(() => {
     if (!daemonConfigLoaded || agentsLoading) return;
-    if (config.onboardingCompleted !== true) return;
     if (config.agentId) return;
     const firstAvailable = agents.find((a) => a.available);
     if (!firstAvailable) return;
@@ -1304,42 +940,6 @@ function AppInner() {
     settingsDraftConfigRef.current = draft;
   }, []);
 
-  const handlePrivacyConsentChoice = useCallback((share: boolean) => {
-    const base = settingsDraftConfigRef.current ?? latestPersistedConfigRef.current;
-    const installationId = share
-      ? base.installationId ?? generateInstallationIdSafe()
-      : null;
-    void handleConfigPersist({
-      ...base,
-      installationId,
-      privacyDecisionAt: Date.now(),
-      telemetry: {
-        ...(base.telemetry ?? {}),
-        metrics: share,
-        content: share,
-      },
-    });
-  }, [handleConfigPersist]);
-
-  /**
-   * Explicit Composio API-key save. Called from the section-local
-   * "Save key" button so secrets never ride the autosave keystroke
-   * loop. Once the daemon confirms, we normalize the saved config
-   * (strip the secret, store apiKeyConfigured + apiKeyTail) and feed
-   * it back into local state so the saved-key badge appears.
-   */
-  const handleConfigPersistComposioKey = useCallback(
-    async (composio: AppConfig['composio']) => {
-      const next = await persistComposioConfigChange(config, composio);
-      setConfig((curr) => {
-        const merged: AppConfig = { ...curr, composio: next.composio };
-        saveConfig(merged);
-        return merged;
-      });
-    },
-    [config],
-  );
-
   const handleModeChange = useCallback(
     (mode: AppConfig['mode']) => {
       const next = { ...latestPersistedConfigRef.current, mode };
@@ -1443,11 +1043,10 @@ function AppInner() {
   const refreshAgents = useCallback(
     async (options?: { throwOnError?: boolean; agentCliEnv?: AppConfig['agentCliEnv'] }) => {
       if (options && Object.prototype.hasOwnProperty.call(options, 'agentCliEnv')) {
-        const nextConfig = clearStaleAmrModelChoiceOnProfileChange(config, {
+        const nextConfig = {
           ...config,
           agentCliEnv: options.agentCliEnv ?? {},
-        });
-        amrModelsRef.current = null;
+        };
         saveConfig(nextConfig);
         await syncConfigToDaemon(nextConfig);
         setConfig(nextConfig);
@@ -1458,17 +1057,12 @@ function AppInner() {
         const next = await fetchAgentsStream({
           onAgent: (agent) => {
             if (!isCurrentAgentStreamRequest(agentRequestId)) return;
-            setAgents((current) =>
-              mergeAmrModelsIntoAgents(
-                upsertAgent(current, agent),
-                amrModelsRef.current,
-              ),
-            );
+            setAgents((current) => upsertAgent(current, agent));
           },
         });
         const ordered = orderAgentsByRegistry(next);
         if (isCurrentAgentStreamRequest(agentRequestId)) {
-          setAgents(mergeAmrModelsIntoAgents(ordered, amrModelsRef.current));
+          setAgents(ordered);
           setAgentsLoading(false);
         }
         return ordered;
@@ -1509,21 +1103,16 @@ function AppInner() {
   useEffect(() => {
     const handleAppConfigChanged = () => {
       void fetchDaemonConfig().then((daemonConfig) => {
-        const next = clearStaleAmrModelChoiceOnProfileChange(
-          latestPersistedConfigRef.current,
-          mergeDaemonConfig(latestPersistedConfigRef.current, daemonConfig),
-        );
+        const next = mergeDaemonConfig(latestPersistedConfigRef.current, daemonConfig);
         latestPersistedConfigRef.current = next;
         saveConfig(next);
         setConfig(next);
-        amrModelsRef.current = null;
-        restartAmrPolling();
         void refreshAgents();
       });
     };
     window.addEventListener(APP_CONFIG_CHANGED_EVENT, handleAppConfigChanged);
     return () => window.removeEventListener(APP_CONFIG_CHANGED_EVENT, handleAppConfigChanged);
-  }, [refreshAgents, restartAmrPolling]);
+  }, [refreshAgents]);
 
   const handleCreateProject = useCallback(
     async (
@@ -1689,16 +1278,6 @@ function AppInner() {
             `od:auto-send-first:${result.project.id}`,
             '1',
           );
-          if (input.amrGatePrechecked) {
-            window.sessionStorage.setItem(
-              `od:auto-send-amr-gate-ok:${result.project.id}`,
-              '1',
-            );
-          } else {
-            window.sessionStorage.removeItem(
-              `od:auto-send-amr-gate-ok:${result.project.id}`,
-            );
-          }
           if (firstMessageAttachments.length > 0) {
             window.sessionStorage.setItem(
               `od:auto-send-attachments:${result.project.id}`,
@@ -1723,23 +1302,6 @@ function AppInner() {
           /* sessionStorage may be unavailable (e.g. SSR / private mode); fall
              back to manual send. */
         }
-      }
-      // Home recommendation handoff: now that the project exists and its id is
-      // known, stash the onboarding entry keyed by that id. Studio consumes it
-      // by the same id on mount. Keying by id (instead of a single global slot
-      // written before create) removes the race where opening an unrelated
-      // project mid-create could steal the personalized funnel context, and
-      // means a failed/aborted create leaves nothing behind.
-      if (input.onboardingEntry) {
-        // Cache the prefilled seed prompt WITH the entry so the first-prompt
-        // funnel's `has_prefilled_prompt` comparison base survives a
-        // reopen-before-send (project.pendingPrompt is wiped on first mount).
-        stashOnboardingEntryForProject(result.project.id, {
-          ...input.onboardingEntry,
-          ...(derivedPendingPrompt
-            ? { seedPrompt: derivedPendingPrompt.trim() }
-            : {}),
-        });
       }
       const project = result.appliedPluginSnapshotId
         ? {
@@ -1840,44 +1402,6 @@ function AppInner() {
         conversationId: result.conversationId,
         fileName: null,
       });
-    },
-    [rememberLocalProject],
-  );
-
-  const handleCreatePluginShareProject = useCallback(
-    async (
-      pluginId: string,
-      action: PluginShareAction,
-      locale?: string,
-    ): Promise<PluginShareProjectOutcome> => {
-      const outcome = await createPluginShareProject(pluginId, action, locale);
-      if (!outcome.ok) return outcome;
-      try {
-        window.sessionStorage.setItem(
-          `od:auto-send-first:${outcome.project.id}`,
-          '1',
-        );
-      } catch {
-        // If sessionStorage is unavailable, the project still opens with
-        // the prepared prompt in the composer.
-      }
-      const project = outcome.appliedPluginSnapshotId
-        ? {
-            ...outcome.project,
-            appliedPluginSnapshotId: outcome.appliedPluginSnapshotId,
-          }
-        : outcome.project;
-      rememberLocalProject(project.id);
-      setProjects((curr) => [
-        project,
-        ...curr.filter((p) => p.id !== project.id),
-      ]);
-      navigate({
-        kind: 'project',
-        projectId: project.id,
-        fileName: null,
-      });
-      return outcome;
     },
     [rememberLocalProject],
   );
@@ -2215,29 +1739,15 @@ function AppInner() {
     section: SettingsSection = 'execution',
     opts?: { highlight?: SettingsHighlight },
   ) => {
-    if (section === 'composio' || section === 'mcpClient' || section === 'integrations') {
-      setIntegrationInitialTab(
-        section === 'composio'
-          ? 'connectors'
-          : section === 'mcpClient'
-            ? 'mcp'
-            : 'use-everywhere',
-      );
-      navigate({ kind: 'home', view: 'integrations' });
-      return;
-    }
+    const localSection =
+      section === 'composio' || section === 'mcpClient' || section === 'integrations'
+        ? 'execution'
+        : section;
     setSettingsWelcome(false);
-    setSettingsInitialSection(section);
+    setSettingsInitialSection(localSection);
     setSettingsHighlight(opts?.highlight ?? null);
     setSettingsOpen(true);
   }, []);
-
-  // Entry point from the failed-run AMR nudge: open Settings on the execution
-  // section and flag the AMR agent card for a one-shot scroll-into-view +
-  // highlight (and a sign-in coachmark when not yet authorized).
-  const openAmrSettings = useCallback(() => {
-    openSettings('execution', { highlight: 'amr' });
-  }, [openSettings]);
 
   const openPetSettings = useCallback(() => {
     setSettingsWelcome(false);
@@ -2245,31 +1755,6 @@ function AppInner() {
     setSettingsOpen(true);
   }, []);
 
-  const openMcpSettings = useCallback(() => {
-    setIntegrationInitialTab('mcp');
-    navigate({ kind: 'home', view: 'integrations' });
-  }, []);
-
-  // The composer "+" menu's "add plugin" / "add connector" rows route to the
-  // home plugin-registry / connector-integration surfaces.
-  const openPluginRegistry = useCallback(() => {
-    navigate({ kind: 'home', view: 'plugins' });
-  }, []);
-
-  const openConnectorIntegrations = useCallback(() => {
-    setIntegrationInitialTab('connectors');
-    navigate({ kind: 'home', view: 'integrations' });
-  }, []);
-
-  const handleCompleteOnboarding = useCallback(() => {
-    const current = latestPersistedConfigRef.current;
-    if (current.onboardingCompleted) return;
-    const next: AppConfig = { ...current, onboardingCompleted: true };
-    latestPersistedConfigRef.current = next;
-    saveConfig(next);
-    void syncConfigToDaemon(next);
-    setConfig(next);
-  }, []);
 
   // Cmd+, (mac) / Ctrl+, (win/linux) opens Settings. Capture phase so we
   // beat the browser's default Preferences dialog. Platform-gated so
@@ -2392,27 +1877,8 @@ function AppInner() {
     [designSystems, config.disabledDesignSystems],
   );
 
-  // Phase 2B / spec §11.6 — marketplace deep UI dispatch. The
-  // /marketplace and /marketplace/:id routes render outside the
-  // EntryView / ProjectView split so the discovery surface stays
-  // independent of any active project.
   let appMain: ReactNode;
-  const pendingFirstRunOnboardingRoute =
-    route.kind === 'home' &&
-    route.view === 'home' &&
-    config.onboardingCompleted !== true &&
-    !daemonConfigLoaded;
-  if (pendingFirstRunOnboardingRoute) {
-    appMain = (
-      <div className="entry-shell entry-shell--no-header">
-        <CenteredLoader label={t('entry.loadingWorkspace')} />
-      </div>
-    );
-  } else if (route.kind === 'marketplace') {
-    appMain = <MarketplaceView />;
-  } else if (route.kind === 'marketplace-detail') {
-    appMain = <PluginDetailView pluginId={route.pluginId} />;
-  } else if (route.kind === 'design-system-create') {
+  if (route.kind === 'design-system-create') {
     appMain = (
       <DesignSystemCreationFlow
         onBack={() => navigate({ kind: 'home', view: 'design-systems' })}
@@ -2503,12 +1969,9 @@ function AppInner() {
         promptTemplates={promptTemplates}
         defaultDesignSystemId={config.designSystemId}
         agents={agents}
-        agentsLoading={agentsLoading}
         config={config}
         providerModelsCache={providerModelsCache}
         onProviderModelsCacheChange={setProviderModelsCache}
-        integrationInitialTab={integrationInitialTab}
-        composioConfigLoading={composioConfigLoading}
         daemonLive={daemonLive}
         onModeChange={handleModeChange}
         onAgentChange={handleAgentChange}
@@ -2527,7 +1990,6 @@ function AppInner() {
         projectsLoading={projectsLoading}
         promptTemplatesLoading={promptTemplatesLoading}
         onCreateProject={handleCreateProject}
-        onCreatePluginShareProject={handleCreatePluginShareProject}
         onImportClaudeDesign={handleImportClaudeDesign}
         onImportFolder={handleImportFolder}
         onImportFolderResponse={handleImportFolderResponse}
@@ -2544,9 +2006,7 @@ function AppInner() {
         }}
         onOpenDesignSystem={(id: string) => navigate({ kind: 'design-system-detail', designSystemId: id })}
         onDesignSystemsRefresh={refreshDesignSystems}
-        onPersistComposioKey={handleConfigPersistComposioKey}
         onOpenSettings={openSettings}
-        onCompleteOnboarding={handleCompleteOnboarding}
       />
     );
   }
@@ -2584,11 +2044,10 @@ function AppInner() {
           welcome={settingsWelcome}
           initialSection={settingsInitialSection}
           initialHighlight={settingsHighlight}
-          composioConfigLoading={composioConfigLoading}
           onPersist={handleConfigPersist}
           onSilentUpdatePreferenceChange={handleSilentUpdatePreferenceChange}
           onDraftChange={handleSettingsDraftChange}
-          onPersistComposioKey={handleConfigPersistComposioKey}
+          onPersistComposioKey={async () => undefined}
           onClose={() => {
             // Closing the dialog is the canonical "I'm done" gesture
             // now that there is no global Save button. We mark
@@ -2607,7 +2066,6 @@ function AppInner() {
             setSettingsHighlight(null);
           }}
           onRefreshAgents={refreshAgents}
-          onAmrLoginStatusChange={handleAmrLoginStatusChange}
           daemonMediaProviders={daemonMediaProviders}
           daemonMediaProvidersFetchState={daemonMediaProvidersFetchState}
           mediaProvidersNotice={mediaProvidersNotice}
@@ -2637,35 +2095,6 @@ function AppInner() {
           onDismiss={() => setProjectOpenError(null)}
         />
       ) : null}
-      {/* First-run privacy consent banner. It waits for daemon config
-          hydration because privacyDecisionAt is daemon-owned and stripped
-          from localStorage. It waits for `onboardingCompleted` so first-run
-          users see the welcome panel before the disclosure (Skip and
-          finish both flip the flag). Independent of Settings: z-index in
-          index.css sits above modal backdrops so opening Settings does
-          not hide the banner. */}
-      <AnimatePresence>
-      {showPrivacyConsent ? (
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 10, scale: 0.97 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-        >
-        <PrivacyConsentModal
-          onShare={() => {
-            // The banner owns only the privacy decision; it does not drive
-            // navigation. Choosing Share keeps the current anonymous identity
-            // when one already exists and enables the telemetry surface.
-            handlePrivacyConsentChoice(true);
-          }}
-          onDecline={() => {
-            handlePrivacyConsentChoice(false);
-          }}
-        />
-      </motion.div>
-      ) : null}
-      </AnimatePresence>
     </>
   );
 }

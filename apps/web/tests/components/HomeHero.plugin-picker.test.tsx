@@ -448,9 +448,9 @@ describe('HomeHero plugin picker', () => {
     expect(screen.getByRole('tab', { name: /design files/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /plugins/i })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /skills/i })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: /mcp/i })).toBeTruthy();
-    expect(screen.getByRole('tab', { name: /connectors/i })).toBeTruthy();
-    expect(screen.getByText('Search files, plugins, skills, MCP servers, and connectors.')).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: /mcp/i })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /connectors/i })).toBeNull();
+    expect(screen.getByText('Search files, plugins, and skills.')).toBeTruthy();
   });
 
   it('can mention staged files from the home @ picker and keeps removal in sync', async () => {
@@ -518,12 +518,10 @@ describe('HomeHero plugin picker', () => {
     expect(onRemoveFile).toHaveBeenCalledWith(0);
   });
 
-  it('can pick skills and MCP servers from the home @ picker', async () => {
+  it('can pick skills from the home @ picker', async () => {
     const onPickSkill = vi.fn();
-    const onPickMcp = vi.fn();
     const skill = makeSkill('prototype-lab', 'Prototype Lab');
-    const mcp = makeMcp('linear', 'Linear');
-    const { rerender } = render(
+    render(
       <HomeHero
         prompt=""
         onPromptChange={() => undefined}
@@ -535,13 +533,10 @@ describe('HomeHero plugin picker', () => {
         pluginsLoading={false}
         skillOptions={[skill]}
         skillsLoading={false}
-        mcpOptions={[mcp]}
-        mcpLoading={false}
         pendingPluginId={null}
         pendingChipId={null}
         onPickPlugin={() => undefined}
         onPickSkill={onPickSkill}
-        onPickMcp={onPickMcp}
         onPickChip={() => undefined}
         contextItemCount={0}
         error={null}
@@ -553,37 +548,6 @@ describe('HomeHero plugin picker', () => {
 
     fireEvent.mouseDown(screen.getByRole('option', { name: /prototype lab/i }));
     expect(onPickSkill).toHaveBeenCalledWith(skill, 'Make @Prototype Lab ');
-
-    rerender(
-      <HomeHero
-        prompt=""
-        onPromptChange={() => undefined}
-        onSubmit={() => undefined}
-        activePluginTitle={null}
-        activeChipId={null}
-        onClearActivePlugin={() => undefined}
-        pluginOptions={[]}
-        pluginsLoading={false}
-        skillOptions={[skill]}
-        skillsLoading={false}
-        mcpOptions={[mcp]}
-        mcpLoading={false}
-        pendingPluginId={null}
-        pendingChipId={null}
-        onPickPlugin={() => undefined}
-        onPickSkill={onPickSkill}
-        onPickMcp={onPickMcp}
-        onPickChip={() => undefined}
-        contextItemCount={0}
-        error={null}
-      />,
-    );
-
-    setHomeHeroPrompt('@lin');
-    await settle();
-
-    fireEvent.mouseDown(screen.getByRole('option', { name: /linear/i }));
-    expect(onPickMcp).toHaveBeenCalledWith(mcp, '@Linear ');
   });
 
   it('submits on a plain Enter through the editor once content is present', async () => {

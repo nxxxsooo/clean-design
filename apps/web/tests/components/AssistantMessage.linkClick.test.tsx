@@ -370,10 +370,7 @@ describe('AssistantMessage — chat file-link routing (#1239)', () => {
     expect(window.location.pathname).toBe('/');
   });
 
-  it('keeps SPA-route links on their default behavior instead of swallowing them', () => {
-    // Extensionless same-origin routes like /automations are legitimate app
-    // pages: the default open still renders real content, so the handler
-    // must not preventDefault them into dead links.
+  it('swallows links to removed SPA routes instead of opening a detached home window', () => {
     const onRequestOpenFile = vi.fn();
     const { container } = render(
       <AssistantMessage
@@ -389,7 +386,7 @@ describe('AssistantMessage — chat file-link routing (#1239)', () => {
     const clickEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
     anchor!.dispatchEvent(clickEvent);
     expect(onRequestOpenFile).not.toHaveBeenCalled();
-    expect(clickEvent.defaultPrevented).toBe(false);
+    expect(clickEvent.defaultPrevented).toBe(true);
   });
 
   it('does not intercept external https:// URLs — preserves default target="_blank" behavior', () => {

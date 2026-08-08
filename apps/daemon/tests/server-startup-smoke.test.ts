@@ -109,15 +109,18 @@ describe('daemon startup route smoke', () => {
       },
       {
         path: '/api/routines',
-        assert: (body) => expect(body).toHaveProperty('routines'),
+        statuses: [410],
+        assert: (body) => expect(body).toMatchObject({ error: { code: 'SERVICE_DISABLED' } }),
       },
       {
         path: '/api/automation-templates',
-        assert: (body) => expect(body).toHaveProperty('templates'),
+        statuses: [410],
+        assert: (body) => expect(body).toMatchObject({ error: { code: 'SERVICE_DISABLED' } }),
       },
       {
         path: '/api/connectors',
-        assert: (body) => expect(body).toHaveProperty('connectors'),
+        statuses: [410],
+        assert: (body) => expect(body).toMatchObject({ error: { code: 'SERVICE_DISABLED' } }),
       },
       {
         path: '/api/agents',
@@ -125,8 +128,8 @@ describe('daemon startup route smoke', () => {
       },
       {
         path: '/api/amr/models',
-        statuses: [200, 500],
-        assert: (body) => expect(body).toEqual(expect.any(Object)),
+        statuses: [410],
+        assert: (body) => expect(body).toMatchObject({ error: { code: 'SERVICE_DISABLED' } }),
       },
     ];
 
@@ -138,7 +141,7 @@ describe('daemon startup route smoke', () => {
     }));
   }, 60_000);
 
-  it('keeps core project, conversation, message, and routine write paths wired', async () => {
+  it('keeps core project, conversation, and message write paths wired while denying routines', async () => {
     const projectId = `startup-write-${Date.now()}`;
     const projectResponse = await fetch(`${started.url}/api/projects`, {
       method: 'POST',
@@ -197,12 +200,9 @@ describe('daemon startup route smoke', () => {
         enabled: true,
       }),
     });
-    expect(routineResponse.status).toBe(201);
+    expect(routineResponse.status).toBe(410);
     await expect(routineResponse.json()).resolves.toMatchObject({
-      routine: {
-        name: 'Startup write routine',
-        target: { mode: 'create_each_run' },
-      },
+      error: { code: 'SERVICE_DISABLED' },
     });
   });
 

@@ -196,7 +196,7 @@ function resolveAgainstResolvedDir(
  * Routability is decided by `parseRoute` itself, not a heuristic: its
  * catch-all home fallback IS the detached-home-window symptom, so exactly
  * the hrefs that would trigger it are swallowed. Recognized SPA routes
- * (`/automations`, `/projects/<id>`, `/design-systems/<id>`, …) keep their
+ * (`/projects/<id>`, `/design-systems/<id>`, …) keep their
  * default behavior, while filesystem-style paths — with or without a file
  * extension (`/Users/…/bar.ts`, `/tmp/README`, `../Makefile`) — are inert.
  * Windows drive-letter paths (`C:\…\README.md`) are filesystem paths too,

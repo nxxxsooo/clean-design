@@ -16,7 +16,6 @@ import {
   type SkillExampleResult,
 } from '../../providers/registry';
 import { PreviewModal, type PreviewSharePopoverItem } from '../PreviewModal';
-import { buildPluginShareUrl } from './PluginShareMenu';
 import { PluginMetaSections } from './PluginMetaSections';
 import { buildPluginUseMenu, pluginUsePrimaryAction } from './pluginUseMenu';
 import type { PluginUseAction } from '../plugins-home/useActions';
@@ -119,11 +118,6 @@ export function PluginExampleDetail({
       ]}
       onView={onView}
       exportTitleFor={() => localizedTitle}
-      shareTarget={{
-        title: localizedTitle,
-        description: description || undefined,
-        url: buildPluginShareUrl(record),
-      }}
       onClose={onClose}
       sidebar={{
         // Surface every plugin-common manifest field — workflow, context

@@ -5,7 +5,6 @@ import { createRef, type ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatComposer, type ChatComposerHandle } from '../../src/components/ChatComposer';
-import { CONNECTORS_CHANGED_EVENT } from '../../src/components/connectors-events';
 import { composerText, flushMounts } from '../helpers/lexical-composer';
 
 const DESIGN_TASTE_SKILL = {
@@ -249,7 +248,7 @@ describe('ChatComposer design toolbox', () => {
     );
   });
 
-  it('gives creative director a searchable index across all resource types', async () => {
+  it('gives creative director a searchable index across local resources', async () => {
     const { ref } = renderComposer({
       skills: [
         DESIGN_TASTE_SKILL,
@@ -277,29 +276,13 @@ describe('ChatComposer design toolbox', () => {
       expect(composerText()).toContain('Global resource index');
       expect(composerText()).toContain('spreadsheet-ops');
       expect(composerText()).toContain('Research Asset Plugin');
-      expect(composerText()).toContain('Higgsfield Video MCP');
-      expect(composerText()).toContain('Figma');
+      expect(composerText()).not.toContain('Higgsfield Video MCP');
+      expect(composerText()).not.toContain('Figma');
       expect(composerText()).toContain('data/proof.csv');
       expect(composerText()).toContain('Do not only use design toolbox recommendations');
     });
-  });
-
-  it('refreshes connected connectors when connector auth changes in another surface', async () => {
-    const { ref } = renderComposer();
-    await flushMounts();
-
-    openToolbox(ref);
-    await waitFor(() => {
-      expect(screen.getByText('Figma')).toBeTruthy();
-    });
-
-    window.dispatchEvent(new Event(CONNECTORS_CHANGED_EVENT));
-
-    const search = screen.getByLabelText('Search design toolbox resources');
-    fireEvent.change(search, { target: { value: 'gmail' } });
-
-    await waitFor(() => {
-      expect(screen.getByText('Gmail')).toBeTruthy();
-    });
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/mcp/servers');
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/connectors');
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/connectors/status');
   });
 });

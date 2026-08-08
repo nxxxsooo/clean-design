@@ -615,8 +615,8 @@ describe('isPathLikeChatHref (suppresses the detached home-window fallback)', ()
     expect(isPathLikeChatHref(`${window.location.origin}/deck-outline.md`)).toBe(true);
   });
 
-  it('false for extensionless SPA routes — their default open renders real content', () => {
-    expect(isPathLikeChatHref('/automations')).toBe(false);
+  it('keeps supported SPA routes open and treats removed routes as inert', () => {
+    expect(isPathLikeChatHref('/automations')).toBe(true);
     expect(isPathLikeChatHref('/projects/abc123')).toBe(false);
     expect(isPathLikeChatHref('/design-systems/xyz')).toBe(false);
   });

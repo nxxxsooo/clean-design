@@ -75,6 +75,11 @@ describe('EntrySettingsMenu language picker a11y', () => {
     // No mixed listbox/option ARIA — locale choices are menuitemradios.
     expect(container.querySelector('[role="listbox"]')).toBeNull();
     expect(container.querySelector('[role="option"]')).toBeNull();
+    expect(container.querySelector('.entry-settings-menu__select-panel')).toBeNull();
+
+    // Opening flips aria-expanded and mounts one radio-menu model.
+    fireEvent.click(langTrigger);
+    expect(langTrigger.getAttribute('aria-expanded')).toBe('true');
     const panel = container.querySelector(
       '.entry-settings-menu__select-panel',
     ) as HTMLElement;
@@ -84,17 +89,5 @@ describe('EntrySettingsMenu language picker a11y', () => {
     expect(
       Array.from(radios).filter((r) => r.getAttribute('aria-checked') === 'true'),
     ).toHaveLength(1);
-
-    // Collapsed: the list is inert, so the options stay out of the a11y tree
-    // and the tab order even though they remain mounted for the animation.
-    const list = container.querySelector(
-      '.entry-settings-menu__select-list',
-    ) as HTMLElement;
-    expect(list.hasAttribute('inert')).toBe(true);
-
-    // Opening flips aria-expanded and lifts inert.
-    fireEvent.click(langTrigger);
-    expect(langTrigger.getAttribute('aria-expanded')).toBe('true');
-    expect(list.hasAttribute('inert')).toBe(false);
   });
 });

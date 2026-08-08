@@ -10,8 +10,15 @@ import type {
 import express from 'express';
 import multer from 'multer';
 import JSZip from 'jszip';
-import { isCleanDesignDisabledApiPath } from '@open-design/contracts';
+import {
+  isCleanDesignDisabledAgent,
+  isCleanDesignDisabledApiPath,
+} from '@open-design/contracts';
 import { resolveCredentialReferencesInValue } from './credential-memory.js';
+import {
+  cleanDesignEgressRequestContext,
+  installCleanDesignEgressGuard,
+} from './egress-policy.js';
 import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -27,7 +34,6 @@ import {
   detectMediaIntentSignal,
   detectPlatformIntentSignal,
   extractUserAuthoredSignalText,
-  renderConnectedExternalMcpDirective,
   resolveExclusiveSurface,
 } from './prompts/system.js';
 import { emittedRenderableQuestionForm } from './question-form-detect.js';
@@ -187,7 +193,6 @@ import {
   detectAgents,
   getAgentDef,
   isKnownModel,
-  openDesignAmrTraceEnv,
   applyAgentLaunchEnv,
   resolveAgentLaunch,
   sanitizeCustomModel,
@@ -195,10 +200,6 @@ import {
 } from './agents.js';
 import {
   getKnownModelOption,
-  getRememberedLiveModels,
-  preferFreshLiveModels,
-  rememberLiveModels,
-  resolveDefaultModelFromOptions,
   resolveModelForAgent,
 } from './runtimes/models.js';
 import {
@@ -212,24 +213,12 @@ import {
   buildOpenCodeByokProviderConfig,
   BYOK_OPENCODE_PROVIDER_REQUIRED_MESSAGE,
 } from './runtimes/byok-opencode.js';
+import { buildOpenCodeRuntimeConfigContent } from './runtimes/opencode-runtime-config.js';
 import {
   extractPlainStreamArtifacts,
   persistPlainStreamArtifactList,
   plainStdoutFromRunEvents,
 } from './runtimes/plain-stream.js';
-import {
-  readVelaLoginStatus,
-  resolveAmrProfile,
-} from './integrations/vela.js';
-import {
-  amrAccountFailureDetails,
-  classifyAmrAccountFailureSignal,
-} from './integrations/vela-errors.js';
-import { amrModelLoadingCache } from './runtimes/amr-model-cache.js';
-import {
-  fetchVelaPresetModels,
-  fetchVelaRemoteModelsWithRetry,
-} from './runtimes/defs/amr.js';
 import { migrateLegacyDataDirSync } from './migration/index.js';
 import {
   consumedImportNonces,
@@ -333,10 +322,6 @@ import {
   uninstallPlugin,
 } from './plugins/index.js';
 import {
-  marketplaceManifestUrlForRegistry,
-  marketplaceRegistryIdFromUrl,
-} from './plugins/marketplaces.js';
-import {
   composeMemoryBody,
   extractFromMessage,
   listActiveRuleEntries,
@@ -345,8 +330,6 @@ import {
 import { runAutoExtractionCleanup } from './memory-cleanup.js';
 import { attachAcpSession } from './agent-protocol/index.js';
 import { attachPiRpcSession } from './agent-protocol/index.js';
-import { stageAmrImagePaths } from './media/amr-image-staging.js';
-import { ingestRoutineConnectorEvolution } from './automation-routine-evolution.js';
 import { createClaudeStreamHandler } from './runtimes/claude-stream.js';
 import { createAgentTitleMarkerStripper } from './title-marker.js';
 import { createRoleMarkerGuard } from './role-marker-guard.js';
@@ -375,7 +358,6 @@ import {
   cursorAuthGuidance,
 } from './runtimes/auth.js';
 import { readOpenCodeServiceFailure } from './runtimes/opencode-log.js';
-import { createAgentStderrVisibilityFilter } from './amr-stderr-filter.js';
 import { createQoderStreamHandler } from './runtimes/qoder-stream.js';
 import { subscribe as subscribeFileEvents } from './project-watchers.js';
 import { importFigmaFromBytes } from './figma/figma-import.js';
@@ -389,10 +371,7 @@ import {
 import { deriveRunErrorCode, runResultFromStatus } from './run-result.js';
 import { classifyRunFailure, isResumableFailure } from './run-failure-classification.js';
 import { decideSafeRunRetry } from './run-retry-policy.js';
-import {
-  amrUserIdForRunAnalytics,
-  scanRunEventsForUsageAnalytics,
-} from './run-analytics-observability.js';
+import { scanRunEventsForUsageAnalytics } from './run-analytics-observability.js';
 import {
   createRunArtifactBaselines,
   diffRunArtifacts,
@@ -404,7 +383,6 @@ import {
 } from './run-html-version-snapshots.js';
 import { reconcileDurableRunTerminals } from './runtimes/run-terminal-reconciliation.js';
 import { buildPromptStackTelemetry } from './prompt-telemetry.js';
-import { readAnalyticsContext } from './analytics.js';
 import {
   agentIdToTracking,
   modelIdForTracking,
@@ -453,40 +431,7 @@ import {
   reconcileMediaTasksOnBoot,
 } from './media/tasks.js';
 import { TASK_TTL_AFTER_DONE_MS, createMediaTaskStore } from './media/task-store.js';
-import {
-  MCP_TEMPLATES,
-  buildAcpMcpServers,
-  buildClaudeMcpJson,
-  buildOpenCodeMcpConfigContent,
-  isManagedProjectCwd,
-  readMcpConfig,
-  writeMcpConfig,
-} from './mcp-config.js';
-import {
-  resolveExternalMcpServersForRun,
-} from './run-tool-bundle.js';
-import {
-  beginAuth,
-  exchangeCodeForToken,
-  PendingAuthCache,
-  refreshAccessToken,
-} from './mcp-oauth.js';
-import {
-  clearToken,
-  getToken,
-  isTokenExpired,
-  readAllTokens,
-  setToken,
-} from './mcp-tokens.js';
 import { agentCliEnvForAgent, readAppConfig, readPluginEnvKnobs, writeAppConfig } from './app-config.js';
-import { OrbitService, formatLocalProjectTimestamp, renderOrbitTemplateSystemPrompt } from './orbit.js';
-import { buildOrbitNoLiveArtifactSummary } from './orbit-agent-summary.js';
-import {
-  RoutineService,
-  validateSchedule as validateRoutineSchedule,
-  validateTarget as validateRoutineTarget,
-} from './routines.js';
-import { buildMcpInstallPayload } from './mcp-install-info.js';
 import { createDiagnosticsExportHandler } from './diagnostics-export.js';
 import { DIAGNOSTICS_EXPORT_PATH } from '@open-design/diagnostics';
 import {
@@ -600,25 +545,16 @@ import {
   setLiveArtifactCodeHeaders,
   setLiveArtifactPreviewHeaders,
 } from './live-artifacts/http-helpers.js';
-import { registerConnectorRoutes } from './connectors/routes.js';
-import { registerActiveContextRoutes } from './routes/active-context.js';
-import { registerAutomationRoutes } from './routes/automation.js';
-import { registerAttributionRoutes } from './routes/attribution.js';
 import { registerDaemonRoutes } from './routes/daemon.js';
 import { registerGenuiRoutes } from './routes/genui.js';
 import { registerDesignSystemRoutes } from './routes/design-systems.js';
-import { registerHostToolsRoutes } from './routes/host-tools.js';
 import { registerPluginAssetRoutes } from './routes/plugins/assets.js';
-import { registerPluginMarketplaceRoutes } from './routes/plugins/marketplaces.js';
-import { registerPluginEventRoutes, registerPluginRoutes, registerProjectPluginRoutes } from './routes/plugins/index.js';
-import { registerMcpRoutes } from './mcp-routes.js';
+import { registerPluginRoutes, registerProjectPluginRoutes } from './routes/plugins/index.js';
 import { registerXaiRoutes } from './routes/xai.js';
 import { registerLiveArtifactRoutes } from './routes/live-artifact.js';
 import { registerDesignSystemToolRoutes } from './routes/design-system-tool.js';
-import { registerDeployRoutes, registerDeploymentCheckRoutes } from './routes/deploy.js';
 import { registerMediaRoutes } from './routes/media.js';
 import { registerProjectRoutes, registerProjectArtifactRoutes, registerProjectFileRoutes, registerProjectUploadRoutes } from './routes/project/index.js';
-import { registerVelaRoutes } from './routes/vela.js';
 import { registerFinalizeRoutes, registerImportRoutes, registerProjectExportRoutes } from './import-export-routes.js';
 import { registerHandoffRoutes } from './routes/handoff.js';
 import { trustedHandoffRootStore } from './handoff/root-runtime.js';
@@ -626,11 +562,7 @@ import { registerChatRoutes } from './routes/chat.js';
 import { registerRunRoutes } from './routes/runs.js';
 import { registerTerminalRoutes } from './routes/terminal.js';
 import { createTerminalService } from './terminals.js';
-import { registerSocialShareRoutes } from './routes/social-share.js';
-import { registerOpenDesignPublicMetadataRoutes } from './routes/open-design-public-metadata.js';
-import { registerWhatsNewRoutes } from './routes/whats-new.js';
 import { registerMemoryRoutes } from './routes/memory.js';
-import { registerTelemetryRoutes } from './routes/telemetry.js';
 import {
   assembleExample,
   registerAtomRoutes,
@@ -638,15 +570,11 @@ import {
   rewriteSkillAssetUrls,
 } from './routes/static-resource.js';
 export { rewriteSkillAssetUrls } from './routes/static-resource.js';
-import { registerRoutineRoutes, routineDbRowToContract } from './routes/routine.js';
-import { resolveAmrModelProbe } from './runtimes/amr-model-probe.js';
 import { createPluginInstallationHelpers, normalizeProjectPluginFolderPath, resolveProjectChildDirectory } from './services/plugin-installation.js';
 import { createPluginShareTaskStore } from './services/plugin-share-tasks.js';
 import { getRouteRegistrationInventory, installRouteRegistrationGuard } from './route-registration-guard.js';
 import { assertServerContextSatisfiesRoutes } from './route-context-contract.js';
-import { configureConnectorCredentialStore, connectorService, FileConnectorCredentialStore } from './connectors/service.js';
-import { composioConnectorProvider } from './connectors/composio.js';
-import { configureComposioConfigStore } from './connectors/composio-config.js';
+import { connectorService } from './connectors/service.js';
 import { CHAT_TOOL_ENDPOINTS, CHAT_TOOL_OPERATIONS, toolTokenRegistry } from './tool-tokens.js';
 import {
   buildDeployFileSet,
@@ -686,13 +614,7 @@ import {
 } from './library-tokens.js';
 import { listLibraryTokenOrigins } from './library-store.js';
 import { apiTokenFromEnv, isApiAuthDisabled, isApiTokenMiddlewareEnabled } from './api-token-auth.js';
-import { createOpenDesignPublicMetadataService } from './services/open-design-public-metadata.js';
-import { createWhatsNewService } from './services/whats-new.js';
 import { execCommandViaLoginShell } from './services/login-shell.js';
-import {
-  OFFICIAL_MARKETPLACE_ID,
-  createMarketplaceSeedHelpers,
-} from './plugins/marketplace-seed.js';
 import {
   PLUGIN_SHARE_ACTION_LABELS,
   USER_PLUGIN_SOURCE_KINDS,
@@ -802,24 +724,6 @@ const BUNDLED_PLUGINS_DIR = resolveDaemonResourceDir(
   path.join('plugins', '_official'),
   defaultBundledRoot(PROJECT_ROOT),
 );
-const PLUGIN_REGISTRY_DIR = resolveDaemonResourceDir(
-  DAEMON_RESOURCE_ROOT,
-  'plugins/registry',
-  path.join(PROJECT_ROOT, 'plugins', 'registry'),
-);
-const {
-  bundledPluginRegistrySource,
-  createMarketplaceFetcher,
-  defaultMarketplaceSeedConfig,
-  marketplaceSeedManifestText,
-} = createMarketplaceSeedHelpers({
-  bundledPluginsDir: BUNDLED_PLUGINS_DIR,
-  projectRoot: PROJECT_ROOT,
-  pluginRegistryDir: PLUGIN_REGISTRY_DIR,
-  marketplaceManifestUrlForRegistry,
-  marketplaceRegistryIdFromUrl,
-});
-
 const SANDBOX_MODE_ENABLED = isSandboxModeEnabled(process.env);
 const RUNTIME_DATA_DIR = resolveDataDir(process.env.OD_DATA_DIR, PROJECT_ROOT, {
   requireExplicit: SANDBOX_MODE_ENABLED,
@@ -893,88 +797,13 @@ for (const dir of [USER_SKILLS_DIR, USER_DESIGN_SYSTEMS_DIR, BRANDS_DIR, USER_DE
   fs.mkdirSync(dir, { recursive: true });
 }
 fs.mkdirSync(CRITIQUE_ARTIFACTS_DIR, { recursive: true });
-const orbitService = new OrbitService(RUNTIME_DATA_DIR);
 const designSystemGenerationJobs = createDesignSystemGenerationJobStore({
   root: USER_DESIGN_SYSTEMS_DIR,
 });
-let routineService = null;
 
-// In-memory OAuth state cache. Lives for the daemon process's lifetime.
-// Maps the OAuth `state` parameter we generated in /api/mcp/oauth/start
-// to the verifier + endpoint info needed to finish the exchange when the
-// browser hits /api/mcp/oauth/callback.
-const mcpPendingAuth = new PendingAuthCache();
-
-/**
- * Resolve the daemon's public base URL — the origin the user's browser
- * (or the OAuth provider) reaches us at. Order of precedence:
- *
- *   1. `OD_PUBLIC_BASE_URL` env var. Cloud and packaged-electron deployments
- *      set this to the externally-routable URL (e.g. `https://app.example.com`).
- *   2. `req.protocol://req.get('host')` from the inbound request. Works in
- *      local dev and most reverse-proxy setups (Express respects
- *      `trust proxy` so X-Forwarded-* headers are honored).
- *
- * The OAuth callback URI is derived from this — it MUST be reachable from
- * the user's browser, otherwise the redirect after auth lands on
- * ERR_CONNECTION_REFUSED. Misconfiguration is loud: the OAuth provider
- * will reject `redirect_uri` mismatches.
- */
 function getPublicBaseUrl(req) {
-  const env = process.env.OD_PUBLIC_BASE_URL;
-  if (env && /^https?:\/\//i.test(env)) {
-    return env.replace(/\/+$/u, '');
-  }
-  const proto = req.protocol || 'http';
-  const host = req.get('host');
-  if (!host) return `http://localhost:${process.env.OD_PORT ?? '7456'}`;
-  return `${proto}://${host}`;
-}
-
-function mcpOAuthCallbackUrl(req) {
-  return `${getPublicBaseUrl(req)}/api/mcp/oauth/callback`;
-}
-
-/**
- * Refresh an expired token using the OAuth client context that the original
- * authorization-code exchange persisted alongside the token. Refresh tokens
- * are bound (RFC 6749 §6) to the client that received them, so we MUST
- * refresh against the same `tokenEndpoint` / `clientId` / `clientSecret`
- * pair — re-running discovery with a different redirect URI would risk
- * registering a new client_id that the upstream then rejects the refresh
- * for. Tokens persisted before that context was recorded can't be safely
- * refreshed; the caller treats `null` as "needs reconnect".
- */
-async function refreshAndPersistToken(dataDir, serverId, current) {
-  if (!current.refreshToken) return null;
-  if (!current.tokenEndpoint || !current.clientId) return null;
-  const tokenResp = await refreshAccessToken({
-    tokenEndpoint: current.tokenEndpoint,
-    clientId: current.clientId,
-    clientSecret: current.clientSecret,
-    refreshToken: current.refreshToken,
-    scope: current.scope,
-    resource: current.resourceUrl,
-  });
-  const next = {
-    accessToken: tokenResp.access_token,
-    refreshToken: tokenResp.refresh_token ?? current.refreshToken,
-    tokenType: tokenResp.token_type ?? 'Bearer',
-    scope: tokenResp.scope ?? current.scope,
-    expiresAt:
-      typeof tokenResp.expires_in === 'number'
-        ? Date.now() + tokenResp.expires_in * 1000
-        : undefined,
-    savedAt: Date.now(),
-    tokenEndpoint: current.tokenEndpoint,
-    clientId: current.clientId,
-    clientSecret: current.clientSecret,
-    authServerIssuer: current.authServerIssuer,
-    redirectUri: current.redirectUri,
-    resourceUrl: current.resourceUrl,
-  };
-  await setToken(dataDir, serverId, next);
-  return next;
+  const localPort = req.socket?.localPort ?? process.env.OD_PORT ?? '7456';
+  return `http://127.0.0.1:${localPort}`;
 }
 
 const activeChatAgentEventSinks = new Map();
@@ -1716,31 +1545,13 @@ function rewriteKnownAgentStreamError(agentId, message, failureText = '') {
   if (
     /bufio\.scanner:\s*token too long/i.test(combined) &&
     /opencode/i.test(combined) &&
-    (agentId === 'opencode' || agentId === 'mimo' || agentId === 'amr' || /json-rpc id \d+/i.test(combined))
+    (agentId === 'opencode' || agentId === 'mimo' || /json-rpc id \d+/i.test(combined))
   ) {
     return 'The run failed due to an unknown upstream streaming error. Please retry.';
   }
   return rawMessage;
 }
 
-function createAmrModelUnavailablePayload(model, init = {}) {
-  const modelText = typeof model === 'string' && model.trim()
-    ? `"${model.trim()}"`
-    : 'the selected model';
-  return createSseErrorPayload(
-    'AMR_MODEL_UNAVAILABLE',
-    `AMR model ${modelText} is not available from Vela. Refresh the AMR model list, choose a supported model, and retry this run.`,
-    {
-      retryable: false,
-      details: {
-        kind: 'amr_model',
-        action: 'choose_model',
-        ...(typeof model === 'string' && model.trim() ? { model: model.trim() } : {}),
-        ...init,
-      },
-    },
-  );
-}
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
@@ -2025,6 +1836,7 @@ export async function startServer({
   desktopArtifactExporter = null,
   runtime = null,
 }: StartServerOptions = {}) {
+  const releaseEgressGuard = installCleanDesignEgressGuard();
   host = normalizeDaemonBindHost(host);
   let resolvedPort = port;
   let daemonShuttingDown = false;
@@ -2069,6 +1881,7 @@ export async function startServer({
   // (registered before the global parser so it claims the body first).
   app.use('/api/brands/:id/extract-from-html', express.json({ limit: '32mb' }));
   app.use(express.json({ limit: '4mb' }));
+  app.use('/api', cleanDesignEgressRequestContext);
   app.use('/api', (req, res, next) => {
     if (!isCleanDesignDisabledApiPath(req.path)) return next();
     res.status(410).json({
@@ -2322,37 +2135,6 @@ export async function startServer({
   // External connector hosts and credential stores are not initialized in
   // the local-only build. The retained local plugin catalog remains usable.
 
-  // RoutineService persistence is a thin adapter over the SQLite helpers.
-  // Routines are stored as DB rows; the service holds in-memory timers and
-  // delegates "list me everything" / "record a run" back to SQLite.
-  routineService = new RoutineService({
-    list: () => listRoutines(db).map((row) => routineDbRowToContract(row, null)),
-    insertRun: (run, options) => {
-      const row = {
-        id: run.id,
-        routineId: run.routineId,
-        trigger: run.trigger,
-        status: run.status,
-        projectId: run.projectId,
-        conversationId: run.conversationId,
-        agentRunId: run.agentRunId,
-        startedAt: run.startedAt,
-        completedAt: run.completedAt,
-        summary: run.summary,
-        error: run.error,
-        errorCode: run.errorCode,
-      };
-      if (options?.scheduledSlotAt != null) {
-        return Boolean(insertScheduledRoutineRun(db, row, options.scheduledSlotAt));
-      }
-      insertRoutineRun(db, row);
-      return true;
-    },
-    updateRun: (id, patch) => {
-      updateRoutineRun(db, id, patch);
-    },
-    getLatestRun: (routineId) => getLatestRoutineRun(db, routineId),
-  });
   let daemonUrl = `http://127.0.0.1:${port}`;
 
   // Boot reconcile: any critique_runs row left in 'running' state by a prior
@@ -2382,7 +2164,6 @@ export async function startServer({
     console.log('[od] Codex plugins disabled via OD_CODEX_DISABLE_PLUGINS=1');
   }
 
-  let bundledMarketplaceEntries = [];
   // Plan §3.I3 / spec §23.3.5 — register every plugin under
   // <resourceRoot>/plugins/_official/** in packaged runs, or
   // <projectRoot>/plugins/_official/** in workspace runs, as bundled plugins. The walker
@@ -2393,28 +2174,7 @@ export async function startServer({
     const result = await registerBundledPlugins({
       db,
       bundledRoot: BUNDLED_PLUGINS_DIR,
-      marketplaceProvenance: {
-        sourceMarketplaceId: OFFICIAL_MARKETPLACE_ID,
-        marketplaceTrust:    'official',
-        entryNamePrefix:     'open-design',
-      },
     });
-    bundledMarketplaceEntries = result.registered.map((plugin) => ({
-      name:        `open-design/${plugin.id}`,
-      title:       plugin.title,
-      title_i18n:  plugin.manifest.title_i18n,
-      description: plugin.manifest.description,
-      description_i18n: plugin.manifest.description_i18n,
-      version:     plugin.version,
-      source:      bundledPluginRegistrySource(plugin.source),
-      publisher:   { id: 'open-design', url: 'https://open-design.ai' },
-      homepage:    plugin.manifest.homepage,
-      license:     plugin.manifest.license,
-      tags:        plugin.manifest.tags,
-      capabilitiesSummary: Array.isArray(plugin.manifest.od?.capabilities)
-        ? plugin.manifest.od.capabilities
-        : undefined,
-    }));
     if (result.registered.length > 0) {
       console.log(`[plugins] registered ${result.registered.length} bundled plugin(s)`);
     }
@@ -2423,34 +2183,6 @@ export async function startServer({
     }
   } catch (err) {
     console.warn(`[plugins] bundled registration failed: ${(err)?.message ?? err}`);
-  }
-
-  try {
-    const seedDirs = await fs.promises.readdir(PLUGIN_REGISTRY_DIR, { withFileTypes: true }).catch((err) => {
-      if (err?.code === 'ENOENT') return [];
-      throw err;
-    });
-    const { ensureMarketplaceManifest } = await import('./plugins/marketplaces.js');
-    for (const dirent of seedDirs) {
-      if (!dirent.isDirectory()) continue;
-      const id = dirent.name;
-      const manifestText = await marketplaceSeedManifestText(id, bundledMarketplaceEntries);
-      if (!manifestText) continue;
-      const configured = defaultMarketplaceSeedConfig(id);
-      const result = ensureMarketplaceManifest(db, {
-        id,
-        url: configured.url,
-        trust: configured.trust,
-        manifestText,
-      });
-      if (result.ok) {
-        console.log(`[plugins] seeded ${id} registry source (${result.row.manifest.plugins.length} plugin(s))`);
-      } else {
-        console.warn(`[plugins] ${id} registry seed failed: ${result.message}`);
-      }
-    }
-  } catch (err) {
-    console.warn(`[plugins] registry seed failed: ${(err)?.message ?? err}`);
   }
 
   // Plan §3.A5 / spec §16 Phase 5 / PB2: periodic snapshot GC. Disabled
@@ -2491,10 +2223,7 @@ export async function startServer({
   // build advertises --include-partial-messages) so the first /api/chat
   // hits a populated cache even if /api/agents hasn't been called yet.
   void readAppConfig(RUNTIME_DATA_DIR)
-    .then((config) => {
-      orbitService.configure(config.orbit);
-      return detectAgents(config.agentCliEnv ?? {});
-    })
+    .then((config) => detectAgents(config.agentCliEnv ?? {}))
     .catch(() => detectAgents().catch(() => {}));
 
   await recoverStaleLiveArtifactRefreshes({ projectsRoot: PROJECTS_DIR }).catch((error) => {
@@ -2514,10 +2243,6 @@ export async function startServer({
     appConfig: { readAppConfig },
   });
 
-  registerAutomationRoutes(app, {
-    paths: { RUNTIME_DATA_DIR },
-  });
-
   // Reconcile follow-up — the inline POST /api/projects body that lived
   // on garnet (with baseDir privilege check, linkedDirs validation,
   // template snapshot seeding, plugin snapshot resolution with default
@@ -2529,11 +2254,17 @@ export async function startServer({
   // follow-up — see reconcile decision log.
   // (legacy POST /api/projects body deleted — see registerProjectRoutes below.)
 
-  const telemetry = registerTelemetryRoutes(app, {
-    dataDir: RUNTIME_DATA_DIR,
-    readAppConfig,
-  });
-  const { analyticsService } = telemetry;
+  const analyticsService = {
+    capture: async () => undefined,
+    captureSafety: async () => undefined,
+    mergeAnonymousPerson: async () => undefined,
+    shutdown: async () => undefined,
+  };
+  const telemetry = {
+    getCachedAppVersion: () => null,
+    reportFeedback: async () => ({ status: 'skipped_no_sink' }),
+  };
+  const readAnalyticsContext = () => null;
   const design = {
     runs: createChatRunService({
       createSseResponse,
@@ -2655,13 +2386,6 @@ export async function startServer({
     isLocalSameOrigin,
     resolvedPortRef,
   };
-  const attributionService = registerAttributionRoutes(app, {
-    analytics: analyticsService,
-    appConfig: { readAppConfig },
-    http: httpDeps,
-    paths: { RUNTIME_DATA_DIR },
-    env: process.env,
-  });
   const pathDeps = {
     PROJECT_ROOT,
     PROJECTS_DIR,
@@ -2732,27 +2456,11 @@ export async function startServer({
     env: process.env,
   });
 
-  const openDesignPublicMetadata = createOpenDesignPublicMetadataService();
-  registerOpenDesignPublicMetadataRoutes(app, {
-    http: httpDeps,
-    openDesignPublicMetadata,
-  });
-
-  registerWhatsNewRoutes(app, {
-    whatsNew: createWhatsNewService(),
-  });
-
-  registerPluginEventRoutes(app, {
-    http: { requireLocalDaemonRequest },
-  });
-
-  registerConnectorRoutes(app, {
-    sendApiError,
-    authorizeToolRequest,
-    projectsRoot: PROJECTS_DIR,
-    requireLocalDaemonRequest,
-    composio: composioConnectorProvider,
-  });
+  const openDesignPublicMetadata = {
+    readGithubRepoStats: async () => { throw new Error('hosted metadata is disabled'); },
+    readLatestReleaseInfo: async () => { throw new Error('hosted metadata is disabled'); },
+    readDiscordPresence: async () => { throw new Error('community metadata is disabled'); },
+  };
 
   // Gate the diagnostics export behind requireLocalDaemonRequest so it stays
   // unreachable when daemon binds to a non-loopback address (Tailscale,
@@ -2889,13 +2597,9 @@ export async function startServer({
   const appConfigDeps = {
     readAppConfig,
     writeAppConfig,
-    onAppConfigWritten: () => {
-      void attributionService.processPending().catch((err: unknown) => {
-        console.warn('[attribution] pending claim failed', err);
-      });
-    },
+    onAppConfigWritten: () => undefined,
   };
-  const orbitDeps = { orbitService };
+  const orbitDeps = {};
   const nativeDialogDeps = { openBrowser, openNativeFolderDialog };
   const researchDeps = { searchResearch, ResearchError };
   const liveArtifactDeps = {
@@ -2955,28 +2659,9 @@ export async function startServer({
     critiqueRunRegistry,
   };
 
-  // External services
-  registerMcpRoutes(app, {
-    http: httpDeps,
-    paths: pathDeps,
-    mcp: { pendingAuth: mcpPendingAuth, daemonUrlRef },
-  });
   registerXaiRoutes(app, {
     http: httpDeps,
     paths: pathDeps,
-  });
-  // Project workspace
-  registerActiveContextRoutes(app, {
-    db,
-    http: httpDeps,
-    projectStore: projectStoreDeps,
-  });
-  registerHostToolsRoutes(app, {
-    db,
-    http: httpDeps,
-    paths: pathDeps,
-    projectStore: projectStoreDeps,
-    projectFiles: projectFileDeps,
   });
   // OD Library — global asset registry (clipper ingest, grid, pairing, apply).
   registerLibraryRoutes(app, {
@@ -3028,7 +2713,6 @@ export async function startServer({
       }
     });
   });
-  registerSocialShareRoutes(app, { http: httpDeps });
   registerProjectRoutes(app, {
     db,
     design,
@@ -3176,14 +2860,6 @@ export async function startServer({
     PLUGIN_PREVIEWS_ROUTE,
     express.static(PLUGIN_PREVIEWS_DIR, { maxAge: '1d', immutable: false }),
   );
-  registerDeployRoutes(app, {
-    db,
-    http: httpDeps,
-    paths: pathDeps,
-    ids: idDeps,
-    deploy: deployDeps,
-    projectStore: projectStoreDeps,
-  });
   registerFinalizeRoutes(app, {
     db,
     http: httpDeps,
@@ -3200,7 +2876,6 @@ export async function startServer({
     validation: validationDeps,
     handoff: handoffDeps,
   });
-  registerDeploymentCheckRoutes(app, { db, http: httpDeps, deploy: deployDeps });
   app.use('/frames', express.static(FRAMES_DIR));
   registerProjectExportRoutes(app, {
     db,
@@ -3241,13 +2916,6 @@ export async function startServer({
     projectFiles: projectFileDeps,
     conversations: conversationDeps,
     research: researchDeps,
-  });
-
-  registerVelaRoutes(app, {
-    paths: { RUNTIME_DATA_DIR },
-    appConfig: { readAppConfig },
-    http: { getPublicBaseUrl },
-    env: process.env,
   });
 
   const pluginRouteHelpers = {
@@ -3495,12 +3163,6 @@ export async function startServer({
   registerAtomRoutes(app, {
     db,
     resources: { FIRST_PARTY_ATOMS },
-  });
-  registerPluginMarketplaceRoutes(app, {
-    db,
-    bundledMarketplaceEntries,
-    createMarketplaceFetcher,
-    marketplaceRegistryIdFromUrl,
   });
   registerPluginAssetRoutes(app, {
     db,
@@ -4314,6 +3976,9 @@ export async function startServer({
         ? normalizeConversationSessionMode(sessionMode)
         : normalizeConversationSessionMode(conversationSession?.sessionMode);
     const def = getAgentDef(agentId);
+    if (typeof agentId === 'string' && isCleanDesignDisabledAgent(agentId)) {
+      return design.runs.fail(run, 'AGENT_UNAVAILABLE', `agent disabled: ${agentId}`);
+    }
     if (!def)
       return design.runs.fail(
         run,
@@ -4450,10 +4115,7 @@ export async function startServer({
         'Failed to read one or more image attachments.',
       );
     }
-    const amrStagedImages =
-      def.id === 'amr'
-        ? await stageAmrImagePaths(cwd ?? PROJECT_ROOT, safeImages, UPLOAD_DIR)
-        : safeImages;
+    const agentImagePaths = safeImages;
 
     // Project-scoped attachments: project-relative paths inside cwd. Each
     // is run through the same path-traversal guard the file CRUD endpoints
@@ -4538,82 +4200,6 @@ export async function startServer({
     const runtimeToolPrompt = createAgentRuntimeToolPrompt(daemonUrl, toolTokenGrant);
     const commentHint = renderCommentAttachmentHint(safeCommentAttachments);
 
-    // Resolve external MCP config + stored OAuth tokens up-front so the
-    // system prompt can warn the model away from Claude Code's synthetic
-    // `*_authenticate` / `*_complete_authentication` tools for any
-    // server the daemon already holds a valid Bearer for. We re-use both
-    // values further down at .mcp.json write time — see the spawn block
-    // below — instead of re-reading.
-    let externalMcpConfig = { servers: [] };
-    if (!SANDBOX_RUNTIME.enabled) {
-      try {
-        externalMcpConfig = await readMcpConfig(RUNTIME_DATA_DIR);
-      } catch (err) {
-        console.warn(
-          '[mcp-config] read failed:',
-          err && err.message ? err.message : err,
-        );
-      }
-    }
-    const runScopedMcpServers = Array.isArray(run?.toolBundle?.mcpServers)
-      ? run.toolBundle.mcpServers
-      : [];
-    const {
-      enabledServers: enabledExternalMcp,
-      persistedTokenServerIds,
-    } = resolveExternalMcpServersForRun({
-      persistedServers: externalMcpConfig.servers,
-      runScopedServers: runScopedMcpServers,
-      sandboxMode: SANDBOX_RUNTIME.enabled,
-    });
-    const oauthTokensForSpawn = {};
-    if (persistedTokenServerIds.size > 0) {
-      try {
-        const stored = await readAllTokens(RUNTIME_DATA_DIR);
-        for (const [serverId, tok] of Object.entries(stored)) {
-          if (!persistedTokenServerIds.has(serverId)) continue;
-          // Default to the persisted access token; null it out if expired so
-          // we never inject a stale `Authorization: Bearer …` header. The
-          // model treats a server with a Bearer pinned as connected and
-          // discourages re-auth, which is the worst possible UX when the
-          // token is going to 401 every call.
-          let access = isTokenExpired(tok) ? null : tok.accessToken;
-          if (isTokenExpired(tok) && tok.refreshToken) {
-            try {
-              const refreshed = await refreshAndPersistToken(
-                RUNTIME_DATA_DIR,
-                serverId,
-                tok,
-              );
-              if (refreshed) access = refreshed.accessToken;
-            } catch (err) {
-              console.warn(
-                '[mcp-oauth] refresh failed for',
-                serverId,
-                err && err.message ? err.message : err,
-              );
-            }
-          }
-          if (access) {
-            oauthTokensForSpawn[serverId] = access;
-          } else {
-            console.warn(
-              '[mcp-oauth] skipping expired token for',
-              serverId,
-              '— reconnect required',
-            );
-          }
-        }
-      } catch (err) {
-        console.warn(
-          '[mcp-tokens] read failed:',
-          err && err.message ? err.message : err,
-        );
-      }
-    }
-    const connectedExternalMcp = enabledExternalMcp
-      .filter((s) => typeof oauthTokensForSpawn[s.id] === 'string')
-      .map((s) => ({ id: s.id, label: s.label }));
 
     // Intent signals gate stable-region prompt blocks, so every flip changes
     // stableInstructionFingerprint and re-sends the whole stable block on
@@ -4891,13 +4477,7 @@ export async function startServer({
     } catch {
       configuredAgentEnv = {};
     }
-    const requestedLiveModelScope = def.id === 'amr'
-      ? resolveAmrProfile({
-          ...process.env,
-          ...(def.env || {}),
-          ...configuredAgentEnv,
-        })
-      : null;
+    const requestedLiveModelScope = null;
     let safeModel = resolveModelForAgent(
       def,
       typeof model === 'string'
@@ -4908,11 +4488,6 @@ export async function startServer({
       process.env,
       requestedLiveModelScope,
     );
-    const hasDefaultModelEnvOverride = Boolean(
-      def.defaultModelEnvVar &&
-      typeof process.env[def.defaultModelEnvVar] === 'string' &&
-      process.env[def.defaultModelEnvVar]?.trim(),
-    );
     const safeReasoning =
       typeof reasoning === 'string' && Array.isArray(def.reasoningOptions)
         ? (def.reasoningOptions.find((r) => r.id === reasoning)?.id ?? null)
@@ -4920,43 +4495,7 @@ export async function startServer({
     const agentOptions = { model: safeModel, reasoning: safeReasoning };
     const agentLaunch = resolveAgentLaunch(def, configuredAgentEnv);
     const resolvedBin = agentLaunch.selectedPath;
-    if (def.id === 'amr' && resolvedBin && agentLaunch.launchPath) {
-      // Concretize omitted/default AMR model requests to the live catalog
-      // default before the resume guard. The AMR preflight below applies the
-      // same rewrite before spawn; keeping this earlier copy aligned prevents
-      // stored concrete session models from comparing against raw `default`.
-      try {
-        const resumeProbe = await resolveAmrModelProbe({ dataDir: RUNTIME_DATA_DIR, env: process.env, readAppConfig });
-        const resumeCatalog = await amrModelLoadingCache.get(resumeProbe.cacheKey, {
-          fetchPreset: () => fetchVelaPresetModels(resumeProbe.launchPath, resumeProbe.env),
-          fetchRemote: () => fetchVelaRemoteModelsWithRetry(resumeProbe.launchPath, resumeProbe.env),
-        });
-        const resumeLiveModels = preferFreshLiveModels(
-          resumeCatalog.models ?? [],
-          getRememberedLiveModels(def.id, requestedLiveModelScope),
-        );
-        const resumeModelIds = new Set(resumeLiveModels.map((c) => c?.id).filter(Boolean));
-        const askedForDefault =
-          typeof model !== 'string' || !model.trim() || model.trim().toLowerCase() === 'default';
-        const defaultRunModel = resolveDefaultModelFromOptions(resumeLiveModels);
-        if (
-          !safeModel ||
-          safeModel === 'default' ||
-          (
-            askedForDefault &&
-            !hasDefaultModelEnvOverride &&
-            defaultRunModel &&
-            (!resumeModelIds.has(safeModel) || safeModel !== defaultRunModel)
-          )
-        ) {
-          safeModel = defaultRunModel ?? safeModel ?? null;
-          agentOptions.model = safeModel;
-        }
-      } catch {
-        // Degrade silently: keep the requested value. The preflight below records
-        // the probe failure and applies the identical fallback.
-      }
-    }
+
     let agentResumeCtx =
       agentSupportsSessionResume && run.conversationId
         ? resolveAgentResumeContext(db, {
@@ -5066,11 +4605,9 @@ export async function startServer({
     // the cached stable prefix (daemonSystemPrompt) and re-sending it here in
     // the per-turn slice keeps the upstream prompt-cache prefix byte-stable
     // across resumes (protecting the conversation-history cache) while still
-    // giving the model the current MCP auth state on every turn.
-    const mcpConnectedDirective = renderConnectedExternalMcpDirective(connectedExternalMcp);
     const clientInstructionParts = includeStableInstructions
-      ? [researchCommandContract, runContextPrompt, mcpConnectedDirective, browserUsePromptGuard, titleGenerationPrompt, systemPrompt]
-      : [researchCommandContract, runContextPrompt, mcpConnectedDirective, browserUsePromptGuard, titleGenerationPrompt];
+      ? [researchCommandContract, runContextPrompt, browserUsePromptGuard, titleGenerationPrompt, systemPrompt]
+      : [researchCommandContract, runContextPrompt, browserUsePromptGuard, titleGenerationPrompt];
     const clientInstructionPrompt = clientInstructionParts
       .map((part) => (typeof part === 'string' ? part.trim() : ''))
       .filter(Boolean)
@@ -5105,7 +4642,7 @@ export async function startServer({
     const promptImagePaths = selectPromptImagePaths(
       def.id,
       safeImages,
-      amrStagedImages,
+      agentImagePaths,
     );
     const composed = [
       instructionPrompt
@@ -5171,7 +4708,7 @@ export async function startServer({
     });
     lifecycle.mark('prompt_build_end');
     lifecycle.mark('launch_preflight_start');
-    // (model resolution + AMR concretization hoisted above the resume guard)
+    // (model resolution is hoisted above the resume guard)
     const executionProfile = executionProfileFromStreamFormat(def.streamFormat);
     // Accumulates the agent's visible text this run so the close handler can
     // tell whether the turn ended on a clarifying question form. The
@@ -5628,122 +5165,18 @@ export async function startServer({
       argsPrefix: [OD_BIN],
     });
 
-    // External MCP servers configured by the user in Settings → External MCP.
-    // Open Design relays them to the agent so the model can call those tools.
-    // Two delivery shapes today:
-    //   - Claude Code: write a `.mcp.json` into the project cwd. Claude Code
-    //     auto-loads that file at spawn (same format the CLI accepts via
-    //     `claude mcp add` + Claude Desktop's config). Fire-and-forget; we
-    //     deliberately do NOT block spawn on a write failure since the agent
-    //     can still run without external tools — log a warning and continue.
-    //   - ACP agents (Hermes/Kimi): merge stdio entries into the existing
-    //     `mcpServers` array; SSE/HTTP entries are skipped because ACP's
-    //     stdio-only descriptor can't represent them yet.
-    // Other agents (Codex, Gemini, OpenCode, Cursor, Qwen, Qoder, Copilot,
-    // Pi, DeepSeek) inherit the user's per-CLI MCP config from their own
-    // home dir for now — a future change can grow this list.
-    //
-    // The MCP config + OAuth tokens were resolved earlier (above
-    // composeDaemonSystemPrompt) so the system prompt could mention any
-    // already-authenticated servers; we reuse `enabledExternalMcp` and
-    // `oauthTokensForSpawn` here for the Claude `.mcp.json` write +
-    // ACP merge so we don't pay for a second filesystem read.
-    //
-    // Claude Code: write `.mcp.json` to the daemon-managed project cwd before
-    // spawn so Claude Code auto-loads the user's external MCP servers. Strict
-    // gating is essential here:
-    //   - cwd must be set (no project → no `.mcp.json` write).
-    //   - cwd must live UNDER PROJECTS_DIR. We never write to a git-linked
-    //     baseDir (= the user's own repo), since that would silently overwrite
-    //     a hand-crafted .mcp.json the user already keeps in their source tree.
-    // We also unlink a stale `.mcp.json` we previously wrote when the user has
-    // since disabled all servers, so removing a server actually takes effect
-    // on the next run.
-    // Dispatch on `def.externalMcpInjection` rather than hard-coding agent
-    // id / stream-format checks. The three branches are functionally
-    // equivalent to the previous shape (claude/acp), with the OpenCode
-    // env-content branch added to fix #2142. Runtimes that leave the field
-    // undefined fall through unchanged — the settings UI surfaces an
-    // explicit "external MCP is not forwarded to <agent>" banner for them
-    // so the previous silent-failure UX is gone.
-    if (
-      def.externalMcpInjection === 'claude-mcp-json' &&
-      isManagedProjectCwd(cwd, PROJECTS_DIR)
-    ) {
-      {
-        const target = path.join(cwd, '.mcp.json');
-        if (enabledExternalMcp.length > 0) {
-          try {
-            const claudeMcp = buildClaudeMcpJson(
-              enabledExternalMcp,
-              oauthTokensForSpawn,
-            );
-            if (claudeMcp) {
-              await fs.promises.mkdir(path.dirname(target), { recursive: true });
-              await fs.promises.writeFile(
-                target,
-                JSON.stringify(claudeMcp, null, 2),
-                'utf8',
-              );
-            }
-          } catch (err) {
-            console.warn(
-              '[mcp-config] failed to write project .mcp.json:',
-              err && err.message ? err.message : err,
-            );
-          }
-        } else {
-          try {
-            await fs.promises.unlink(target);
-          } catch (err) {
-            if ((err && err.code) !== 'ENOENT') {
-              console.warn(
-                '[mcp-config] failed to remove stale .mcp.json:',
-                err && err.message ? err.message : err,
-              );
-            }
-          }
-        }
-      }
-    }
-    if (
-      enabledExternalMcp.length > 0 &&
-      def.externalMcpInjection === 'acp-merge'
-    ) {
-      const acpExternal = buildAcpMcpServers(enabledExternalMcp);
-      mcpServers.push(...acpExternal);
-    }
-    // OpenCode: serialise enabled MCP servers into its `mcp` config schema
-    // and hand the JSON to the child via `OPENCODE_CONFIG_CONTENT`. The env
-    // var is *merged* with the user's saved `~/.config/opencode/opencode
-    // .json` (per OpenCode's documented config layering), so adding a
-    // server here does not erase whatever the user already has in their
-    // global config. We deliberately leave the env unset when no servers
-    // are enabled — overwriting with `{}` would wipe the user's saved
-    // mcp section for this single invocation, which is exactly the kind
-    // of surprise the previous silent-failure UX taught us to avoid.
-    let opencodeConfigContent: string | null = null;
-    const isOpenCodeContent = def.externalMcpInjection === 'opencode-env-content';
-    const isMiMoContent = def.externalMcpInjection === 'mimo-env-content';
-    if (isOpenCodeContent || isMiMoContent) {
-      try {
-        opencodeConfigContent = buildOpenCodeMcpConfigContent(
-          enabledExternalMcp,
-          oauthTokensForSpawn,
-          {
-            allowedDirectories: [effectiveCwd, ...extraAllowedDirs],
-            ...(byokOpenCodeProvider
-              ? { extraConfig: byokOpenCodeProvider.config }
-              : {}),
-          },
-        );
-      } catch (err) {
-        console.warn(
-          '[mcp-config] failed to build OPENCODE_CONFIG_CONTENT:',
-          err && err.message ? err.message : err,
-        );
-      }
-    }
+
+    const runtimeConfigEnvKey = def.id === 'mimo'
+      ? 'MIMOCODE_CONFIG_CONTENT'
+      : def.id === 'opencode' || def.id === 'byok-opencode'
+        ? 'OPENCODE_CONFIG_CONTENT'
+        : null;
+    const opencodeConfigContent = runtimeConfigEnvKey
+      ? buildOpenCodeRuntimeConfigContent(
+          byokOpenCodeProvider?.config ?? {},
+          [effectiveCwd, ...extraAllowedDirs],
+        )
+      : null;
 
     // Pre-flight the composed prompt against any argv-byte budget the
     // adapter declared (only DeepSeek TUI today — its CLI doesn't accept
@@ -5778,146 +5211,6 @@ export async function startServer({
       ).catch(() => null);
     }
 
-    // agentLaunch / resolvedBin are resolved above the resume guard (hoisted).
-    // Hoisted above the AMR catalog preflight: the empty-catalog branch
-    // below calls `sendAmrAccountFailure(...)` to surface AMR_AUTH_REQUIRED
-    // for signed-out users, and a `const` declared later in the same outer
-    // function scope would hit a TDZ ReferenceError before initialization.
-    const sendAmrAccountFailure = (failure) => {
-      send('error', createSseErrorPayload(
-        failure.code,
-        failure.message,
-        {
-          retryable: false,
-          details: amrAccountFailureDetails(failure),
-        },
-      ));
-    };
-
-    if (def.id === 'amr' && resolvedBin && agentLaunch.launchPath) {
-      const launchPath = agentLaunch.launchPath ?? resolvedBin;
-      const modelProbeEnv = launchPath
-        ? applyAgentLaunchEnv(
-            spawnEnvForAgent(
-              def.id,
-              {
-                ...createAgentRuntimeEnv(process.env, daemonUrl, toolTokenGrant),
-                ...(def.env || {}),
-              },
-              configuredAgentEnv,
-              undefined,
-              { resolvedBin: agentLaunch.selectedPath },
-            ),
-            agentLaunch,
-          )
-        : null;
-      const amrModelScope = resolveAmrProfile(modelProbeEnv ?? process.env);
-      // Resolve the AMR model catalog through the SAME shared cache the UI's
-      // `/api/amr/models` endpoint serves (AmrModelLoadingCache): a cached
-      // authoritative `vela model list` when it is hot, otherwise the offline
-      // `vela model preset` seed while a remote refresh runs in the background.
-      //
-      // Why not a fresh `vela model list` per run: that authoritative call
-      // needs network reachability to the AMR gateway AND `$HOME` (the offline
-      // `preset`/`--version` calls need neither), takes up to ~10s, and only
-      // retries a narrow set of network errors. Running it blocking on every
-      // turn turned any transient gateway/timeout/HOME hiccup into a hard
-      // "AMR model … is not available from Vela" — even for a logged-in user
-      // who already picked a real model the picker surfaced from the preset
-      // seed. Under CorpLink/飞连 the call routinely exceeded the timeout, so
-      // AMR became unusable in packaged nightlies. Reusing the cache keeps that
-      // blocking probe off the per-run hot path and degrades to preset instead
-      // of fail-closing; vela's own `session/set_model` remains the final gate.
-      let liveModels = [];
-      try {
-        const probe = await resolveAmrModelProbe({ dataDir: RUNTIME_DATA_DIR, env: process.env, readAppConfig });
-        const catalog = await amrModelLoadingCache.get(probe.cacheKey, {
-          fetchPreset: () => fetchVelaPresetModels(probe.launchPath, probe.env),
-          fetchRemote: () => fetchVelaRemoteModelsWithRetry(probe.launchPath, probe.env),
-        });
-        liveModels = catalog.models ?? [];
-      } catch (error) {
-        // Do not swallow silently: a probe failure here is exactly what made
-        // the packaged AMR breakage undiagnosable (the old `catch {}` left no
-        // trace in any log or diagnostics bundle). Record it and degrade to the
-        // remembered catalog below.
-        console.warn('[amr] model catalog preflight probe failed', error);
-        liveModels = [];
-      }
-      const rememberedLiveModels = getRememberedLiveModels(def.id, amrModelScope);
-      if (liveModels.length > 0) {
-        rememberLiveModels(def.id, liveModels, amrModelScope);
-      }
-      liveModels = preferFreshLiveModels(liveModels, rememberedLiveModels);
-      const liveModelIds = new Set(
-        liveModels.map((candidate) => candidate?.id).filter(Boolean),
-      );
-      // A request that came in as 'default'/empty is normally pre-resolved to a
-      // concrete id via the agent-wide cached model order; if it still is not,
-      // adopt the catalog's enabled default so the spawn layer always has a
-      // usable real id.
-      const userAskedForDefault =
-        typeof model !== 'string' ||
-        !model.trim() ||
-        model.trim().toLowerCase() === 'default';
-      const defaultRunModel = resolveDefaultModelFromOptions(liveModels);
-      if (
-        !safeModel ||
-        safeModel === 'default' ||
-        (
-          userAskedForDefault &&
-          !hasDefaultModelEnvOverride &&
-          defaultRunModel &&
-          (!liveModelIds.has(safeModel) || safeModel !== defaultRunModel)
-        )
-      ) {
-        safeModel = defaultRunModel ?? (safeModel === 'default' ? null : safeModel ?? null);
-        agentOptions.model = safeModel;
-      }
-      if (liveModelIds.size === 0) {
-        // The catalog is genuinely empty: even the offline preset seed could
-        // not be read, which almost always means the user is signed out (`vela`
-        // catalog calls 401) or the CLI is unrunnable. Prefer the relogin
-        // affordance over a misleading "choose a model".
-        if (def.id === 'amr') {
-          const loginStatus = readVelaLoginStatus(
-            modelProbeEnv ?? process.env,
-            configuredAgentEnv,
-          );
-          if (!loginStatus.loggedIn) {
-            sendAmrAccountFailure({
-              code: 'AMR_AUTH_REQUIRED',
-              message:
-                'AMR sign-in is required. Sign in to AMR Cloud again, then retry this run.',
-              action: 'relogin',
-            });
-            return design.runs.finish(run, 'failed', 1, null);
-          }
-        }
-        // Logged in but no catalog at all AND no resolvable model: only now is
-        // there nothing safe to forward, so surface the model error.
-        if (!safeModel) {
-          send('error', createAmrModelUnavailablePayload(safeModel, {
-            reason: 'model_catalog_unavailable',
-          }));
-          return design.runs.finish(run, 'failed', 1, null);
-        }
-        // Otherwise fall through with the user's selected model and let vela's
-        // `session/set_model` be the authoritative gate.
-      } else if (!safeModel) {
-        // Catalog known but we could not resolve any model id to forward.
-        send('error', createAmrModelUnavailablePayload(
-          typeof model === 'string' && model.trim() ? model : safeModel,
-          { availableModels: [...liveModelIds] },
-        ));
-        return design.runs.finish(run, 'failed', 1, null);
-      }
-      // NOTE: when the selected model is absent from the (possibly preset-only
-      // or stale) catalog we intentionally do NOT fail-close. The cached/preset
-      // catalog can lag the live one, and a logged-in user picked a concrete
-      // id; vela rejects a truly unsupported model at `session/set_model` with
-      // a precise error, which beats a pre-emptive block on a flaky metadata read.
-    }
 
     const launchContextBudget = evaluateModelContextBudget({
       prompt: composed,
@@ -6209,7 +5502,7 @@ export async function startServer({
     // `runStartTimeMs` is consumed by the run-end artifact-manifest
     // reconciler (#2893 / #3110) to skip artifacts whose mtime predates
     // this run. The original main-side hunk also re-declared `const send`
-    // here; on this branch `send` was hoisted into the AMR preflight
+    // here; `send` is already available to the launch path
     // earlier, so we keep only the new `runStartTimeMs` declaration.
     const runStartTimeMs = Date.now();
     const inactivityTimeoutMs = resolveChatRunInactivityTimeoutMs(def.inactivityTimeoutMs);
@@ -6458,20 +5751,7 @@ export async function startServer({
       undefined,
       { resolvedBin: agentLaunch.selectedPath },
     );
-    if (def.id === 'amr') {
-      const loginStatus = readVelaLoginStatus(agentSpawnEnv, configuredAgentSpawnEnv);
-      if (!loginStatus.loggedIn) {
-        cleanupPromptFile();
-        revokeToolToken('child_exit');
-        unregisterChatAgentEventSink();
-        sendAmrAccountFailure({
-          code: 'AMR_AUTH_REQUIRED',
-          message: 'AMR sign-in is required. Sign in to AMR Cloud again, then retry this run.',
-          action: 'relogin',
-        });
-        return design.runs.finish(run, 'failed', 1, null);
-      }
-    }
+
     const odMediaEnv = createOpenDesignToolEnv({
       daemonUrl,
       projectDir: cwd,
@@ -6505,19 +5785,13 @@ export async function startServer({
     let spawnedAgentEnv = null;
     let agentStdoutTail = '';
     let agentStderrTail = '';
-    const agentStderrFilter = createAgentStderrVisibilityFilter(agentId);
     const emitVisibleAgentStderr = (chunk: unknown) => {
-      const visibleChunk = agentStderrFilter.write(chunk);
+      const visibleChunk = chunk == null ? '' : String(chunk);
       if (!visibleChunk) return;
       agentStderrTail = `${agentStderrTail}${visibleChunk}`.slice(-2000);
       send('stderr', { chunk: visibleChunk });
     };
-    const flushVisibleAgentStderr = () => {
-      const visibleChunk = agentStderrFilter.flush();
-      if (!visibleChunk) return;
-      agentStderrTail = `${agentStderrTail}${visibleChunk}`.slice(-2000);
-      send('stderr', { chunk: visibleChunk });
-    };
+    const flushVisibleAgentStderr = () => undefined;
     try {
       // Prompt delivery via stdin is now the universal default. This bypasses
       // both the cmd.exe 8KB limit and the CreateProcess 32KB limit.
@@ -6530,24 +5804,10 @@ export async function startServer({
         ...(mmdRouteLaunchEnv || {}),
         ...odMediaEnv,
         ...(byokOpenCodeProvider ? byokOpenCodeProvider.env : {}),
-        ...openDesignAmrTraceEnv({
-          agentId: def.id,
-          runId: run.id,
-          conversationId: run.conversationId,
-          runAttempt: run.retryAttemptCount ?? 0,
-        }),
-        // OpenCode external-MCP injection (issue #2142). Layered AFTER
-        // spawnEnvForAgent / odMediaEnv / configuredAgentEnv so the
-        // daemon-built MCP config wins over a stale value the user
-        // might have exported in their shell — that would let an
-        // outdated content string suppress the user's freshly-saved
-        // MCP servers, which is exactly the bug we are fixing.
-        // `opencodeConfigContent === null` means "no enabled servers";
-        // we deliberately leave the env unset in that case so the
-        // user's saved `~/.config/opencode/opencode.json` continues
-        // to apply as-is.
-        ...(opencodeConfigContent
-          ? { [isMiMoContent ? 'MIMOCODE_CONFIG_CONTENT' : 'OPENCODE_CONFIG_CONTENT']: opencodeConfigContent }
+        // Inject only the per-run BYOK provider and linked-directory
+        // allowlist. User-managed global OpenCode config remains untouched.
+        ...(opencodeConfigContent && runtimeConfigEnvKey
+          ? { [runtimeConfigEnvKey]: opencodeConfigContent }
           : {}),
       }, agentLaunch);
       spawnedAgentEnv = env;
@@ -7472,7 +6732,7 @@ export async function startServer({
             send(channel, payload);
           }
         },
-        imagePaths: def.supportsImagePaths ? amrStagedImages : [],
+        imagePaths: def.supportsImagePaths ? agentImagePaths : [],
         uploadRoot: UPLOAD_DIR,
       });
     } else if (def.streamFormat === 'acp-json-rpc') {
@@ -7482,11 +6742,10 @@ export async function startServer({
         prompt: composed,
         cwd: effectiveCwd,
         model: safeModel,
-        imagePaths: def.supportsImagePaths ? amrStagedImages : [],
+        imagePaths: def.supportsImagePaths ? agentImagePaths : [],
         mcpServers,
         envFormat: def.acpMcpEnvFormat ?? 'array',
         executionProfile,
-        ...(def.id === 'amr' ? { modelUnavailableErrorCode: 'AMR_MODEL_UNAVAILABLE' } : {}),
         // Resume the prior upstream session (drives `session/load`) when the
         // resume-identity guard says it is safe; otherwise a fresh session/new.
         ...(def.resumesSessionViaAcpLoad === true && agentResumeCtx.isResuming && agentResumeCtx.resumeSessionId
@@ -7505,20 +6764,6 @@ export async function startServer({
           }
           noteAgentActivity();
           if (event === 'error') flushVisibleAgentStderr();
-          if (def.id === 'amr' && event === 'error') {
-            const failure = classifyAmrAccountFailureSignal({
-              details: data?.error?.details,
-              message: data?.message,
-              errorMessage: data?.error?.message,
-              errorCode: data?.error?.code,
-              stdoutTail: agentStdoutTail,
-              stderrTail: agentStderrTail,
-            });
-            if (failure) {
-              sendAmrAccountFailure(failure);
-              return;
-            }
-          }
           // Hold back the `resume_failed` error so the same-turn reseed stays
           // transparent. When this run is resuming an upstream session via
           // `session/load` and the agent reports that session is gone, the ACP
@@ -7667,8 +6912,8 @@ export async function startServer({
       unregisterChatAgentEventSink();
       // Resume-target-missing recovery runs BEFORE the generic fatal/stream-error
       // short-circuits. The signal arrives differently per adapter: codex reports
-      // "no rollout found for thread id" as a stream `error` event, while AMR/vela
-      // reports a structured `resume_failed` JSON-RPC error that the ACP bridge
+      // "no rollout found for thread id" as a stream `error`, while ACP adapters
+      // report a structured `resume_failed` JSON-RPC error that the ACP bridge
       // turns into a FATAL. Either would otherwise be swallowed by the
       // `fatal_rpc_error` / `stream_error` paths below and leave the dead session
       // id stored — so every later turn would retry the same broken resume (#4275
@@ -7736,16 +6981,6 @@ export async function startServer({
         code !== 0 &&
         !run.cancelRequested
       ) {
-        if (def.id === 'amr') {
-          const amrFailure = classifyAmrAccountFailureSignal({
-            stdoutTail: agentStdoutTail,
-            stderrTail: agentStderrTail,
-          });
-          if (amrFailure) {
-            sendAmrAccountFailure(amrFailure);
-            return finishWithRetryDecision('failed', code ?? 1, signal ?? null);
-          }
-        }
         const authFailure = classifyAgentAuthFailure(
           agentId,
           `${agentStderrTail}\n${agentStdoutTail}`,
@@ -8149,7 +7384,7 @@ export async function startServer({
           publishNativeSessionRecoveryMetadata();
         }
       }
-      // ACP session/load adapters (AMR/vela) report a durable upstream handle
+      // ACP session/load adapters report a durable upstream handle
       // from the ACP session; persist it (under the resume-identity guard) so
       // the next turn resumes via session/load. A missing handle clears the row
       // (so a fresh session is opened next turn), mirroring the capture-style
@@ -8258,161 +7493,6 @@ export async function startServer({
     }
   };
 
-  orbitService.setRunHandler(async ({
-    trigger,
-    startedAt,
-    prompt,
-    systemPrompt,
-    template,
-  }) => {
-    // Each Orbit run gets its own project so the conversation, messages, and
-    // live artifact are isolated. The handler does the synchronous prep here
-    // (insert project/conversation/run rows, kick off the chat run) and
-    // returns immediately with the new project id; the daemon endpoint
-    // resolves the HTTP request with that id so the client can navigate to
-    // the new project before the agent has finished. Anything that depends
-    // on the agent's final status (live artifact discovery, lastRun summary
-    // metadata) lives inside the `completion` promise.
-    const appConfig = await readAppConfig(RUNTIME_DATA_DIR);
-    let agentId = typeof appConfig.agentId === 'string' && appConfig.agentId
-      ? appConfig.agentId
-      : null;
-    if (!agentId) {
-      const agents = await detectAgents(appConfig.agentCliEnv ?? {}).catch(() => []);
-      agentId = agents.find((agent) => agent.available)?.id ?? null;
-    }
-    if (!agentId) throw new Error('No available agent is configured for Orbit. Choose an agent in Settings first.');
-
-    const now = Date.now();
-    const projectId = `orbit-${randomUUID()}`;
-    const conversationId = `orbit-conv-${randomUUID()}`;
-    const assistantMessageId = `orbit-assistant-${randomUUID()}`;
-    const projectName = `Orbit · ${formatLocalProjectTimestamp(startedAt)}`;
-
-    const orbitDesignSystemId = template?.designSystemRequired === false
-      ? null
-      : appConfig.designSystemId ?? null;
-
-    insertProject(db, {
-      id: projectId,
-      name: projectName,
-      skillId: 'live-artifact',
-      designSystemId: orbitDesignSystemId,
-      pendingPrompt: null,
-      metadata: { kind: 'orbit', trigger },
-      createdAt: now,
-      updatedAt: now,
-    });
-    insertConversation(db, {
-      id: conversationId,
-      projectId,
-      title: projectName,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    const run = design.runs.create({
-      projectId,
-      conversationId,
-      assistantMessageId,
-      clientRequestId: `orbit-${trigger}-${randomUUID()}`,
-      agentId,
-      mediaExecution: defaultMediaExecutionPolicy(),
-    });
-    upsertMessage(db, conversationId, {
-      id: `orbit-user-${run.id}`,
-      role: 'user',
-      content: prompt,
-    });
-    upsertMessage(db, conversationId, {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      agentId,
-      agentName: getAgentDef(agentId)?.name ?? agentId,
-      runId: run.id,
-      runStatus: 'queued',
-      startedAt: now,
-    });
-
-    if (template?.dir) {
-      const cwd = await ensureProject(PROJECTS_DIR, projectId);
-      const result = await stageActiveSkill(
-        cwd,
-        skillCwdAliasSegment(template.dir),
-        template.dir,
-        (msg) => console.warn(msg),
-      );
-      if (!result.staged) {
-        console.warn(
-          `[od] orbit template skill-stage skipped: ${result.reason ?? 'unknown reason'}; falling back to prompt-embedded instructions`,
-        );
-      }
-    }
-
-    const modelPrefs = appConfig.agentModels?.[agentId] ?? {};
-    design.runs.start(run, () => startChatRun({
-      agentId,
-      projectId,
-      conversationId: run.conversationId,
-      assistantMessageId: run.assistantMessageId,
-      clientRequestId: run.clientRequestId,
-      skillId: 'live-artifact',
-      designSystemId: orbitDesignSystemId,
-      model: modelPrefs.model ?? null,
-      reasoning: modelPrefs.reasoning ?? null,
-      message: prompt,
-      systemPrompt: [
-        renderOrbitTemplateSystemPrompt(template),
-        systemPrompt,
-        'You are Orbit, an autonomous activity-summary agent inside Open Design.',
-        'You must discover connectors and connector tools yourself through the OD CLI; the daemon has not chosen tools for you.',
-        'You must create and register a Live Artifact as the final deliverable. Do not merely describe what you would do.',
-        'Do not ask follow-up questions, do not emit <question-form>, and do not wait for user input. This run is unattended; pick reasonable defaults and complete the artifact.',
-        'Keep connector credentials and OD_TOOL_TOKEN private; never print or persist secrets.',
-      ].join('\n'),
-    }, run));
-
-    const completion = (async () => {
-      const finalStatus = await design.runs.wait(run);
-      db.prepare(
-        `UPDATE messages SET run_status = ?, ended_at = ? WHERE id = ?`,
-      ).run(finalStatus.status, Date.now(), assistantMessageId);
-      const artifacts = await listLiveArtifacts({ projectsRoot: PROJECTS_DIR, projectId });
-      const artifact = artifacts.find((candidate) => candidate.createdByRunId === run.id);
-      const status = finalStatus.status === 'succeeded' && !artifact ? 'failed' : finalStatus.status;
-      return {
-        agentRunId: run.id,
-        status,
-        ...(artifact?.id ? { artifactId: artifact.id, artifactProjectId: projectId } : {}),
-        summary: artifact?.id
-          ? `Agent ${finalStatus.status} and registered live artifact ${artifact.title}.`
-          : finalStatus.status === 'succeeded'
-            ? buildOrbitNoLiveArtifactSummary(run.events)
-            : `Agent ${finalStatus.status} but did not register a live artifact for this Orbit run.`,
-      };
-    })();
-
-    return { projectId, agentRunId: run.id, completion };
-  });
-
-  orbitService.setTemplateResolver(async (skillId) => {
-    // Orbit templates (live-artifact, etc.) live under design-templates after
-    // the split, but earlier projects may still point at functional-skill
-    // ids for the same purpose — search both roots so a stored project id
-    // keeps resolving through one or the other.
-    const skills = await listAllSkillLikeEntries();
-    const skill = findSkillById(skills, skillId);
-    if (!skill || skill.scenario !== 'orbit') return null;
-    return {
-      id: skill.id,
-      name: skill.name,
-      examplePrompt: skill.examplePrompt,
-      dir: skill.dir,
-      body: skill.body,
-      designSystemRequired: skill.designSystemRequired !== false,
-    };
-  });
 
   registerRunRoutes(app, {
     db,
@@ -8441,355 +7521,6 @@ export async function startServer({
     },
   });
 
-  // Each routine fire resolves an agent, prepares project/conversation state,
-  // and dispatches into the same chat runner used by manual runs.
-  routineService.setRunHandler(async ({ routine, trigger, startedAt, runId }) => {
-    const appConfig = await readAppConfig(RUNTIME_DATA_DIR);
-    let agentId = routine.agentId
-      || (typeof appConfig.agentId === 'string' && appConfig.agentId ? appConfig.agentId : null);
-    if (!agentId) {
-      const agents = await detectAgents(appConfig.agentCliEnv ?? {}).catch(() => []);
-      agentId = agents.find((agent) => agent.available)?.id ?? null;
-    }
-    if (!agentId) {
-      throw new Error('No available agent is configured. Choose an agent in Settings first.');
-    }
-
-    const now = startedAt;
-    const routineContext = normalizeRunContextSelection(routine.context);
-    const routineSkillId = routine.skillId ?? routineContext.skillIds?.[0] ?? null;
-    const contextMetadata = {
-      ...(routineContext.pluginIds?.length
-        ? {
-            contextPlugins: routineContext.pluginIds.map((id) => {
-              const plugin = getInstalledPlugin(db, id);
-              return {
-                id,
-                title: plugin?.title ?? id,
-                ...(plugin?.manifest?.description ? { description: plugin.manifest.description } : {}),
-              };
-            }),
-          }
-        : {}),
-      ...(routineContext.mcpServerIds?.length
-        ? { contextMcpServers: routineContext.mcpServerIds.map((id) => ({ id })) }
-        : {}),
-      ...(routineContext.connectorIds?.length
-        ? { contextConnectors: routineContext.connectorIds.map((id) => ({ id, name: id })) }
-        : {}),
-    };
-    const stamp = formatLocalProjectTimestamp(new Date(now).toISOString());
-    let projectId;
-    let projectName;
-    const scheduledPlaceholderProjectId = `routine-pending-project-${runId}`;
-    const scheduledPlaceholderConversationId = `routine-pending-conv-${runId}`;
-    let createdProjectId: string | null = null;
-    let createdConversationId: string | null = null;
-    let previousProjectSnapshotId: string | null = null;
-    const createRoutineProject = () => {
-      if (createdProjectId) return;
-      projectId = `routine-${randomUUID()}`;
-      projectName = `${routine.name} · ${stamp}`;
-      insertProject(db, {
-        id: projectId,
-        name: projectName,
-        skillId: routineSkillId,
-        designSystemId: appConfig.designSystemId ?? null,
-        pendingPrompt: null,
-        metadata: {
-          kind: 'other',
-          intent: 'automation',
-          automationId: routine.id,
-          routineId: routine.id,
-          trigger,
-          ...contextMetadata,
-        },
-        createdAt: now,
-        updatedAt: now,
-      });
-      createdProjectId = projectId;
-    };
-    if (routine.target.mode === 'reuse') {
-      const project = getProject(db, routine.target.projectId);
-      if (!project) throw new Error(`Routine target project ${routine.target.projectId} not found`);
-      assertSandboxProjectRootAvailable(project.metadata);
-      projectId = project.id;
-      projectName = project.name;
-      previousProjectSnapshotId = project.appliedPluginSnapshotId ?? null;
-    }
-
-    let conversationId = `routine-conv-${randomUUID()}`;
-    let conversationCreatedEvent: ProjectConversationCreatedSsePayload | null = null;
-    const routineConversationTitle = () => routine.target.mode === 'reuse'
-      ? `${routine.name} · ${stamp}`
-      : projectName;
-    const createRoutineConversation = () => {
-      if (createdConversationId) return;
-      if (!projectId) createRoutineProject();
-      if (!projectId) throw new Error('Routine project could not be prepared');
-      conversationId = `routine-conv-${randomUUID()}`;
-      insertConversation(db, {
-        id: conversationId,
-        projectId,
-        title: routineConversationTitle(),
-        createdAt: now,
-        updatedAt: now,
-      });
-      createdConversationId = conversationId;
-      conversationCreatedEvent = {
-        type: 'conversation-created',
-        projectId,
-        conversationId,
-        title: routineConversationTitle(),
-        createdAt: now,
-      };
-    };
-
-    const assistantMessageId = `routine-assistant-${randomUUID()}`;
-    let resolvedRoutineSnapshot = null;
-    // Tracks any snapshot id that `resolvePluginSnapshot()` already pinned
-    // to the reused project before the resolver threw on a later linking
-    // step. `finalizeOk()` performs `linkSnapshotToProject()` BEFORE
-    // `linkSnapshotToConversation()` / `linkSnapshotToRun()`, so a failure
-    // mid-resolve can leave `projects.applied_plugin_snapshot_id` repointed
-    // at a snapshot the routine never durably claimed. The rollback path in
-    // `discard()` falls back to this id when `resolvedRoutineSnapshot` is
-    // still null so the reused project pin is restored either way.
-    let partiallyAppliedSnapshotId: string | null = null;
-    const primaryPluginId = routineContext.pluginIds?.[0] ?? null;
-    const resolveRoutinePluginSnapshot = async () => {
-      if (!primaryPluginId || resolvedRoutineSnapshot) return;
-      const registry = await loadPluginRegistryView();
-      const projectSnapshotBefore = routine.target.mode === 'reuse'
-        ? getProject(db, routine.target.projectId)?.appliedPluginSnapshotId ?? null
-        : null;
-      let resolved;
-      try {
-        resolved = resolvePluginSnapshot({
-          db,
-          body: {
-            pluginId: primaryPluginId,
-            pluginInputs: { prompt: routine.prompt },
-          },
-          projectId,
-          conversationId,
-          registry,
-          activeProjectDesignSystem:
-            typeof appConfig.designSystemId === 'string' && appConfig.designSystemId.length > 0
-              ? { id: appConfig.designSystemId }
-              : undefined,
-        });
-      } catch (resolverError) {
-        // `resolvePluginSnapshot()` may have already updated the reused
-        // project's pin via `linkSnapshotToProject()` before throwing on
-        // `linkSnapshotToConversation()` (or `linkSnapshotToRun()`). Capture
-        // whatever pin it left behind so `discard()` can roll it back even
-        // though `resolvedRoutineSnapshot` will stay null.
-        if (routine.target.mode === 'reuse') {
-          const after = getProject(db, routine.target.projectId)?.appliedPluginSnapshotId ?? null;
-          if (after && after !== projectSnapshotBefore) {
-            partiallyAppliedSnapshotId = after;
-          }
-        }
-        throw resolverError;
-      }
-      if (resolved && !resolved.ok) {
-        // Non-throwing resolver failures cannot have called `finalizeOk()`,
-        // so the project pin is still the previous one — nothing to roll
-        // back beyond the loser cleanup the caller will perform.
-        throw new Error(`Automation plugin ${primaryPluginId} could not be applied: ${JSON.stringify(resolved.body)}`);
-      }
-      resolvedRoutineSnapshot = resolved;
-    };
-    const run = design.runs.create({
-      projectId: projectId ?? scheduledPlaceholderProjectId,
-      conversationId: createdConversationId ? conversationId : scheduledPlaceholderConversationId,
-      assistantMessageId,
-      clientRequestId: `routine-${trigger}-${randomUUID()}`,
-      agentId,
-      mediaExecution: defaultMediaExecutionPolicy(),
-      ...(resolvedRoutineSnapshot?.ok
-        ? {
-            appliedPluginSnapshotId: resolvedRoutineSnapshot.snapshotId,
-            pluginId: resolvedRoutineSnapshot.snapshot.pluginId,
-          }
-        : {}),
-    });
-    const persistPreparedRun = async (routineRun = null) => {
-      if (!projectId) {
-        createRoutineProject();
-      }
-      if (projectId) {
-        run.projectId = projectId;
-        const preparedProject = getProject(db, projectId);
-        run.projectMetadata =
-          preparedProject?.metadata && typeof preparedProject.metadata === 'object'
-            ? preparedProject.metadata
-            : null;
-        if (routineRun) {
-          routineRun.projectId = projectId;
-        }
-      }
-      createRoutineConversation();
-      run.conversationId = conversationId;
-      if (routineRun) {
-        routineRun.conversationId = conversationId;
-        routineRun.agentRunId = run.id;
-      }
-      await resolveRoutinePluginSnapshot();
-      if (resolvedRoutineSnapshot?.ok) {
-        run.appliedPluginSnapshotId = resolvedRoutineSnapshot.snapshotId;
-        run.pluginId = resolvedRoutineSnapshot.snapshot.pluginId;
-        const { linkSnapshotToRun } = await import('./plugins/snapshots.js');
-        linkSnapshotToRun(db, resolvedRoutineSnapshot.snapshotId, run.id);
-      }
-      upsertMessage(db, conversationId, {
-        id: `routine-user-${run.id}`,
-        role: 'user',
-        content: routine.prompt,
-      });
-      upsertMessage(db, conversationId, {
-        id: assistantMessageId,
-        role: 'assistant',
-        content: '',
-        agentId,
-        agentName: getAgentDef(agentId)?.name ?? agentId,
-        runId: run.id,
-        runStatus: 'queued',
-        startedAt: now,
-      });
-    };
-
-    const modelPrefs = appConfig.agentModels?.[agentId] ?? {};
-    const start = () => {
-      // Notify any open `ProjectView` only after the routine run row has
-      // been accepted and preparation has completed, so failed setup does not
-      // surface phantom conversations (#1361).
-      if (conversationCreatedEvent) emitProjectEvent(projectId, conversationCreatedEvent);
-      design.runs.start(run, () => startChatRun({
-        agentId,
-        projectId,
-        conversationId: run.conversationId,
-        assistantMessageId: run.assistantMessageId,
-        clientRequestId: run.clientRequestId,
-        skillId: routineSkillId,
-        designSystemId: appConfig.designSystemId ?? null,
-        context: routineContext,
-        model: modelPrefs.model ?? null,
-        reasoning: modelPrefs.reasoning ?? null,
-        message: routine.prompt,
-        systemPrompt: [
-          `You are running an unattended scheduled routine named "${routine.name}".`,
-          'Do not ask follow-up questions, do not emit <question-form>, and do not wait for user input. Pick reasonable defaults and finish the task.',
-        ].join('\n'),
-      }, run));
-    };
-
-    // Tear-down for the case where the durable routine_run row was never
-    // inserted (sibling daemon won the slot, or insertRun threw). The
-    // in-memory chat run was created speculatively above, but the deferred
-    // `persistPreparedRun()` has not run yet — so no project / conversation
-    // / snapshot writes have to be rolled back. Dropping the run keeps it
-    // off `/api/runs` instead of leaving a phantom canceled entry there.
-    const discardUnstarted = () => {
-      design.runs.drop(run);
-    };
-
-    const discard = () => {
-      if (typeof run.projectId === 'string' && run.projectId.startsWith('routine-pending-')) {
-        run.projectId = null;
-      }
-      if (typeof run.conversationId === 'string' && run.conversationId.startsWith('routine-pending-')) {
-        run.conversationId = null;
-      }
-      design.runs.finish(run, 'canceled');
-      if (routine.target.mode === 'reuse') {
-        // Prefer the fully-resolved snapshot id; fall back to whatever id
-        // `resolvePluginSnapshot()` left pinned on the project if it threw
-        // partway through linking — see the comment on
-        // `partiallyAppliedSnapshotId` above.
-        const snapshotIdToDiscard =
-          resolvedRoutineSnapshot?.ok
-            ? resolvedRoutineSnapshot.snapshotId
-            : partiallyAppliedSnapshotId;
-        if (snapshotIdToDiscard) {
-          restoreProjectSnapshotLink(
-            db,
-            projectId,
-            snapshotIdToDiscard,
-            previousProjectSnapshotId,
-            run.id,
-          );
-        }
-      }
-      if (createdConversationId) {
-        deleteConversation(db, createdConversationId);
-      }
-      if (createdProjectId) {
-        dbDeleteProject(db, createdProjectId);
-      }
-    };
-
-    const completion = (async () => {
-      const finalStatus = await design.runs.wait(run);
-      const failureError = finalStatus.status === 'failed'
-        ? (typeof finalStatus.error === 'string' && finalStatus.error.trim() ? finalStatus.error.trim() : null)
-        : null;
-      const failureErrorCode = finalStatus.status === 'failed'
-        ? (typeof finalStatus.errorCode === 'string' && finalStatus.errorCode.trim() ? finalStatus.errorCode.trim() : null)
-        : null;
-      if (failureError) {
-        appendMessageStatusEvent(db, assistantMessageId, {
-          label: 'error',
-          detail: failureError,
-        });
-      }
-      db.prepare(`UPDATE messages SET run_status = ?, ended_at = ? WHERE id = ?`)
-        .run(finalStatus.status, Date.now(), assistantMessageId);
-      let evolutionSummary = '';
-      if (finalStatus.status === 'succeeded' && routineContext.connectorIds?.length) {
-        try {
-          const evolution = await ingestRoutineConnectorEvolution(RUNTIME_DATA_DIR, {
-            routine,
-            runId,
-            trigger,
-            status: finalStatus.status,
-            projectId,
-            conversationId,
-            agentRunId: run.id,
-            summary: `Routine "${routine.name}" ${finalStatus.status}.`,
-            connectorIds: routineContext.connectorIds,
-            messages: listMessages(db, conversationId),
-          });
-          if (evolution?.proposals?.length) {
-            evolutionSummary = ` Created ${evolution.proposals.length} self-evolution proposal(s) from connector context.`;
-          }
-        } catch (error) {
-          evolutionSummary = ` Connector self-evolution ingestion failed: ${error instanceof Error ? error.message : String(error)}.`;
-        }
-      }
-      return {
-        status: finalStatus.status,
-        summary: failureError
-          ? `Routine "${routine.name}" failed: ${failureError}`
-          : `Routine "${routine.name}" ${finalStatus.status}.${evolutionSummary}`,
-        error: failureError ?? undefined,
-        errorCode: failureErrorCode ?? undefined,
-      };
-    })();
-
-    return {
-      projectId: run.projectId,
-      conversationId: run.conversationId,
-      agentRunId: run.id,
-      completion,
-      prepare: persistPreparedRun,
-      start,
-      discard,
-      discardUnstarted,
-    };
-  });
-  routineService.start();
 
   assertServerContextSatisfiesRoutes({
     db,
@@ -8817,7 +7548,7 @@ export async function startServer({
     orbit: orbitDeps,
     nativeDialogs: nativeDialogDeps,
     research: researchDeps,
-    mcp: { pendingAuth: mcpPendingAuth, daemonUrlRef },
+    mcp: {},
     plugins: {
       connectorService,
       detectSkillPluginCandidateOnRunSuccess,
@@ -8832,7 +7563,7 @@ export async function startServer({
       listAllDesignSystems,
       mimeFor,
     },
-    routines: { routineService },
+    routines: {},
     projectPreviewScopes,
     validation: validationDeps,
     finalize: finalizeDeps,
@@ -8846,12 +7577,6 @@ export async function startServer({
     critique: critiqueDeps,
     openDesignPublicMetadata,
     lifecycle: { isDaemonShuttingDown: () => daemonShuttingDown },
-  });
-
-  registerRoutineRoutes(app, {
-    db,
-    paths: { RUNTIME_DATA_DIR },
-    routines: { routineService },
   });
 
   // proxy routes (anthropic / openai / azure / google / ollama) live
@@ -8887,9 +7612,7 @@ export async function startServer({
   return await new Promise((resolve, reject) => {
     let daemonShutdownStarted = false;
     const cleanupDaemonBackgroundWork = () => {
-      composioConnectorProvider.stopCatalogRefreshLoop();
-      orbitService.stop();
-      routineService?.stop();
+      // Local-only services own no cloud refresh loops or schedulers.
     };
     const shutdownDaemonRuns = async () => {
       if (daemonShutdownStarted) return;
@@ -8902,6 +7625,7 @@ export async function startServer({
     let server;
     try {
       server = app.listen(port, host);
+      server.once('close', releaseEgressGuard);
       server.once('listening', () => {
         // Widen the between-request idle window so kept-alive sockets
         // belonging to chat/SSE clients survive the gaps between bursts.

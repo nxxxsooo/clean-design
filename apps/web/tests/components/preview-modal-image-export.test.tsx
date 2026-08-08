@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PreviewModal } from '../../src/components/PreviewModal';
 
-// Regression coverage for image export: the PreviewModal share menu must
+// Regression coverage for image export: the PreviewModal export menu must
 // include an "Export as image" button that snapshots the srcdoc iframe and
 // downloads a PNG. The snapshot bridges (requestPreviewSnapshot) and the
 // Blob download (exportAsImage) come from the shared exports module —
@@ -33,9 +33,9 @@ const baseProps = {
   exportTitleFor: (id: string) => id,
 };
 
-function openShareMenu() {
-  const share = screen.getByRole('button', { name: /share/i });
-  fireEvent.click(share);
+function openExportMenu() {
+  const exportMenu = screen.getByRole('button', { name: /export files/i });
+  fireEvent.click(exportMenu);
 }
 
 describe('PreviewModal image export', () => {
@@ -44,19 +44,19 @@ describe('PreviewModal image export', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the Export as image button in the share menu', () => {
+  it('renders the Export as image button in the export menu', () => {
     render(
       <PreviewModal {...baseProps} onClose={() => {}} />,
     );
 
-    openShareMenu();
+    openExportMenu();
 
     expect(
       screen.getByRole('menuitem', { name: /export as image/i }),
     ).toBeTruthy();
   });
 
-  it('hides the share menu (including image export) when the view is custom (no iframe)', () => {
+  it('hides the export menu when the view is custom (no iframe)', () => {
     render(
       <PreviewModal
         {...baseProps}
@@ -65,8 +65,7 @@ describe('PreviewModal image export', () => {
       />,
     );
 
-    // The share button itself must not render for custom views.
-    expect(screen.queryByRole('button', { name: /share/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /export files/i })).toBeNull();
   });
 
   it('calls requestPreviewSnapshot and exportAsImage on success', async () => {
@@ -82,7 +81,7 @@ describe('PreviewModal image export', () => {
       <PreviewModal {...baseProps} onClose={() => {}} />,
     );
 
-    openShareMenu();
+    openExportMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: /export as image/i }));
 
     await waitFor(() => {
@@ -106,7 +105,7 @@ describe('PreviewModal image export', () => {
       <PreviewModal {...baseProps} onClose={() => {}} />,
     );
 
-    openShareMenu();
+    openExportMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: /export as image/i }));
 
     await waitFor(() => {
@@ -126,7 +125,7 @@ describe('PreviewModal image export', () => {
       <PreviewModal {...baseProps} onClose={() => {}} />,
     );
 
-    openShareMenu();
+    openExportMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: /export as image/i }));
 
     await waitFor(() => {
@@ -155,7 +154,7 @@ describe('PreviewModal image export', () => {
       <PreviewModal {...baseProps} onClose={() => {}} />,
     );
 
-    openShareMenu();
+    openExportMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: /export as image/i }));
 
     await waitFor(() => {
@@ -182,7 +181,7 @@ describe('PreviewModal image export', () => {
       />,
     );
 
-    openShareMenu();
+    openExportMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: /export as image/i }));
 
     expect(onItemClick).toHaveBeenCalledWith('image');

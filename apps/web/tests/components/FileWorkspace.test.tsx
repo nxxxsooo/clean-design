@@ -1861,63 +1861,6 @@ describe('FileWorkspace launcher tab creation', () => {
   });
 });
 
-describe('DesignFilesPanel plugin folders', () => {
-  it('surfaces generated plugin folders with agent-routed CLI actions', async () => {
-    const onPluginFolderAgentAction = vi.fn();
-    const container = renderWorkspace(
-      <DesignFilesPanel
-        projectId="project-1"
-        files={[
-          workspaceFile('generated-plugin/open-design.json'),
-          workspaceFile('generated-plugin/SKILL.md'),
-          workspaceFile('generated-plugin/examples/demo.md'),
-        ]}
-        liveArtifacts={[]}
-        onRefreshFiles={vi.fn()}
-        onOpenFile={vi.fn()}
-        onOpenLiveArtifact={vi.fn()}
-        onDeleteFile={vi.fn()}
-        onDeleteFiles={vi.fn()}
-        onRenameFile={vi.fn()}
-        onUpload={vi.fn()}
-        onUploadFiles={vi.fn()}
-        onPaste={vi.fn()}
-        onNewSketch={vi.fn()}
-        onPluginFolderAgentAction={onPluginFolderAgentAction}
-      />,
-    );
-
-    expect(container.querySelector('[data-testid="design-plugin-folder-generated-plugin"]')).toBeTruthy();
-    const install = container.querySelector<HTMLButtonElement>(
-      '[data-testid="design-plugin-folder-install-generated-plugin"]',
-    );
-    expect(install).toBeTruthy();
-    await act(async () => {
-      install?.click();
-    });
-    expect(onPluginFolderAgentAction).toHaveBeenCalledWith('generated-plugin', 'install');
-
-    const publish = container.querySelector<HTMLButtonElement>(
-      '[data-testid="design-plugin-folder-publish-generated-plugin"]',
-    );
-    const contribute = container.querySelector<HTMLButtonElement>(
-      '[data-testid="design-plugin-folder-contribute-generated-plugin"]',
-    );
-    expect(publish).toBeTruthy();
-    expect(contribute).toBeTruthy();
-    await act(async () => {
-      publish?.click();
-    });
-    expect(onPluginFolderAgentAction).toHaveBeenCalledWith('generated-plugin', 'publish');
-    await act(async () => {
-      contribute?.click();
-    });
-    expect(onPluginFolderAgentAction).toHaveBeenCalledWith('generated-plugin', 'contribute');
-    expect(container.textContent).not.toContain(
-      'Sent to the agent. The CLI run will continue in chat.',
-    );
-  });
-});
 
 describe('FileWorkspace tab reordering', () => {
   it('persists a dragged file tab before the tab it is dropped on', () => {

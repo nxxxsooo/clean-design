@@ -114,11 +114,6 @@ export function parseRoute(pathname: string): Route {
   if (parts[0] === 'integrations') {
     return { kind: 'home', view: 'home' };
   }
-  // Phase 2B / spec §11.6 — marketplace deep UI routes. Two paths:
-  //   /marketplace            → catalog grid (MarketplaceView)
-  //   /marketplace/<pluginId> → detail page (PluginDetailView)
-  // Aliases to /plugins remain reserved for the public site (spec §13);
-  // in-app we keep /marketplace canonical.
   if (parts[0] === 'marketplace' || parts[0] === 'plugins') {
     return { kind: 'home', view: 'home' };
   }

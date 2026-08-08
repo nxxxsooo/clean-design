@@ -82,7 +82,7 @@ describe('DesignSystemPreviewModal layering', () => {
     expect(screen.getByRole('tab', { name: 'Visualize' }).getAttribute('aria-selected')).toBe('true');
     expect(screen.getByRole('tab', { name: 'Showcase' }).getAttribute('aria-selected')).toBe('false');
     expect(screen.getByTestId('design-system-modal-kit')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Share' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Export files' })).toBeNull();
 
     fireEvent.click(screen.getByRole('tab', { name: 'Showcase' }));
 
@@ -90,6 +90,6 @@ describe('DesignSystemPreviewModal layering', () => {
       expect(fetchDesignSystemShowcaseMock).toHaveBeenCalledWith('claymorphism');
     });
     expect(screen.getByRole('tab', { name: 'Showcase' }).getAttribute('aria-selected')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Share' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Export files' })).toBeTruthy();
   });
 });
