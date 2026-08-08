@@ -6,14 +6,6 @@ export interface AgentModelPrefs {
 export type AgentCliEnvPrefs = Record<string, Record<string, string>>;
 export type AgentCliEnvIntentPrefs = Record<string, { apiKeyOverride?: boolean }>;
 
-export interface OrbitConfigPrefs {
-  enabled: boolean;
-  /** Local 24-hour clock time in HH:mm format. Defaults to 08:00. */
-  time: string;
-  /** Optional skill id from the examples gallery where scenario === "orbit". */
-  templateSkillId?: string | null;
-}
-
 export interface ProjectLocationPrefs {
   id: string;
   name: string;
@@ -30,7 +22,6 @@ export interface AppConfigPrefs {
   designSystemId?: string | null;
   disabledSkills?: string[];
   disabledDesignSystems?: string[];
-  orbit?: OrbitConfigPrefs;
   customInstructions?: string | null;
   /** External project library roots. The daemon adds its built-in .od/projects location at read time. */
   projectLocations?: ProjectLocationPrefs[];

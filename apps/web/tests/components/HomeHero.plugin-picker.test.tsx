@@ -430,8 +430,6 @@ describe('HomeHero plugin picker', () => {
         pluginsLoading={false}
         skillOptions={[]}
         skillsLoading={false}
-        mcpOptions={[]}
-        mcpLoading={false}
         pendingPluginId={null}
         pendingChipId={null}
         onPickPlugin={() => undefined}
@@ -469,8 +467,6 @@ describe('HomeHero plugin picker', () => {
       pluginsLoading: false,
       skillOptions: [],
       skillsLoading: false,
-      mcpOptions: [],
-      mcpLoading: false,
       pendingPluginId: null,
       pendingChipId: null,
       onPickPlugin: () => undefined,

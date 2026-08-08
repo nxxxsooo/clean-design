@@ -262,20 +262,6 @@ export function renderRunContextPrompt(selection: unknown, metadata: unknown) {
     );
     lines.push(formatContextRefList(context.pluginIds, metadataRecord.contextPlugins, 'title'));
   }
-  if (Array.isArray(context.mcpServerIds) && context.mcpServerIds.length > 0) {
-    lines.push('### Selected MCP servers');
-    lines.push(
-      'The user selected these MCP servers for this run. Prefer their tools when they are mounted and relevant before asking where data should come from.',
-    );
-    lines.push(formatContextRefList(context.mcpServerIds, metadataRecord.contextMcpServers, 'label'));
-  }
-  if (Array.isArray(context.connectorIds) && context.connectorIds.length > 0) {
-    lines.push('### Selected connectors');
-    lines.push(
-      'The user selected these connectors for this run. Discover available read-only connector tools first with `"$OD_NODE_BIN" "$OD_BIN" tools connectors list --format compact`, then execute relevant tools through `tools connectors execute`; do not ask for a data source that is already selected.',
-    );
-    lines.push(formatContextRefList(context.connectorIds, metadataRecord.contextConnectors, 'name'));
-  }
   if (lines.length === 0) return '';
   return ['## Selected run context', ...lines].join('\n');
 }

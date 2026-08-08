@@ -75,7 +75,6 @@ interface PluginRouteHelpers {
     stageUploadedPluginZip(buffer: Buffer, source: string): Promise<unknown>;
     stageUploadedPluginFolder(files: Array<{ buffer: Buffer; originalname: string }>, rawPaths: unknown): Promise<unknown>;
   };
-  connectorService: unknown;
   resolvedPortRef: { current: number | null | undefined };
   pluginShareTaskStore: {
     get(id: string): PluginShareTaskLike | null;
@@ -87,7 +86,6 @@ interface PluginRouteHelpers {
   decodeMultipartFilename(name: string): string;
   installOrUpgradePlugin(req: Request, res: Response, mode: 'install' | 'upgrade'): Promise<unknown>;
   loadPluginRegistryView(): Promise<unknown>;
-  buildConnectorProbe(service: unknown): unknown;
   handleShareProject(req: Request, res: Response): Promise<unknown>;
   handlePluginTrust(req: Request, res: Response): Promise<unknown>;
   handlePluginStats(res: Response): Promise<unknown> | unknown;
@@ -124,7 +122,7 @@ export interface RegisterPluginRoutesDeps {
     uninstallPlugin: (db: SqliteDbLike, id: string, roots: string[]) => Promise<{ ok: boolean; removedFolder?: boolean; warning?: string }>;
     installFromLocalFolder: (db: SqliteDbLike, args: unknown) => AsyncIterable<unknown>;
     applyPlugin: (args: unknown) => PluginApplyResult;
-    doctorPlugin: (plugin: InstalledPluginLike, registry: unknown, extras: unknown) => unknown;
+    doctorPlugin: (plugin: InstalledPluginLike, registry: unknown) => unknown;
     getSnapshot: (db: SqliteDbLike, id: string) => AppliedPluginSnapshotLike | null;
     pruneExpiredSnapshots: (db: SqliteDbLike, opts?: { before?: number }) => { removed: number; ids: string[] };
     readPluginLockfile: (path: string) => Promise<unknown>;
@@ -178,7 +176,7 @@ export function registerPluginRoutes(app: Express, deps: RegisterPluginRoutesDep
   app.post('/api/plugins/install', async (req, res) => helpers.installOrUpgradePlugin(req, res, 'install'));
   app.post('/api/plugins/:id/uninstall', async (req, res) => { try { if (!plugins.isSafePluginId(req.params.id)) return res.status(400).json({ error: 'invalid plugin id' }); const result = await plugins.uninstallPlugin(db, req.params.id, paths.PLUGIN_REGISTRY_ROOTS); if (!result.ok && !result.removedFolder) return res.status(404).json({ error: 'plugin not found', warning: result.warning }); res.json(result); } catch (err) { res.status(500).json({ error: String(err) }); } });
   app.post('/api/plugins/:id/upgrade', async (req, res) => helpers.installOrUpgradePlugin(req, res, 'upgrade'));
-  app.post('/api/plugins/:id/apply', async (req, res) => { try { const plugin = plugins.getInstalledPlugin(db, req.params.id); if (!plugin) return res.status(404).json({ error: 'plugin not found' }); const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {}; const inputs = body.inputs && typeof body.inputs === 'object' ? body.inputs : {}; const grantCaps = Array.isArray(body.grantCaps) ? body.grantCaps.filter((c: unknown): c is string => typeof c === 'string') : []; const locale = typeof body.locale === 'string' ? body.locale : undefined; const registry = await helpers.loadPluginRegistryView(); const connectorProbe = helpers.buildConnectorProbe(helpers.connectorService); const computed = plugins.applyPlugin({ plugin, inputs, registry, locale, connectorProbe }); if (grantCaps.length > 0) { const merged = new Set([...computed.result.capabilitiesGranted, ...grantCaps]); computed.result.capabilitiesGranted = Array.from(merged); computed.result.appliedPlugin.capabilitiesGranted = Array.from(merged); } res.json({ ok: true, ...computed.result, warnings: computed.warnings, manifestSourceDigest: computed.manifestSourceDigest }); } catch (err: unknown) { if (err instanceof plugins.MissingInputError) return res.status(422).json({ error: 'missing_inputs', fields: err.fields }); res.status(500).json({ error: String(err) }); } });
+  app.post('/api/plugins/:id/apply', async (req, res) => { try { const plugin = plugins.getInstalledPlugin(db, req.params.id); if (!plugin) return res.status(404).json({ error: 'plugin not found' }); const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {}; const inputs = body.inputs && typeof body.inputs === 'object' ? body.inputs : {}; const grantCaps = Array.isArray(body.grantCaps) ? body.grantCaps.filter((c: unknown): c is string => typeof c === 'string') : []; const locale = typeof body.locale === 'string' ? body.locale : undefined; const registry = await helpers.loadPluginRegistryView(); const computed = plugins.applyPlugin({ plugin, inputs, registry, locale }); if (grantCaps.length > 0) { const merged = new Set([...computed.result.capabilitiesGranted, ...grantCaps]); computed.result.capabilitiesGranted = Array.from(merged); computed.result.appliedPlugin.capabilitiesGranted = Array.from(merged); } res.json({ ok: true, ...computed.result, warnings: computed.warnings, manifestSourceDigest: computed.manifestSourceDigest }); } catch (err: unknown) { if (err instanceof plugins.MissingInputError) return res.status(422).json({ error: 'missing_inputs', fields: err.fields }); res.status(500).json({ error: String(err) }); } });
   app.post('/api/plugins/:id/duplicate-project', helpers.requireLocalDaemonRequest, async (req, res) => {
     let cleanupProjectId: string | null = null;
     let insertedProject = false;
@@ -266,7 +264,7 @@ export function registerPluginRoutes(app: Express, deps: RegisterPluginRoutesDep
     }
   });
   app.post('/api/plugins/:id/share-project', async (req, res) => helpers.handleShareProject(req, res));
-  app.post('/api/plugins/:id/doctor', async (req, res) => { try { const plugin = plugins.getInstalledPlugin(db, req.params.id); if (!plugin) return res.status(404).json({ error: 'plugin not found' }); const registry = await helpers.loadPluginRegistryView(); const connectorProbe = helpers.buildConnectorProbe(helpers.connectorService); res.json(plugins.doctorPlugin(plugin, registry, { connectorProbe })); } catch (err) { res.status(500).json({ error: String(err) }); } });
+  app.post('/api/plugins/:id/doctor', async (req, res) => { try { const plugin = plugins.getInstalledPlugin(db, req.params.id); if (!plugin) return res.status(404).json({ error: 'plugin not found' }); const registry = await helpers.loadPluginRegistryView(); res.json(plugins.doctorPlugin(plugin, registry)); } catch (err) { res.status(500).json({ error: String(err) }); } });
   app.post('/api/plugins/:id/trust', async (req, res) => helpers.handlePluginTrust(req, res));
   app.get('/api/plugins/stats', async (_req, res) => helpers.handlePluginStats(res));
   app.get('/api/applied-plugins/:snapshotId', (req, res) => { try { const snap = plugins.getSnapshot(db, req.params.snapshotId); if (!snap) return res.status(404).json({ error: 'snapshot not found' }); res.json(snap); } catch (err) { res.status(500).json({ error: String(err) }); } });

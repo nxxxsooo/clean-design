@@ -30,10 +30,6 @@ import {
   removeVerification as removeMemoryVerification,
 } from '../memory-verify.js';
 import { distillRulesFromAnnotations } from '../memory-rules.js';
-import {
-  extractMemoryFromConnectors,
-  suggestMemoryFromConnectors,
-} from '../memory-connectors.js';
 
 export interface RegisterMemoryRoutesDeps extends RouteDeps<'http' | 'paths' | 'appConfig'> {}
 
@@ -423,102 +419,6 @@ export function registerMemoryRoutes(app: Express, ctx: RegisterMemoryRoutesDeps
             : {}),
         },
       );
-      res.json(result);
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) });
-    }
-  });
-
-  app.post('/api/memory/connectors/suggest', requireLocalDaemonRequest, async (req, res) => {
-    try {
-      const body = asRecord(req.body);
-      const connectorIds = Array.isArray(body.connectorIds)
-        ? body.connectorIds
-          .filter((id: unknown): id is string => typeof id === 'string')
-          .map((id: string) => id.trim())
-          .filter(Boolean)
-          .slice(0, 12)
-        : undefined;
-      const query =
-        typeof body.query === 'string' ? body.query.trim().slice(0, 240) : '';
-      const projectId =
-        typeof body.projectId === 'string' && body.projectId.trim()
-          ? body.projectId.trim()
-          : null;
-      const appConfig = (await readAppConfig(RUNTIME_DATA_DIR).catch(() => ({}))) as MemoryAppConfigLike;
-      const chatAgentId =
-        typeof body.chatAgentId === 'string' && body.chatAgentId.trim()
-          ? body.chatAgentId.trim()
-          : typeof appConfig.agentId === 'string' && appConfig.agentId.trim()
-            ? appConfig.agentId.trim()
-            : null;
-      const requestChatModel =
-        typeof body.chatModel === 'string' && body.chatModel.trim()
-          ? body.chatModel.trim()
-          : null;
-      const chatModel =
-        requestChatModel
-        || (chatAgentId && appConfig.agentModels?.[chatAgentId]?.model
-          ? appConfig.agentModels[chatAgentId].model ?? null
-          : null);
-      const options = {
-        projectsRoot: PROJECTS_DIR,
-        projectRoot: PROJECT_ROOT,
-        ...(projectId ? { projectId } : {}),
-        ...(connectorIds ? { connectorIds } : {}),
-        ...(query ? { query } : {}),
-        ...(chatAgentId ? { chatAgentId } : {}),
-        ...(chatModel ? { chatModel } : {}),
-      };
-      const result = await suggestMemoryFromConnectors(RUNTIME_DATA_DIR, options);
-      res.json(result);
-    } catch (err) {
-      res.status(400).json({ error: errorMessage(err) });
-    }
-  });
-
-  app.post('/api/memory/connectors/extract', requireLocalDaemonRequest, async (req, res) => {
-    try {
-      const body = asRecord(req.body);
-      const connectorIds = Array.isArray(body.connectorIds)
-        ? body.connectorIds
-          .filter((id: unknown): id is string => typeof id === 'string')
-          .map((id: string) => id.trim())
-          .filter(Boolean)
-          .slice(0, 12)
-        : undefined;
-      const query =
-        typeof body.query === 'string' ? body.query.trim().slice(0, 240) : '';
-      const projectId =
-        typeof body.projectId === 'string' && body.projectId.trim()
-          ? body.projectId.trim()
-          : null;
-      const appConfig = (await readAppConfig(RUNTIME_DATA_DIR).catch(() => ({}))) as MemoryAppConfigLike;
-      const chatAgentId =
-        typeof body.chatAgentId === 'string' && body.chatAgentId.trim()
-          ? body.chatAgentId.trim()
-          : typeof appConfig.agentId === 'string' && appConfig.agentId.trim()
-            ? appConfig.agentId.trim()
-            : null;
-      const requestChatModel =
-        typeof body.chatModel === 'string' && body.chatModel.trim()
-          ? body.chatModel.trim()
-          : null;
-      const chatModel =
-        requestChatModel
-        || (chatAgentId && appConfig.agentModels?.[chatAgentId]?.model
-          ? appConfig.agentModels[chatAgentId].model ?? null
-          : null);
-      const options = {
-        projectsRoot: PROJECTS_DIR,
-        projectRoot: PROJECT_ROOT,
-        ...(projectId ? { projectId } : {}),
-        ...(connectorIds ? { connectorIds } : {}),
-        ...(query ? { query } : {}),
-        ...(chatAgentId ? { chatAgentId } : {}),
-        ...(chatModel ? { chatModel } : {}),
-      };
-      const result = await extractMemoryFromConnectors(RUNTIME_DATA_DIR, options);
       res.json(result);
     } catch (err) {
       res.status(400).json({ error: errorMessage(err) });

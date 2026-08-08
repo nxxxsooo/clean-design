@@ -24,6 +24,7 @@ import {
   resolveLocalizedText,
   type AppliedPluginSnapshot,
   type ApplyResult,
+  type GenUISurfaceSpec,
   type InstalledPluginRecord,
   type McpServerSpec,
   type PluginAssetRef,
@@ -34,12 +35,6 @@ import {
   type TrustTier,
 } from '@open-design/contracts';
 import { resolveCapabilitiesGranted, requiredCapabilities } from './trust.js';
-import {
-  deriveAutoOAuthPrompts,
-  mergeAutoOAuthPrompts,
-  resolveConnectorBindings,
-  type ConnectorProbe,
-} from './connector-gate.js';
 import { deriveAutoAtomSurfaces } from './atoms/auto-surfaces.js';
 import { ensureCoreQualityStages } from './ensure-core-stages.js';
 import { getManifestContextCraft } from './context-craft.js';
@@ -70,13 +65,6 @@ export interface ApplyInput {
   // UI locale used to resolve localized manifest strings. Snapshots store
   // the resolved string so historical runs never change when translations do.
   locale?: string | undefined;
-  // Sync probe over the connector catalog + status maps. When supplied,
-  // apply resolves `od.connectors.*` against the live catalog and
-  // auto-derives an `oauth-prompt` GenUI surface for any not-yet-connected
-  // required connector (spec §10.3.1). When omitted (legacy callers, unit
-  // tests), the connector bindings stay in `pending` status and no
-  // auto-prompt is derived.
-  connectorProbe?: ConnectorProbe | undefined;
 }
 
 export interface ApplyComputed {
@@ -113,9 +101,20 @@ export function applyPlugin(input: ApplyInput): ApplyComputed {
   });
 
   const assets = buildAssetRefs(manifest);
-  const mcpServers = manifest.od?.context?.mcp?.slice() ?? [];
-  const { resolved: connectorsResolved, required: connectorsRequired } =
-    resolveConnectorBindings(manifest, input.connectorProbe);
+  // Clean Design keeps old manifests parseable but never mounts external
+  // MCP servers or connector hosts. Declarations are retained in the
+  // snapshot as explicitly unavailable metadata for deterministic exports.
+  const mcpServers: McpServerSpec[] = [];
+  const connectorsRequired: PluginConnectorRef[] = [
+    ...(manifest.od?.connectors?.required ?? []).map((ref) => ({ ...ref, required: true })),
+    ...(manifest.od?.connectors?.optional ?? []).map((ref) => ({ ...ref, required: false })),
+  ];
+  const connectorsResolved: PluginConnectorBinding[] = connectorsRequired.map((ref) => ({
+    id: ref.id,
+    tools: Array.isArray(ref.tools) ? ref.tools : [],
+    required: ref.required,
+    status: 'unavailable',
+  }));
   const required = requiredCapabilities(manifest);
   const granted = resolveCapabilitiesGranted({ manifest, trust });
   const taskKind = (manifest.od?.taskKind ?? 'new-generation') as AppliedPluginSnapshot['taskKind'];
@@ -144,20 +143,14 @@ export function applyPlugin(input: ApplyInput): ApplyComputed {
   });
 
   const declaredSurfaces = manifest.od?.genui?.surfaces ?? [];
-  const autoOAuth = input.connectorProbe
-    ? deriveAutoOAuthPrompts(connectorsResolved)
-    : [];
-  // Spec §10.3.1 / §21.5: auto-derive surfaces for first-party atom
+  // Auto-derive surfaces for first-party atom
   // stages (diff-review → choice surface). Plugin-author surfaces
   // with the same id win; the merge helper handles the dedupe.
   // We use the EFFECTIVE pipeline (appliedPipeline) so a plugin that
   // inherits the bundled scenario's diff-review stage still gets
   // the auto-surface.
   const autoAtom = deriveAutoAtomSurfaces({ pipeline: appliedPipeline });
-  const genuiSurfaces = mergeAutoOAuthPrompts(
-    mergeAutoOAuthPrompts(declaredSurfaces, autoOAuth),
-    autoAtom,
-  );
+  const genuiSurfaces = mergeGenuiSurfaces(declaredSurfaces, autoAtom);
 
   const pluginTitle = resolveLocalizedText(manifest.title_i18n, input.locale) || (manifest.title ?? manifest.name);
   const pluginDescription =
@@ -272,6 +265,22 @@ function coerceScalar(value: unknown): string | number | boolean {
   if (typeof value === 'boolean') return value;
   if (Array.isArray(value)) return value.join(', ');
   return JSON.stringify(value);
+}
+
+function mergeGenuiSurfaces(
+  declared: GenUISurfaceSpec[],
+  generated: GenUISurfaceSpec[],
+): GenUISurfaceSpec[] {
+  const ids = new Set(declared.map((surface) => surface.id.toLowerCase()));
+  return [
+    ...declared,
+    ...generated.filter((surface) => {
+      const id = surface.id.toLowerCase();
+      if (ids.has(id)) return false;
+      ids.add(id);
+      return true;
+    }),
+  ];
 }
 
 function buildAssetRefs(manifest: PluginManifest): PluginAssetRef[] {

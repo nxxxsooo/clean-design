@@ -140,7 +140,7 @@ describe('live artifact schema validation', () => {
     }
   });
 
-  it('persists only connector references and rejects credential material in connector metadata', () => {
+  it('rejects removed connector_tool sources', () => {
     const result = validateLiveArtifactCreateInput({
       ...validCreateInput(),
       document: {
@@ -149,97 +149,15 @@ describe('live artifact schema validation', () => {
           type: 'connector_tool',
           toolName: 'docs.search',
           input: { query: 'launch' },
-          connector: {
-            connectorId: 'docs',
-            accountLabel: 'docs@example.com',
-            toolName: 'docs.search',
-            approvalPolicy: 'manual_refresh_granted_for_read_only',
-            accessToken: 'oauth-secret-token',
-            headers: { authorization: 'Bearer oauth-secret-token' },
-          },
-          oauthState: 'state-that-must-not-persist',
-          refreshPermission: 'manual_refresh_granted_for_read_only',
-        },
-      },
-    });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.issues.map((issue) => issue.path)).toEqual(expect.arrayContaining([
-        'input.document.sourceJson.connector.accessToken',
-        'input.document.sourceJson.connector.headers',
-        'input.document.sourceJson.oauthState',
-      ]));
-    }
-  });
-
-  it('requires connector metadata for connector_tool sources', () => {
-    const result = validateLiveArtifactCreateInput({
-      ...validCreateInput(),
-      document: {
-        ...validCreateInput().document,
-        sourceJson: {
-          type: 'connector_tool',
-          toolName: 'docs.search',
-          input: { query: 'launch' },
-          refreshPermission: 'manual_refresh_granted_for_read_only',
-        },
-      },
-    });
-
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.issues).toEqual(expect.arrayContaining([
-        expect.objectContaining({ path: 'input.document.sourceJson.connector' }),
-      ]));
-    }
-  });
-
-  it('does not require connector approval metadata for connector_tool sources', () => {
-    const result = validateLiveArtifactCreateInput({
-      ...validCreateInput(),
-      document: {
-        ...validCreateInput().document,
-        sourceJson: {
-          type: 'connector_tool',
-          toolName: 'docs.search',
-          input: { query: 'launch' },
-          connector: {
-            connectorId: 'docs',
-            toolName: 'docs.search',
-          },
           refreshPermission: 'none',
         },
       },
     });
 
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value.document?.sourceJson?.connector).toEqual({ connectorId: 'docs', toolName: 'docs.search' });
-  });
-
-  it('requires connector source tool name to match connector metadata', () => {
-    const result = validateLiveArtifactCreateInput({
-      ...validCreateInput(),
-      document: {
-        ...validCreateInput().document,
-        sourceJson: {
-          type: 'connector_tool',
-          toolName: 'docs.search',
-          input: { query: 'launch' },
-          connector: {
-            connectorId: 'docs',
-            toolName: 'docs.lookup',
-            approvalPolicy: 'read_only_auto',
-          },
-          refreshPermission: 'manual_refresh_granted_for_read_only',
-        },
-      },
-    });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.issues).toEqual(expect.arrayContaining([
-        expect.objectContaining({ path: 'input.document.sourceJson.toolName' }),
+        expect.objectContaining({ path: 'input.document.sourceJson.type' }),
       ]));
     }
   });

@@ -75,12 +75,6 @@ export interface AgentModelPrefs {
 export type AgentCliEnvPrefs = Record<string, Record<string, string>>;
 export type AgentCliEnvIntentPrefs = Record<string, { apiKeyOverride?: boolean }>;
 
-export interface OrbitConfigPrefs {
-  enabled: boolean;
-  time: string;
-  templateSkillId?: string | null;
-}
-
 export interface ProjectLocationPrefs {
   id: string;
   name: string;
@@ -97,7 +91,6 @@ export interface AppConfigPrefs {
   designSystemId?: string | null;
   disabledSkills?: string[];
   disabledDesignSystems?: string[];
-  orbit?: OrbitConfigPrefs;
   customInstructions?: string | null;
   projectLocations?: ProjectLocationPrefs[];
   defaultProjectLocationId?: string | null;
@@ -122,7 +115,6 @@ const ALLOWED_KEYS: ReadonlySet<keyof AppConfigPrefs> = new Set([
   'designSystemId',
   'disabledSkills',
   'disabledDesignSystems',
-  'orbit',
   'customInstructions',
   'projectLocations',
   'defaultProjectLocationId',
@@ -251,33 +243,6 @@ export function validateAgentCliEnvIntent(raw: unknown): AgentCliEnvIntentPrefs 
     }
   }
   return Object.keys(result).length > 0 ? result : undefined;
-}
-
-function isValidOrbitTime(time: string): boolean {
-  const match = /^(\d{2}):(\d{2})$/.exec(time);
-  if (!match) return false;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
-}
-
-function validateOrbit(raw: unknown): OrbitConfigPrefs | undefined {
-  if (raw === undefined || raw === null) return undefined;
-  if (typeof raw !== 'object' || Array.isArray(raw)) return undefined;
-  const obj = raw as Record<string, unknown>;
-  const enabled = typeof obj.enabled === 'boolean' ? obj.enabled : false;
-  const time = typeof obj.time === 'string' && isValidOrbitTime(obj.time)
-    ? obj.time
-    : '08:00';
-  const orbit: OrbitConfigPrefs = { enabled, time };
-
-  if (Object.hasOwn(obj, 'templateSkillId')) {
-    orbit.templateSkillId = typeof obj.templateSkillId === 'string' && obj.templateSkillId.trim()
-      ? obj.templateSkillId.trim()
-      : null;
-  }
-
-  return orbit;
 }
 
 function normalizeLocationId(raw: string, fallback: string): string {
@@ -503,14 +468,6 @@ function applyConfigValue(
   if (key === 'disabledSkills' || key === 'disabledDesignSystems') {
     if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
       target[key] = value;
-    } else {
-      delete target[key];
-    }
-  }
-  if (key === 'orbit') {
-    const validated = validateOrbit(value);
-    if (validated !== undefined) {
-      target[key] = validated;
     } else {
       delete target[key];
     }

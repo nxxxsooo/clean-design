@@ -251,7 +251,6 @@ function renderSettingsDialog(
   } = {},
 ) {
   const onPersist = vi.fn();
-  const onPersistComposioKey = vi.fn();
   const onClose = vi.fn();
   const onRefreshAgents = options.onRefreshAgents ?? vi.fn<OnRefreshAgents>();
 
@@ -265,7 +264,6 @@ function renderSettingsDialog(
       providerModelsCache={options.providerModelsCache}
       welcome={options.welcome}
       onPersist={onPersist}
-      onPersistComposioKey={onPersistComposioKey}
       onClose={onClose}
       onRefreshAgents={onRefreshAgents}
     />,
@@ -273,7 +271,6 @@ function renderSettingsDialog(
 
   return {
     onPersist,
-    onPersistComposioKey,
     onClose,
     onRefreshAgents,
     ...view,
@@ -293,7 +290,6 @@ function renderLanguageSettingsDialog(initialLocale: Parameters<typeof I18nProvi
         appVersionInfo={null}
         initialSection="language"
         onPersist={onPersist}
-        onPersistComposioKey={vi.fn()}
         onClose={onClose}
         onRefreshAgents={vi.fn()}
       />
@@ -3465,7 +3461,6 @@ describe('SettingsDialog appearance interactions', () => {
           appVersionInfo={null}
           initialSection="appearance"
           onPersist={vi.fn()}
-          onPersistComposioKey={vi.fn()}
           onClose={vi.fn()}
           onRefreshAgents={vi.fn()}
         />

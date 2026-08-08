@@ -19,7 +19,6 @@ import {
 import {
   defaultScenarioPluginIdForProjectMetadata,
   type ChatSessionMode,
-  type ConnectorDetail,
   type InstalledPluginRecord,
   type RunContextSelection,
 } from '@open-design/contracts';
@@ -217,8 +216,6 @@ interface Props {
   onDeleteTemplate?: (id: string) => Promise<boolean>;
   promptTemplates: PromptTemplateSummary[];
   defaultDesignSystemId: string | null;
-  connectors: ConnectorDetail[];
-  connectorsLoading: boolean;
   skillsLoading?: boolean;
   designSystemsLoading?: boolean;
   projectsLoading?: boolean;
@@ -319,8 +316,6 @@ export function EntryShell({
   onDeleteTemplate,
   promptTemplates,
   defaultDesignSystemId,
-  connectors,
-  connectorsLoading,
   skillsLoading = false,
   designSystemsLoading = false,
   projectsLoading = false,
@@ -511,12 +506,6 @@ export function EntryShell({
       nameSource: 'prompt',
       ...(payload.contextPlugins && payload.contextPlugins.length > 0
         ? { contextPlugins: payload.contextPlugins }
-        : {}),
-      ...(payload.contextMcpServers && payload.contextMcpServers.length > 0
-        ? { contextMcpServers: payload.contextMcpServers }
-        : {}),
-      ...(payload.contextConnectors && payload.contextConnectors.length > 0
-        ? { contextConnectors: payload.contextConnectors }
         : {}),
       // The Home working-directory picker grants the agent read-only
       // awareness of a local folder (via `--add-dir`), it does NOT import
@@ -758,8 +747,6 @@ export function EntryShell({
         {...(onDeleteTemplate ? { onDeleteTemplate } : {})}
         promptTemplates={promptTemplates}
         mediaProviders={config.mediaProviders}
-        connectors={connectors}
-        connectorsLoading={connectorsLoading}
         loading={skillsLoading}
         onCreate={handleCreate}
         onImportClaudeDesign={onImportClaudeDesign}

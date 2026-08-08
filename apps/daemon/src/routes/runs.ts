@@ -20,7 +20,6 @@ import {
   codexSessionIdFromRunEvents,
   readCodexRolloutFirstCall,
 } from '../codex-rollout-usage.js';
-import type { ConnectorService } from '../connectors/service.js';
 import {
   conversationTurnIndexForRun,
   getConversation,
@@ -33,11 +32,7 @@ import {
 import { getDetectedRuntimeVersions } from '../runtimes/detection.js';
 import { parseMediaExecutionPolicyInput } from '../media/policy.js';
 import { isManagedProjectCwd } from '../mcp-config.js';
-import {
-  buildConnectorProbe,
-  getInstalledPlugin,
-  resolvePluginSnapshot,
-} from '../plugins/index.js';
+import { getInstalledPlugin, resolvePluginSnapshot } from '../plugins/index.js';
 import {
   assertSandboxProjectRootAvailable,
   isSafeId,
@@ -242,7 +237,6 @@ export interface RegisterRunRoutesDeps {
     isDaemonShuttingDown: () => boolean;
   };
   plugins: {
-    connectorService: ConnectorService;
     detectSkillPluginCandidateOnRunSuccess: (
       db: SqliteDb,
       runs: ChatRunService,
@@ -429,7 +423,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
   const { detectAgents, getAgentDef } = ctx.agents;
   const { startChatRun } = ctx.chat;
   const {
-    connectorService,
     detectSkillPluginCandidateOnRunSuccess,
     firePipelineForRun,
     loadPluginRegistryView,
@@ -511,7 +504,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
           ? requestBody.conversationId
           : null,
         registry: registryView,
-        connectorProbe: buildConnectorProbe(connectorService),
       });
       if (resolved && !resolved.ok) {
         if (!explicitPlugin) {

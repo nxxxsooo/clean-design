@@ -10,8 +10,7 @@ export interface BoundedJsonObject {
 export type LiveArtifactStatus = 'active' | 'archived' | 'error';
 export type LiveArtifactRefreshStatus = 'never' | 'idle' | 'running' | 'succeeded' | 'failed';
 export type LiveArtifactPreviewType = 'html' | 'jsx' | 'markdown';
-export type LiveArtifactSourceType = 'local_file' | 'daemon_tool' | 'connector_tool';
-export type LiveArtifactConnectorApprovalPolicy = 'read_only_auto' | 'manual_refresh_granted_for_read_only';
+export type LiveArtifactSourceType = 'local_file' | 'daemon_tool';
 export type LiveArtifactRefreshPermission = 'none' | 'manual_refresh_granted_for_read_only';
 export type LiveArtifactOutputTransform = 'identity' | 'compact_table' | 'metric_summary';
 export type LiveArtifactProvenanceGenerator = 'agent' | 'refresh_runner';
@@ -38,12 +37,6 @@ export interface LiveArtifactSource {
   type: LiveArtifactSourceType;
   toolName?: string;
   input: BoundedJsonObject;
-  connector?: {
-    connectorId: string;
-    accountLabel?: string;
-    toolName: string;
-    approvalPolicy?: LiveArtifactConnectorApprovalPolicy;
-  };
   outputMapping?: {
     dataPaths?: Array<{ from: string; to: string }>;
     transform?: LiveArtifactOutputTransform;
@@ -82,17 +75,9 @@ export interface LiveArtifact {
   document: LiveArtifactDocument;
 }
 
-export interface LiveArtifactRefreshConnectorMetadata {
-  connectorId: string;
-  accountLabel?: string;
-  toolName: string;
-  approvalPolicy?: LiveArtifactConnectorApprovalPolicy;
-}
-
 export interface LiveArtifactRefreshSourceMetadata {
   sourceType: LiveArtifactRefreshSourceType;
   toolName?: string;
-  connector?: LiveArtifactRefreshConnectorMetadata;
 }
 
 export interface LiveArtifactRefreshErrorRecord {
@@ -205,11 +190,6 @@ const PREVIEW_TYPES = new Set<LiveArtifactPreview['type']>(['html', 'jsx', 'mark
 const SOURCE_TYPES = new Set<LiveArtifactSource['type']>([
   'local_file',
   'daemon_tool',
-  'connector_tool',
-]);
-const CONNECTOR_APPROVAL_POLICIES = new Set<LiveArtifactConnectorApprovalPolicy>([
-  'read_only_auto',
-  'manual_refresh_granted_for_read_only',
 ]);
 const REFRESH_PERMISSIONS = new Set<LiveArtifactSource['refreshPermission']>([
   'none',
@@ -237,10 +217,9 @@ const REFRESH_SOURCE_TYPES = new Set<LiveArtifactRefreshSourceType>([
   'document',
   'artifact',
 ]);
-const SOURCE_KEYS = new Set(['type', 'toolName', 'input', 'connector', 'outputMapping', 'refreshPermission']);
-const CONNECTOR_REFERENCE_KEYS = new Set(['connectorId', 'accountLabel', 'toolName', 'approvalPolicy']);
+const SOURCE_KEYS = new Set(['type', 'toolName', 'input', 'outputMapping', 'refreshPermission']);
 const OUTPUT_MAPPING_KEYS = new Set(['dataPaths', 'transform']);
-const REFRESH_SOURCE_METADATA_KEYS = new Set(['sourceType', 'toolName', 'connector']);
+const REFRESH_SOURCE_METADATA_KEYS = new Set(['sourceType', 'toolName']);
 
 function fail<T>(issues: LiveArtifactValidationIssue[]): LiveArtifactValidationResult<T> {
   return {
@@ -572,27 +551,6 @@ function validateSource(value: unknown, path: string, issues: LiveArtifactValida
     validateDaemonRefreshRequiredInput(resolveDaemonRefreshToolName(type, toolName), inputResult.value, `${path}.input`, issues);
   }
 
-  let connector: LiveArtifactSource['connector'];
-  if (value.connector !== undefined) {
-    if (!isPlainObject(value.connector)) {
-      issues.push({ path: `${path}.connector`, message: `${path}.connector must be an object` });
-    } else {
-      validateOnlyAllowedKeys(value.connector, CONNECTOR_REFERENCE_KEYS, `${path}.connector`, issues);
-      const connectorId = asString(value.connector.connectorId, `${path}.connector.connectorId`, issues, MAX_ID_LENGTH);
-      const accountLabel = asOptionalString(value.connector.accountLabel, `${path}.connector.accountLabel`, issues, MAX_SHORT_TEXT_LENGTH);
-      const connectorToolName = asString(value.connector.toolName, `${path}.connector.toolName`, issues, MAX_ID_LENGTH);
-      const approvalPolicy = value.connector.approvalPolicy === undefined
-        ? undefined
-        : validateEnum(value.connector.approvalPolicy, CONNECTOR_APPROVAL_POLICIES, `${path}.connector.approvalPolicy`, issues);
-      if (connectorId !== undefined && connectorToolName !== undefined) {
-        const nextConnector: NonNullable<LiveArtifactSource['connector']> = { connectorId, toolName: connectorToolName };
-        if (accountLabel !== undefined) nextConnector.accountLabel = accountLabel;
-        if (approvalPolicy !== undefined) nextConnector.approvalPolicy = approvalPolicy;
-        connector = nextConnector;
-      }
-    }
-  }
-
   let outputMapping: LiveArtifactSource['outputMapping'];
   if (value.outputMapping !== undefined) {
     if (!isPlainObject(value.outputMapping)) {
@@ -628,19 +586,12 @@ function validateSource(value: unknown, path: string, issues: LiveArtifactValida
   }
 
   const refreshPermission = validateEnum(value.refreshPermission, REFRESH_PERMISSIONS, `${path}.refreshPermission`, issues);
-  if (type === 'connector_tool' && connector === undefined) {
-    issues.push({ path: `${path}.connector`, message: `${path}.connector is required for connector_tool sources` });
-  }
-  if (type === 'connector_tool' && toolName !== undefined && connector !== undefined && toolName !== connector.toolName) {
-    issues.push({ path: `${path}.toolName`, message: `${path}.toolName must match ${path}.connector.toolName` });
-  }
   if (type === 'daemon_tool' && toolName === undefined) {
     issues.push({ path: `${path}.toolName`, message: `${path}.toolName is required for daemon_tool sources` });
   }
   if (type === undefined || !inputResult.ok || refreshPermission === undefined) return undefined;
   const source: LiveArtifactSource = { type, input: inputResult.value, refreshPermission };
   if (toolName !== undefined) source.toolName = toolName;
-  if (connector !== undefined) source.connector = connector;
   if (outputMapping !== undefined) source.outputMapping = outputMapping;
   return source;
 }
@@ -653,29 +604,9 @@ function validateRefreshSourceMetadata(value: unknown, path: string, issues: Liv
   validateOnlyAllowedKeys(value, REFRESH_SOURCE_METADATA_KEYS, path, issues);
   const sourceType = validateEnum(value.sourceType, REFRESH_SOURCE_TYPES, `${path}.sourceType`, issues);
   const toolName = asOptionalString(value.toolName, `${path}.toolName`, issues, MAX_ID_LENGTH);
-  let connector: LiveArtifactRefreshConnectorMetadata | undefined;
-  if (value.connector !== undefined) {
-    if (!isPlainObject(value.connector)) {
-      issues.push({ path: `${path}.connector`, message: `${path}.connector must be an object` });
-    } else {
-      validateOnlyAllowedKeys(value.connector, CONNECTOR_REFERENCE_KEYS, `${path}.connector`, issues);
-      const connectorId = asString(value.connector.connectorId, `${path}.connector.connectorId`, issues, MAX_ID_LENGTH);
-      const accountLabel = asOptionalString(value.connector.accountLabel, `${path}.connector.accountLabel`, issues, MAX_SHORT_TEXT_LENGTH);
-      const connectorToolName = asString(value.connector.toolName, `${path}.connector.toolName`, issues, MAX_ID_LENGTH);
-      const approvalPolicy = value.connector.approvalPolicy === undefined
-        ? undefined
-        : validateEnum(value.connector.approvalPolicy, CONNECTOR_APPROVAL_POLICIES, `${path}.connector.approvalPolicy`, issues);
-      if (connectorId !== undefined && connectorToolName !== undefined) {
-        connector = { connectorId, toolName: connectorToolName };
-        if (accountLabel !== undefined) connector.accountLabel = accountLabel;
-        if (approvalPolicy !== undefined) connector.approvalPolicy = approvalPolicy;
-      }
-    }
-  }
   if (sourceType === undefined) return undefined;
   const source: LiveArtifactRefreshSourceMetadata = { sourceType };
   if (toolName !== undefined) source.toolName = toolName;
-  if (connector !== undefined) source.connector = connector;
   return source;
 }
 

@@ -2540,15 +2540,6 @@ export function LiveArtifactRefreshHistoryPanel({
                 </dd>
               </div>
             ) : null}
-            {documentSource.connector ? (
-              <div>
-                <dt>{t('liveArtifact.refresh.docSourceConnector')}</dt>
-                <dd>
-                  {documentSource.connector.accountLabel ??
-                    documentSource.connector.connectorId}
-                </dd>
-              </div>
-            ) : null}
           </dl>
         </section>
       ) : null}

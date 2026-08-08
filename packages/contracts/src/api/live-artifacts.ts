@@ -15,11 +15,7 @@ export type LiveArtifactRefreshStatus = 'never' | 'idle' | 'running' | 'succeede
 
 export type LiveArtifactPreviewType = 'html' | 'jsx' | 'markdown';
 
-export type LiveArtifactSourceType = 'local_file' | 'daemon_tool' | 'connector_tool';
-
-export type LiveArtifactConnectorApprovalPolicy =
-  | 'read_only_auto'
-  | 'manual_refresh_granted_for_read_only';
+export type LiveArtifactSourceType = 'local_file' | 'daemon_tool';
 
 export type LiveArtifactRefreshPermission = 'none' | 'manual_refresh_granted_for_read_only';
 
@@ -49,12 +45,6 @@ export interface LiveArtifactSource {
   type: LiveArtifactSourceType;
   toolName?: string;
   input: BoundedJsonObject;
-  connector?: {
-    connectorId: string;
-    accountLabel?: string;
-    toolName: string;
-    approvalPolicy?: LiveArtifactConnectorApprovalPolicy;
-  };
   outputMapping?: {
     dataPaths?: Array<{ from: string; to: string }>;
     transform?: LiveArtifactOutputTransform;
@@ -158,12 +148,6 @@ export interface LiveArtifactRefreshErrorRecord {
 export interface LiveArtifactRefreshSourceMetadata {
   sourceType: 'document';
   toolName?: string;
-  connector?: {
-    connectorId: string;
-    accountLabel?: string;
-    toolName: string;
-    approvalPolicy?: LiveArtifactConnectorApprovalPolicy;
-  };
 }
 
 export interface LiveArtifactRefreshLogEntry {

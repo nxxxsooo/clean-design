@@ -373,12 +373,6 @@ describe('live artifact store layout', () => {
       source: {
         sourceType: 'document',
         toolName: 'github.issues.list',
-        connector: {
-          connectorId: 'github',
-          accountLabel: 'octo-org',
-          toolName: 'issues.list',
-          approvalPolicy: 'manual_refresh_granted_for_read_only',
-        },
       },
       metadata: { rows: 3, transform: 'compact_table' },
       now: new Date('2026-04-30T10:00:00.010Z'),
@@ -409,7 +403,6 @@ describe('live artifact store layout', () => {
       source: {
         sourceType: 'document',
         toolName: 'github.issues.list',
-        connector: { connectorId: 'github', accountLabel: 'octo-org', toolName: 'issues.list' },
       },
       metadata: { rows: 3, transform: 'compact_table' },
     });
@@ -898,10 +891,9 @@ describe('live artifact store layout', () => {
       dataPath: 'data.json',
       dataJson: { title: 'Notion word cloud' },
       sourceJson: {
-        type: 'connector_tool',
-        toolName: 'notion.notion_fetch_data',
+        type: 'daemon_tool',
+        toolName: 'project_files.read_json',
         input: { fetch_type: 'pages' },
-        connector: { connectorId: 'notion', toolName: 'notion.notion_fetch_data' },
         outputMapping: {
           dataPaths: [{ from: 'values', to: 'documents' }],
           transform: 'compact_table',
@@ -1308,14 +1300,9 @@ describe('live artifact store layout', () => {
       ...created.artifact.document!,
       dataJson: { title: 'Updated <Title>', owner: 'Ops' },
       sourceJson: {
-        type: 'connector_tool' as const,
-        toolName: 'gmail.search_messages',
+        type: 'daemon_tool' as const,
+        toolName: 'project_files.search',
         input: { query: 'to:reports' },
-        connector: {
-          connectorId: 'gmail',
-          toolName: 'gmail.search_messages',
-          approvalPolicy: 'manual_refresh_granted_for_read_only' as const,
-        },
         refreshPermission: 'none' as const,
       },
     };

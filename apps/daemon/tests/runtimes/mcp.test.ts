@@ -12,7 +12,7 @@ test('live artifact MCP discovery is limited to mature ACP agents', () => {
     assert.equal(server.length, 1);
     const s = server[0];
     if (!s) throw new Error('unreachable: server length verified as 1 above');
-    assert.equal(s.name, 'open-design-live-artifacts');
+    assert.equal(s.name, 'clean-design-live-artifacts');
     assert.equal(s.command, 'od');
     assert.deepEqual(s.args, ['mcp', 'live-artifacts']);
     const envIsMap =
@@ -40,7 +40,7 @@ test('live artifact MCP discovery can use daemon-resolved CLI command', () => {
     } as unknown as Parameters<typeof buildLiveArtifactsMcpServersForAgent>[1]),
     [
       {
-        name: 'open-design-live-artifacts',
+        name: 'clean-design-live-artifacts',
         command: process.execPath,
         args: ['/workspace/apps/daemon/dist/cli.js', 'mcp', 'live-artifacts'],
         env: [{ name: 'ELECTRON_RUN_AS_NODE', value: '1' }],
@@ -49,15 +49,13 @@ test('live artifact MCP discovery can use daemon-resolved CLI command', () => {
   );
 });
 
-test('MCP-capable agents can discover equivalent live artifact and connector tools', async () => {
+test('MCP-capable agents can discover live artifact tools', async () => {
   const tools = createLiveArtifactsMcpTools();
   assert.deepEqual(tools.map((tool) => tool.name), [
     'live_artifacts_create',
     'live_artifacts_list',
     'live_artifacts_update',
     'live_artifacts_refresh',
-    'connectors_list',
-    'connectors_execute',
   ]);
 
   for (const tool of tools) {
@@ -67,7 +65,7 @@ test('MCP-capable agents can discover equivalent live artifact and connector too
   }
 
   const initialized = await handleLiveArtifactsMcpRequest({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) as { result: { serverInfo: { name: string }; capabilities: unknown } };
-  assert.equal(initialized.result.serverInfo.name, 'open-design-live-artifacts');
+  assert.equal(initialized.result.serverInfo.name, 'clean-design-live-artifacts');
   assert.deepEqual(initialized.result.capabilities, { tools: {} });
 
   const listed = await handleLiveArtifactsMcpRequest({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }) as { result: { tools: Array<{ name: string }> } };
@@ -75,36 +73,10 @@ test('MCP-capable agents can discover equivalent live artifact and connector too
 
   const createTool = tools.find((tool) => tool.name === 'live_artifacts_create')!;
   const updateTool = tools.find((tool) => tool.name === 'live_artifacts_update')!;
-  const connectorsListTool = tools.find((tool) => tool.name === 'connectors_list')!;
   const createProperties = createTool.inputSchema.properties as Record<string, unknown>;
   const updateProperties = updateTool.inputSchema.properties as Record<string, unknown>;
-  const connectorsListProperties = connectorsListTool.inputSchema.properties as Record<string, unknown>;
   assert.deepEqual(Object.keys(createProperties).sort(), ['input', 'provenanceJson', 'templateHtml']);
   assert.deepEqual(Object.keys(updateProperties).sort(), ['artifactId', 'input', 'provenanceJson', 'templateHtml']);
-  assert.deepEqual(Object.keys(connectorsListProperties).sort(), ['useCase']);
-});
-
-test('live artifact MCP connector list forwards daily digest use case to daemon tools', async () => {
-  process.env.OD_DAEMON_URL = 'http://127.0.0.1:17456/base';
-  process.env.OD_TOOL_TOKEN = 'test-tool-token';
-  const calls: Array<{ url: string; init: RequestInit | undefined }> = [];
-  globalThis.fetch = async (url, init) => {
-    calls.push({ url: String(url), init });
-    return new Response(JSON.stringify({ connectors: [] }), { status: 200 });
-  };
-
-  const response = await handleLiveArtifactsMcpRequest({
-    jsonrpc: '2.0',
-    id: 5,
-    method: 'tools/call',
-    params: { name: 'connectors_list', arguments: { useCase: 'personal_daily_digest' } },
-  }) as { error?: unknown };
-
-  assert.equal(response.error, undefined);
-  assert.equal(calls.length, 1);
-  const call = calls[0];
-  assert.ok(call);
-  assert.equal(call.url, 'http://127.0.0.1:17456/base/api/tools/connectors/list?useCase=personal_daily_digest');
 });
 
 test('live artifact MCP create forwards input and artifact payload fields to daemon tools', async () => {

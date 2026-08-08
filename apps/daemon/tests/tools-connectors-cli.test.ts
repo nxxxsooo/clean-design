@@ -517,172 +517,6 @@ exit 128
     await rm(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 
-  it('appends curated useCase query params for connector listing', async () => {
-    process.env.OD_DAEMON_URL = 'http://127.0.0.1:7456/base/';
-    process.env.OD_TOOL_TOKEN = 'agent-run-token';
-    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ connectors: [] }), { headers: { 'Content-Type': 'application/json' }, status: 200 }));
-
-    const result = await runConnectorsToolCli(['list', '--use-case', 'personal_daily_digest']);
-
-    expect(result.exitCode).toBe(0);
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:7456/base/api/tools/connectors/list?useCase=personal_daily_digest',
-      expect.objectContaining({
-        method: 'GET',
-        headers: expect.objectContaining({ Authorization: 'Bearer agent-run-token' }),
-      }),
-    );
-  });
-
-  it('includes curation in compact connector output', async () => {
-    process.env.OD_DAEMON_URL = 'http://127.0.0.1:7456';
-    process.env.OD_TOOL_TOKEN = 'agent-run-token';
-    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
-      connectors: [{
-        id: 'slack',
-        name: 'Slack',
-        provider: 'composio',
-        category: 'Communication',
-        status: 'connected',
-        tools: [{
-          name: 'slack.slack_list_channels',
-          description: 'List Slack channels',
-          safety: { sideEffect: 'read', approval: 'auto', reason: 'read-only' },
-          curation: { useCases: ['personal_daily_digest'], reason: 'Digest source' },
-        }],
-      }],
-    }), { headers: { 'Content-Type': 'application/json' }, status: 200 }));
-
-    const result = await runConnectorsToolCli(['list']);
-
-    expect(result.exitCode).toBe(0);
-    expect(JSON.parse(stdoutOutput.join(''))).toEqual({
-      ok: true,
-      connectors: [{
-        id: 'slack',
-        name: 'Slack',
-        provider: 'composio',
-        category: 'Communication',
-        status: 'connected',
-        accountLabel: undefined,
-        tools: [{
-          name: 'slack.slack_list_channels',
-          description: 'List Slack channels',
-          safety: { sideEffect: 'read', approval: 'auto', reason: 'read-only' },
-          curation: { useCases: ['personal_daily_digest'], reason: 'Digest source' },
-          inputSchema: undefined,
-        }],
-      }],
-    });
-    expect(stderrOutput.join('')).toBe('');
-  });
-
-  it('writes GitHub design evidence through connected connector tools', async () => {
-    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-connectors-cli-'));
-    process.chdir(tmpDir);
-    process.env.OD_DAEMON_URL = 'http://127.0.0.1:7456';
-    process.env.OD_TOOL_TOKEN = 'agent-run-token';
-    await installFailingLocalGithubTools(tmpDir);
-
-    const encode = (value: string) => Buffer.from(value, 'utf8').toString('base64');
-    fetchMock
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        connectors: [{
-          id: 'github',
-          name: 'GitHub',
-          provider: 'composio',
-          category: 'Developer',
-          status: 'connected',
-          tools: [{ name: 'github.github_get_repository_content' }],
-        }],
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { default_branch: 'main', html_url: 'https://github.com/acme/ui' } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { path: 'README.md', encoding: 'base64', content: encode('# Acme UI') } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { tree: [
-          { path: 'build/logo.png', type: 'blob' },
-          { path: 'package.json', type: 'blob' },
-          { path: 'src/pages/home/HomePage.tsx', type: 'blob' },
-          { path: 'src/components/Button.tsx', type: 'blob' },
-          { path: 'src/styles.css', type: 'blob' },
-        ] } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { encoding: 'base64', content: Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64') } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: 'export function HomePage(){ return <main className="workspace" /> }' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: ':root { --color-brand: #ff5500; --radius-md: 8px; }' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { content: { mimetype: 'text/plain', name: 'Button.tsx', s3url: 'https://signed.example/Button.tsx' } } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response('export function Button(){ return <button className="rounded-md" /> }', { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: '{"dependencies":{"@radix-ui/react-slot":"latest"}}' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }));
-
-    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/ui', '--max-files', '5']);
-
-    expect(result.exitCode).toBe(0);
-    const stdout = JSON.parse(stdoutOutput.join(''));
-    expect(stdout).toEqual(expect.objectContaining({
-      ok: true,
-      repo: 'acme/ui',
-      method: 'connector',
-      outputPath: 'context/github/acme-ui.md',
-      snapshotFiles: expect.arrayContaining([
-        'context/github/acme-ui/files/build/logo.png',
-        'context/github/acme-ui/files/src/pages/home/HomePage.tsx',
-      ]),
-      materializedFiles: expect.arrayContaining([
-        'build/logo.png',
-        'source_examples/src/pages/home/HomePage.tsx',
-      ]),
-    }));
-    const evidenceNote = await readFile(path.join(tmpDir, 'context/github/acme-ui.md'), 'utf8');
-    expect(evidenceNote).toContain('Connector platform fallback was used');
-    expect(evidenceNote).toContain('Source Evidence Inventory');
-    expect(evidenceNote).toContain('Package Files Materialized');
-    expect(evidenceNote).toContain('`build/logo.png`');
-    expect(evidenceNote).toContain('`source_examples/src/pages/home/HomePage.tsx`');
-    expect(evidenceNote).toContain('Theme, tokens, and styling');
-    expect(evidenceNote).toContain('Reusable components');
-    expect(evidenceNote).toContain('ui_kits/app/index.html` must be a browser-reviewable component entry');
-    expect(evidenceNote).toContain('ui_kits/app/components/App.jsx` (or equivalent app shell) must compose source-backed role components');
-    expect(evidenceNote).toContain('Claude-style UI-kit entry skeleton for direct JSX kits');
-    expect(evidenceNote).toContain('<script type="text/babel" src="components/ComponentName.jsx"></script>');
-    expect(evidenceNote).toContain('ReactDOM.createRoot(document.getElementById("root"))');
-    expect(evidenceNote).toContain('source_examples/');
-    const materializedLogo = await readFile(path.join(tmpDir, 'build/logo.png'));
-    expect([...materializedLogo]).toEqual([0x89, 0x50, 0x4e, 0x47]);
-    await expect(readFile(path.join(tmpDir, 'source_examples/src/pages/home/HomePage.tsx'), 'utf8')).resolves.toContain('HomePage');
-    await expect(readFile(path.join(tmpDir, 'context/github/acme-ui/files/src/components/Button.tsx'), 'utf8')).resolves.toContain('rounded-md');
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:7456/api/tools/connectors/execute',
-      expect.objectContaining({
-        method: 'POST',
-        body: expect.stringContaining('github.github_get_raw_repository_content'),
-      }),
-    );
-
-    await cleanupTempDir(tmpDir);
-  });
-
   it('writes bounded local design evidence snapshots from a linked folder', async () => {
     const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-local-context-'));
     process.chdir(tmpDir);
@@ -2385,161 +2219,6 @@ exit 128
     await cleanupTempDir(tmpDir);
   });
 
-  it('falls back to bounded connector directory browsing when the repository tree is too large', async () => {
-    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-connectors-cli-'));
-    process.chdir(tmpDir);
-    process.env.OD_DAEMON_URL = 'http://127.0.0.1:7456';
-    process.env.OD_TOOL_TOKEN = 'agent-run-token';
-    await installFailingLocalGithubTools(tmpDir);
-
-    const encode = (value: string) => Buffer.from(value, 'utf8').toString('base64');
-    fetchMock
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        connectors: [{
-          id: 'github',
-          name: 'GitHub',
-          provider: 'composio',
-          category: 'Developer',
-          status: 'connected',
-          tools: [{ name: 'github.github_get_repository_content' }],
-        }],
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { default_branch: 'main', html_url: 'https://github.com/acme/ui' } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { path: 'README.md', encoding: 'base64', content: encode('# Acme UI') } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: { code: 'CONNECTOR_OUTPUT_TOO_LARGE', message: 'connector output exceeds max serialized size' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 502 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { content: [
-          { path: 'package.json', type: 'file' },
-          { path: 'src', type: 'dir' },
-          { path: 'docs', type: 'dir' },
-        ] } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { content: [
-          { path: 'src/styles.css', type: 'file' },
-          { path: 'src/components', type: 'dir' },
-        ] } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { content: [{ path: 'src/components/Button.tsx', type: 'file' }] } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: '{"dependencies":{"@radix-ui/react-slot":"latest"}}' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: ':root { --color-brand: #ff5500; }' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: 'export function Button(){ return <button /> }' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }));
-
-    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/ui', '--max-files', '3', '--require-connector']);
-
-    expect(result.exitCode).toBe(0);
-    const stdout = JSON.parse(stdoutOutput.join(''));
-    expect(stdout).toEqual(expect.objectContaining({
-      ok: true,
-      method: 'connector',
-      warnings: expect.arrayContaining([
-        expect.stringContaining('Recursive tree connector read failed'),
-      ]),
-    }));
-    await expect(readFile(path.join(tmpDir, 'context/github/acme-ui.md'), 'utf8')).resolves.toContain('bounded directory browsing');
-    await expect(readFile(path.join(tmpDir, 'context/github/acme-ui.md'), 'utf8')).resolves.toContain('src/components/Button.tsx');
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:7456/api/tools/connectors/execute',
-      expect.objectContaining({
-        method: 'POST',
-        body: expect.stringContaining('github.github_get_repository_content'),
-      }),
-    );
-
-    await cleanupTempDir(tmpDir);
-  });
-
-  it('continues bounded GitHub intake when repository metadata is too large', async () => {
-    const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-connectors-cli-'));
-    process.chdir(tmpDir);
-    process.env.OD_DAEMON_URL = 'http://127.0.0.1:7456';
-    process.env.OD_TOOL_TOKEN = 'agent-run-token';
-    await installFailingLocalGithubTools(tmpDir);
-
-    const encode = (value: string) => Buffer.from(value, 'utf8').toString('base64');
-    fetchMock
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        connectors: [{
-          id: 'github',
-          name: 'GitHub',
-          provider: 'composio',
-          category: 'Developer',
-          status: 'connected',
-          tools: [{ name: 'github.github_get_repository_content' }],
-        }],
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: { code: 'CONNECTOR_OUTPUT_TOO_LARGE', message: 'connector output exceeds max serialized size' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 502 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { path: 'README.md', encoding: 'base64', content: encode('# Huge Repo UI') } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: { code: 'CONNECTOR_OUTPUT_TOO_LARGE', message: 'connector output exceeds max serialized size' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 502 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { content: [
-          { path: 'package.json', type: 'file' },
-          { path: 'src', type: 'dir' },
-        ] } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: { content: [
-          { path: 'src/styles.css', type: 'file' },
-        ] } },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: ':root { --color-brand: #ff5500; }' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        ok: true,
-        output: { data: '{"dependencies":{"@radix-ui/react-slot":"latest"}}' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }));
-
-    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/huge-ui', '--max-files', '2', '--require-connector']);
-
-    expect(result.exitCode).toBe(0);
-    const stdout = JSON.parse(stdoutOutput.join(''));
-    expect(stdout).toEqual(expect.objectContaining({
-      ok: true,
-      method: 'connector',
-      warnings: expect.arrayContaining([
-        expect.stringContaining('Repository metadata connector read failed'),
-        expect.stringContaining('Recursive tree connector read failed'),
-      ]),
-    }));
-    await expect(readFile(path.join(tmpDir, 'context/github/acme-huge-ui.md'), 'utf8')).resolves.toContain('Huge Repo UI');
-    await expect(readFile(path.join(tmpDir, 'context/github/acme-huge-ui/files/src/styles.css'), 'utf8')).resolves.toContain('--color-brand');
-
-    await cleanupTempDir(tmpDir);
-  });
-
   it('uses shallow local git clone before connector-backed intake', async () => {
     const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-connectors-cli-'));
     process.chdir(tmpDir);
@@ -2627,7 +2306,7 @@ printf 'font-data' > "$last/fonts/ubuntu/Ubuntu-Regular.ttf"
         error: { code: 'CONNECTOR_RATE_LIMITED', message: 'connector tool rate limit exceeded' },
       }), { headers: { 'Content-Type': 'application/json' }, status: 429 }));
 
-    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/rate-limited-ui', '--max-files', '6', '--require-connector']);
+    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/rate-limited-ui', '--max-files', '6']);
 
     expect(result.exitCode).toBe(0);
     const stdout = JSON.parse(stdoutOutput.join(''));
@@ -2735,7 +2414,7 @@ exit 1
         error: { message: 'repository access denied' },
       }), { headers: { 'Content-Type': 'application/json' }, status: 403 }));
 
-    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/private-ui', '--require-connector']);
+    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/private-ui']);
 
     expect(result.exitCode).toBe(0);
     const stdout = JSON.parse(stdoutOutput.join(''));
@@ -2759,11 +2438,9 @@ exit 1
     await cleanupTempDir(tmpDir);
   });
 
-  it('reports GitHub CLI login when connector and local clone cannot read a repository', async () => {
+  it('reports GitHub CLI login when local clone cannot read a repository', async () => {
     const tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-connectors-cli-'));
     process.chdir(tmpDir);
-    process.env.OD_DAEMON_URL = 'http://127.0.0.1:7456';
-    process.env.OD_TOOL_TOKEN = 'agent-run-token';
 
     const fakeBinDir = path.join(tmpDir, 'bin');
     await mkdir(fakeBinDir, { recursive: true });
@@ -2796,27 +2473,12 @@ exit 1
     ].join('\r\n'));
     process.env.PATH = `${fakeBinDir}${path.delimiter}${process.env.PATH ?? ''}`;
 
-    fetchMock
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        connectors: [{
-          id: 'github',
-          name: 'GitHub',
-          provider: 'composio',
-          category: 'Developer',
-          status: 'connected',
-        }],
-      }), { headers: { 'Content-Type': 'application/json' }, status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        error: { message: 'repository access denied' },
-      }), { headers: { 'Content-Type': 'application/json' }, status: 403 }));
-
-    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/private-ui', '--require-connector']);
+    const result = await runConnectorsToolCli(['github-design-context', '--repo', 'acme/private-ui']);
 
     expect(result.exitCode).toBe(1);
-    expect(stderrOutput.join('')).toContain('Required GitHub repository intake could not read the repository through git, GitHub CLI, or connector');
     expect(stderrOutput.join('')).toContain('gh auth login --web');
     await expect(readFile(path.join(tmpDir, 'context/github/acme-private-ui.md'), 'utf8')).rejects.toThrow();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).not.toHaveBeenCalled();
 
     await cleanupTempDir(tmpDir);
   });

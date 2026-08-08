@@ -6899,15 +6899,10 @@ describe('LiveArtifactRefreshHistoryPanel', () => {
               dataPath: 'data.json',
               dataJson: { title: 'Launch Metrics' },
               sourceJson: {
-                type: 'connector_tool',
-                toolName: 'design-files.list',
-                input: {},
+                type: 'daemon_tool',
+                toolName: 'project_files.read_json',
+                input: { path: 'data.json' },
                 refreshPermission: 'none',
-                connector: {
-                  connectorId: 'figma',
-                  toolName: 'design-files.list',
-                  accountLabel: 'figma:acct-1',
-                },
               },
             },
           })}

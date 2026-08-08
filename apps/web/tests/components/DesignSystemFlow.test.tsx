@@ -2,7 +2,6 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConnectorDetail } from '@open-design/contracts';
 
 import {
   buildDesignSystemPackageAuditRepairPrompt,
@@ -12,16 +11,12 @@ import {
   DesignSystemCreationFlow,
   DesignSystemDetailView,
 } from '../../src/components/DesignSystemFlow';
-import { CONNECTORS_CHANGED_EVENT } from '../../src/components/connectors-events';
 import type { AppConfig, Conversation, DesignSystemDetail, DesignSystemSummary, Project, ProjectFile } from '../../src/types';
 import { I18nProvider } from '../../src/i18n';
 
 const mocks = vi.hoisted(() => ({
-  connectConnector: vi.fn(),
   createDesignSystemDraft: vi.fn(),
-  disconnectConnector: vi.fn(),
   ensureDesignSystemWorkspace: vi.fn(),
-  fetchConnectorStatuses: vi.fn(),
   fetchDesignSystem: vi.fn(),
   fetchDesignSystemRevisions: vi.fn(),
   fetchProjectDesignSystemPackageAudit: vi.fn(),
@@ -103,15 +98,12 @@ vi.mock('../../src/providers/registry', async () => {
   );
   return {
     ...actual,
-    connectConnector: mocks.connectConnector,
     createDesignSystemDraft: mocks.createDesignSystemDraft,
-    disconnectConnector: mocks.disconnectConnector,
     ensureDesignSystemWorkspace: mocks.ensureDesignSystemWorkspace,
     fetchDesignSystem: mocks.fetchDesignSystem,
     fetchDesignSystemRevisions: mocks.fetchDesignSystemRevisions,
     fetchProjectDesignSystemPackageAudit: mocks.fetchProjectDesignSystemPackageAudit,
     fetchProjectFiles: mocks.fetchProjectFiles,
-    fetchConnectorStatuses: mocks.fetchConnectorStatuses,
     openFolderDialog: mocks.openFolderDialog,
     uploadProjectFile: mocks.uploadProjectFile,
     writeProjectTextFile: mocks.writeProjectTextFile,
@@ -144,14 +136,11 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-  mocks.connectConnector.mockResolvedValue({ connector: null });
-  mocks.disconnectConnector.mockResolvedValue(null);
   mocks.fetchDesignSystem.mockResolvedValue(null);
   mocks.fetchDesignSystemRevisions.mockResolvedValue([]);
   mocks.fetchProjectDesignSystemPackageAudit.mockResolvedValue(null);
   mocks.fetchProjectFiles.mockResolvedValue([]);
   mocks.getProject.mockResolvedValue(null);
-  mocks.fetchConnectorStatuses.mockResolvedValue({});
   mocks.createConversation.mockResolvedValue(null);
   mocks.listConversations.mockResolvedValue([]);
   mocks.listMessages.mockResolvedValue([]);
@@ -2015,457 +2004,15 @@ describe('DesignSystemCreationFlow', () => {
     );
   });
 
-  it.skip('allows GitHub repo links without Composio by using local GitHub intake', () => {
-    const onOpenConnectorsTab = vi.fn();
-    const config = {
-      composio: { apiKeyConfigured: false },
-    } as AppConfig;
+  it('shows only this-device GitHub access', () => {
+    render(<DesignSystemCreationFlow onBack={() => {}} onCreated={() => {}} />);
 
-    render(
-      <DesignSystemCreationFlow
-        onBack={() => {}}
-        onCreated={() => {}}
-        config={config}
-        onOpenConnectorsTab={onOpenConnectorsTab}
-      />,
-    );
-
-    const input = screen.getByPlaceholderText('https://github.com/org/repo') as HTMLInputElement;
-    expect(input.disabled).toBe(false);
-    expect(screen.getByText('GitHub access: Auto')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Show access methods' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Configure Composio' })).toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show access methods' }));
+    expect(screen.getByText('GitHub access: This device')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Show access method' }));
     expect(screen.getByText('This device')).toBeTruthy();
-    expect(screen.getByText('Open Design account')).toBeTruthy();
-    expect(screen.getByText('Connector platform')).toBeTruthy();
-    expect(screen.getByText('Coming soon')).toBeTruthy();
-    expect(screen.getByText('Not configured')).toBeTruthy();
-
-    fireEvent.change(input, { target: { value: 'https://github.com/nexu-io/open-design/' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-
-    expect(screen.getByText('nexu-io/open-design')).toBeTruthy();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Configure Composio' }));
-
-    expect(onOpenConnectorsTab).toHaveBeenCalledTimes(1);
-    expect(mocks.fetchConnectorStatuses).not.toHaveBeenCalled();
+    expect(screen.getByText(/Clean Design never brokers repository access/i)).toBeTruthy();
   });
 
-  it('stops checking GitHub connector if the status request hangs', async () => {
-    const originalSetTimeout = window.setTimeout;
-    type WindowSetTimeout = typeof window.setTimeout;
-    const timeoutSpy = vi.spyOn(window, 'setTimeout').mockImplementation(((...params: Parameters<WindowSetTimeout>) => {
-      const [handler, timeout, ...args] = params;
-      if (timeout === 5000 && typeof handler === 'function') {
-        handler(...args);
-        return 1;
-      }
-      return originalSetTimeout(...params);
-    }) as typeof window.setTimeout);
-    mocks.fetchConnectorStatuses.mockReturnValue(new Promise(() => {}));
-    const config = {
-      composio: { apiKeyConfigured: true, apiKeyTail: 'uQEg' },
-    } as AppConfig;
-
-    try {
-      render(
-        <DesignSystemCreationFlow
-          onBack={() => {}}
-          onCreated={() => {}}
-          config={config}
-        />,
-      );
-
-      expect(screen.getByText('GitHub access: Auto')).toBeTruthy();
-      fireEvent.click(screen.getByRole('button', { name: 'Show access methods' }));
-      expect(screen.queryByText('Checking GitHub connector')).toBeNull();
-
-      await waitFor(() => expect(screen.getByText('Needs attention')).toBeTruthy());
-      expect(screen.queryByText('Checking GitHub connector')).toBeNull();
-      expect(screen.getByText(/Could not finish checking GitHub connector/i)).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'Connect via Composio' })).toBeTruthy();
-      expect(mocks.fetchConnectorStatuses.mock.calls[0]?.[0]?.signal?.aborted).toBe(true);
-    } finally {
-      timeoutSpy.mockRestore();
-    }
-  });
-
-  it('surfaces GitHub connector status errors from the connector status endpoint', async () => {
-    mocks.fetchConnectorStatuses.mockResolvedValue({
-      github: {
-        status: 'error',
-        lastError: 'GitHub authorization expired. Reconnect GitHub.',
-      },
-    });
-    const config = {
-      composio: { apiKeyConfigured: true, apiKeyTail: 'uQEg' },
-    } as AppConfig;
-
-    render(
-      <DesignSystemCreationFlow
-        onBack={() => {}}
-        onCreated={() => {}}
-        config={config}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show access methods' }));
-    await waitFor(() => expect(screen.getByText('Needs attention')).toBeTruthy());
-    expect(screen.getByText('GitHub authorization expired. Reconnect GitHub.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Connect via Composio' })).toBeTruthy();
-  });
-
-  it.skip('keeps GitHub repo links available and shows connected connector status', async () => {
-    const connectedConnector: ConnectorDetail = {
-      id: 'github',
-      name: 'GitHub',
-      provider: 'Composio',
-      category: 'Code',
-      status: 'connected',
-      tools: [],
-      accountLabel: 'qiongyu1999',
-    };
-    mocks.fetchConnectorStatuses.mockResolvedValue({ github: { status: 'available' } });
-    mocks.connectConnector.mockResolvedValue({
-      connector: connectedConnector,
-      auth: { kind: 'connected' },
-    });
-    const config = {
-      composio: { apiKeyConfigured: true, apiKeyTail: 'uQEg' },
-    } as AppConfig;
-    const onConnectorsChanged = vi.fn();
-    window.addEventListener(CONNECTORS_CHANGED_EVENT, onConnectorsChanged);
-
-    try {
-      render(
-        <DesignSystemCreationFlow
-          onBack={() => {}}
-          onCreated={() => {}}
-          config={config}
-        />,
-      );
-
-      fireEvent.click(screen.getByRole('button', { name: 'Show access methods' }));
-      await waitFor(() => expect(screen.getByRole('button', { name: 'Connect via Composio' })).toBeTruthy());
-      expect((screen.getByPlaceholderText('https://example.com or https://github.com/owner/repo') as HTMLInputElement).disabled).toBe(false);
-
-      fireEvent.click(screen.getByRole('button', { name: 'Connect via Composio' }));
-
-      await waitFor(() => expect(mocks.connectConnector).toHaveBeenCalledWith('github'));
-      await waitFor(() => expect(screen.getByText(/Connected as qiongyu1999/i)).toBeTruthy());
-      await waitFor(() => expect(onConnectorsChanged).toHaveBeenCalledTimes(1));
-      expect(screen.queryByRole('button', { name: 'Configure' })).toBeNull();
-      expect(screen.getByRole('button', { name: 'Disconnect' })).toBeTruthy();
-      const input = screen.getByPlaceholderText('https://example.com or https://github.com/owner/repo') as HTMLInputElement;
-      expect(input.disabled).toBe(false);
-
-      fireEvent.change(input, { target: { value: 'https://github.com/nexu-io/open-design/' } });
-      fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-
-      expect(screen.getByText('nexu-io/open-design')).toBeTruthy();
-      expect(input.value).toBe('');
-    } finally {
-      window.removeEventListener(CONNECTORS_CHANGED_EVENT, onConnectorsChanged);
-    }
-  });
-
-  it('hides Composio connection ids in the connected GitHub label', async () => {
-    mocks.fetchConnectorStatuses.mockResolvedValue({
-      github: { status: 'connected', accountLabel: 'ca_6U6mv_8IzMVR' },
-    });
-    const config = {
-      composio: { apiKeyConfigured: true, apiKeyTail: 'uQEg' },
-    } as AppConfig;
-
-    render(
-      <DesignSystemCreationFlow
-        onBack={() => {}}
-        onCreated={() => {}}
-        config={config}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show access methods' }));
-    await waitFor(() => expect(screen.getByText('Connected')).toBeTruthy());
-    expect(screen.queryByText(/ca_6U6mv_8IzMVR/)).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Configure' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Disconnect' })).toBeTruthy();
-  });
-
-  it('keeps a manual GitHub authorization action when the automatic popup is blocked', async () => {
-    const availableConnector: ConnectorDetail = {
-      id: 'github',
-      name: 'GitHub',
-      provider: 'Composio',
-      category: 'Code',
-      status: 'available',
-      tools: [],
-    };
-    mocks.fetchConnectorStatuses.mockResolvedValue({ github: { status: 'available' } });
-    mocks.connectConnector.mockResolvedValue({
-      connector: availableConnector,
-      auth: {
-        kind: 'redirect_required',
-        redirectUrl: 'https://example.com/oauth',
-        expiresAt: '2099-05-08T10:00:00.000Z',
-      },
-      error: 'Popup blocked. Allow popups for Open Design and try again.',
-    });
-    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => ({ closed: false } as Window));
-    const config = {
-      composio: { apiKeyConfigured: true, apiKeyTail: 'uQEg' },
-    } as AppConfig;
-
-    try {
-      render(
-        <DesignSystemCreationFlow
-          onBack={() => {}}
-          onCreated={() => {}}
-          config={config}
-        />,
-      );
-
-      fireEvent.click(screen.getByRole('button', { name: 'Show access methods' }));
-      await waitFor(() => expect(screen.getByRole('button', { name: 'Connect via Composio' })).toBeTruthy());
-      fireEvent.click(screen.getByRole('button', { name: 'Connect via Composio' }));
-
-      await waitFor(() => expect(screen.getByText('Pending')).toBeTruthy());
-      expect(screen.getByText('Popup blocked. Allow popups for Open Design and try again.')).toBeTruthy();
-
-      fireEvent.click(screen.getByRole('button', { name: 'Open authorization' }));
-
-      expect(openSpy).toHaveBeenCalledWith('https://example.com/oauth', '_blank');
-    } finally {
-      openSpy.mockRestore();
-    }
-  });
-
-  it('records connected GitHub repository sources in the project source manifest', async () => {
-    const availableConnector: ConnectorDetail = {
-      id: 'github',
-      name: 'GitHub',
-      provider: 'Composio',
-      category: 'Code',
-      status: 'connected',
-      accountLabel: 'qiongyu1999',
-      tools: [],
-    };
-    const system: DesignSystemDetail = {
-      id: 'user:github-design-system',
-      title: 'Github Design System',
-      category: 'Custom',
-      summary: 'GitHub-backed workspace.',
-      swatches: [],
-      surface: 'web',
-      body: '# Github Design System\n',
-      source: 'user',
-      status: 'draft',
-      isEditable: true,
-      projectId: 'ds-github-design-system',
-    };
-    const project: Project = {
-      id: 'ds-github-design-system',
-      name: 'Github Design System',
-      skillId: null,
-      designSystemId: system.id,
-      createdAt: 1,
-      updatedAt: 1,
-      metadata: {
-        kind: 'other',
-        importedFrom: 'design-system',
-        entryFile: 'DESIGN.md',
-        sourceFileName: system.id,
-      },
-    };
-    mocks.fetchConnectorStatuses.mockResolvedValue({
-      github: { status: 'connected', accountLabel: 'qiongyu1999' },
-    });
-    mockBrandExtractProject(project);
-    mocks.patchProject.mockResolvedValue({ ...project, pendingPrompt: 'Create this project as a design system.' });
-    const config = {
-      composio: { apiKeyConfigured: true, apiKeyTail: 'uQEg' },
-    } as AppConfig;
-
-    render(
-      <DesignSystemCreationFlow
-        onBack={() => {}}
-        onCreated={() => {}}
-        config={config}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show access methods' }));
-    await waitFor(() => expect(screen.getByText(/Connected as qiongyu1999/i)).toBeTruthy());
-    fireEvent.change(screen.getByPlaceholderText(/Mission Impastabowl/i), {
-      target: { value: 'GitHub: product workspace' },
-    });
-    addSourceUrl('https://github.com/nexu-io/open-design');
-    continueToGeneration();
-    confirmExtraction();
-
-    await waitFor(() => expect(mocks.writeProjectTextFile).toHaveBeenCalled());
-    expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('Connector status: connected as qiongyu1999.'),
-    );
-    expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('https://github.com/nexu-io/open-design'),
-    );
-    expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('GitHub Connector Intake Runbook'),
-    );
-    expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('"$OD_NODE_BIN" "$OD_BIN" tools connectors github-design-context --repo \'https://github.com/nexu-io/open-design\' --output context/github/nexu-io-open-design.md'),
-    );
-    expect(mocks.writeProjectTextFile).not.toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('--require-connector'),
-    );
-    expect(mocks.patchProject).toHaveBeenCalledWith(
-      project.id,
-      expect.objectContaining({
-        pendingPrompt: expect.stringContaining('GitHub repository intake is required before drafting the design system'),
-      }),
-    );
-    expect(mocks.patchProject).toHaveBeenCalledWith(
-      project.id,
-      expect.objectContaining({
-        pendingPrompt: expect.stringContaining('Do not call GitHub connector tree/content/raw tools directly from the agent.'),
-      }),
-    );
-    expect(mocks.patchProject).toHaveBeenCalledWith(
-      project.id,
-      expect.objectContaining({
-        pendingPrompt: expect.stringContaining('The command tries this-device access first'),
-      }),
-    );
-    expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('GitHub evidence must come from the bounded `github-design-context` command'),
-    );
-    expect(mocks.patchProject).toHaveBeenCalledWith(
-      project.id,
-      expect.objectContaining({
-        pendingPrompt: expect.stringContaining('Do not call GitHub connector tree/content/raw tools directly from the agent.'),
-      }),
-    );
-    expect(mocks.patchProject).toHaveBeenCalledWith(
-      project.id,
-      expect.objectContaining({
-        pendingPrompt: expect.stringContaining('Treat `Read method: git-clone` as the preferred this-device path.'),
-      }),
-    );
-    expect(mocks.patchProject).toHaveBeenCalledWith(
-      project.id,
-      expect.objectContaining({
-        pendingPrompt: expect.stringContaining('selects design-system-relevant source files plus available logos/icons/fonts'),
-      }),
-    );
-    expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('assets/, build/, fonts/, and context/ should preserve logos'),
-    );
-    expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('Claude-style build asset contract:'),
-    );
-    expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('copy representative runtime assets there with their original filenames'),
-    );
-    expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('Copy those runtime assets byte-for-byte from the captured `context/.../files/...` snapshots.'),
-    );
-    expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('Do not satisfy build/runtime icon evidence by only renaming those files into `assets/`'),
-    );
-    expect(mocks.writeProjectTextFile).toHaveBeenCalledWith(
-      project.id,
-      'context/source-context.md',
-      expect.stringContaining('preview/brand-assets.html should visibly reference preserved files'),
-    );
-  });
-
-  it('does not leak Composio connected-account ids into the project source manifest', async () => {
-    const system: DesignSystemDetail = {
-      id: 'user:github-internal-account-design-system',
-      title: 'GitHub Internal Account Design System',
-      category: 'Custom',
-      summary: 'GitHub-backed workspace.',
-      swatches: [],
-      surface: 'web',
-      body: '# GitHub Internal Account Design System\n',
-      source: 'user',
-      status: 'draft',
-      isEditable: true,
-      projectId: 'ds-github-internal-account-design-system',
-    };
-    const project: Project = {
-      id: 'ds-github-internal-account-design-system',
-      name: 'GitHub Internal Account Design System',
-      skillId: null,
-      designSystemId: system.id,
-      createdAt: 1,
-      updatedAt: 1,
-      metadata: {
-        kind: 'other',
-        importedFrom: 'design-system',
-        entryFile: 'DESIGN.md',
-        sourceFileName: system.id,
-      },
-    };
-    mocks.fetchConnectorStatuses.mockResolvedValue({
-      github: { status: 'connected', accountLabel: 'ca_6U6mv_8IzMVR' },
-    });
-    mockBrandExtractProject(project);
-    mocks.patchProject.mockResolvedValue({ ...project, pendingPrompt: 'Create this project as a design system.' });
-    const config = {
-      composio: { apiKeyConfigured: true, apiKeyTail: 'uQEg' },
-    } as AppConfig;
-
-    render(
-      <DesignSystemCreationFlow
-        onBack={() => {}}
-        onCreated={() => {}}
-        config={config}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Show access methods' }));
-    await waitFor(() => expect(screen.getByText('Connected')).toBeTruthy());
-    fireEvent.change(screen.getByPlaceholderText(/Mission Impastabowl/i), {
-      target: { value: 'GitHub: product workspace' },
-    });
-    addSourceUrl('https://github.com/nexu-io/open-design');
-    continueToGeneration();
-    confirmExtraction();
-
-    await waitFor(() => expect(mocks.writeProjectTextFile).toHaveBeenCalled());
-    const sourceManifestCall = mocks.writeProjectTextFile.mock.calls.find(
-      (call) => call[0] === project.id && call[1] === 'context/source-context.md',
-    );
-    expect(sourceManifestCall?.[2]).toEqual(expect.stringContaining('Connector status: connected.'));
-    expect(sourceManifestCall?.[2]).not.toEqual(expect.stringContaining('ca_6U6mv_8IzMVR'));
-  });
 });
 
 describe('DesignSystemDetailView', () => {

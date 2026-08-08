@@ -15,7 +15,6 @@ import {
   withLiveArtifactRefreshRun,
   withLiveArtifactRefreshSourceTimeout,
 } from './refresh.js';
-import { connectorService } from '../connectors/service.js';
 import type { BoundedJsonObject, LiveArtifactRefreshErrorRecord, LiveArtifactRefreshSourceMetadata, LiveArtifactSource } from './schema.js';
 
 export interface RefreshLiveArtifactOptions {
@@ -62,13 +61,12 @@ function toRefreshErrorRecord(error: unknown): LiveArtifactRefreshErrorRecord {
 function documentSourceMetadata(source: LiveArtifactSource): LiveArtifactRefreshSourceMetadata {
   const metadata: LiveArtifactRefreshSourceMetadata = { sourceType: 'document' };
   if (source.toolName !== undefined) metadata.toolName = source.toolName;
-  if (source.connector !== undefined) metadata.connector = source.connector;
   return metadata;
 }
 
 function isSupportedSource(source: LiveArtifactSource | undefined): source is LiveArtifactSource {
   if (source === undefined) return false;
-  return source.type === 'local_file' || source.type === 'daemon_tool' || source.type === 'connector_tool';
+  return source.type === 'local_file' || source.type === 'daemon_tool';
 }
 
 function hasRefreshPermission(source: LiveArtifactSource): boolean {
@@ -82,23 +80,6 @@ async function executeRefreshSource(options: {
   signal: AbortSignal;
 }): Promise<BoundedJsonObject> {
   const { projectsRoot, projectId, source, signal } = options;
-  if (source.type === 'connector_tool') {
-    const connector = source.connector;
-    if (connector === undefined) throw new Error('connector refresh source requires connector metadata');
-    const result = await connectorService.execute(
-      {
-        connectorId: connector.connectorId,
-        toolName: connector.toolName,
-        input: source.input,
-        ...(connector.accountLabel === undefined ? {} : { expectedAccountLabel: connector.accountLabel }),
-      },
-      { projectsRoot, projectId, purpose: 'artifact_refresh', signal },
-    );
-    if (result.output === null || typeof result.output !== 'object' || Array.isArray(result.output)) {
-      throw new Error('connector refresh output must be a JSON object');
-    }
-    return result.output;
-  }
   if (source.type !== 'daemon_tool' && source.type !== 'local_file') {
     throw new Error(`refresh source ${source.type} is not supported yet`);
   }

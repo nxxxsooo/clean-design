@@ -292,7 +292,6 @@ import { registerBrandRoutes } from './brand-routes.js';
 import {
   applyDiffReviewDecisionToCwd,
   applyPlugin,
-  buildConnectorProbe,
   defaultBundledRoot,
   dismissSkillPluginCandidate,
   doctorPlugin,
@@ -557,7 +556,6 @@ import { createPluginInstallationHelpers, normalizeProjectPluginFolderPath, reso
 import { createPluginShareTaskStore } from './services/plugin-share-tasks.js';
 import { getRouteRegistrationInventory, installRouteRegistrationGuard } from './route-registration-guard.js';
 import { assertServerContextSatisfiesRoutes } from './route-context-contract.js';
-import { connectorService } from './connectors/service.js';
 import { CHAT_TOOL_ENDPOINTS, CHAT_TOOL_OPERATIONS, toolTokenRegistry } from './tool-tokens.js';
 import {
   allowedBrowserPorts,
@@ -2606,8 +2604,6 @@ export async function startServer({
     pluginInstallation,
     sendMulterError,
     decodeMultipartFilename,
-    connectorService,
-    buildConnectorProbe,
     loadPluginRegistryView,
     requireLocalDaemonRequest,
     getProject,
@@ -2695,7 +2691,7 @@ export async function startServer({
         const now = Date.now(); const id = randomId(); const cid = randomId(); const sourceSlug = githubRepoNameFromPluginName(sourcePlugin.id); const stagedPath = `plugin-source/${sourceSlug}`; const prompt = renderPluginSharePrompt({ action, sourcePlugin, stagedPath }); const metadata = { kind: 'prototype' }; const projectRoot = await ensureProject(PROJECTS_DIR, id, metadata); await copyPluginFolderForProjectContext(sourcePlugin.fsPath, path.join(projectRoot, 'plugin-source', sourceSlug));
         insertProject(db, { id, name: `${PLUGIN_SHARE_ACTION_LABELS[action]}: ${sourcePlugin.title || sourcePlugin.id}`, skillId: null, designSystemId: null, pendingPrompt: prompt, metadata, createdAt: now, updatedAt: now });
         insertConversation(db, { id: cid, projectId: id, title: null, createdAt: now, updatedAt: now });
-        const registry = await loadPluginRegistryView(); const connectorProbe = buildConnectorProbe(connectorService); const resolved = resolvePluginSnapshot({ db, body: { pluginId: actionPluginId, pluginInputs: { source_plugin_id: sourcePlugin.id, source_plugin_title: sourcePlugin.title || sourcePlugin.id, source_plugin_version: sourcePlugin.version, source_plugin_path: sourcePlugin.fsPath, plugin_context_path: stagedPath }, locale: typeof body.locale === 'string' ? body.locale : undefined }, projectId: id, conversationId: cid, registry, connectorProbe });
+        const registry = await loadPluginRegistryView(); const resolved = resolvePluginSnapshot({ db, body: { pluginId: actionPluginId, pluginInputs: { source_plugin_id: sourcePlugin.id, source_plugin_title: sourcePlugin.title || sourcePlugin.id, source_plugin_version: sourcePlugin.version, source_plugin_path: sourcePlugin.fsPath, plugin_context_path: stagedPath }, locale: typeof body.locale === 'string' ? body.locale : undefined }, projectId: id, conversationId: cid, registry });
         if (resolved && !resolved.ok) return res.status(resolved.status).json(resolved.body);
         const project = getProject(db, id); if (!project) return sendApiError(res, 500, 'INTERNAL_ERROR', 'created project could not be loaded');
         res.json({ ok: true, project, conversationId: cid, ...(resolved?.ok ? { appliedPluginSnapshotId: resolved.snapshotId } : {}), actionPluginId, sourcePluginId: sourcePlugin.id, stagedPath, prompt, message: `Created a ${PLUGIN_SHARE_ACTION_LABELS[action]} task for ${sourcePlugin.title || sourcePlugin.id}.` });
@@ -7122,7 +7118,6 @@ export async function startServer({
     chat: { startChatRun },
     lifecycle: { isDaemonShuttingDown: () => daemonShuttingDown },
     plugins: {
-      connectorService,
       detectSkillPluginCandidateOnRunSuccess,
       firePipelineForRun,
       loadPluginRegistryView,
@@ -7160,7 +7155,6 @@ export async function startServer({
     nativeDialogs: nativeDialogDeps,
     research: researchDeps,
     plugins: {
-      connectorService,
       detectSkillPluginCandidateOnRunSuccess,
       firePipelineForRun,
       loadPluginRegistryView,

@@ -68,7 +68,6 @@ describe('chat run context helpers', () => {
 
     expect(prompt).toContain('## Selected run context');
     expect(prompt).toContain('terminal: Dev server (`term-1`)');
-    expect(prompt).toContain('Selected connectors');
-    expect(prompt).toContain('- Figma (`figma`)');
+    expect(prompt).not.toContain('Selected connectors');
   });
 });

@@ -77,7 +77,6 @@ export async function protectConfigCredentials(
     agentCliEnv: Object.fromEntries(
       Object.entries(config.agentCliEnv ?? {}).map(([key, value]) => [key, { ...value }]),
     ),
-    composio: { ...(config.composio ?? {}), apiKey: '' },
   };
   const desiredRefs = new Set<string>();
   const savedBySlot = new Map<string, Promise<CredentialMetadata>>();
@@ -224,6 +223,5 @@ export function stripPlaintextConfigCredentials(config: AppConfig): AppConfig {
       Object.entries(config.mediaProviders ?? {}).map(([key, value]) => [key, scrubMediaEntry(value)]),
     ),
     agentCliEnv,
-    composio: { ...(config.composio ?? {}), apiKey: '' },
   };
 }

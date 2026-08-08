@@ -12,9 +12,7 @@ import { Dialog, DialogFooter, DialogTitle } from '@open-design/components';
 import type {
   ApplyResult,
   ChatSessionMode,
-  ConnectorDetail,
   InputFieldSpec,
-  McpServerConfig,
   InstalledPluginRecord,
   ProjectKind,
   AudioVoiceOption,
@@ -172,16 +170,6 @@ interface SelectedPluginContext {
   inlineBacked: boolean;
 }
 
-interface SelectedMcpContext {
-  server: McpServerConfig;
-  inlineBacked: boolean;
-}
-
-interface SelectedConnectorContext {
-  connector: ConnectorDetail;
-  inlineBacked: boolean;
-}
-
 interface PendingReplacement {
   title: string;
   // Returns a promise resolving when the underlying plugin apply has
@@ -228,8 +216,6 @@ interface Props {
   onDuplicateProject?: (id: string) => Promise<void> | void;
   onRenameProject?: (id: string, name: string) => void;
   onBrowseRegistry?: () => void;
-  onOpenIntegrations?: () => void;
-  onOpenMcp?: () => void;
   // Stage B: optional callbacks the rail's migration chips need.
   // HomeView itself never imports them; EntryShell threads them
   // through so the dispatcher can stay declarative.
@@ -238,7 +224,6 @@ interface Props {
   promptHandoff?: HomePromptHandoff | null;
   skills?: SkillSummary[];
   skillsLoading?: boolean;
-  connectors?: ConnectorDetail[];
   promptTemplates?: PromptTemplateSummary[];
   // Personalized first-run starting point (spec §7). Null unless the user just
   // finished the About-you survey this session; EntryShell owns the state.
@@ -256,8 +241,6 @@ interface Props {
 
 const EMPTY_DESIGN_SYSTEMS: DesignSystemSummary[] = [];
 const EMPTY_SKILLS: SkillSummary[] = [];
-const EMPTY_CONNECTORS: ConnectorDetail[] = [];
-const EMPTY_MCP_OPTIONS: McpServerConfig[] = [];
 const EMPTY_PROMPT_TEMPLATES: PromptTemplateSummary[] = [];
 
 // The Home composer lives inside EntryView, which App.tsx fully UNMOUNTS the
@@ -313,14 +296,11 @@ export function HomeView({
   onDuplicateProject,
   onRenameProject,
   onBrowseRegistry,
-  onOpenIntegrations,
-  onOpenMcp,
   onOpenNewProject,
   onStartBlankProject,
   promptHandoff,
   skills = EMPTY_SKILLS,
   skillsLoading = false,
-  connectors = EMPTY_CONNECTORS,
   promptTemplates = EMPTY_PROMPT_TEMPLATES,
   recommendation = null,
   onRecommendationStart,
@@ -370,8 +350,6 @@ export function HomeView({
   const [sessionMode, setSessionMode] = useState<ChatSessionMode>('design');
   const [activeSkill, setActiveSkill] = useState<SkillSummary | null>(null);
   const [selectedPluginContexts, setSelectedPluginContexts] = useState<SelectedPluginContext[]>([]);
-  const [selectedMcpContexts, setSelectedMcpContexts] = useState<SelectedMcpContext[]>([]);
-  const [selectedConnectorContexts, setSelectedConnectorContexts] = useState<SelectedConnectorContext[]>([]);
   const [contextWorkspaceItems, setContextWorkspaceItems] = useState<WorkspaceContextItem[]>([]);
   const [stagedFiles, setStagedFiles] = useState<File[]>([]);
   const [workingDir, setWorkingDir] = useState<string | null>(null);
@@ -652,8 +630,6 @@ export function HomeView({
     setActive(null);
     setActiveSkill(null);
     setSelectedPluginContexts([]);
-    setSelectedMcpContexts([]);
-    setSelectedConnectorContexts([]);
     setFallbackProjectKind('other');
     setFallbackProjectMetadata(null);
     if (promptHandoff.focus) {
@@ -689,33 +665,23 @@ export function HomeView({
   );
   // Inline-backed contexts are already represented in the composer as `@mention`
   // pills, so they must NOT also drive the active context row — otherwise
-  // selecting only an inline-mentioned connector mounts an empty row (count
-  // label, no visible children) above the editor. Context-only `Use` selections
+  // selecting only an inline-mentioned item mounts an empty row (count label,
+  // no visible children) above the editor. Context-only `Use` selections
   // have no inline representation, so they are the only ones the row should
   // surface (and count).
   const contextItemCount = useMemo(() => {
     const contextOnlyPlugins = selectedPluginContexts.filter(
       (item) => !item.inlineBacked,
     ).length;
-    const contextOnlyMcp = selectedMcpContexts.filter(
-      (item) => !item.inlineBacked,
-    ).length;
-    const contextOnlyConnectors = selectedConnectorContexts.filter(
-      (item) => !item.inlineBacked,
-    ).length;
     return (
       activeContextItemCount +
       contextOnlyPlugins +
-      contextOnlyMcp +
-      contextOnlyConnectors +
       contextWorkspaceItems.length +
       stagedFiles.length
     );
   }, [
     activeContextItemCount,
     contextWorkspaceItems.length,
-    selectedConnectorContexts,
-    selectedMcpContexts,
     selectedPluginContexts,
     stagedFiles.length,
   ]);
@@ -756,7 +722,6 @@ export function HomeView({
     [skills],
   );
 
-  const enabledMcpServers = EMPTY_MCP_OPTIONS;
 
   const designSystemPickerSystems = useMemo(
     () => selectableHomeDesignSystems(designSystems, defaultDesignSystemId),
@@ -1554,53 +1519,6 @@ export function HomeView({
     focusPromptAtEnd();
   }
 
-  function useMcpServer(_server: McpServerConfig, nextPrompt: string) {
-    setSelectedMcpContexts((current) => (
-      current.some((item) => item.server.id === _server.id)
-        ? current
-        : [...current, { server: _server, inlineBacked: true }]
-    ));
-    setPrompt(nextPrompt);
-    setError(null);
-    focusPromptAtEnd();
-  }
-
-  function removeMcpContext(serverId: string) {
-    const server = selectedMcpContexts.find((item) => item.server.id === serverId)?.server ?? null;
-    setSelectedMcpContexts((current) => current.filter((item) => item.server.id !== serverId));
-    if (server) {
-      setPrompt((current) => removeContextMentionsFromPrompt(current, [
-        server.label || server.id,
-        server.id,
-      ]));
-      setPromptEditedByUser(true);
-    }
-  }
-
-  function useConnector(connector: ConnectorDetail, nextPrompt: string) {
-    setSelectedConnectorContexts((current) => (
-      current.some((item) => item.connector.id === connector.id)
-        ? current
-        : [...current, { connector, inlineBacked: true }]
-    ));
-    setPrompt(nextPrompt);
-    setPromptEditedByUser(false);
-    setError(null);
-    focusPromptAtEnd();
-  }
-
-  function removeConnectorContext(connectorId: string) {
-    const connector = selectedConnectorContexts.find((item) => item.connector.id === connectorId)?.connector ?? null;
-    setSelectedConnectorContexts((current) => current.filter((item) => item.connector.id !== connectorId));
-    if (connector) {
-      setPrompt((current) => removeContextMentionsFromPrompt(current, [
-        connector.name,
-        connector.id,
-      ]));
-      setPromptEditedByUser(true);
-    }
-  }
-
   function queuePluginAuthoring(chipId: string | null, goal?: string) {
     const nextInputs = buildPluginAuthoringInputs(goal);
     const nextPrompt = buildPluginAuthoringPromptForInputs(nextInputs);
@@ -1924,7 +1842,7 @@ export function HomeView({
       // forwarding it. Inline-backed contexts (inserted as `@mention` pills) are
       // only sent while their token survives in the prompt — the Lexical composer
       // lets users delete a mention pill (backspace, edit), and when they do that
-      // plugin/MCP/connector should stop being sent. Context-only `Use`
+      // plugin context should stop being sent. Context-only `Use`
       // selections never carry a token, so they stay in the payload until the
       // user explicitly clears them.
       const contextPlugins = selectedPluginContexts
@@ -1935,25 +1853,6 @@ export function HomeView({
           ...(item.record.manifest?.description
             ? { description: item.record.manifest.description }
             : {}),
-        }));
-      const contextMcpServers = selectedMcpContexts
-        .filter((item) => !item.inlineBacked || mentionTokenPresent(trimmed, item.server.label || item.server.id))
-        .map((item) => ({
-          id: item.server.id,
-          ...(item.server.label ? { label: item.server.label } : {}),
-          ...(item.server.transport ? { transport: item.server.transport } : {}),
-          ...(item.server.url ? { url: item.server.url } : {}),
-          ...(item.server.command ? { command: item.server.command } : {}),
-        }));
-      const contextConnectors = selectedConnectorContexts
-        .filter((item) => !item.inlineBacked || mentionTokenPresent(trimmed, item.connector.name))
-        .map((item) => ({
-          id: item.connector.id,
-          name: item.connector.name,
-          provider: item.connector.provider,
-          category: item.connector.category,
-          status: item.connector.status,
-          ...(item.connector.accountLabel ? { accountLabel: item.connector.accountLabel } : {}),
         }));
       // Referenced project / local-code folders are required user-selected
       // inputs. If one disappears before submit, fail loudly instead of sending
@@ -2011,8 +1910,6 @@ export function HomeView({
         projectMetadata: submittedProjectMetadata,
         designSystemId: submittedDesignSystemId,
         contextPlugins,
-        contextMcpServers,
-        contextConnectors,
         ...(contextWorkspaceItems.length > 0
           ? { initialRunContext: { workspaceItems: contextWorkspaceItems } }
           : {}),
@@ -2039,8 +1936,6 @@ export function HomeView({
       // Only drop the staged contexts once the run actually started — a
       // rejected creation keeps them so the retry sends the same payload.
       setSelectedPluginContexts([]);
-      setSelectedMcpContexts([]);
-      setSelectedConnectorContexts([]);
       setContextWorkspaceItems([]);
     } catch (err) {
       // A submit handler that throws (instead of resolving false) lands on
@@ -2077,15 +1972,9 @@ export function HomeView({
         onClearActiveChip={clearActiveChipSelection}
         onClearActiveSkill={() => setActiveSkill(null)}
         selectedPluginContexts={selectedPluginContexts.map((item) => item.record)}
-        selectedMcpContexts={selectedMcpContexts.map((item) => item.server)}
-        selectedConnectorContexts={selectedConnectorContexts.map((item) => item.connector)}
         contextOnlyPlugins={selectedPluginContexts.filter((item) => !item.inlineBacked).map((item) => item.record)}
-        contextOnlyMcpServers={selectedMcpContexts.filter((item) => !item.inlineBacked).map((item) => item.server)}
-        contextOnlyConnectors={selectedConnectorContexts.filter((item) => !item.inlineBacked).map((item) => item.connector)}
         contextWorkspaceItems={contextWorkspaceItems}
         onRemovePluginContext={removePluginContext}
-        onRemoveMcpContext={removeMcpContext}
-        onRemoveConnectorContext={removeConnectorContext}
         onAddWorkspaceContext={addWorkspaceContext}
         onRemoveWorkspaceContext={removeWorkspaceContext}
         onOpenPluginDetails={setDetailsRecord}
@@ -2109,9 +1998,6 @@ export function HomeView({
         pluginsLoading={pluginsLoading}
         skillOptions={selectableSkills}
         skillsLoading={skillsLoading}
-        mcpOptions={enabledMcpServers}
-        mcpLoading={false}
-        connectorOptions={EMPTY_CONNECTORS}
         pendingPluginId={pendingApplyId}
         pendingChipId={pendingChipId}
         submitDisabled={
@@ -2124,8 +2010,6 @@ export function HomeView({
         onDuplicateExamplePlugin={duplicateExamplePlugin}
         pendingDuplicatePluginId={pendingDuplicatePluginId}
         onPickSkill={useSkill}
-        onPickMcp={useMcpServer}
-        onPickConnector={useConnector}
         onPickChip={pickChip}
         contextItemCount={contextItemCount}
         error={error}

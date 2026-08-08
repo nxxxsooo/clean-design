@@ -9,7 +9,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import type { ConnectorDetail } from '@open-design/contracts';
 import type { OpenDesignHostProjectImportSuccess } from '@open-design/host';
 import { modalOverlay, modalContent } from '../motion';
 import type {
@@ -37,8 +36,6 @@ interface Props {
   onDeleteTemplate?: (id: string) => Promise<boolean>;
   promptTemplates: PromptTemplateSummary[];
   mediaProviders?: Record<string, MediaProviderCredentials>;
-  connectors?: ConnectorDetail[];
-  connectorsLoading?: boolean;
   loading?: boolean;
   onCreate: (input: CreateInput & { requestId?: string }) => Promise<boolean> | boolean | void;
   onImportClaudeDesign?: (
@@ -46,7 +43,6 @@ interface Props {
   ) => Promise<ImportClaudeDesignOutcome | void> | ImportClaudeDesignOutcome | void;
   onImportFolder?: (baseDir: string) => Promise<void> | void;
   onImportFolderResponse?: (response: OpenDesignHostProjectImportSuccess) => Promise<void> | void;
-  onOpenConnectorsTab?: () => void;
   onClose: () => void;
   initialTab?: CreateTab;
 }
@@ -75,14 +71,11 @@ function NewProjectModalBody({
   onDeleteTemplate,
   promptTemplates,
   mediaProviders,
-  connectors,
-  connectorsLoading,
   loading,
   onCreate,
   onImportClaudeDesign,
   onImportFolder,
   onImportFolderResponse,
-  onOpenConnectorsTab,
   onClose,
   initialTab,
 }: Omit<Props, 'open'>) {
@@ -174,8 +167,6 @@ function NewProjectModalBody({
             {...(onDeleteTemplate ? { onDeleteTemplate } : {})}
             promptTemplates={promptTemplates}
             {...(mediaProviders ? { mediaProviders } : {})}
-            {...(connectors ? { connectors } : {})}
-            {...(typeof connectorsLoading === 'boolean' ? { connectorsLoading } : {})}
             loading={Boolean(loading) || creating}
             onCreate={(input) => {
               void handleCreate(input);
@@ -183,7 +174,6 @@ function NewProjectModalBody({
             {...(onImportClaudeDesign ? { onImportClaudeDesign } : {})}
             {...(onImportFolder ? { onImportFolder } : {})}
             {...(onImportFolderResponse ? { onImportFolderResponse } : {})}
-            {...(onOpenConnectorsTab ? { onOpenConnectorsTab } : {})}
             {...(initialTab ? { initialTab } : {})}
           />
           {creating ? (

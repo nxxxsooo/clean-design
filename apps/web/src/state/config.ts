@@ -7,7 +7,6 @@ import type {
   AppConfig,
   MediaProviderCredentials,
   NotificationsConfig,
-  OrbitConfig,
   PetConfig,
 } from '../types';
 import { resolveFixedOriginBaseUrl } from './apiProtocols';
@@ -50,16 +49,6 @@ export const DEFAULT_PET: PetConfig = {
   },
 };
 
-export const DEFAULT_ORBIT: OrbitConfig = {
-  enabled: false,
-  time: '08:00',
-  // Ship with the general-purpose Orbit briefing skill pre-selected so a
-  // fresh install runs against a real adaptive template instead of the
-  // bare built-in prompt. Users can clear it from Settings → Orbit to fall
-  // back to the built-in prompt or pick another scenario === 'orbit' skill.
-  templateSkillId: 'orbit-general',
-};
-
 export const DEFAULT_CONFIG: AppConfig = {
   mode: 'daemon',
   apiKey: '',
@@ -80,13 +69,11 @@ export const DEFAULT_CONFIG: AppConfig = {
   theme: 'system',
   accentColor: DEFAULT_ACCENT_COLOR,
   mediaProviders: {},
-  composio: {},
   agentModels: {},
   agentCliEnv: {},
   agentCliEnvIntent: {},
   pet: DEFAULT_PET,
   notifications: DEFAULT_NOTIFICATIONS,
-  orbit: DEFAULT_ORBIT,
   projectLocations: [],
   defaultProjectLocationId: 'default',
 };
@@ -542,21 +529,6 @@ function normalizeNotifications(
   return { ...DEFAULT_NOTIFICATIONS, ...(input ?? {}) };
 }
 
-function normalizeOrbit(input: Partial<OrbitConfig> | undefined): OrbitConfig {
-  const time = typeof input?.time === 'string' && isValidOrbitTime(input.time)
-    ? input.time
-    : DEFAULT_ORBIT.time;
-  return { ...DEFAULT_ORBIT, ...(input ?? {}), time };
-}
-
-function isValidOrbitTime(time: string): boolean {
-  const match = /^(\d{2}):(\d{2})$/.exec(time);
-  if (!match) return false;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59;
-}
-
 function isBedrockRuntimeBaseUrl(baseUrl: string): boolean {
   try {
     const hostname = new URL(baseUrl).hostname.toLowerCase();
@@ -640,7 +612,6 @@ export function loadConfig(): AppConfig {
         ...DEFAULT_CONFIG,
         pet: normalizePet(DEFAULT_PET),
         notifications: normalizeNotifications(DEFAULT_NOTIFICATIONS),
-        orbit: normalizeOrbit(DEFAULT_ORBIT),
       };
     }
     const parsed = JSON.parse(raw) as Partial<AppConfig>;
@@ -653,14 +624,12 @@ export function loadConfig(): AppConfig {
       ...parsed,
       apiProtocolConfigs: { ...(parsed.apiProtocolConfigs ?? {}) },
       mediaProviders: { ...(parsed.mediaProviders ?? {}) },
-      composio: { ...(parsed.composio ?? {}) },
       agentModels: { ...(parsed.agentModels ?? {}) },
       agentCliEnv: { ...(parsed.agentCliEnv ?? {}) },
       agentCliEnvIntent: { ...(parsed.agentCliEnvIntent ?? {}) },
       accentColor: normalizeAccentColor(parsed.accentColor) ?? DEFAULT_CONFIG.accentColor,
       pet: normalizePet(parsed.pet),
       notifications: normalizeNotifications(parsed.notifications),
-      orbit: normalizeOrbit(parsed.orbit),
     };
     merged.onboardingCompleted = true;
     if (merged.agentId === 'amr') merged.agentId = null;
@@ -757,14 +726,8 @@ export function loadConfig(): AppConfig {
       ...DEFAULT_CONFIG,
       pet: normalizePet(DEFAULT_PET),
       notifications: normalizeNotifications(DEFAULT_NOTIFICATIONS),
-      orbit: normalizeOrbit(DEFAULT_ORBIT),
     };
   }
-}
-
-interface PublicComposioConfigResponse {
-  configured?: boolean;
-  apiKeyTail?: string;
 }
 
 interface PublicMediaProviderConfigEntry {
@@ -883,21 +846,6 @@ export function buildMediaProvidersForDaemonSave(
   };
 }
 
-export async function fetchComposioConfigFromDaemon(): Promise<AppConfig['composio'] | null> {
-  try {
-    const response = await fetch('/api/connectors/composio/config');
-    if (!response.ok) return null;
-    const payload = await response.json() as PublicComposioConfigResponse;
-    return {
-      apiKey: '',
-      apiKeyConfigured: Boolean(payload.configured),
-      apiKeyTail: payload.apiKeyTail ?? '',
-    };
-  } catch {
-    return null;
-  }
-}
-
 export async function fetchMediaProvidersFromDaemon(): Promise<DaemonMediaProvidersFetchResult> {
   try {
     const response = await fetch('/api/media/config');
@@ -925,25 +873,6 @@ export async function fetchMediaProvidersFromDaemon(): Promise<DaemonMediaProvid
     };
   } catch {
     return { status: 'error' };
-  }
-}
-
-export async function syncComposioConfigToDaemon(
-  config: AppConfig['composio'] | undefined,
-): Promise<boolean> {
-  const apiKey = config?.apiKey ?? '';
-  const payload = {
-    ...(apiKey.trim() || !config?.apiKeyConfigured ? { apiKey } : {}),
-  };
-  try {
-    const response = await fetch('/api/connectors/composio/config', {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    return response.ok;
-  } catch {
-    return false;
   }
 }
 
@@ -1008,9 +937,6 @@ export function mergeDaemonConfig(
   }
   if (daemonConfig.disabledDesignSystems !== undefined) {
     next.disabledDesignSystems = daemonConfig.disabledDesignSystems;
-  }
-  if (daemonConfig.orbit !== undefined) {
-    next.orbit = normalizeOrbit(daemonConfig.orbit);
   }
   if (daemonConfig.customInstructions !== undefined) {
     next.customInstructions = daemonConfig.customInstructions ?? undefined;
@@ -1131,7 +1057,6 @@ export async function syncConfigToDaemon(
     designSystemId: config.designSystemId,
     disabledSkills: config.disabledSkills,
     disabledDesignSystems: config.disabledDesignSystems,
-    orbit: normalizeOrbit(config.orbit),
     customInstructions: config.customInstructions ?? null,
     projectLocations: config.projectLocations ?? [],
     defaultProjectLocationId: config.defaultProjectLocationId ?? 'default',

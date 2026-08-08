@@ -24,7 +24,6 @@ import path from 'node:path';
 import type { RegistryView } from '@open-design/plugin-runtime';
 import { doctorPlugin, type DoctorReport, type Diagnostic } from './doctor.js';
 import { resolvePluginFolder } from './registry.js';
-import type { ConnectorProbe } from './connector-gate.js';
 
 export interface ValidatePluginFolderInput {
   // Path to the plugin folder. Must contain at least one of
@@ -36,9 +35,6 @@ export interface ValidatePluginFolderInput {
   // skips registry-bound ref checks (skills / DS / craft refs in
   // the manifest just emit warnings).
   registry?: RegistryView;
-  // Optional connector probe. Same semantics as the post-install
-  // doctor.
-  connectorProbe?: ConnectorProbe;
 }
 
 export interface ValidatePluginFolderResult {
@@ -85,7 +81,6 @@ export async function validatePluginFolder(
 
   const doctor = doctorPlugin(probe.record, input.registry ?? EMPTY_REGISTRY, {
     warnOnMissingRefs: !!input.registry,
-    ...(input.connectorProbe ? { connectorProbe: input.connectorProbe } : {}),
   });
   return {
     ok:              probe.warnings.length > 0 ? doctor.ok : doctor.ok,

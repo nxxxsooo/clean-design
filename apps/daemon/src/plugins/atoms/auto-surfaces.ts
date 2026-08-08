@@ -1,14 +1,12 @@
 // Phase 8 entry slice / spec §10.3.1 / §21.5 — auto-derived GenUI surfaces
 // for first-party atom stages.
 //
-// Mirrors the connector-gate's auto oauth-prompt pattern: when the
-// pipeline contains a `diff-review` stage, the daemon synthesises a
+// When the pipeline contains a `diff-review` stage, the daemon synthesises a
 // `choice` GenUI surface (`__auto_diff_review_<stageId>`,
 // persist='run') so the user can accept / reject / partial without
 // the plugin author having to declare the surface by hand.
 // Plugin-author-declared surfaces with the same id win — this helper
-// returns the implicit list and `mergeAutoOAuthPrompts` (re-used) does
-// the dedupe.
+// returns the implicit list and the apply layer handles deduplication.
 //
 // Other atom stages that auto-derive surfaces in the future (e.g.
 // `direction-picker` could auto-derive a `choice`) plug in here.

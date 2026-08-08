@@ -1103,21 +1103,9 @@ export function LibrarySection({ active, onOpenProject }: Props) {
       {fontFaceCss ? <style>{fontFaceCss}</style> : null}
       <header className="entry-section__head">
         <h1 className="entry-section__title">Library</h1>
-        <div className={styles.clipperHint}>
-          <p className={styles.headerHint}>
-            Clip any page, design system, screenshot, image, or Figma import JSON into your Library —
-            local-first, one click, no login.
-          </p>
-          <a
-            className={styles.clipperDownload}
-            href="https://open-design.ai/clipper"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <Icon name="download" size={15} />
-            Get the Clean Design Web Clipper
-          </a>
-        </div>
+        <p className={styles.headerHint}>
+          Keep reusable pages, design systems, screenshots, images, and Figma import JSON in your local Library.
+        </p>
       </header>
 
       <div className={styles.toolbar}>

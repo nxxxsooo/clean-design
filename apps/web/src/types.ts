@@ -354,14 +354,6 @@ export interface NotificationsConfig {
   desktopEnabled: boolean;
 }
 
-export interface OrbitConfig {
-  enabled: boolean;
-  /** Local 24-hour clock time in HH:mm format. */
-  time: string;
-  /** Optional skill id from the examples gallery where scenario === "orbit". */
-  templateSkillId?: string | null;
-}
-
 export interface PetConfig {
   // True once the user has explicitly picked a pet (built-in or custom).
   // Until then, the entry view shows an "adopt" callout to drive discovery.
@@ -416,7 +408,6 @@ export interface AppConfig {
   // this is set so refreshing the page doesn't re-prompt.
   onboardingCompleted?: boolean;
   mediaProviders?: Record<string, MediaProviderCredentials>;
-  composio?: ComposioSettings;
   // Per-CLI model picker state, keyed by agent id (e.g. `gemini`, `codex`).
   // Pre-existing configs without this field fall through to the agent's
   // declared default.
@@ -437,21 +428,12 @@ export interface AppConfig {
   // configs that pre-date the feature land at `undefined`, which the loader
   // normalizes to a safe default (everything off).
   notifications?: NotificationsConfig;
-  // Daily connector activity digest. When enabled, the daemon runs this once
-  // per day at the configured local time; defaults to 08:00.
-  orbit?: OrbitConfig;
   // IDs of skills/design-systems the user has explicitly disabled.
   disabledSkills?: string[];
   disabledDesignSystems?: string[];
   customInstructions?: string;
   projectLocations?: ProjectLocationPrefs[];
   defaultProjectLocationId?: string | null;
-}
-
-export interface ComposioSettings {
-  apiKey?: string;
-  apiKeyConfigured?: boolean;
-  apiKeyTail?: string;
 }
 
 export type AgentEvent = PersistedAgentEvent;

@@ -7,7 +7,6 @@ import { installMockOpenDesignHost } from '@open-design/host/testing';
 import { App } from '../../src/App';
 import type { AppConfig } from '../../src/types';
 import {
-  fetchComposioConfigFromDaemon,
   loadConfig,
   mergeDaemonConfig,
   saveConfig,
@@ -139,7 +138,6 @@ vi.mock('../../src/state/config', async () => {
     saveConfig: vi.fn(),
     syncConfigToDaemon: vi.fn().mockResolvedValue(undefined),
     syncMediaProvidersToDaemon: vi.fn().mockResolvedValue(undefined),
-    fetchComposioConfigFromDaemon: vi.fn().mockResolvedValue(null),
   };
 });
 
@@ -151,7 +149,6 @@ const mockedFetchPromptTemplates = vi.mocked(fetchPromptTemplates);
 const mockedFetchSkills = vi.mocked(fetchSkills);
 const mockedListProjects = vi.mocked(listProjects);
 const mockedListTemplates = vi.mocked(listTemplates);
-const mockedFetchComposioConfigFromDaemon = vi.mocked(fetchComposioConfigFromDaemon);
 const mockedLoadConfig = vi.mocked(loadConfig);
 const mockedMergeDaemonConfig = vi.mocked(mergeDaemonConfig);
 const mockedSaveConfig = vi.mocked(saveConfig);
@@ -207,7 +204,6 @@ describe('App media provider sync flows', () => {
     mockedFetchAppVersionInfo.mockResolvedValue(null);
     mockedListProjects.mockResolvedValue([]);
     mockedListTemplates.mockResolvedValue([]);
-    mockedFetchComposioConfigFromDaemon.mockResolvedValue(null);
     mockedMergeDaemonConfig.mockImplementation((local) => local);
     mockedLoadConfig.mockReturnValue({ ...baseConfig });
     vi.stubGlobal(

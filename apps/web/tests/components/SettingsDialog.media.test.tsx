@@ -531,7 +531,6 @@ function renderDialog(
       appVersionInfo={null}
       initialSection="media"
       onPersist={options?.onPersist ?? vi.fn()}
-      onPersistComposioKey={vi.fn()}
       onClose={vi.fn()}
       onRefreshAgents={vi.fn()}
       mediaProvidersNotice={options?.mediaProvidersNotice}

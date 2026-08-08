@@ -26,11 +26,9 @@ import type {
 } from 'react';
 import type {
   ChatSessionMode,
-  ConnectorDetail,
   DesignSystemSummary,
   InputFieldSpec,
   InstalledPluginRecord,
-  McpServerConfig,
   WorkspaceContextItem,
 } from '@open-design/contracts';
 import { DesignSystemPicker } from './DesignSystemPicker';
@@ -168,19 +166,13 @@ interface Props {
   activeSkillRecord?: SkillSummary | null;
   onClearActiveSkill?: () => void;
   selectedPluginContexts?: InstalledPluginRecord[];
-  selectedMcpContexts?: McpServerConfig[];
-  selectedConnectorContexts?: ConnectorDetail[];
   // Context-only selections (staged through the plain `Use` action, no inline
   // @mention pill). These have no in-prompt representation, so the active row
   // renders a removable chip for each — otherwise a kept-in-payload context
   // would be invisible and unremovable (silent context drift).
   contextOnlyPlugins?: InstalledPluginRecord[];
-  contextOnlyMcpServers?: McpServerConfig[];
-  contextOnlyConnectors?: ConnectorDetail[];
   contextWorkspaceItems?: WorkspaceContextItem[];
   onRemovePluginContext?: (pluginId: string) => void;
-  onRemoveMcpContext?: (serverId: string) => void;
-  onRemoveConnectorContext?: (connectorId: string) => void;
   onAddWorkspaceContext?: (item: WorkspaceContextItem) => void;
   onRemoveWorkspaceContext?: (id: string) => void;
   onAddPlugin?: () => void;
@@ -209,9 +201,6 @@ interface Props {
   pluginsLoading: boolean;
   skillOptions?: SkillSummary[];
   skillsLoading?: boolean;
-  mcpOptions?: McpServerConfig[];
-  mcpLoading?: boolean;
-  connectorOptions?: ConnectorDetail[];
   pendingPluginId: string | null;
   pendingChipId: string | null;
   submitDisabled?: boolean;
@@ -224,8 +213,6 @@ interface Props {
   onDuplicateExamplePlugin?: (record: InstalledPluginRecord) => void;
   pendingDuplicatePluginId?: string | null;
   onPickSkill?: (skill: SkillSummary, nextPrompt: string | null) => void;
-  onPickMcp?: (server: McpServerConfig, nextPrompt: string) => void;
-  onPickConnector?: (connector: ConnectorDetail, nextPrompt: string) => void;
   onPickChip: (chip: HomeHeroChip) => void;
   contextItemCount: number;
   error: string | null;
@@ -279,16 +266,12 @@ interface SelectedPromptExample {
 }
 
 const EMPTY_PLUGIN_CONTEXTS: InstalledPluginRecord[] = [];
-const EMPTY_MCP_CONTEXTS: McpServerConfig[] = [];
-const EMPTY_CONNECTOR_CONTEXTS: ConnectorDetail[] = [];
 const EMPTY_INPUT_FIELDS: InputFieldSpec[] = [];
 const EMPTY_PLUGIN_INPUT_VALUES: Record<string, unknown> = {};
 const EMPTY_INPUT_NAMES: string[] = [];
 const EMPTY_DESIGN_SYSTEMS: DesignSystemSummary[] = [];
 const EMPTY_STAGED_FILES: File[] = [];
 const EMPTY_SKILLS: SkillSummary[] = [];
-const EMPTY_MCP_OPTIONS: McpServerConfig[] = [];
-const EMPTY_CONNECTOR_OPTIONS: ConnectorDetail[] = [];
 const EMPTY_WORKSPACE_ITEMS: WorkspaceContextItem[] = [];
 
 export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
@@ -313,12 +296,8 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
     onClearActiveSkill = () => undefined,
     selectedPluginContexts = EMPTY_PLUGIN_CONTEXTS,
     contextOnlyPlugins = EMPTY_PLUGIN_CONTEXTS,
-    contextOnlyMcpServers = EMPTY_MCP_OPTIONS,
-    contextOnlyConnectors = EMPTY_CONNECTOR_OPTIONS,
     contextWorkspaceItems = EMPTY_WORKSPACE_ITEMS,
     onRemovePluginContext = () => undefined,
-    onRemoveMcpContext = () => undefined,
-    onRemoveConnectorContext = () => undefined,
     onAddWorkspaceContext = () => undefined,
     onRemoveWorkspaceContext = () => undefined,
     onAddPlugin = () => undefined,
@@ -341,9 +320,6 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
     pluginsLoading,
     skillOptions = EMPTY_SKILLS,
     skillsLoading = false,
-    mcpOptions = EMPTY_MCP_OPTIONS,
-    mcpLoading = false,
-    connectorOptions = EMPTY_CONNECTOR_OPTIONS,
     pendingPluginId,
     pendingChipId,
     submitDisabled = false,
@@ -353,8 +329,6 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
     onDuplicateExamplePlugin = () => undefined,
     pendingDuplicatePluginId = null,
     onPickSkill = () => undefined,
-    onPickMcp = () => undefined,
-    onPickConnector = () => undefined,
     onPickChip,
     contextItemCount,
     error,
@@ -575,9 +549,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
         activePluginRecord,
         activeSkillId,
         activeSkillTitle,
-        mcpOptions,
         pluginOptions,
-        connectorOptions,
         contextWorkspaceItems,
         selectedPluginContexts,
         stagedFiles,
@@ -587,9 +559,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
       activePluginRecord,
       activeSkillId,
       activeSkillTitle,
-      mcpOptions,
       pluginOptions,
-      connectorOptions,
       contextWorkspaceItems,
       selectedPluginContexts,
       stagedFiles,
@@ -876,24 +846,6 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
     onPickSkill(skill, next);
   }
 
-  function pickMcp(server: McpServerConfig) {
-    const label = server.label || server.id;
-    const token = inlineMentionToken(label);
-    const next = insertHomeMention(token, { id: server.id, kind: 'mcp', label, token });
-    onPickMcp(server, next);
-  }
-
-  function pickConnector(connector: ConnectorDetail) {
-    const token = inlineMentionToken(connector.name);
-    const next = insertHomeMention(token, {
-      id: connector.id,
-      kind: 'connector',
-      label: connector.name,
-      token,
-    });
-    onPickConnector(connector, next);
-  }
-
   function insertInlineMentionSeparator() {
     const current = editorRef.current?.getText() ?? prompt;
     if (current.trim() && !/\s$/.test(current)) {
@@ -1150,7 +1102,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
     if (activeSkillRecord) onOpenSkillDetails(activeSkillRecord);
   }
 
-  // Inline-backed plugin/MCP/connector contexts already render as @mention pills
+  // Inline-backed plugin contexts already render as @mention pills
   // in the editor. This row should mount only for content that has a visible chip
   // here; the aggregate context count is just an aria label when the row exists.
   const showActivePluginRow = Boolean(showActivePluginChip && activePluginTitle);
@@ -1159,8 +1111,6 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
     showActivePluginRow ||
     Boolean(activeSkillTitle) ||
     contextOnlyPlugins.length > 0 ||
-    contextOnlyMcpServers.length > 0 ||
-    contextOnlyConnectors.length > 0 ||
     contextWorkspaceItems.length > 0;
   const blankProjectEntry = onStartBlankProject ? (
     <button
@@ -1388,77 +1338,6 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
                   title={t('common.close')}
                   data-tooltip={t('common.close')}
                   data-testid={`home-hero-context-clear-${plugin.id}`}
-                >
-                  <Icon name="close" size={9} />
-                </button>
-              </ContextChipHoverCard>
-            ))}
-            {contextOnlyMcpServers.map((server) => {
-              const label = server.label || server.id;
-              return (
-                <ContextChipHoverCard
-                  key={`ctx-mcp-${server.id}`}
-                  className="home-hero__active-chip home-hero__active-chip--context"
-                  data-testid={`home-hero-context-mcp-${server.id}`}
-                  typeLabel="MCP server"
-                  detail={server.url || server.id}
-                >
-                  <span className="home-hero__active-icon" aria-hidden>
-                    <Icon name="sliders" size={12} />
-                  </span>
-                  <span className="home-hero__active-label">{label}</span>
-                  <button
-                    type="button"
-                    className="home-hero__active-clear od-tooltip"
-                    onClick={() => {
-                      trackHomeChatComposerClick(analytics.track, {
-                        page_name: 'home',
-                        area: 'chat_composer',
-                        element: 'context_remove',
-                        resource_kind: 'mcp',
-                        resource_id: server.id,
-                      });
-                      onRemoveMcpContext(server.id);
-                    }}
-                    aria-label={t('chat.removeAria', { name: label })}
-                    title={t('common.close')}
-                    data-tooltip={t('common.close')}
-                    data-testid={`home-hero-context-clear-${server.id}`}
-                  >
-                    <Icon name="close" size={9} />
-                  </button>
-                </ContextChipHoverCard>
-              );
-            })}
-            {contextOnlyConnectors.map((connector) => (
-              <ContextChipHoverCard
-                key={`ctx-connector-${connector.id}`}
-                className="home-hero__active-chip home-hero__active-chip--context"
-                data-testid={`home-hero-context-connector-${connector.id}`}
-                typeLabel="Connector"
-                detail={connector.provider || connector.id}
-              >
-                <span className="home-hero__active-icon" aria-hidden>
-                  <Icon name="link" size={12} />
-                </span>
-                <span className="home-hero__active-label">{connector.name}</span>
-                <button
-                  type="button"
-                  className="home-hero__active-clear od-tooltip"
-                  onClick={() => {
-                    trackHomeChatComposerClick(analytics.track, {
-                      page_name: 'home',
-                      area: 'chat_composer',
-                      element: 'context_remove',
-                      resource_kind: 'connector',
-                      resource_id: connector.id,
-                    });
-                    onRemoveConnectorContext(connector.id);
-                  }}
-                  aria-label={t('chat.removeAria', { name: connector.name })}
-                  title={t('common.close')}
-                  data-tooltip={t('common.close')}
-                  data-testid={`home-hero-context-clear-${connector.id}`}
                 >
                   <Icon name="close" size={9} />
                 </button>
@@ -2446,9 +2325,7 @@ function buildHomeMentionEntities({
   activePluginRecord,
   activeSkillId,
   activeSkillTitle,
-  connectorOptions,
   contextWorkspaceItems,
-  mcpOptions,
   pluginOptions,
   selectedPluginContexts,
   stagedFiles,
@@ -2457,9 +2334,7 @@ function buildHomeMentionEntities({
   activePluginRecord: InstalledPluginRecord | null;
   activeSkillId: string | null;
   activeSkillTitle: string | null;
-  connectorOptions: ConnectorDetail[];
   contextWorkspaceItems: WorkspaceContextItem[];
-  mcpOptions: McpServerConfig[];
   pluginOptions: InstalledPluginRecord[];
   selectedPluginContexts: InstalledPluginRecord[];
   stagedFiles: File[];
@@ -2537,43 +2412,6 @@ function buildHomeMentionEntities({
       token: inlineMentionToken(activeSkillTitle),
       title: `Skill: ${activeSkillTitle}`,
     });
-  }
-  for (const server of mcpOptions) {
-    const label = server.label || server.id;
-    entities.push({
-      id: server.id,
-      kind: 'mcp',
-      label,
-      token: inlineMentionToken(label),
-      title: `MCP: ${label}`,
-    });
-    if (server.id !== label) {
-      entities.push({
-        id: server.id,
-        kind: 'mcp',
-        label: server.id,
-        token: inlineMentionToken(server.id),
-        title: `MCP: ${label}`,
-      });
-    }
-  }
-  for (const connector of connectorOptions) {
-    entities.push({
-      id: connector.id,
-      kind: 'connector',
-      label: connector.name,
-      token: inlineMentionToken(connector.name),
-      title: `Connector: ${connector.name}`,
-    });
-    if (connector.id !== connector.name) {
-      entities.push({
-        id: connector.id,
-        kind: 'connector',
-        label: connector.id,
-        token: inlineMentionToken(connector.id),
-        title: `Connector: ${connector.name}`,
-      });
-    }
   }
   return entities;
 }
@@ -3124,37 +2962,6 @@ function skillMatchesQuery(skill: SkillSummary, query: string, locale: Locale): 
     skill.mode,
     skill.surface ?? '',
     ...skill.triggers,
-  ]
-    .join(' ')
-    .toLowerCase()
-    .includes(q);
-}
-
-function mcpServerMatchesQuery(server: McpServerConfig, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  return [
-    server.id,
-    server.label ?? '',
-    server.transport,
-    server.url ?? '',
-    server.command ?? '',
-  ]
-    .join(' ')
-    .toLowerCase()
-    .includes(q);
-}
-
-function connectorMatchesQuery(connector: ConnectorDetail, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  return [
-    connector.id,
-    connector.name,
-    connector.provider,
-    connector.category,
-    connector.description ?? '',
-    connector.accountLabel ?? '',
   ]
     .join(' ')
     .toLowerCase()

@@ -25,14 +25,6 @@ const EMPTY_OBJECT_SCHEMA = {
   properties: {},
 } satisfies JsonObject;
 
-const CONNECTORS_LIST_INPUT_SCHEMA = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    useCase: { type: 'string', enum: ['personal_daily_digest'] },
-  },
-} satisfies JsonObject;
-
 const ARTIFACT_INPUT_SCHEMA = {
   type: 'object',
   additionalProperties: true,
@@ -84,25 +76,6 @@ export function createLiveArtifactsMcpTools(): McpTool[] {
         required: ['artifactId'],
         properties: {
           artifactId: { type: 'string', minLength: 1 },
-        },
-      },
-    },
-    {
-      name: 'connectors_list',
-      description: 'List connector catalog and available read-only tools through the daemon tool endpoint. Use `{ "useCase": "personal_daily_digest" }` for curated daily-digest tools. POSIX equivalent: `"$OD_NODE_BIN" "$OD_BIN" tools connectors list --use-case personal_daily_digest --format compact` or fallback `"$OD_NODE_BIN" "$OD_BIN" tools connectors list --format compact`.',
-      inputSchema: CONNECTORS_LIST_INPUT_SCHEMA,
-    },
-    {
-      name: 'connectors_execute',
-      description: 'Execute an allowed connector read tool through the daemon tool endpoint. POSIX equivalent: `"$OD_NODE_BIN" "$OD_BIN" tools connectors execute --connector <id> --tool <name> --input input.json`.',
-      inputSchema: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['connectorId', 'toolName', 'input'],
-        properties: {
-          connectorId: { type: 'string', minLength: 1 },
-          toolName: { type: 'string', minLength: 1 },
-          input: { type: 'object', additionalProperties: true },
         },
       },
     },
@@ -188,16 +161,6 @@ async function callTool(name: string, args: JsonObject): Promise<unknown> {
   if (name === 'live_artifacts_refresh') {
     return await requestJson('/api/tools/live-artifacts/refresh', { method: 'POST', body: JSON.stringify({ artifactId: args.artifactId }) });
   }
-  if (name === 'connectors_list') {
-    const useCase = args.useCase === 'personal_daily_digest' ? '?useCase=personal_daily_digest' : '';
-    return await requestJson(`/api/tools/connectors/list${useCase}`, { method: 'GET' });
-  }
-  if (name === 'connectors_execute') {
-    return await requestJson('/api/tools/connectors/execute', {
-      method: 'POST',
-      body: JSON.stringify({ connectorId: args.connectorId, toolName: args.toolName, input: args.input ?? {} }),
-    });
-  }
   throw new Error(`unknown MCP tool: ${name}`);
 }
 
@@ -215,7 +178,7 @@ export async function handleLiveArtifactsMcpRequest(request: JsonRpcRequest): Pr
         result: {
           protocolVersion: '2025-03-26',
           capabilities: { tools: {} },
-          serverInfo: { name: 'open-design-live-artifacts', version: '0.1.0' },
+          serverInfo: { name: 'clean-design-live-artifacts', version: '0.1.0' },
         },
       };
     }

@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { startServer } from '../../src/server.js';
-import { connectorService, ConnectorServiceError } from '../../src/connectors/service.js';
 import { CHAT_TOOL_ENDPOINTS, CHAT_TOOL_OPERATIONS, toolTokenRegistry } from '../../src/tool-tokens.js';
 
 type StartedServer = { server: http.Server; url: string };
@@ -60,10 +59,6 @@ function uniqueProjectId() {
   const id = `route-live-artifact-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   projectIds.push(id);
   return id;
-}
-
-function readAutoSafety(reason = 'test read-only connector fixture') {
-  return { sideEffect: 'read' as const, approval: 'auto' as const, reason };
 }
 
 function validCreateInput(title = 'Tool Route Live Artifact') {
@@ -256,79 +251,6 @@ describe('live artifact tool routes', () => {
     expect(list.body.artifacts[0].document).toBeUndefined();
   });
 
-  it('refreshes live artifacts through tool and UI routes', async () => {
-    const projectId = uniqueProjectId();
-    const token = mintToolToken(projectId, 'run-route-test-refresh');
-    const executeConnector = vi.spyOn(connectorService, 'execute')
-      .mockResolvedValueOnce({
-        ok: true,
-        connectorId: 'monet',
-        toolName: 'monet.metrics',
-        safety: readAutoSafety(),
-        output: { title: 'Open bugs', owner: '7' },
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        connectorId: 'monet',
-        toolName: 'monet.metrics',
-        safety: readAutoSafety(),
-        output: { title: 'Open bugs', owner: '8' },
-      });
-
-    const create = await jsonFetch(`${baseUrl}/api/tools/live-artifacts/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        input: {
-          ...validCreateInput('Refresh Route Artifact'),
-          document: {
-            ...validCreateInput('Refresh Route Artifact').document,
-            sourceJson: {
-              type: 'connector_tool',
-              toolName: 'monet.metrics',
-              input: { report: 'bugs' },
-              connector: {
-                connectorId: 'monet',
-                toolName: 'monet.metrics',
-                approvalPolicy: 'read_only_auto',
-              },
-              refreshPermission: 'manual_refresh_granted_for_read_only',
-            },
-          },
-        },
-      }),
-    });
-    expect(create.status).toBe(200);
-    expect(create.body.artifact.document.sourceJson.refreshPermission).toBe('manual_refresh_granted_for_read_only');
-
-    const toolRefresh = await jsonFetch(`${baseUrl}/api/tools/live-artifacts/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ artifactId: create.body.artifact.id }),
-    });
-    expect(toolRefresh.status).toBe(200);
-    expect(toolRefresh.body.refresh).toMatchObject({ id: 'refresh-000001', status: 'succeeded', refreshedSourceCount: 1 });
-    expect(toolRefresh.body.artifact).toMatchObject({ refreshStatus: 'succeeded', lastRefreshedAt: expect.any(String) });
-    expect(toolRefresh.body.artifact.document.dataJson).toMatchObject({ title: 'Open bugs', owner: '7' });
-    expect(executeConnector).toHaveBeenCalledTimes(1);
-    expect(executeConnector).toHaveBeenLastCalledWith(
-      expect.not.objectContaining({ expectedApprovalPolicy: expect.anything() }),
-      expect.objectContaining({ purpose: 'artifact_refresh' }),
-    );
-
-    const uiRefresh = await jsonFetch(`${baseUrl}/api/live-artifacts/${create.body.artifact.id}/refresh?projectId=${encodeURIComponent(projectId)}`, {
-      method: 'POST',
-    });
-    expect(uiRefresh.status).toBe(200);
-    expect(uiRefresh.body.refresh).toMatchObject({ id: 'refresh-000002', status: 'succeeded', refreshedSourceCount: 1 });
-    expect(uiRefresh.body.artifact.document.dataJson).toMatchObject({ title: 'Open bugs', owner: '8' });
-    expect(executeConnector).toHaveBeenCalledTimes(2);
-    expect(executeConnector).toHaveBeenLastCalledWith(
-      expect.not.objectContaining({ expectedApprovalPolicy: expect.anything() }),
-      expect.objectContaining({ purpose: 'artifact_refresh' }),
-    );
-  });
-
   it('rejects local refresh sources when refreshPermission is none', async () => {
     const projectId = uniqueProjectId();
     const token = mintToolToken(projectId, 'run-route-test-refresh-disabled');
@@ -499,110 +421,6 @@ describe('live artifact tool routes', () => {
     }
   }, 15_000);
 
-  it('rejects manual refresh requests with non-loopback host before refresh side effects', async () => {
-    const projectId = uniqueProjectId();
-    const token = mintToolToken(projectId, 'run-route-test-refresh-local-security');
-    const executeConnector = vi.spyOn(connectorService, 'execute').mockResolvedValue({
-      ok: true,
-      connectorId: 'monet',
-      toolName: 'monet.metrics',
-      safety: readAutoSafety(),
-      output: { title: 'Should not refresh', owner: '0' },
-    });
-
-    const create = await jsonFetch(`${baseUrl}/api/tools/live-artifacts/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        input: {
-          ...validCreateInput('Refresh Local Security'),
-          document: {
-            ...validCreateInput('Refresh Local Security').document,
-            sourceJson: {
-              type: 'connector_tool',
-              toolName: 'monet.metrics',
-              input: { report: 'bugs' },
-              connector: {
-                connectorId: 'monet',
-                toolName: 'monet.metrics',
-                approvalPolicy: 'read_only_auto',
-              },
-              refreshPermission: 'manual_refresh_granted_for_read_only',
-            },
-          },
-        },
-      }),
-    });
-    expect(create.status).toBe(200);
-
-    const refresh = await rawHttpJsonFetch(`${baseUrl}/api/live-artifacts/${create.body.artifact.id}/refresh?projectId=${encodeURIComponent(projectId)}`, {
-      method: 'POST',
-      headers: { Host: 'attacker.example' },
-    });
-
-    expect(refresh.status).toBe(403);
-    expect(refresh.body.error).toMatchObject({
-      code: 'FORBIDDEN',
-      details: { header: 'host' },
-    });
-    expect(executeConnector).not.toHaveBeenCalled();
-  });
-
-  it('rejects connector refresh sources when refreshPermission is none', async () => {
-    const projectId = uniqueProjectId();
-    const token = mintToolToken(projectId, 'run-route-test-refresh-default');
-    const executeConnector = vi.spyOn(connectorService, 'execute').mockResolvedValueOnce({
-      ok: true,
-      connectorId: 'monet',
-      toolName: 'monet.metrics',
-      safety: readAutoSafety(),
-      output: { title: 'Default refresh', owner: '9' },
-    });
-
-    const create = await jsonFetch(`${baseUrl}/api/tools/live-artifacts/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ input: validCreateInput('Default Refresh Artifact') }),
-    });
-    expect(create.status).toBe(200);
-
-    const update = await jsonFetch(`${baseUrl}/api/tools/live-artifacts/update`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        artifactId: create.body.artifact.id,
-        input: {
-          document: {
-            ...validCreateInput('Default Refresh Artifact').document,
-            sourceJson: {
-              type: 'connector_tool',
-              toolName: 'monet.metrics',
-              input: { report: 'defaults' },
-              connector: {
-                connectorId: 'monet',
-                toolName: 'monet.metrics',
-                approvalPolicy: 'read_only_auto',
-              },
-              refreshPermission: 'none',
-            },
-          },
-        },
-      }),
-    });
-    expect(update.status).toBe(200);
-    expect(update.body.artifact.document.sourceJson.refreshPermission).toBe('none');
-
-    const refresh = await jsonFetch(`${baseUrl}/api/live-artifacts/${create.body.artifact.id}/refresh?projectId=${encodeURIComponent(projectId)}`, {
-      method: 'POST',
-    });
-    expect(refresh.status).toBe(400);
-    expect(refresh.body.error).toMatchObject({
-      code: 'LIVE_ARTIFACT_REFRESH_UNAVAILABLE',
-      message: 'Refresh is disabled for this artifact source.',
-    });
-    expect(executeConnector).not.toHaveBeenCalled();
-  });
-
   it('rejects refresh requests when no refresh source exists', async () => {
     const projectId = uniqueProjectId();
     const token = mintToolToken(projectId, 'run-route-test-refresh-unavailable');
@@ -622,49 +440,6 @@ describe('live artifact tool routes', () => {
       code: 'LIVE_ARTIFACT_REFRESH_UNAVAILABLE',
       message: 'No refresh source is available yet.',
     });
-  });
-
-  it('marks artifacts failed and returns connector refresh error codes', async () => {
-    const projectId = uniqueProjectId();
-    const token = mintToolToken(projectId, 'run-route-test-refresh-failure');
-    vi.spyOn(connectorService, 'execute').mockRejectedValueOnce(
-      new ConnectorServiceError('CONNECTOR_NOT_CONNECTED', 'connector is not connected', 403, { connectorId: 'monet' }),
-    );
-
-    const create = await jsonFetch(`${baseUrl}/api/tools/live-artifacts/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        input: {
-          ...validCreateInput('Failed Refresh Artifact'),
-          document: {
-            ...validCreateInput('Failed Refresh Artifact').document,
-            sourceJson: {
-              type: 'connector_tool',
-              toolName: 'monet.metrics',
-              input: { report: 'fail' },
-              connector: {
-                connectorId: 'monet',
-                toolName: 'monet.metrics',
-                approvalPolicy: 'read_only_auto',
-              },
-              refreshPermission: 'manual_refresh_granted_for_read_only',
-            },
-          },
-        },
-      }),
-    });
-    expect(create.status).toBe(200);
-
-    const refresh = await jsonFetch(`${baseUrl}/api/live-artifacts/${create.body.artifact.id}/refresh?projectId=${encodeURIComponent(projectId)}`, {
-      method: 'POST',
-    });
-    expect(refresh.status).toBe(403);
-    expect(refresh.body.error).toMatchObject({ code: 'CONNECTOR_NOT_CONNECTED', message: 'connector is not connected' });
-
-    const detail = await jsonFetch(`${baseUrl}/api/live-artifacts/${create.body.artifact.id}?projectId=${encodeURIComponent(projectId)}`);
-    expect(detail.status).toBe(200);
-    expect(detail.body.artifact).toMatchObject({ refreshStatus: 'failed' });
   });
 
   it('serves live artifact previews with restrictive iframe headers', async () => {

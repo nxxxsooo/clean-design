@@ -6,13 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../../src/App';
 import type { AppConfig, Project } from '../../src/types';
 import {
-  fetchComposioConfigFromDaemon,
   fetchDaemonConfig,
   fetchMediaProvidersFromDaemon,
   loadConfig,
   mergeDaemonConfig,
   saveConfig,
-  syncComposioConfigToDaemon,
   syncConfigToDaemon,
 } from '../../src/state/config';
 import {
@@ -190,13 +188,11 @@ vi.mock('../../src/state/config', async () => {
   );
   return {
     ...actual,
-    fetchComposioConfigFromDaemon: vi.fn(),
     fetchDaemonConfig: vi.fn(),
     fetchMediaProvidersFromDaemon: vi.fn(),
     loadConfig: vi.fn(),
     mergeDaemonConfig: vi.fn(),
     saveConfig: vi.fn(),
-    syncComposioConfigToDaemon: vi.fn().mockResolvedValue(true),
     syncConfigToDaemon: vi.fn().mockResolvedValue(undefined),
   };
 });
@@ -210,7 +206,6 @@ const mockedFetchPromptTemplates = vi.mocked(fetchPromptTemplates);
 const mockedFetchSkills = vi.mocked(fetchSkills);
 const mockedListProjects = vi.mocked(listProjects);
 const mockedListTemplates = vi.mocked(listTemplates);
-const mockedFetchComposioConfigFromDaemon = vi.mocked(fetchComposioConfigFromDaemon);
 const mockedFetchDaemonConfig = vi.mocked(fetchDaemonConfig);
 const mockedFetchMediaProvidersFromDaemon = vi.mocked(fetchMediaProvidersFromDaemon);
 const mockedLoadConfig = vi.mocked(loadConfig);
@@ -264,7 +259,6 @@ describe('App preview keep-alive invalidation', () => {
     mockedListProjects.mockResolvedValue([project]);
     mockedListTemplates.mockResolvedValue([]);
     mockedFetchDaemonConfig.mockResolvedValue({});
-    mockedFetchComposioConfigFromDaemon.mockResolvedValue(null);
     mockedFetchMediaProvidersFromDaemon.mockResolvedValue({ status: 'ok', providers: {} });
     mockedMergeDaemonConfig.mockImplementation((local) => local);
     mockedLoadConfig.mockReturnValue({ ...baseConfig });

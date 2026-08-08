@@ -57,7 +57,7 @@ afterEach(async () => {
 });
 
 describe('POST /api/plugins/:id/doctor', () => {
-  it('fails plugins that require a connector missing from the live connector catalog', async () => {
+  it('keeps legacy connector declarations parseable without probing a hosted catalog', async () => {
     const pluginId = `missing-connector-${randomUUID()}`;
     const folder = path.join(pluginRoot, pluginId);
     await mkdir(folder, { recursive: true });
@@ -101,15 +101,7 @@ describe('POST /api/plugins/:id/doctor', () => {
       ok: boolean;
       issues: Array<{ severity: string; code: string; message: string; field?: string }>;
     };
-    expect(report.ok).toBe(false);
-    expect(report.issues).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          severity: 'error',
-          code: 'connector.unknown-connector',
-          field: 'od.connectors',
-        }),
-      ]),
-    );
+    expect(report.ok).toBe(true);
+    expect(report.issues.some((issue) => issue.code.startsWith('connector.'))).toBe(false);
   });
 });

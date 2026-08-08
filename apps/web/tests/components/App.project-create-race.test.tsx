@@ -6,12 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../../src/App';
 import type { AgentInfo, AppConfig, Project } from '../../src/types';
 import {
-  fetchComposioConfigFromDaemon,
   fetchDaemonConfig,
   loadConfig,
   mergeDaemonConfig,
   saveConfig,
-  syncComposioConfigToDaemon,
   syncConfigToDaemon,
 } from '../../src/state/config';
 import {
@@ -234,11 +232,9 @@ vi.mock('../../src/state/config', async () => {
   return {
     ...actual,
     fetchDaemonConfig: vi.fn().mockResolvedValue({}),
-    fetchComposioConfigFromDaemon: vi.fn().mockResolvedValue(null),
     loadConfig: vi.fn(),
     mergeDaemonConfig: vi.fn(),
     saveConfig: vi.fn(),
-    syncComposioConfigToDaemon: vi.fn().mockResolvedValue(true),
     syncConfigToDaemon: vi.fn().mockResolvedValue(undefined),
   };
 });
@@ -259,11 +255,9 @@ const mockedListProjects = vi.mocked(listProjects);
 const mockedListTemplates = vi.mocked(listTemplates);
 const mockedPatchProject = vi.mocked(patchProject);
 const mockedFetchDaemonConfig = vi.mocked(fetchDaemonConfig);
-const mockedFetchComposioConfigFromDaemon = vi.mocked(fetchComposioConfigFromDaemon);
 const mockedLoadConfig = vi.mocked(loadConfig);
 const mockedMergeDaemonConfig = vi.mocked(mergeDaemonConfig);
 const mockedSaveConfig = vi.mocked(saveConfig);
-const mockedSyncComposioConfigToDaemon = vi.mocked(syncComposioConfigToDaemon);
 const mockedSyncConfigToDaemon = vi.mocked(syncConfigToDaemon);
 
 const baseConfig: AppConfig = {
@@ -280,7 +274,6 @@ const baseConfig: AppConfig = {
   designSystemId: null,
   onboardingCompleted: true,
   mediaProviders: {},
-  composio: {},
   agentModels: {},
   agentCliEnv: {},
 };
@@ -325,7 +318,6 @@ describe('App project creation routing', () => {
     mockedFetchAppVersionInfo.mockResolvedValue(null);
     mockedListTemplates.mockResolvedValue([]);
     mockedFetchDaemonConfig.mockResolvedValue({});
-    mockedFetchComposioConfigFromDaemon.mockResolvedValue(null);
     mockedMergeDaemonConfig.mockImplementation((local) => local);
     mockedLoadConfig.mockReturnValue({ ...baseConfig });
     mockedUploadProjectFiles.mockResolvedValue({ uploaded: [], failed: [] });

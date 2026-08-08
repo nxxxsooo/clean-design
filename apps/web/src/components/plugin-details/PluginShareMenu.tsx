@@ -1,19 +1,6 @@
-// Plugin-specific detail actions.
-//
-// Surfaces the small set of actions a user wants when they need to install,
-// identify, audit, or embed a plugin:
-//
-//   - Copy plugin id          (raw `<id>` for paste-into-yaml)
-//   - Copy install command    (`od plugin install <ref>`)
-//   - Copy README badge       (Clean Design powered, includes link)
-//   - Open source on GitHub   (when the source is a github repo)
-//   - Open homepage           (when manifest.homepage is set)
-//   - Open in marketplace     (always — the canonical detail page)
-//
-// We render the popover next to the template Share control in every
-// detail variant header so plugin-specific actions stay available without
-// competing with the user's primary "share this template" intent. A tiny inline
-// toast confirms every copy action so the user trusts the click landed.
+// Local plugin detail actions. Source and homepage links open only after an
+// explicit click; marketplace, publishing, badge, and install-command actions
+// are intentionally absent from Clean Design.
 
 import { useEffect, useRef, useState } from 'react';
 import type { InstalledPluginRecord } from '@open-design/contracts';
@@ -21,10 +8,6 @@ import { Icon } from '../Icon';
 import { useT } from '../../i18n';
 import { copyToClipboard } from '../../lib/copy-to-clipboard';
 import { derivePluginSourceLinks } from '../../runtime/plugin-source';
-import { pluginShareUrl } from '@open-design/contracts';
-
-const PUBLIC_OPEN_DESIGN_MARKETPLACE_ID = 'official';
-const PUBLIC_COMMUNITY_MARKETPLACE_ID = 'community';
 
 interface Props {
   record: InstalledPluginRecord;
@@ -46,66 +29,13 @@ interface ShareItem {
     | 'external-link'
     | 'eye';
   onSelect: () => void | Promise<void>;
-  /**
-   * When true, the item triggers a `copy` action — we show a brief
-   * "Copied" confirmation in the popover after it runs.
-   */
-  copies?: boolean;
 }
 
 interface ShareLinkItem {
   key: string;
   label: string;
-  icon: 'github' | 'external-link' | 'eye';
+  icon: 'github' | 'external-link';
   href: string;
-}
-
-function buildInstallCommand(record: InstalledPluginRecord): string {
-  // The daemon's install resolver accepts the raw `record.source`
-  // shape for every kind (github:owner/repo[@ref][/sub], https URL,
-  // local path, marketplace id), so we mirror it verbatim. For
-  // marketplace records should use the registry entry name when
-  // provenance preserved it; sourceMarketplaceId names the catalog,
-  // not the plugin package.
-  if (typeof record.sourceMarketplaceEntryName === 'string') {
-    return `od plugin install ${record.sourceMarketplaceEntryName}`;
-  }
-  if (record.sourceKind === 'marketplace' && typeof record.sourceMarketplaceId === 'string') {
-    return `od plugin install ${record.sourceMarketplaceId}`;
-  }
-  return `od plugin install ${record.source}`;
-}
-
-export function buildPluginShareUrl(record: InstalledPluginRecord): string | null {
-  // Only plugins with a public detail page on open-design.ai get a shareable
-  // link: bundled (`_official`) plugins and ones installed from the official
-  // or community marketplace. Local/github installs have no public page, so
-  // no link — never leak a local tools-dev origin (127.0.0.1:<port>).
-  const hasPublicPage =
-    record.sourceKind === 'bundled' ||
-    record.sourceMarketplaceId === PUBLIC_OPEN_DESIGN_MARKETPLACE_ID ||
-    record.sourceMarketplaceId === PUBLIC_COMMUNITY_MARKETPLACE_ID;
-  if (!hasPublicPage) return null;
-  // Community marketplace entry names use the `community/<folder>` path form
-  // (e.g. `community/registry-starter`). pluginDetailSlug takes the last
-  // slash-separated segment, producing `registry-starter` — the same
-  // single-segment slug the landing page emits via routeId. Community plugin
-  // manifest names carry a `community-` prefix, so using them directly would
-  // produce a mismatched slug (`community-registry-starter`).
-  const id =
-    record.sourceMarketplaceId === PUBLIC_COMMUNITY_MARKETPLACE_ID &&
-    typeof record.sourceMarketplaceEntryName === 'string'
-      ? record.sourceMarketplaceEntryName
-      : (record.manifest?.name ?? record.id);
-  return pluginShareUrl(id);
-}
-
-function buildPluginMarketplacePath(record: InstalledPluginRecord): string {
-  return `/marketplace/${encodeURIComponent(record.id)}`;
-}
-
-function buildMarkdownBadge(record: InstalledPluginRecord, url: string): string {
-  return `[![${record.title} — Clean Design plugin](https://img.shields.io/badge/Open%20Design-${encodeURIComponent(record.title)}-d65a31?logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2C)](${url})`;
 }
 
 export function PluginShareMenu({ record, variant = 'default' }: Props) {
@@ -118,7 +48,6 @@ export function PluginShareMenu({ record, variant = 'default' }: Props) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   const links = derivePluginSourceLinks(record);
-  const publicShareUrl = buildPluginShareUrl(record);
 
   useEffect(() => {
     if (!open) return;
@@ -150,32 +79,12 @@ export function PluginShareMenu({ record, variant = 'default' }: Props) {
 
   const items: ShareItem[] = [
     {
-      key: 'install',
-      label: t('plugins.actions.copyInstallCommand'),
-      icon: 'copy',
-      copies: true,
-      onSelect: () => copyPluginShareText(buildInstallCommand(record), 'install'),
-    },
-    {
       key: 'id',
       label: t('plugins.actions.copyPluginId'),
       icon: 'copy',
-      copies: true,
       onSelect: () => copyPluginShareText(record.id, 'id'),
     },
   ];
-  if (publicShareUrl) {
-    items.push({
-      key: 'badge',
-      label: t('plugins.actions.copyReadmeBadge'),
-      icon: 'copy',
-      copies: true,
-      onSelect: () => copyPluginShareText(
-        buildMarkdownBadge(record, publicShareUrl),
-        'badge',
-      ),
-    });
-  }
 
   // Open-in-tab actions are real anchors so users can right-click,
   // copy the link address, or open in a new tab from browser chrome.
@@ -199,14 +108,6 @@ export function PluginShareMenu({ record, variant = 'default' }: Props) {
       href: links.homepageUrl,
     });
   }
-  openItems.push({
-    key: 'marketplace',
-    label: t('plugins.actions.openMarketplace'),
-    icon: 'eye',
-    // Prefer the public open-design.ai detail page; fall back to the in-app
-    // /marketplace route only for local/github installs with no public page.
-    href: publicShareUrl ?? buildPluginMarketplacePath(record),
-  });
 
   const triggerClass =
     variant === 'inline'

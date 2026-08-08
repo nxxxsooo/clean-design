@@ -9,16 +9,11 @@ import {
 import { createPortal } from 'react-dom';
 import { Button } from '@open-design/components';
 import { Icon, type IconName } from './Icon';
-import { ConnectorLogo, useResolvedTheme } from './ConnectorLogo';
 import { useT } from '../i18n';
 
 type Translate = ReturnType<typeof useT>;
 import { renderMarkdown } from '../runtime/markdown';
 import type {
-  ConnectorDetail,
-  ConnectorDiscoveryResponse,
-  ConnectorMemorySuggestionResponse,
-  ConnectorStatusResponse,
   MemoryChangeEvent,
   MemoryEntry,
   MemoryEntrySummary,
@@ -29,15 +24,8 @@ import type {
   MemoryListResponse,
   MemoryTreeListResponse,
   MemoryTreeNode,
-  MemorySuggestion,
   MemoryType,
 } from '@open-design/contracts';
-import {
-  connectConnector,
-  fetchConnectorStatuses,
-} from '../providers/registry';
-import { notifyConnectorsChanged } from './connectors-events';
-import { hasConnectorStatusChanges } from './connectors-state';
 import { MemoryProfilePanel } from './MemoryProfilePanel';
 import { MemoryHooksPanel, type MemoryHookKey } from './MemoryHooksPanel';
 
@@ -113,75 +101,6 @@ const STARTERS: ReadonlyArray<{
   },
 ];
 
-const MEMORY_CONNECTOR_APP_IDS = [
-  'notion',
-  'figma',
-  'linear',
-  'google_drive',
-  'github',
-  'slack',
-] as const;
-
-const MEMORY_CONNECTOR_APP_LABELS: Record<string, string> = {
-  notion: 'Notion',
-  figma: 'Figma',
-  linear: 'Linear',
-  google_drive: 'Google Drive',
-  github: 'GitHub',
-  slack: 'Slack',
-};
-
-type ConnectorMemoryAttempt = ConnectorMemorySuggestionResponse['connectors'][number];
-type ConnectorStatusMap = ConnectorStatusResponse['statuses'];
-
-const CONNECTOR_CALLBACK_MESSAGE_TYPE = 'clean-design:connector-connected';
-const MEMORY_CONNECTOR_PENDING_AUTH_STORAGE_KEY = 'od:memory:pending-connector-auth';
-
-function isTrustedConnectorCallbackOrigin(origin: string): boolean {
-  const expectedOrigin = typeof window === 'undefined' ? '' : window.location.origin;
-  if (origin === expectedOrigin) return true;
-  try {
-    const url = new URL(origin);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false;
-    return (
-      url.hostname === 'localhost'
-      || url.hostname === '127.0.0.1'
-      || url.hostname === '[::1]'
-      || url.hostname === '::1'
-    );
-  } catch {
-    return false;
-  }
-}
-
-function readPendingConnectorAuthIds(): Set<string> {
-  if (typeof window === 'undefined') return new Set();
-  try {
-    const raw = window.sessionStorage.getItem(MEMORY_CONNECTOR_PENDING_AUTH_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((id): id is string => typeof id === 'string' && id.trim().length > 0));
-  } catch {
-    return new Set();
-  }
-}
-
-function writePendingConnectorAuthIds(ids: Set<string>): void {
-  if (typeof window === 'undefined') return;
-  try {
-    if (ids.size === 0) {
-      window.sessionStorage.removeItem(MEMORY_CONNECTOR_PENDING_AUTH_STORAGE_KEY);
-      return;
-    }
-    window.sessionStorage.setItem(
-      MEMORY_CONNECTOR_PENDING_AUTH_STORAGE_KEY,
-      JSON.stringify([...ids]),
-    );
-  } catch {
-    // Session storage can be blocked; the in-memory state still works.
-  }
-}
-
 async function fetchMemoryList(): Promise<MemoryListResponse> {
   const resp = await fetch('/api/memory');
   if (!resp.ok) {
@@ -226,10 +145,6 @@ async function saveMemoryEntry(draft: DraftEntry): Promise<MemoryEntry | null> {
   if (!resp.ok) return null;
   const json = (await resp.json()) as { entry: MemoryEntry };
   return json.entry ?? null;
-}
-
-function memoryEntryIdForConnectorSuggestion(suggestion: MemorySuggestion): string | undefined {
-  return /^[a-z0-9_]+$/.test(suggestion.id) ? suggestion.id : undefined;
 }
 
 async function deleteMemoryEntry(id: string): Promise<boolean> {
@@ -277,54 +192,6 @@ async function fetchExtractions(): Promise<MemoryExtractionRecord[]> {
   if (!resp.ok) return [];
   const json = (await resp.json()) as MemoryExtractionsResponse;
   return json.extractions ?? [];
-}
-
-async function fetchMemoryConnectors(): Promise<ConnectorDetail[]> {
-  const resp = await fetch('/api/connectors/discovery?hydrateTools=false');
-  if (!resp.ok) return [];
-  const json = (await resp.json()) as ConnectorDiscoveryResponse;
-  return json.connectors ?? [];
-}
-
-async function suggestConnectorMemories(
-  connectorIds: string[],
-  context: { chatAgentId?: string | null; chatModel?: string | null } = {},
-): Promise<ConnectorMemorySuggestionResponse | null> {
-  const body: {
-    connectorIds: string[];
-    chatAgentId?: string;
-    chatModel?: string;
-  } = { connectorIds };
-  if (context.chatAgentId) body.chatAgentId = context.chatAgentId;
-  if (context.chatModel) body.chatModel = context.chatModel;
-  const resp = await fetch('/api/memory/connectors/suggest', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) return null;
-  return (await resp.json()) as ConnectorMemorySuggestionResponse;
-}
-
-function describeConnectorReadIssue(
-  result: ConnectorMemorySuggestionResponse,
-): string | null {
-  const failed = result.connectors.filter((connector) => connector.status === 'failed');
-  const skipped = result.connectors.filter((connector) => connector.status === 'skipped');
-  const firstIssue = failed[0] ?? skipped[0];
-  if (!firstIssue) return null;
-
-  const connectorName =
-    firstIssue.connectorName
-    || MEMORY_CONNECTOR_APP_LABELS[firstIssue.connectorId]
-    || firstIssue.connectorId;
-  const reason = (firstIssue.error || firstIssue.summary || '').trim();
-  const suffix = reason ? ` ${reason}` : '';
-
-  if (failed.length > 0) {
-    return `Couldn't read ${connectorName}.${suffix}`;
-  }
-  return `No readable content from ${connectorName}.${suffix}`;
 }
 
 interface FriendlyExtractionFailure {
@@ -395,10 +262,7 @@ function describeExtractionFailure(record: MemoryExtractionRecord): FriendlyExtr
   const usesChatCli = record.provider?.credentialSource === 'chat-cli';
   const parsed = parseProviderError(record.error);
   const haystack = `${parsed.message} ${parsed.code} ${record.error}`.toLowerCase();
-  const source =
-    record.kind === 'connector'
-      ? 'Connected apps were read, but OpenDesign could not turn that context into memory.'
-      : 'OpenDesign could not run memory extraction for this chat.';
+  const source = 'Clean Design could not run memory extraction for this chat.';
 
   if (
     parsed.status === 401
@@ -437,90 +301,6 @@ function describeExtractionFailure(record: MemoryExtractionRecord): FriendlyExtr
     action: usesChatCli
       ? 'Try again after checking the selected Local CLI.'
       : 'Try again after checking the Memory extraction model settings.',
-  };
-}
-
-function formatConnectorContextBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) return 'No data';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function connectorAttemptName(attempt: ConnectorMemoryAttempt): string {
-  return attempt.connectorName
-    || MEMORY_CONNECTOR_APP_LABELS[attempt.connectorId]
-    || attempt.connectorId;
-}
-
-function connectorAttemptTitle(attempt: ConnectorMemoryAttempt): string {
-  const connectorName = connectorAttemptName(attempt);
-  if (attempt.status === 'succeeded') return `Read ${connectorName}`;
-  if (attempt.status === 'failed') return `Could not read ${connectorName}`;
-  return `Skipped ${connectorName}`;
-}
-
-function connectorAttemptDetail(attempt: ConnectorMemoryAttempt): string {
-  const parts = [
-    attempt.toolTitle || attempt.toolName,
-    attempt.status === 'failed' ? attempt.error : null,
-    attempt.summary,
-  ]
-    .map((part) => part?.trim())
-    .filter((part): part is string => Boolean(part));
-  return parts.join(' · ');
-}
-
-function mergeMemoryConnector(current: ConnectorDetail, next: ConnectorDetail): ConnectorDetail {
-  return {
-    ...current,
-    ...next,
-    tools: next.tools.length > 0 ? next.tools : current.tools,
-    toolCount: next.toolCount ?? current.toolCount,
-    toolsNextCursor: next.toolsNextCursor ?? current.toolsNextCursor,
-    toolsHasMore: next.toolsHasMore ?? current.toolsHasMore,
-  };
-}
-
-function upsertMemoryConnector(
-  current: ConnectorDetail[],
-  next: ConnectorDetail | null,
-): ConnectorDetail[] {
-  if (!next) return current;
-  let found = false;
-  const merged = current.map((connector) => {
-    if (connector.id !== next.id) return connector;
-    found = true;
-    return mergeMemoryConnector(connector, next);
-  });
-  return found ? merged : [...merged, next];
-}
-
-function applyMemoryConnectorStatus(
-  connector: ConnectorDetail,
-  status: ConnectorStatusMap[string],
-): ConnectorDetail {
-  const { accountLabel: _accountLabel, lastError: _lastError, ...base } = connector;
-  return { ...base, ...status };
-}
-
-function applyMemoryConnectorStatuses(
-  current: ConnectorDetail[],
-  statuses: ConnectorStatusMap,
-): ConnectorDetail[] {
-  if (Object.keys(statuses).length === 0) return current;
-  return current.map((connector) => {
-    const status = statuses[connector.id];
-    if (!status) return connector;
-    return applyMemoryConnectorStatus(connector, status);
-  });
-}
-
-function connectorWithPendingAuthorization(connector: ConnectorDetail): ConnectorDetail {
-  const { accountLabel: _accountLabel, lastError: _lastError, ...base } = connector;
-  return {
-    ...base,
-    status: base.status === 'disabled' ? 'disabled' : 'available',
   };
 }
 
@@ -714,21 +494,12 @@ function extractionCardMeta(
 }
 
 type FlashKind = 'created' | 'saved' | 'deleted' | 'indexSaved' | 'pathCopied';
-type MemoryTab = 'profile' | 'manual' | 'chat' | 'connected';
+type MemoryTab = 'profile' | 'manual' | 'chat';
 
-interface MemorySectionProps {
-  onOpenConnectors?: () => void;
-  chatAgentId?: string | null;
-  chatModel?: string | null;
-}
+interface MemorySectionProps {}
 
-export function MemorySection({
-  onOpenConnectors,
-  chatAgentId = null,
-  chatModel = null,
-}: MemorySectionProps = {}) {
+export function MemorySection(_props: MemorySectionProps = {}) {
   const t = useT();
-  const logoTheme = useResolvedTheme();
   const [enabled, setEnabled] = useState(true);
   const [chatExtractionEnabled, setChatExtractionEnabled] = useState(true);
   // The three new per-hook flags (default-on). They live alongside the
@@ -766,30 +537,6 @@ export function MemorySection({
   // fetch on mount + live SSE updates merged by id so phase transitions
   // (running → success) replace the row in place.
   const [extractions, setExtractions] = useState<MemoryExtractionRecord[]>([]);
-  const [connectors, setConnectors] = useState<ConnectorDetail[]>([]);
-  const [connectorStatuses, setConnectorStatuses] = useState<ConnectorStatusMap>({});
-  const [connectorsLoading, setConnectorsLoading] = useState(true);
-  const [selectedConnectorIds, setSelectedConnectorIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [connectorExtracting, setConnectorExtracting] = useState(false);
-  const [connectorSaving, setConnectorSaving] = useState(false);
-  const [connectorSuggestions, setConnectorSuggestions] = useState<MemorySuggestion[]>([]);
-  const [selectedSuggestionIds, setSelectedSuggestionIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [connectorAttempts, setConnectorAttempts] = useState<ConnectorMemoryAttempt[]>([]);
-  const [connectorContextBytes, setConnectorContextBytes] = useState(0);
-  const [connectorStatus, setConnectorStatus] = useState<string | null>(null);
-  const [connectorError, setConnectorError] = useState<string | null>(null);
-  const [connectingConnectorIds, setConnectingConnectorIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [pendingConnectorAuthIds, setPendingConnectorAuthIds] = useState<Set<string>>(
-    readPendingConnectorAuthIds,
-  );
-  const [connectorConnectErrors, setConnectorConnectErrors] = useState<Record<string, string>>({});
-  const connectorsRef = useRef(connectors);
 
   const fireFlash = useCallback((kind: FlashKind) => {
     setFlash({ kind, key: Date.now() });
@@ -800,10 +547,6 @@ export function MemorySection({
     const id = setTimeout(() => setFlash(null), 1800);
     return () => clearTimeout(id);
   }, [flash]);
-
-  useEffect(() => {
-    connectorsRef.current = connectors;
-  }, [connectors]);
 
   useEffect(() => {
     if (!editingTarget) return;
@@ -882,33 +625,10 @@ export function MemorySection({
     }
   }, []);
 
-  const reloadConnectors = useCallback(async () => {
-    setConnectorsLoading(true);
-    try {
-      const statusesPromise = fetchConnectorStatuses();
-      const connectorsPromise = fetchMemoryConnectors();
-      const statuses = await statusesPromise;
-      setConnectorStatuses(statuses);
-      setConnectors((prev) => applyMemoryConnectorStatuses(prev, statuses));
-      setConnectors(applyMemoryConnectorStatuses(await connectorsPromise, statuses));
-    } finally {
-      setConnectorsLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     void reload();
     void reloadExtractions();
   }, [reload, reloadExtractions]);
-
-  useEffect(() => {
-    if (activeTab !== 'connected') return;
-    void reloadConnectors();
-  }, [activeTab, reloadConnectors]);
-
-  useEffect(() => {
-    writePendingConnectorAuthIds(pendingConnectorAuthIds);
-  }, [pendingConnectorAuthIds]);
 
   // Live updates: when the daemon emits a memory change event (chat
   // hook, LLM extractor, settings PATCH from a different tab, curl…),
@@ -973,6 +693,14 @@ export function MemorySection({
     return entries.filter((e) => e.type === filter);
   }, [entries, filter]);
 
+  const visibleExtractions = useMemo(
+    () => filter === 'all'
+      ? extractions.filter((record) => record.kind !== 'connector')
+      : [],
+    [extractions, filter],
+  );
+  const unifiedMemoryCount = filtered.length + visibleExtractions.length;
+
   // The provider banner only shows when the most recent attempt skipped
   // because extraction could not resolve a usable provider. We don't show it
   // for memory-disabled (the user's own toggle) or empty-message (a routine
@@ -1005,73 +733,6 @@ export function MemorySection({
     const id = setInterval(() => setNowClock(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
-
-	  const connectorExtractions = useMemo(
-	    () => extractions.filter((record) => record.kind === 'connector'),
-	    [extractions],
-  );
-  const visibleExtractions = useMemo(
-    () =>
-      filter === 'all'
-        ? extractions.filter((record) => record.kind !== 'connector')
-        : [],
-    [extractions, filter],
-  );
-  const unifiedMemoryCount = filtered.length + visibleExtractions.length;
-  const memoryConnectors = useMemo(() => {
-    const byId = new Map(connectors.map((connector) => [connector.id, connector]));
-    return MEMORY_CONNECTOR_APP_IDS.map((id) => {
-      const connector = byId.get(id);
-      const status = connectorStatuses[id];
-      if (connector) {
-        return status ? applyMemoryConnectorStatus(connector, status) : connector;
-      }
-      return {
-        id,
-        name: MEMORY_CONNECTOR_APP_LABELS[id] ?? id,
-        provider: 'composio',
-        category: 'Memory source',
-        status: status?.status ?? 'available' as const,
-        ...(status?.accountLabel ? { accountLabel: status.accountLabel } : {}),
-        ...(status?.lastError ? { lastError: status.lastError } : {}),
-        tools: [],
-      };
-    });
-  }, [connectorStatuses, connectors]);
-  const connectorIdsWithDetails = useMemo(
-    () => new Set(connectors.map((connector) => connector.id)),
-    [connectors],
-  );
-  const connectedMemoryConnectors = useMemo(
-    () => memoryConnectors.filter((connector) => connector.status === 'connected'),
-    [memoryConnectors],
-  );
-  const selectedConnectedConnectorIds = useMemo(
-    () =>
-      [...selectedConnectorIds].filter((id) =>
-        connectedMemoryConnectors.some((connector) => connector.id === id),
-      ),
-	    [selectedConnectorIds, connectedMemoryConnectors],
-	  );
-	  const connectedCount = connectedMemoryConnectors.length;
-	  const connectorScanLabel = connectorExtracting
-	    ? 'Scanning apps'
-	    : selectedConnectedConnectorIds.length === 0
-	      ? 'Select apps to scan'
-	      : 'Scan selected apps';
-	  const selectedConnectorSuggestions = useMemo(
-	    () => connectorSuggestions.filter((suggestion) => selectedSuggestionIds.has(suggestion.id)),
-	    [connectorSuggestions, selectedSuggestionIds],
-	  );
-
-  useEffect(() => {
-    setSelectedConnectorIds((prev) => {
-      const connectedIds = connectedMemoryConnectors.map((connector) => connector.id);
-      const connected = new Set(connectedIds);
-      const next = new Set([...prev].filter((id) => connected.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [connectedMemoryConnectors]);
 
   const treeFolders = useMemo(
     () => memoryTree.filter((node) => node.kind === 'folder'),
@@ -1129,254 +790,6 @@ export function MemorySection({
   const cancelEdit = useCallback(() => {
     setEditing(null);
   }, []);
-
-  const toggleConnectorSelection = useCallback((connectorId: string) => {
-    setSelectedConnectorIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(connectorId)) {
-        next.delete(connectorId);
-      } else {
-        next.add(connectorId);
-      }
-      return next;
-    });
-  }, []);
-
-  const refreshMemoryConnectorStatuses = useCallback(async () => {
-    const statuses = await fetchConnectorStatuses();
-    const statusChanged = hasConnectorStatusChanges(connectorsRef.current, statuses);
-    setConnectorStatuses(statuses);
-    setConnectors((prev) => applyMemoryConnectorStatuses(prev, statuses));
-    setPendingConnectorAuthIds((prev) => {
-      const next = new Set(prev);
-      for (const connectorId of prev) {
-        if (statuses[connectorId]?.status === 'connected') next.delete(connectorId);
-      }
-      return next.size === prev.size ? prev : next;
-    });
-    setConnectorConnectErrors((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const [connectorId, status] of Object.entries(statuses)) {
-        if (status.status === 'connected' && next[connectorId] !== undefined) {
-          delete next[connectorId];
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-    if (statusChanged) notifyConnectorsChanged();
-  }, []);
-
-  useEffect(() => {
-    if (pendingConnectorAuthIds.size === 0) return;
-    const interval = window.setInterval(() => {
-      void refreshMemoryConnectorStatuses();
-    }, 2_000);
-    const onFocus = () => {
-      void refreshMemoryConnectorStatuses();
-    };
-    window.addEventListener('focus', onFocus);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
-    };
-  }, [pendingConnectorAuthIds, refreshMemoryConnectorStatuses]);
-
-  useEffect(() => {
-    function onMessage(event: MessageEvent) {
-      const data = event.data;
-      if (!data || typeof data !== 'object') return;
-      if ((data as { type?: unknown }).type !== CONNECTOR_CALLBACK_MESSAGE_TYPE) return;
-      if (!isTrustedConnectorCallbackOrigin(event.origin)) return;
-      void refreshMemoryConnectorStatuses();
-    }
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [refreshMemoryConnectorStatuses]);
-
-  const onConnectMemoryConnector = useCallback(async (connectorId: string) => {
-    if (connectingConnectorIds.has(connectorId)) return;
-    setConnectingConnectorIds((prev) => new Set(prev).add(connectorId));
-    setConnectorConnectErrors((prev) => {
-      if (prev[connectorId] === undefined) return prev;
-      const next = { ...prev };
-      delete next[connectorId];
-      return next;
-    });
-    try {
-      const result = await connectConnector(connectorId);
-      if (result.connector?.status === 'connected') notifyConnectorsChanged();
-      const requiresAuthorizationCompletion =
-        result.auth?.kind === 'redirect_required' || result.auth?.kind === 'pending';
-      setConnectors((prev) =>
-        upsertMemoryConnector(
-          prev,
-          requiresAuthorizationCompletion && result.connector
-            ? connectorWithPendingAuthorization(result.connector)
-            : result.connector,
-        ),
-      );
-      if (result.error) {
-        setConnectorConnectErrors((prev) => ({ ...prev, [connectorId]: result.error! }));
-        setPendingConnectorAuthIds((prev) => {
-          if (!prev.has(connectorId)) return prev;
-          const next = new Set(prev);
-          next.delete(connectorId);
-          return next;
-        });
-        return;
-      }
-      if (result.auth?.kind === 'redirect_required' || result.auth?.kind === 'pending') {
-        setPendingConnectorAuthIds((prev) => new Set(prev).add(connectorId));
-      } else {
-        setPendingConnectorAuthIds((prev) => {
-          if (!prev.has(connectorId)) return prev;
-          const next = new Set(prev);
-          next.delete(connectorId);
-          return next;
-        });
-      }
-      await refreshMemoryConnectorStatuses();
-    } finally {
-      setConnectingConnectorIds((prev) => {
-        if (!prev.has(connectorId)) return prev;
-        const next = new Set(prev);
-        next.delete(connectorId);
-        return next;
-      });
-    }
-  }, [connectingConnectorIds, refreshMemoryConnectorStatuses]);
-
-  const toggleConnectorSuggestion = useCallback((suggestionId: string) => {
-    setSelectedSuggestionIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(suggestionId)) {
-        next.delete(suggestionId);
-      } else {
-        next.add(suggestionId);
-      }
-      return next;
-    });
-  }, []);
-
-  const onSuggestConnectorMemory = useCallback(async () => {
-    if (selectedConnectedConnectorIds.length === 0) return;
-    setConnectorExtracting(true);
-    setConnectorSuggestions([]);
-    setSelectedSuggestionIds(new Set());
-    setConnectorAttempts([]);
-    setConnectorContextBytes(0);
-    setConnectorStatus(null);
-    setConnectorError(null);
-    const startedAt = Date.now();
-    try {
-      const result = await suggestConnectorMemories(selectedConnectedConnectorIds, {
-        chatAgentId,
-        chatModel,
-      });
-      if (!result) {
-        setConnectorError('Could not read connected apps. Try again from the Connectors tab.');
-        return;
-      }
-      const latestExtractions = await reloadExtractions();
-      const latestFailure = latestExtractions.find(
-        (record) =>
-          record.kind === 'connector'
-          && record.phase === 'failed'
-          && record.startedAt >= startedAt - 5_000,
-      );
-      const friendlyFailure = latestFailure
-        ? describeExtractionFailure(latestFailure)
-        : null;
-      setConnectorAttempts(result.connectors);
-      setConnectorContextBytes(result.contextBytes);
-      const succeeded = result.connectors.filter(
-        (connector) => connector.status === 'succeeded',
-      ).length;
-      if (friendlyFailure) {
-        setConnectorError([
-          friendlyFailure.title,
-          friendlyFailure.detail,
-          friendlyFailure.action,
-        ].filter(Boolean).join(' '));
-      } else if (result.suggestions.length > 0) {
-        setConnectorSuggestions(result.suggestions);
-        setSelectedSuggestionIds(new Set(result.suggestions.map((suggestion) => suggestion.id)));
-        setConnectorStatus(
-          `Found ${result.suggestions.length} suggested memor${result.suggestions.length === 1 ? 'y' : 'ies'} from ${succeeded} app${succeeded === 1 ? '' : 's'}. Review before saving.`,
-        );
-      } else if (!result.attemptedLLM) {
-        setConnectorError(
-          describeConnectorReadIssue(result)
-          ?? 'No memory suggestions found. OpenDesign could not read useful content from the selected app yet.',
-        );
-      } else {
-        setConnectorStatus(
-          `Checked ${succeeded} selected app${succeeded === 1 ? '' : 's'}, but found no new memory suggestions.`,
-        );
-      }
-    } catch (err) {
-      setConnectorError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setConnectorExtracting(false);
-    }
-  }, [chatAgentId, chatModel, reloadExtractions, selectedConnectedConnectorIds]);
-
-  const onDiscardConnectorSuggestions = useCallback(() => {
-    setConnectorSuggestions([]);
-    setSelectedSuggestionIds(new Set());
-    setConnectorAttempts([]);
-    setConnectorContextBytes(0);
-    setConnectorStatus(null);
-  }, []);
-
-  const onSaveConnectorSuggestions = useCallback(async () => {
-    if (selectedConnectorSuggestions.length === 0) return;
-    setConnectorSaving(true);
-    setConnectorError(null);
-    try {
-      const saved: MemoryEntry[] = [];
-      const savedSuggestionIds = new Set<string>();
-      for (const suggestion of selectedConnectorSuggestions) {
-        const entry = await saveMemoryEntry({
-          id: memoryEntryIdForConnectorSuggestion(suggestion),
-          name: suggestion.name,
-          description: suggestion.description,
-          type: suggestion.type,
-          body: suggestion.body,
-        });
-        if (entry) {
-          saved.push(entry);
-          savedSuggestionIds.add(suggestion.id);
-        }
-      }
-      await reload();
-      const savedEntriesById = new Map(saved.map((entry) => [entry.id, entry]));
-      setConnectorSuggestions((prev) =>
-        prev.filter((suggestion) => !savedSuggestionIds.has(suggestion.id)),
-      );
-      setSelectedSuggestionIds(
-        new Set(
-          selectedConnectorSuggestions
-            .filter((suggestion) => !savedSuggestionIds.has(suggestion.id))
-            .map((suggestion) => suggestion.id),
-        ),
-      );
-      setConnectorStatus(
-        `Saved ${savedEntriesById.size} memor${savedEntriesById.size === 1 ? 'y' : 'ies'} from connected apps.`,
-      );
-      if (savedEntriesById.size !== selectedConnectorSuggestions.length) {
-        setConnectorError(
-          `Saved ${savedEntriesById.size} of ${selectedConnectorSuggestions.length} selected memories. Please try the remaining items again.`,
-        );
-      }
-    } catch (err) {
-      setConnectorError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setConnectorSaving(false);
-    }
-  }, [reload, selectedConnectorSuggestions]);
 
   const onSave = useCallback(async () => {
     if (!editing) return;
@@ -1496,12 +909,6 @@ export function MemorySection({
 	      label: 'Add manually',
 	      caption: 'Write a fact or preference',
 	      icon: 'edit',
-	    },
-	    {
-	      id: 'connected',
-	      label: 'Import from apps',
-	      caption: 'Scan connected tools',
-	      icon: 'link',
 	    },
 	  ];
 
@@ -2065,279 +1472,6 @@ export function MemorySection({
             </div>
           ) : null}
 
-        </div>
-      ) : null}
-
-      {activeTab === 'connected' ? (
-        <div className="memory-tab-panel memory-connected-panel">
-          <div className="memory-source-summary memory-connected-summary">
-            <span className="memory-block-icon">
-              <Icon name="link" size={15} />
-            </span>
-            <div>
-              <h4>Import from apps</h4>
-              <p className="hint">
-                Choose apps to scan for design preferences, project context,
-                and visual references. Nothing is scanned until you select an app.
-              </p>
-            </div>
-            <span className="memory-source-badge">
-              {connectorsLoading ? 'Loading' : `${connectedCount} connected`}
-            </span>
-            <button
-              type="button"
-              className="ghost memory-source-action"
-              onClick={onOpenConnectors}
-              disabled={!onOpenConnectors}
-            >
-              Manage
-            </button>
-          </div>
-          <div className="memory-connector-workbench">
-            <div className="memory-connector-picker-head">
-              <div>
-                <h4>Choose sources</h4>
-                <p className="hint">
-                  Select connected apps first. OpenDesign only scans the apps you choose.
-                </p>
-              </div>
-              <span className="memory-source-badge">
-                {selectedConnectedConnectorIds.length} selected
-              </span>
-            </div>
-            <div className="memory-connector-list" aria-label="Connected memory apps">
-              {memoryConnectors.map((connector) => {
-                const connected = connector.status === 'connected';
-                const selected = selectedConnectorIds.has(connector.id) && connected;
-                const connecting = connectingConnectorIds.has(connector.id);
-                const authorizationPending = pendingConnectorAuthIds.has(connector.id);
-                const connectError = connectorConnectErrors[connector.id];
-                const statusResolved =
-                  connectorIdsWithDetails.has(connector.id)
-                  || connectorStatuses[connector.id] !== undefined;
-                const checkingStatus =
-                  connectorsLoading
-                  && !statusResolved
-                  && !connected
-                  && !authorizationPending
-                  && !connectError
-                  && !connecting;
-                const connectorLastError = connector.lastError?.trim();
-                const reconnecting = connector.status === 'error';
-                const connectorHint = connected
-                  ? connector.accountLabel || `${connector.tools.length} read tools`
-                  : checkingStatus
-                    ? 'Checking connection status…'
-                    : authorizationPending
-                    ? 'Finish authorization in your browser, then return here'
-                    : connectorLastError || connectError || 'Connect this app before extraction';
-                return (
-                  <label
-                    key={connector.id}
-                    className={`memory-connector-row${connected ? '' : ' is-disabled'}${selected ? ' is-selected' : ''}`}
-                    data-memory-connector-id={connector.id}
-                  >
-                    <input
-                      className="memory-connector-input"
-                      type="checkbox"
-                      checked={selected}
-                      disabled={!connected}
-                      aria-label={`Use ${connector.name} for memory extraction`}
-                      onChange={() => toggleConnectorSelection(connector.id)}
-                    />
-                    <span className={`memory-connector-brand${selected ? ' is-selected' : ''}`}>
-                      <ConnectorLogo connector={connector} theme={logoTheme} size="sm" />
-                      <span className="memory-connector-selected-mark" aria-hidden="true">
-                        {selected ? <Icon name="check" size={13} /> : null}
-                      </span>
-                    </span>
-                    <span className="memory-connector-copy">
-                      <strong>{connector.name}</strong>
-                      <small>{connectorHint}</small>
-                    </span>
-                    {connected ? (
-                      <span className={`memory-connector-picker${selected ? ' is-selected' : ''}`}>
-                        <span className="memory-connector-picker-box" aria-hidden="true">
-                          {selected ? <Icon name="check" size={12} /> : null}
-                        </span>
-                        <span>{selected ? 'Selected' : 'Select'}</span>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        className={`memory-connector-connect-button${connecting || authorizationPending || checkingStatus ? ' is-loading' : ''}`}
-                        disabled={connecting || authorizationPending || checkingStatus}
-                        aria-busy={connecting || authorizationPending || checkingStatus || undefined}
-                        aria-label={`${reconnecting ? 'Reconnect' : 'Connect'} ${connector.name}`}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          void onConnectMemoryConnector(connector.id);
-                        }}
-                      >
-                        <Icon
-                          name={connecting || authorizationPending || checkingStatus ? 'refresh' : 'plus'}
-                          size={12}
-                          className={connecting || authorizationPending || checkingStatus ? 'icon-spin' : ''}
-                        />
-                        <span>
-                          {checkingStatus ? 'Checking' : authorizationPending ? 'Waiting' : connecting ? 'Connecting' : reconnecting ? 'Reconnect' : 'Connect'}
-                        </span>
-                      </button>
-                    )}
-                  </label>
-                );
-              })}
-            </div>
-            <div className="memory-connector-actions memory-connector-runbar">
-              <span className="hint">
-                Selected {selectedConnectedConnectorIds.length} of {connectedCount} connected app{connectedCount === 1 ? '' : 's'}.
-              </span>
-              <button
-                type="button"
-                className="primary memory-source-action"
-                onClick={() => void onSuggestConnectorMemory()}
-                disabled={
-                  !enabled
-                  || connectorExtracting
-                  || connectorSaving
-                  || selectedConnectedConnectorIds.length === 0
-                }
-              >
-                <Icon
-                  name={connectorExtracting ? 'refresh' : 'sparkles'}
-                  size={14}
-                  className={connectorExtracting ? 'icon-spin' : ''}
-                />
-                <span>{connectorScanLabel}</span>
-              </button>
-            </div>
-          </div>
-          {connectorSuggestions.length > 0 ? (
-            <div className="memory-suggestion-panel">
-              <div className="memory-subsection-head">
-                <div>
-                  <h4>Suggested memories</h4>
-                  <p className="hint">
-                    Review design-related memories before saving them.
-                  </p>
-                </div>
-                <span className="memory-source-badge">
-                  {selectedConnectorSuggestions.length} selected
-                </span>
-              </div>
-              <div className="memory-suggestion-list">
-                {connectorSuggestions.map((suggestion) => {
-                  const selected = selectedSuggestionIds.has(suggestion.id);
-                  const sourceLabel =
-                    suggestion.source?.connectorName
-                    || suggestion.source?.toolTitle
-                    || 'Connected apps';
-                  return (
-                    <label
-                      key={suggestion.id}
-                      className={`memory-suggestion-card${selected ? ' is-selected' : ''}`}
-                    >
-                      <span className="memory-connector-check">
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={() => toggleConnectorSuggestion(suggestion.id)}
-                        />
-                        <span aria-hidden="true">
-                          {selected ? <Icon name="check" size={13} /> : null}
-                        </span>
-                      </span>
-                      <span className="memory-suggestion-copy">
-                        <span className="memory-suggestion-title">
-                          <strong>{suggestion.name}</strong>
-                          <span className="memory-type-badge">
-                            {TYPE_LABEL[suggestion.type]}
-                          </span>
-                        </span>
-                        {suggestion.description ? (
-                          <small>{suggestion.description}</small>
-                        ) : null}
-                        <span className="memory-suggestion-body">{suggestion.body}</span>
-                      </span>
-                      <span className="memory-connector-state is-connected">
-                        {sourceLabel}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-              <div className="memory-connector-actions">
-                <button
-                  type="button"
-                  className="primary memory-source-action"
-                  onClick={() => void onSaveConnectorSuggestions()}
-                  disabled={connectorSaving || selectedConnectorSuggestions.length === 0}
-                >
-                  <Icon
-                    name={connectorSaving ? 'refresh' : 'check'}
-                    size={14}
-                    className={connectorSaving ? 'icon-spin' : ''}
-                  />
-                  <span>{connectorSaving ? 'Saving' : 'Save selected'}</span>
-                </button>
-                <button
-                  type="button"
-                  className="ghost memory-source-action"
-                  onClick={onDiscardConnectorSuggestions}
-                  disabled={connectorSaving}
-                >
-                  Discard
-                </button>
-              </div>
-            </div>
-          ) : null}
-          {connectorStatus ? (
-            <div role="status" className="memory-connector-result is-success">
-              {connectorStatus}
-            </div>
-          ) : null}
-          {connectorError ? (
-            <div role="alert" className="memory-connector-result is-error">
-              {connectorError}
-            </div>
-          ) : null}
-          {connectorAttempts.length > 0 ? (
-            <div className="memory-connector-diagnostics" aria-label="Connected app read status">
-              <div className="memory-connector-diagnostics-head">
-                <strong>Last scan</strong>
-                <span>{formatConnectorContextBytes(connectorContextBytes)} read</span>
-              </div>
-              <div className="memory-connector-diagnostics-list">
-                {connectorAttempts.map((attempt) => (
-                  <div
-                    key={`${attempt.connectorId}-${attempt.status}-${attempt.toolName ?? 'none'}`}
-                    className={`memory-connector-diagnostic-row is-${attempt.status}`}
-                  >
-                    <span className="memory-connector-diagnostic-dot" aria-hidden="true" />
-                    <span className="memory-connector-diagnostic-copy">
-                      <strong>{connectorAttemptTitle(attempt)}</strong>
-                      <small>{connectorAttemptDetail(attempt)}</small>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {connectorExtractions.length > 0 ? (
-            <details className="memory-scan-history">
-              <summary>
-                <span>Recent scans</span>
-                <span>{connectorExtractions.length}</span>
-              </summary>
-              <div
-                className="memory-connector-run-history"
-                aria-label="Connected app memory run status"
-              >
-                {connectorExtractions.slice(0, 4).map(renderExtractionCard)}
-              </div>
-            </details>
-          ) : null}
         </div>
       ) : null}
 

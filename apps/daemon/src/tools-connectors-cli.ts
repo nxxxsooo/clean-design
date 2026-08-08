@@ -4,61 +4,32 @@ import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import os from 'node:os';
 import path from 'node:path';
 
-type JsonObject = Record<string, unknown>;
-
-interface CliError {
-  code?: string;
-  message: string;
-  details?: unknown;
-  retryable?: boolean;
-  requestId?: string;
-}
-
 interface ToolCliResult {
   exitCode: number;
 }
 
 interface ParsedOptions {
   command: string | undefined;
-  connectorId?: string;
-  toolName?: string;
-  inputPath?: string;
   localPath?: string;
   repo?: string;
   ref?: string;
   outputPath?: string;
   maxFiles?: number;
-  requireConnector?: boolean;
   referencePackage?: boolean;
   failOnWarnings?: boolean;
-  useCase?: 'personal_daily_digest';
-  format: 'compact' | 'json';
   help: boolean;
 }
 
 const CONNECTORS_USAGE = `Usage:
-  od tools connectors list [--use-case personal_daily_digest] [--format compact]
-  od tools connectors execute --connector <id> --tool <name> --input input.json
-  od tools connectors github-design-context --repo owner/repo [--ref main] [--output context/github/owner-repo.md] [--max-files 48] [--require-connector]
+  od tools connectors github-design-context --repo owner/repo [--ref main] [--output context/github/owner-repo.md] [--max-files 48]
   od tools connectors local-design-context --path /path/to/project [--output context/local-code/project.md] [--max-files 48]
   od tools connectors design-system-package-audit --path /path/to/project [--reference-package] [--fail-on-warnings]
 
 Environment:
   OD_NODE_BIN     Node-compatible runtime for agent wrapper invocations
   OD_BIN          Open Design CLI script for agent wrapper invocations
-  OD_DAEMON_URL   Daemon base URL injected into agent runs
-  OD_TOOL_TOKEN   Bearer token injected into agent runs
-
-Agent runtime invocation:
-  "$OD_NODE_BIN" "$OD_BIN" tools connectors list --use-case personal_daily_digest --format compact
+Repository and folder intake run entirely through tools available on this device.
 `;
-
-const GITHUB_CONNECTOR_ID = 'github';
-const GITHUB_GET_REPOSITORY_TOOL = 'github.github_get_a_repository';
-const GITHUB_GET_TREE_TOOL = 'github.github_get_a_tree';
-const GITHUB_GET_README_TOOL = 'github.github_get_a_repository_readme';
-const GITHUB_GET_RAW_CONTENT_TOOL = 'github.github_get_raw_repository_content';
-const GITHUB_GET_REPOSITORY_CONTENT_TOOL = 'github.github_get_repository_content';
 
 const DEFAULT_GITHUB_CONTEXT_MAX_FILES = 48;
 const MAX_GITHUB_CONTEXT_FILES = 80;
@@ -67,7 +38,6 @@ const MAX_LOCAL_CONTEXT_FILES = 120;
 const MAX_CONTEXT_FILE_BYTES = 120_000;
 const MAX_CONTEXT_ASSET_BYTES = 1_500_000;
 const MAX_MARKDOWN_EXCERPT_CHARS = 2_400;
-const MAX_CONNECTOR_DIRECTORY_SCAN_DIRS = 48;
 const GITHUB_CLONE_TIMEOUT_MS = 120_000;
 const GH_AUTH_TIMEOUT_MS = 10_000;
 const MAX_PROCESS_OUTPUT_CHARS = 8_000;
@@ -93,7 +63,7 @@ interface GithubSnapshotFile {
   outputPath?: string;
   content: string | Buffer;
   bytes: number;
-  source: 'connector' | 'git-clone' | 'local-folder';
+  source: 'git-clone' | 'local-folder';
   binary?: boolean;
 }
 
@@ -101,9 +71,8 @@ interface GithubDesignEvidence {
   repo: ParsedGitHubRepo;
   ref?: string;
   resolvedRef?: string;
-  method: 'connector' | 'git-clone';
+  method: 'git-clone';
   localCloneMethod?: 'git' | 'gh-cli';
-  repositoryMetadata?: JsonObject;
   readme?: { path: string; content: string };
   treePaths: string[];
   files: GithubSnapshotFile[];
@@ -182,25 +151,12 @@ function parseOptions(args: string[]): ParsedOptions | { error: string } {
   const [command, ...rest] = args;
   const options: ParsedOptions = {
     command: command === '-h' || command === '--help' ? undefined : command,
-    format: 'compact',
     help: command === '-h' || command === '--help',
   };
 
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index];
-    if (arg === '--connector') {
-      const value = rest[++index];
-      if (!value) return { error: '--connector requires a connector id' };
-      options.connectorId = value;
-    } else if (arg === '--tool') {
-      const value = rest[++index];
-      if (!value) return { error: '--tool requires a tool name' };
-      options.toolName = value;
-    } else if (arg === '--input') {
-      const value = rest[++index];
-      if (!value) return { error: '--input requires a file path' };
-      options.inputPath = value;
-    } else if (arg === '--path') {
+    if (arg === '--path') {
       const value = rest[++index];
       if (!value) return { error: '--path requires a local folder path' };
       options.localPath = value;
@@ -224,20 +180,10 @@ function parseOptions(args: string[]): ParsedOptions | { error: string } {
         parsed,
         options.command === 'local-design-context' ? MAX_LOCAL_CONTEXT_FILES : MAX_GITHUB_CONTEXT_FILES,
       );
-    } else if (arg === '--require-connector') {
-      options.requireConnector = true;
     } else if (arg === '--reference-package') {
       options.referencePackage = true;
     } else if (arg === '--fail-on-warnings') {
       options.failOnWarnings = true;
-    } else if (arg === '--format') {
-      const value = rest[++index];
-      if (value !== 'compact' && value !== 'json') return { error: '--format must be compact or json' };
-      options.format = value;
-    } else if (arg === '--use-case') {
-      const value = rest[++index];
-      if (value !== 'personal_daily_digest') return { error: '--use-case must be personal_daily_digest' };
-      options.useCase = value;
     } else if (arg === '-h' || arg === '--help') {
       options.help = true;
     } else {
@@ -246,53 +192,6 @@ function parseOptions(args: string[]): ParsedOptions | { error: string } {
   }
 
   return options;
-}
-
-function daemonUrl(): URL | { error: string } {
-  const rawUrl = process.env.OD_DAEMON_URL;
-  if (!rawUrl) return { error: 'OD_DAEMON_URL is required' };
-  try {
-    const url = new URL(rawUrl);
-    url.pathname = url.pathname.replace(/\/+$/u, '');
-    url.search = '';
-    url.hash = '';
-    return url;
-  } catch {
-    return { error: 'OD_DAEMON_URL must be a valid URL' };
-  }
-}
-
-function toolToken(): string | { error: string } {
-  const token = process.env.OD_TOOL_TOKEN;
-  if (!token) return { error: 'OD_TOOL_TOKEN is required' };
-  return token;
-}
-
-function endpoint(baseUrl: URL, pathname: string): string {
-  const url = new URL(baseUrl.toString());
-  const [pathPart, searchPart] = pathname.split('?');
-  url.pathname = `${url.pathname}${pathPart ?? ''}`.replace(/\/+/gu, '/');
-  url.search = searchPart === undefined ? '' : `?${searchPart}`;
-  return url.toString();
-}
-
-async function readJsonFile(filePath: string): Promise<unknown> {
-  const resolved = path.resolve(filePath);
-  const text = await readFile(resolved, 'utf8');
-  try {
-    return JSON.parse(text) as unknown;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`invalid JSON in ${resolved}: ${message}`);
-  }
-}
-
-async function readJsonObject(filePath: string): Promise<JsonObject> {
-  const value = await readJsonFile(filePath);
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error(`${path.resolve(filePath)} must contain a JSON object`);
-  }
-  return value as JsonObject;
 }
 
 function parseGithubRepo(input: string): ParsedGitHubRepo {
@@ -368,226 +267,6 @@ async function ensureParentDirectory(filePath: string): Promise<void> {
 
 function isAbsenceError(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT');
-}
-
-async function requestJsonOrThrow(baseUrl: URL, token: string, pathname: string, init: RequestInit = {}): Promise<unknown> {
-  const response = await requestJson(baseUrl, token, pathname, init);
-  if (response.status >= 200 && response.status < 300) return response.body;
-  const error = normalizeCliError(response.body);
-  throw new Error(`${error.code ? `${error.code}: ` : ''}${error.message}`);
-}
-
-async function executeConnectorReadTool(
-  baseUrl: URL,
-  token: string,
-  toolName: string,
-  input: JsonObject,
-): Promise<unknown> {
-  const body = await requestJsonOrThrow(baseUrl, token, '/api/tools/connectors/execute', {
-    method: 'POST',
-    body: JSON.stringify({ connectorId: GITHUB_CONNECTOR_ID, toolName, input }),
-  });
-  if (!body || typeof body !== 'object') return body;
-  const output = (body as JsonObject).output;
-  if (output && typeof output === 'object' && !Array.isArray(output) && 'data' in output) {
-    return (output as JsonObject).data;
-  }
-  return output;
-}
-
-async function assertGithubConnectorIsListable(baseUrl: URL, token: string): Promise<void> {
-  const body = await requestJsonOrThrow(baseUrl, token, '/api/tools/connectors/list', { method: 'GET' });
-  const connectors = body && typeof body === 'object' && Array.isArray((body as JsonObject).connectors)
-    ? (body as { connectors: JsonObject[] }).connectors
-    : [];
-  const github = connectors.find((connector) => connector.id === GITHUB_CONNECTOR_ID);
-  if (!github) throw new Error('GitHub connector is not connected or has no auto-approved read tools');
-  const status = typeof github.status === 'string' ? github.status.toLowerCase() : '';
-  if (status && status !== 'connected') {
-    throw new Error(`GitHub connector status is ${status}; connect GitHub before repository intake`);
-  }
-}
-
-function getStringAtKeys(value: unknown, keys: string[]): string | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const record = value as JsonObject;
-  for (const key of keys) {
-    const direct = record[key];
-    if (typeof direct === 'string' && direct.trim()) return direct;
-  }
-  for (const child of Object.values(record)) {
-    const found = getStringAtKeys(child, keys);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-function getDefaultBranch(metadata: unknown): string | undefined {
-  return getStringAtKeys(metadata, ['default_branch', 'defaultBranch']);
-}
-
-function decodeContentPayload(value: unknown): string | undefined {
-  if (typeof value === 'string') return value;
-  if (!value || typeof value !== 'object') return undefined;
-  const record = value as JsonObject;
-  const content = typeof record.content === 'string'
-    ? record.content
-    : typeof record.data === 'string'
-      ? record.data
-      : undefined;
-  if (content !== undefined) {
-    const encoding = typeof record.encoding === 'string' ? record.encoding.toLowerCase() : '';
-    if (encoding === 'base64') return decodeBase64Content(content);
-    return content;
-  }
-  for (const [key, child] of Object.entries(record)) {
-    if (key === 'mimetype' || key === 'name' || key === 's3url') continue;
-    const decoded = decodeContentPayload(child);
-    if (decoded !== undefined) return decoded;
-  }
-  return undefined;
-}
-
-function decodeBase64Content(value: string): string {
-  return decodeBase64Buffer(value).toString('utf8');
-}
-
-function decodeBase64Buffer(value: string): Buffer {
-  return Buffer.from(value.replace(/\s+/gu, ''), 'base64');
-}
-
-function decodeBinaryContentPayload(value: unknown): Buffer | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const decoded = decodeBinaryContentPayload(item);
-      if (decoded) return decoded;
-    }
-    return undefined;
-  }
-  const record = value as JsonObject;
-  const content = typeof record.content === 'string'
-    ? record.content
-    : typeof record.data === 'string'
-      ? record.data
-      : undefined;
-  if (content !== undefined) {
-    const encoding = typeof record.encoding === 'string' ? record.encoding.toLowerCase() : '';
-    if (encoding === 'base64') return decodeBase64Buffer(content);
-  }
-  for (const [key, child] of Object.entries(record)) {
-    if (key === 'mimetype' || key === 'name' || key === 's3url') continue;
-    const decoded = decodeBinaryContentPayload(child);
-    if (decoded) return decoded;
-  }
-  return undefined;
-}
-
-function findConnectorSignedContentUrl(value: unknown): string | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const found = findConnectorSignedContentUrl(item);
-      if (found) return found;
-    }
-    return undefined;
-  }
-  const record = value as JsonObject;
-  if (typeof record.s3url === 'string' && /^https:\/\//iu.test(record.s3url)) return record.s3url;
-  for (const child of Object.values(record)) {
-    const found = findConnectorSignedContentUrl(child);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-async function readConnectorTextContent(value: unknown): Promise<string | undefined> {
-  const decoded = decodeContentPayload(value);
-  if (decoded !== undefined) return decoded;
-  const signedUrl = findConnectorSignedContentUrl(value);
-  if (!signedUrl) return undefined;
-  const response = await fetch(signedUrl);
-  if (!response.ok) {
-    throw new Error(`connector content download failed with HTTP ${response.status}`);
-  }
-  const text = await response.text();
-  return text.slice(0, MAX_CONTEXT_FILE_BYTES);
-}
-
-async function readConnectorBinaryContent(value: unknown): Promise<Buffer | undefined> {
-  const decoded = decodeBinaryContentPayload(value);
-  if (decoded) return decoded;
-  const signedUrl = findConnectorSignedContentUrl(value);
-  if (!signedUrl) return undefined;
-  const response = await fetch(signedUrl);
-  if (!response.ok) {
-    throw new Error(`connector content download failed with HTTP ${response.status}`);
-  }
-  return Buffer.from(await response.arrayBuffer());
-}
-
-async function readConnectorSnapshotContent(
-  repoPath: string,
-  value: unknown,
-): Promise<{ content: string | Buffer; bytes: number; binary?: boolean } | undefined> {
-  const normalizedPath = repoPath.toLowerCase();
-  if (isBinaryDesignAssetPath(normalizedPath)) {
-    const binaryContent = await readConnectorBinaryContent(value);
-    if (!binaryContent) return undefined;
-    if (binaryContent.length > MAX_CONTEXT_ASSET_BYTES) {
-      throw new Error(`binary asset exceeds ${MAX_CONTEXT_ASSET_BYTES} bytes`);
-    }
-    return { content: binaryContent, bytes: binaryContent.length, binary: true };
-  }
-  const textContent = await readConnectorTextContent(value);
-  if (textContent === undefined) return undefined;
-  const content = textContent.slice(0, MAX_CONTEXT_FILE_BYTES);
-  return { content, bytes: Buffer.byteLength(content, 'utf8') };
-}
-
-function extractTreePaths(value: unknown): string[] {
-  const paths = new Set<string>();
-  const visit = (node: unknown) => {
-    if (!node || typeof node !== 'object') return;
-    if (Array.isArray(node)) {
-      for (const item of node) visit(item);
-      return;
-    }
-    const record = node as JsonObject;
-    const rawPath = typeof record.path === 'string' ? record.path : undefined;
-    const rawType = typeof record.type === 'string' ? record.type.toLowerCase() : '';
-    if (rawPath && rawType !== 'tree' && rawType !== 'dir') {
-      paths.add(rawPath);
-    }
-    for (const child of Object.values(record)) visit(child);
-  };
-  visit(value);
-  return [...paths].sort((left, right) => left.localeCompare(right));
-}
-
-interface GithubDirectoryEntry {
-  path: string;
-  type: 'file' | 'dir';
-}
-
-function extractDirectoryEntries(value: unknown): GithubDirectoryEntry[] {
-  const entries = new Map<string, GithubDirectoryEntry>();
-  const visit = (node: unknown) => {
-    if (!node || typeof node !== 'object') return;
-    if (Array.isArray(node)) {
-      for (const item of node) visit(item);
-      return;
-    }
-    const record = node as JsonObject;
-    const rawPath = typeof record.path === 'string' ? record.path : undefined;
-    const rawType = typeof record.type === 'string' ? record.type.toLowerCase() : '';
-    if (rawPath && (rawType === 'file' || rawType === 'dir')) {
-      entries.set(rawPath, { path: rawPath, type: rawType });
-    }
-    for (const child of Object.values(record)) visit(child);
-  };
-  visit(value);
-  return [...entries.values()].sort((left, right) => left.path.localeCompare(right.path));
 }
 
 export function scoreDesignFile(repoPath: string): number {
@@ -705,176 +384,6 @@ function preferredReadmePath(paths: string[]): string | undefined {
       const rightSegments = right.split('/').length;
       return leftSegments - rightSegments || left.localeCompare(right);
     })[0];
-}
-
-async function collectGithubTreePathsWithConnector(
-  baseUrl: URL,
-  token: string,
-  repo: ParsedGitHubRepo,
-  resolvedRef: string,
-  warnings: string[],
-): Promise<string[]> {
-  try {
-    const treePayload = await executeConnectorReadTool(baseUrl, token, GITHUB_GET_TREE_TOOL, {
-      owner: repo.owner,
-      repo: repo.repo,
-      tree_sha: resolvedRef,
-      recursive: true,
-    });
-    return extractTreePaths(treePayload);
-  } catch (error) {
-    warnings.push(
-      `Recursive tree connector read failed; falling back to bounded directory browsing: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-    return collectGithubTreePathsFromDirectoryListings(baseUrl, token, repo, resolvedRef, warnings);
-  }
-}
-
-async function collectGithubTreePathsFromDirectoryListings(
-  baseUrl: URL,
-  token: string,
-  repo: ParsedGitHubRepo,
-  resolvedRef: string,
-  warnings: string[],
-): Promise<string[]> {
-  const filePaths = new Set<string>();
-  const seenDirs = new Set<string>();
-  const queue: string[] = [''];
-
-  while (queue.length > 0 && seenDirs.size < MAX_CONNECTOR_DIRECTORY_SCAN_DIRS) {
-    const currentDir = queue.shift() ?? '';
-    if (seenDirs.has(currentDir)) continue;
-    seenDirs.add(currentDir);
-
-    let entries: GithubDirectoryEntry[] = [];
-    try {
-      const payload = await executeConnectorReadTool(baseUrl, token, GITHUB_GET_REPOSITORY_CONTENT_TOOL, {
-        owner: repo.owner,
-        repo: repo.repo,
-        ref: resolvedRef,
-        path: currentDir,
-      });
-      entries = extractDirectoryEntries(payload);
-    } catch (error) {
-      warnings.push(`Skipped directory ${currentDir || '.'}: ${error instanceof Error ? error.message : String(error)}`);
-      continue;
-    }
-
-    for (const entry of entries) {
-      if (entry.type === 'file') {
-        if (!shouldSkipRepoPath(entry.path.toLowerCase())) filePaths.add(entry.path);
-        continue;
-      }
-      if (entry.type === 'dir' && !seenDirs.has(entry.path) && scoreDesignDirectory(entry.path) > 0) {
-        queue.push(entry.path);
-      }
-    }
-
-    queue.sort((left, right) => scoreDesignDirectory(right) - scoreDesignDirectory(left) || left.localeCompare(right));
-  }
-
-  if (queue.length > 0) {
-    warnings.push(`Directory browsing stopped after ${MAX_CONNECTOR_DIRECTORY_SCAN_DIRS} directories; evidence is a bounded connector snapshot.`);
-  }
-  return [...filePaths].sort((left, right) => left.localeCompare(right));
-}
-
-async function collectGithubEvidenceWithConnector(
-  baseUrl: URL,
-  token: string,
-  repo: ParsedGitHubRepo,
-  options: { ref?: string; maxFiles: number },
-): Promise<GithubDesignEvidence> {
-  await assertGithubConnectorIsListable(baseUrl, token);
-  const warnings: string[] = [];
-  let metadata: unknown;
-  try {
-    metadata = await executeConnectorReadTool(baseUrl, token, GITHUB_GET_REPOSITORY_TOOL, {
-      owner: repo.owner,
-      repo: repo.repo,
-    });
-  } catch (error) {
-    if (!connectorIntakeIsRecoverable(error)) throw error;
-    warnings.push(
-      `Repository metadata connector read failed; continuing with ${
-        options.ref ?? 'main'
-      } as the ref: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-  const resolvedRef = options.ref ?? getDefaultBranch(metadata) ?? 'main';
-
-  let readme: GithubDesignEvidence['readme'];
-  try {
-    const readmePayload = await executeConnectorReadTool(baseUrl, token, GITHUB_GET_README_TOOL, {
-      owner: repo.owner,
-      repo: repo.repo,
-      ref: resolvedRef,
-    });
-    const content = await readConnectorTextContent(readmePayload);
-    if (content) {
-      readme = {
-        path: getStringAtKeys(readmePayload, ['path', 'name']) ?? 'README.md',
-        content,
-      };
-    }
-  } catch (error) {
-    warnings.push(`README connector read failed: ${error instanceof Error ? error.message : String(error)}`);
-  }
-
-  const treePaths = await collectGithubTreePathsWithConnector(baseUrl, token, repo, resolvedRef, warnings);
-  const selectedPaths = selectDesignFiles(treePaths, options.maxFiles);
-  const files: GithubSnapshotFile[] = [];
-  for (const repoPath of selectedPaths) {
-    if (readme?.path === repoPath) continue;
-    try {
-      const contentPayload = await executeConnectorReadTool(baseUrl, token, GITHUB_GET_RAW_CONTENT_TOOL, {
-        owner: repo.owner,
-        repo: repo.repo,
-        ref: resolvedRef,
-        path: repoPath,
-      });
-      const snapshot = await readConnectorSnapshotContent(repoPath, contentPayload);
-      if (snapshot === undefined) {
-        warnings.push(`Skipped ${repoPath}: connector returned no readable content`);
-        continue;
-      }
-      files.push({
-        repoPath,
-        content: snapshot.content,
-        bytes: snapshot.bytes,
-        source: 'connector',
-        ...(snapshot.binary ? { binary: true } : {}),
-      });
-    } catch (error) {
-      warnings.push(`Skipped ${repoPath}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  if (!readme && files.length === 0) {
-    throw new Error(
-      [
-        'GitHub connector did not produce readable repository evidence through bounded intake.',
-        warnings.length ? `Warnings: ${warnings.join(' | ')}` : '',
-      ].filter(Boolean).join(' '),
-    );
-  }
-
-  const metadataObject = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
-    ? metadata as JsonObject
-    : undefined;
-  return {
-    repo,
-    ...(options.ref === undefined ? {} : { ref: options.ref }),
-    resolvedRef,
-    method: 'connector',
-    ...(metadataObject === undefined ? {} : { repositoryMetadata: metadataObject }),
-    ...(readme === undefined ? {} : { readme }),
-    treePaths,
-    files,
-    warnings,
-  };
 }
 
 async function collectGithubEvidenceWithGitClone(
@@ -1007,20 +516,6 @@ async function collectLocalDesignEvidence(
     ...(readme === undefined ? {} : { readme }),
     warnings,
   };
-}
-
-function connectorIntakeIsRecoverable(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/\b(ACCESS_DENIED|NOT_FOUND|FORBIDDEN|UNAUTHORIZED)\b|access denied|repository not found|not found|forbidden|permission|unauthorized|\b40[134]\b/iu.test(message)) {
-    return false;
-  }
-  return /\b(CONNECTOR_OUTPUT_TOO_LARGE|CONNECTOR_RATE_LIMITED)\b/u.test(message)
-    || /did not produce readable repository evidence/iu.test(message)
-    || /produced no snapshot files/iu.test(message);
-}
-
-function connectorEvidenceNeedsCloneFallback(evidence: GithubDesignEvidence): boolean {
-  return evidence.files.length === 0;
 }
 
 async function cloneGithubRepository(
@@ -1393,9 +888,7 @@ function renderGithubDesignEvidenceMarkdown(evidence: GithubDesignEvidence): str
     '',
     '## Intake Status',
     '',
-    evidence.method === 'connector'
-      ? '- Connector platform fallback was used through `od tools connectors`.'
-      : '- This-device intake was used through local git or GitHub CLI.',
+    '- This-device intake was used through local git or GitHub CLI.',
   ];
   if (evidence.warnings.length > 0) {
     lines.push('', '## Warnings', '', ...evidence.warnings.map((warning) => `- ${warning}`));
@@ -1622,62 +1115,10 @@ async function runGithubDesignContext(options: ParsedOptions): Promise<ToolCliRe
   const repo = parseGithubRepo(options.repo);
   const maxFiles = options.maxFiles ?? DEFAULT_GITHUB_CONTEXT_MAX_FILES;
   const outputPath = options.outputPath ?? defaultGithubContextOutputPath(repo);
-  const baseUrl = daemonUrl();
-  const token = toolToken();
-  let evidence: GithubDesignEvidence;
-
-  try {
-    evidence = await collectGithubEvidenceWithGitClone(repo, {
-      ...(options.ref === undefined ? {} : { ref: options.ref }),
-      maxFiles,
-    });
-  } catch (localError) {
-    const localReason = localError instanceof Error ? localError.message : String(localError);
-    const connectorReady = !('error' in baseUrl) && typeof token === 'string';
-    if (connectorReady) {
-      let connectorReason: string | undefined;
-      try {
-        evidence = await collectGithubEvidenceWithConnector(baseUrl, token, repo, {
-          ...(options.ref === undefined ? {} : { ref: options.ref }),
-          maxFiles,
-        });
-        if (connectorEvidenceNeedsCloneFallback(evidence)) {
-          throw new Error('GitHub connector bounded intake produced no snapshot files.');
-        }
-        evidence.warnings.unshift(
-          `This-device GitHub intake failed; used Composio GitHub connector fallback. Reason: ${localReason}`,
-        );
-      } catch (connectorError) {
-        connectorReason = connectorError instanceof Error ? connectorError.message : String(connectorError);
-        if (options.requireConnector) {
-          return fail('Required GitHub repository intake could not read the repository through git, GitHub CLI, or connector', {
-            repo: `${repo.owner}/${repo.repo}`,
-            localReason,
-            connectorReason,
-            nextStep: 'Run `gh auth login --web`, configure local git credentials, or connect GitHub through Composio with access to this repository. Do not draft design-system files from URL text alone.',
-          });
-        }
-        throw new Error(
-          `GitHub repository intake failed through this device and connector fallback. This device: ${localReason}; Connector: ${connectorReason}`,
-        );
-      }
-    } else {
-      const connectorReason = 'error' in baseUrl
-        ? baseUrl.error
-        : typeof token === 'string'
-          ? 'OD_TOOL_TOKEN is not available'
-          : token.error;
-      if (options.requireConnector) {
-        return fail('Required GitHub repository intake could not read the repository through git, GitHub CLI, or connector', {
-          repo: `${repo.owner}/${repo.repo}`,
-          localReason,
-          connectorReason,
-          nextStep: 'Run `gh auth login --web`, configure local git credentials, or connect GitHub through Composio with access to this repository. Do not draft design-system files from URL text alone.',
-        });
-      }
-      throw localError;
-    }
-  }
+  const evidence = await collectGithubEvidenceWithGitClone(repo, {
+    ...(options.ref === undefined ? {} : { ref: options.ref }),
+    maxFiles,
+  });
 
   const written = await writeGithubDesignEvidence(outputPath, evidence);
   writeJson({
@@ -2655,120 +2096,6 @@ function missingUiKitComponentRoles(componentFiles: string[]): string[] {
     .map(([role]) => role);
 }
 
-async function requestJson(baseUrl: URL, token: string, pathname: string, init: RequestInit = {}): Promise<{ status: number; body: unknown }> {
-  const response = await fetch(endpoint(baseUrl, pathname), {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-      ...(init.body === undefined ? {} : { 'Content-Type': 'application/json' }),
-      ...init.headers,
-    },
-  });
-  const text = await response.text();
-  let body: unknown = text;
-  if (text.length > 0) {
-    try {
-      body = JSON.parse(text) as unknown;
-    } catch {
-      body = { message: text };
-    }
-  }
-  return { status: response.status, body };
-}
-
-function compactTool(value: unknown): unknown {
-  if (!value || typeof value !== 'object') return value;
-  const tool = value as JsonObject;
-  return {
-    name: tool.name,
-    description: tool.description,
-    safety: tool.safety,
-    curation: tool.curation,
-    inputSchema: tool.inputSchemaJson ?? tool.inputSchema,
-  };
-}
-
-function compactConnector(value: unknown): unknown {
-  if (!value || typeof value !== 'object') return value;
-  const connector = value as JsonObject;
-  const tools = Array.isArray(connector.tools) ? connector.tools : [];
-  return {
-    id: connector.id,
-    name: connector.name,
-    provider: connector.provider,
-    category: connector.category,
-    status: connector.status,
-    accountLabel: connector.accountLabel,
-    tools: tools.map(compactTool),
-  };
-}
-
-function compactList(value: unknown): unknown {
-  if (!value || typeof value !== 'object') return value;
-  const response = value as JsonObject;
-  const connectors = Array.isArray(response.connectors) ? response.connectors : [];
-  return { connectors: connectors.map(compactConnector) };
-}
-
-function compactExecution(value: unknown): unknown {
-  if (!value || typeof value !== 'object') return value;
-  const response = value as JsonObject;
-  return {
-    connectorId: response.connectorId,
-    accountLabel: response.accountLabel,
-    toolName: response.toolName,
-    safety: response.safety,
-    outputSummary: response.outputSummary,
-    output: response.output,
-    metadata: response.metadata,
-  };
-}
-
-function compactValidationDetails(details: unknown): unknown {
-  if (!details || typeof details !== 'object') return details;
-  const record = details as JsonObject;
-  if (record.kind !== 'validation' || !Array.isArray(record.issues)) return details;
-  return {
-    kind: 'validation',
-    issues: record.issues.map((issue) => {
-      if (!issue || typeof issue !== 'object') return { message: String(issue) };
-      const issueRecord = issue as JsonObject;
-      return {
-        ...(typeof issueRecord.path === 'string' ? { path: issueRecord.path } : {}),
-        message: typeof issueRecord.message === 'string' ? issueRecord.message : String(issueRecord.message ?? 'validation failed'),
-        ...(typeof issueRecord.code === 'string' ? { code: issueRecord.code } : {}),
-      };
-    }),
-  };
-}
-
-function normalizeCliError(body: unknown): CliError {
-  const rawError = body && typeof body === 'object' && 'error' in body ? (body as JsonObject).error : body;
-
-  if (typeof rawError === 'string') return { message: rawError };
-  if (!rawError || typeof rawError !== 'object') return { message: String(rawError ?? 'request failed') };
-
-  const error = rawError as JsonObject;
-  return {
-    ...(typeof error.code === 'string' ? { code: error.code } : {}),
-    message: typeof error.message === 'string' ? error.message : String(error.error ?? 'request failed'),
-    ...(error.details === undefined ? {} : { details: compactValidationDetails(error.details) }),
-    ...(typeof error.retryable === 'boolean' ? { retryable: error.retryable } : {}),
-    ...(typeof error.requestId === 'string' ? { requestId: error.requestId } : {}),
-  };
-}
-
-async function printApiResult(response: { status: number; body: unknown }, compact: (body: unknown) => unknown): Promise<ToolCliResult> {
-  if (response.status < 200 || response.status >= 300) {
-    writeJson({ ok: false, status: response.status, error: normalizeCliError(response.body) }, process.stderr);
-    return { exitCode: 1 };
-  }
-  const body = compact(response.body);
-  writeJson(body && typeof body === 'object' && !Array.isArray(body) ? { ok: true, ...(body as JsonObject) } : { ok: true, result: body });
-  return { exitCode: 0 };
-}
-
 export async function runConnectorsToolCli(args: string[]): Promise<ToolCliResult> {
   const options = parseOptions(args);
   if ('error' in options) return fail(options.error);
@@ -2804,37 +2131,5 @@ export async function runConnectorsToolCli(args: string[]): Promise<ToolCliResul
     }
   }
 
-  const baseUrl = daemonUrl();
-  if ('error' in baseUrl) return fail(baseUrl.error);
-  const token = toolToken();
-  if (typeof token !== 'string') return fail(token.error);
-
-  try {
-    if (options.command === 'list') {
-      const listPath = options.useCase ? `/api/tools/connectors/list?useCase=${encodeURIComponent(options.useCase)}` : '/api/tools/connectors/list';
-      return await printApiResult(
-        await requestJson(baseUrl, token, listPath, { method: 'GET' }),
-        options.format === 'compact' ? compactList : (body) => body,
-      );
-    }
-
-    if (options.command === 'execute') {
-      if (!options.connectorId) return fail('execute requires --connector <id>');
-      if (!options.toolName) return fail('execute requires --tool <name>');
-      if (!options.inputPath) return fail('execute requires --input input.json');
-      const input = await readJsonObject(options.inputPath);
-      return await printApiResult(
-        await requestJson(baseUrl, token, '/api/tools/connectors/execute', {
-          method: 'POST',
-          body: JSON.stringify({ connectorId: options.connectorId, toolName: options.toolName, input }),
-        }),
-        options.format === 'compact' ? compactExecution : (body) => body,
-      );
-    }
-
-    return fail(`unknown connectors command: ${options.command}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return fail(message);
-  }
+  return fail(`external connector command is disabled: ${options.command}`);
 }
