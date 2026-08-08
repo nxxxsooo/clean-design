@@ -1471,10 +1471,10 @@ export function FileWorkspace({
       });
     };
     load();
-    window.addEventListener('open-design:plugins-changed', load);
+    window.addEventListener('clean-design:plugins-changed', load);
     return () => {
       cancelled = true;
-      window.removeEventListener('open-design:plugins-changed', load);
+      window.removeEventListener('clean-design:plugins-changed', load);
     };
   }, []);
 

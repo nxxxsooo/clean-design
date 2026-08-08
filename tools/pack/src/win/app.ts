@@ -134,9 +134,7 @@ async function buildWorkspaceArtifacts(config: ToolPackConfig): Promise<void> {
   try {
     await runPnpm(config, ["--filter", "@open-design/web", "build"], { OD_WEB_OUTPUT_MODE: config.webOutputMode });
     await runPnpm(config, ["--filter", "@open-design/web", "build:sidecar"]);
-    // Inject chunk IDs + upload browser sourcemaps to PostHog, then strip
-    // .map files before any packaging step copies the web output into the
-    // Electron resources. See `tools/pack/src/web-sourcemaps.ts`.
+    // Strip browser sourcemaps before packaging so source never ships in the app.
     await processWebSourcemaps(config);
   } finally {
     if (previousWebNextEnv == null) await rm(webNextEnvPath, { force: true });

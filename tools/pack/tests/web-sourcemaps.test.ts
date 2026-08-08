@@ -7,50 +7,16 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ToolPackConfig } from "../src/config.js";
 import { processWebSourcemaps } from "../src/web-sourcemaps.js";
 
-/**
- * These tests cover the parts of `processWebSourcemaps` that don't shell out
- * to `@posthog/cli`:
- *
- *   - missing chunks dir: returns silently
- *   - no .map files: returns silently
- *   - no credentials: ALWAYS strips .map files (the security guarantee)
- *
- * The upload-credentials-set path is not exercised here because it would have
- * to either reach PostHog (network in unit tests is forbidden) or mock out
- * `runPnpm`, which is intentionally an internal helper. The CLI happy-path
- * runs in the release workflows themselves; this suite focuses on the
- * strip-always invariant that must hold for both PR/fork builds and the rare
- * case where the upload step fails inside the release.
- */
-
 let tempRoot: string;
-const SAVED_API_KEY = process.env.POSTHOG_CLI_API_KEY;
-const SAVED_PROJECT_ID = process.env.POSTHOG_CLI_PROJECT_ID;
-
-function restoreEnv(name: string, value: string | undefined): void {
-  if (value == null) {
-    delete process.env[name];
-  } else {
-    process.env[name] = value;
-  }
-}
 
 beforeEach(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), "od-web-sourcemaps-"));
-  // Force the "no credentials" path so we test the strip-always invariant
-  // without needing to mock @posthog/cli or hit the network.
-  delete process.env.POSTHOG_CLI_API_KEY;
-  delete process.env.POSTHOG_CLI_PROJECT_ID;
-  delete process.env.POSTHOG_PERSONAL_API_KEY;
-  delete process.env.POSTHOG_PROJECT_ID;
 });
 
 afterEach(async () => {
   if (tempRoot != null) {
     await rm(tempRoot, { recursive: true, force: true });
   }
-  restoreEnv("POSTHOG_CLI_API_KEY", SAVED_API_KEY);
-  restoreEnv("POSTHOG_CLI_PROJECT_ID", SAVED_PROJECT_ID);
 });
 
 function fakeConfig(workspaceRoot: string): ToolPackConfig {
@@ -119,7 +85,7 @@ describe("processWebSourcemaps", () => {
     await expect(processWebSourcemaps(config)).resolves.toBeUndefined();
   });
 
-  it("strips every .map file when credentials are missing (strip-only path)", async () => {
+  it("strips every .map file", async () => {
     const chunksDir = await setupChunksDir(tempRoot, [
       "framework-abc.js.map",
       "main-app-def.js.map",

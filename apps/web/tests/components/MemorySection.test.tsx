@@ -1151,7 +1151,7 @@ describe('MemorySection', () => {
       connected = true;
       window.dispatchEvent(new MessageEvent('message', {
         origin: window.location.origin,
-        data: { type: 'open-design:connector-connected' },
+        data: { type: 'clean-design:connector-connected' },
       }));
 
       await waitFor(() => expect(onConnectorsChanged).toHaveBeenCalledTimes(1));

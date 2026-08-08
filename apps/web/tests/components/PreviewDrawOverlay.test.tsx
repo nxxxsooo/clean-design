@@ -423,7 +423,7 @@ describe('PreviewDrawOverlay', () => {
       const detail = (event as CustomEvent<{ ack?: (result: { ok: boolean }) => void }>).detail;
       detail.ack?.({ ok: true });
     });
-    window.addEventListener('opendesign:annotation', annotation);
+    window.addEventListener('cleandesign:annotation', annotation);
 
     try {
       const { container, getByRole } = render(
@@ -449,7 +449,7 @@ describe('PreviewDrawOverlay', () => {
       expect(detail.file).toBeInstanceOf(File);
       expect(detail.markKind).toBe('stroke');
     } finally {
-      window.removeEventListener('opendesign:annotation', annotation);
+      window.removeEventListener('cleandesign:annotation', annotation);
       restoreCompositeMocks();
     }
   });
@@ -471,7 +471,7 @@ describe('PreviewDrawOverlay', () => {
 
   it('queues a note when Enter submits from the draw input', async () => {
     const annotation = vi.fn();
-    window.addEventListener('opendesign:annotation', annotation);
+    window.addEventListener('cleandesign:annotation', annotation);
 
     try {
       const { container } = render(
@@ -492,13 +492,13 @@ describe('PreviewDrawOverlay', () => {
         note: 'Please inspect this panel.',
       });
     } finally {
-      window.removeEventListener('opendesign:annotation', annotation);
+      window.removeEventListener('cleandesign:annotation', annotation);
     }
   });
 
   it('does not submit a note when Enter confirms IME composition', () => {
     const annotation = vi.fn();
-    window.addEventListener('opendesign:annotation', annotation);
+    window.addEventListener('cleandesign:annotation', annotation);
 
     try {
       const { container } = render(
@@ -516,7 +516,7 @@ describe('PreviewDrawOverlay', () => {
 
       expect(annotation).not.toHaveBeenCalled();
     } finally {
-      window.removeEventListener('opendesign:annotation', annotation);
+      window.removeEventListener('cleandesign:annotation', annotation);
     }
   });
 
@@ -525,7 +525,7 @@ describe('PreviewDrawOverlay', () => {
       const detail = (event as CustomEvent<{ ack?: (result: { ok: boolean }) => void }>).detail;
       detail.ack?.({ ok: true });
     });
-    window.addEventListener('opendesign:annotation', annotation);
+    window.addEventListener('cleandesign:annotation', annotation);
 
     try {
       const { container, getByRole } = render(
@@ -564,7 +564,7 @@ describe('PreviewDrawOverlay', () => {
       fireEvent.click(getByRole('menuitemradio', { name: 'Queue' }));
       await waitFor(() => expect(annotation).toHaveBeenCalledTimes(2));
     } finally {
-      window.removeEventListener('opendesign:annotation', annotation);
+      window.removeEventListener('cleandesign:annotation', annotation);
     }
   });
 
@@ -573,7 +573,7 @@ describe('PreviewDrawOverlay', () => {
       const detail = (event as CustomEvent<{ ack?: (result: { ok: boolean }) => void }>).detail;
       detail.ack?.({ ok: true });
     });
-    window.addEventListener('opendesign:annotation', annotation);
+    window.addEventListener('cleandesign:annotation', annotation);
 
     try {
       const { container, getByRole } = render(
@@ -598,7 +598,7 @@ describe('PreviewDrawOverlay', () => {
         }),
       });
     } finally {
-      window.removeEventListener('opendesign:annotation', annotation);
+      window.removeEventListener('cleandesign:annotation', annotation);
     }
   });
 
@@ -799,7 +799,7 @@ describe('PreviewDrawOverlay', () => {
       const detail = (event as CustomEvent<{ ack?: (result: { ok: boolean }) => void }>).detail;
       detail.ack?.({ ok: true });
     });
-    window.addEventListener('opendesign:annotation', annotation);
+    window.addEventListener('cleandesign:annotation', annotation);
 
     try {
       const { container, getByRole } = render(
@@ -825,7 +825,7 @@ describe('PreviewDrawOverlay', () => {
       // The split button's default action is now Queue.
       await waitFor(() => expect(getByRole('button', { name: 'Queue' })).toBeTruthy());
     } finally {
-      window.removeEventListener('opendesign:annotation', annotation);
+      window.removeEventListener('cleandesign:annotation', annotation);
     }
   });
 
@@ -1037,7 +1037,7 @@ describe('PreviewDrawOverlay', () => {
       const detail = (event as CustomEvent<{ ack?: (result: { ok: boolean }) => void }>).detail;
       detail.ack?.({ ok: true });
     });
-    window.addEventListener('opendesign:annotation', annotation);
+    window.addEventListener('cleandesign:annotation', annotation);
 
     let host: HTMLElement | null = null;
     const captureSnapshot = vi.fn(async () => {
@@ -1060,7 +1060,7 @@ describe('PreviewDrawOverlay', () => {
       await waitFor(() => expect(annotation).toHaveBeenCalledTimes(1));
       expect(container.querySelector<HTMLElement>('.preview-draw-toolbar')?.style.visibility).toBe('');
     } finally {
-      window.removeEventListener('opendesign:annotation', annotation);
+      window.removeEventListener('cleandesign:annotation', annotation);
       restoreCompositeMocks();
     }
   });

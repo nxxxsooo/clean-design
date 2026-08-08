@@ -22,7 +22,7 @@ import {
 import { randomUUID } from '../utils/uuid';
 import { stripPlaintextConfigCredentials } from './credentials';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 const CONFIG_MIGRATION_VERSION = 2;
 
 // Hatched out of the box, but tucked away — the user has to go through
@@ -89,16 +89,6 @@ export const DEFAULT_CONFIG: AppConfig = {
   orbit: DEFAULT_ORBIT,
   projectLocations: [],
   defaultProjectLocationId: 'default',
-  // Telemetry defaults to ON so fresh-install users emit onboarding /
-  // ui_click events from the first frame. The disclosure modal still
-  // appears after `onboardingCompleted` flips, and Settings → Privacy
-  // remains the one-click opt-out. Without these defaults the gate at
-  // `daemon/src/analytics.ts` (`if (telemetry?.metrics !== true) return`)
-  // dropped every event fired during onboarding because no consent
-  // existed yet — observed live on the prerelease.10 QA run, which left
-  // zero `page_view pn=onboarding` rows on PostHog despite the user
-  // completing the flow.
-  telemetry: { metrics: false, content: false },
 };
 
 /** Well-known providers with pre-filled base URLs. */
@@ -654,13 +644,6 @@ export function loadConfig(): AppConfig {
       };
     }
     const parsed = JSON.parse(raw) as Partial<AppConfig>;
-    // Strip daemon-owned privacy fields if a stale localStorage payload
-    // still carries them. Older builds wrote these to localStorage; we
-    // now treat the daemon as authoritative so the user can rotate /
-    // revoke without leaving residue in browser storage.
-    for (const key of DAEMON_OWNED_KEYS) {
-      delete (parsed as Record<string, unknown>)[key];
-    }
     const parsedHasApiProtocol = Object.prototype.hasOwnProperty.call(
       parsed,
       'apiProtocol',
@@ -684,7 +667,6 @@ export function loadConfig(): AppConfig {
     delete merged.agentModels?.amr;
     delete merged.agentCliEnv?.amr;
     delete merged.agentCliEnvIntent?.amr;
-    merged.telemetry = { metrics: false, content: false };
 
     let migratedConfig = false;
     const parsedMigrationVersion =
@@ -965,17 +947,6 @@ export async function syncComposioConfigToDaemon(
   }
 }
 
-// Privacy-sensitive fields the user can revoke. We deliberately keep
-// these out of localStorage so the daemon remains the single source of
-// truth: clearing app-config.json (or rotating via "Delete my data")
-// fully resets the install identity, with no residual cohort key
-// silently sitting in browser storage where the user can't see it.
-const DAEMON_OWNED_KEYS = new Set<keyof AppConfig>([
-  'installationId',
-  'telemetry',
-  'privacyDecisionAt',
-]);
-
 const AGENT_CLI_SECRET_ENV_KEYS = new Set([
   'ANTHROPIC_API_KEY',
   'ANTHROPIC_AUTH_TOKEN',
@@ -1001,9 +972,6 @@ export function saveConfig(config: AppConfig): void {
     ...config,
     agentCliEnv: sanitizeAgentCliEnv(config.agentCliEnv),
   });
-  for (const key of DAEMON_OWNED_KEYS) {
-    delete (sanitized as unknown as Record<string, unknown>)[key];
-  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
 }
 
@@ -1044,9 +1012,6 @@ export function mergeDaemonConfig(
   if (daemonConfig.orbit !== undefined) {
     next.orbit = normalizeOrbit(daemonConfig.orbit);
   }
-  next.installationId = null;
-  next.telemetry = { metrics: false, content: false };
-  next.privacyDecisionAt = Date.now();
   if (daemonConfig.customInstructions !== undefined) {
     next.customInstructions = daemonConfig.customInstructions ?? undefined;
   }
@@ -1167,9 +1132,6 @@ export async function syncConfigToDaemon(
     disabledSkills: config.disabledSkills,
     disabledDesignSystems: config.disabledDesignSystems,
     orbit: normalizeOrbit(config.orbit),
-    installationId: config.installationId,
-    telemetry: config.telemetry,
-    privacyDecisionAt: config.privacyDecisionAt,
     customInstructions: config.customInstructions ?? null,
     projectLocations: config.projectLocations ?? [],
     defaultProjectLocationId: config.defaultProjectLocationId ?? 'default',

@@ -218,9 +218,6 @@ export function buildDockerArgs(
     "-e",
     `${PRODUCTION_INSTALL_PNPM_BIN_ENV}=${CONTAINER_PNPM_PATH}`,
   ];
-  if (config.telemetryRelayUrl != null) {
-    dockerArgs.push("-e", `OPEN_DESIGN_TELEMETRY_RELAY_URL=${config.telemetryRelayUrl}`);
-  }
   const velaBinHost = process.env.OPEN_DESIGN_VELA_CLI_BIN?.trim();
   if (velaBinHost) {
     // The container only mounts /project, /tools-pack and cache/home dirs by
@@ -234,9 +231,6 @@ export function buildDockerArgs(
     const containerVelaDir = "/opt/vela-cli";
     dockerArgs.push("-v", `${hostVelaDir}:${containerVelaDir}:ro`);
     dockerArgs.push("-e", `OPEN_DESIGN_VELA_CLI_BIN=${containerVelaDir}/${velaBinBase}`);
-  }
-  if (config.amrProfile != null) {
-    dockerArgs.push("-e", `OPEN_DESIGN_AMR_PROFILE=${config.amrProfile}`);
   }
   dockerArgs.push(
     "-w",
@@ -477,9 +471,7 @@ async function buildWorkspaceArtifacts(config: ToolPackConfig): Promise<void> {
   try {
     await runPnpm(config, ["--filter", "@open-design/web", "build"], { OD_WEB_OUTPUT_MODE: "server" });
     await runPnpm(config, ["--filter", "@open-design/web", "build:sidecar"]);
-    // Inject chunk IDs + upload browser sourcemaps to PostHog, then strip
-    // .map files before AppImage packaging. See
-    // `tools/pack/src/web-sourcemaps.ts`.
+    // Strip browser sourcemaps before AppImage packaging.
     await processWebSourcemaps(config);
   } finally {
     if (previousWebNextEnv == null) {
@@ -579,13 +571,9 @@ async function writeAssembledApp(
     paths.packagedConfigPath,
     `${JSON.stringify(
       {
-        ...(config.amrProfile == null ? {} : { amrProfile: config.amrProfile }),
         appVersion: version,
         namespace: config.namespace,
         nodeCommandRelative: "open-design/bin/node",
-        ...(config.telemetryRelayUrl == null ? {} : { telemetryRelayUrl: config.telemetryRelayUrl }),
-        ...(config.posthogKey == null ? {} : { posthogKey: config.posthogKey }),
-        ...(config.posthogHost == null ? {} : { posthogHost: config.posthogHost }),
         ...(config.portable ? {} : { namespaceBaseRoot: config.roots.runtime.namespaceBaseRoot }),
       },
       null,

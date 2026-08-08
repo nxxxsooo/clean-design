@@ -199,28 +199,6 @@ describe('syncConfigToDaemon', () => {
     });
   });
 
-  it('syncs daemon-owned privacy decision fields', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await syncConfigToDaemon({
-      ...DEFAULT_CONFIG,
-      installationId: 'install-1',
-      privacyDecisionAt: 1778244000000,
-      telemetry: { metrics: true, content: true, artifactManifest: false },
-    });
-
-    const [, init] = fetchMock.mock.calls[0] as unknown as [
-      string,
-      RequestInit,
-    ];
-    expect(JSON.parse(String(init.body))).toMatchObject({
-      installationId: 'install-1',
-      privacyDecisionAt: 1778244000000,
-      telemetry: { metrics: true, content: true, artifactManifest: false },
-    });
-  });
-
 });
 
 describe('syncMediaProvidersToDaemon', () => {
@@ -294,57 +272,6 @@ describe('mergeDaemonConfig', () => {
     expect(merged.agentCliEnvIntent).toEqual({
       codex: { apiKeyOverride: true },
     });
-  });
-
-  it('ignores legacy daemon telemetry identity while preserving a resolved decision', () => {
-    const merged = mergeDaemonConfig(DEFAULT_CONFIG, {
-      installationId: 'install-1',
-      privacyDecisionAt: 1778244000000,
-      telemetry: { metrics: true },
-    });
-
-    expect(merged.installationId).toBeNull();
-    expect(typeof merged.privacyDecisionAt).toBe('number');
-    expect(merged.telemetry).toEqual({ metrics: false, content: false });
-  });
-
-  it('disables old daemon telemetry config without minting an identity', () => {
-    const merged = mergeDaemonConfig(DEFAULT_CONFIG, {
-      installationId: 'install-1',
-      telemetry: { metrics: true },
-    });
-
-    expect(merged.installationId).toBeNull();
-    expect(typeof merged.privacyDecisionAt).toBe('number');
-  });
-
-  it('defaults reporting off and does not mint an installationId', () => {
-    const merged = mergeDaemonConfig(DEFAULT_CONFIG, {});
-
-    expect(merged.telemetry?.metrics).toBe(false);
-    expect(merged.telemetry?.content).toBe(false);
-    expect(merged.installationId).toBeNull();
-  });
-
-  it('turns off a reporting install that somehow has no identity', () => {
-    const merged = mergeDaemonConfig(DEFAULT_CONFIG, {
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      installationId: null,
-    });
-
-    expect(merged.telemetry?.metrics).toBe(false);
-    expect(merged.installationId).toBeNull();
-  });
-
-  it('preserves an explicit opt-out and never re-mints an id', () => {
-    const merged = mergeDaemonConfig(DEFAULT_CONFIG, {
-      telemetry: { metrics: false, content: false, artifactManifest: false },
-      installationId: null,
-      privacyDecisionAt: 1778244000000,
-    });
-
-    expect(merged.telemetry?.metrics).toBe(false);
-    expect(merged.installationId == null).toBe(true);
   });
 
 });
@@ -904,7 +831,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(legacyConfig));
+    store.set('clean-design:config', JSON.stringify(legacyConfig));
 
     const config = loadConfig();
 
@@ -944,7 +871,7 @@ describe('loadConfig', () => {
         },
       },
     };
-    store.set('open-design:config', JSON.stringify(persisted));
+    store.set('clean-design:config', JSON.stringify(persisted));
 
     const config = loadConfig();
 
@@ -966,7 +893,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(legacyConfig));
+    store.set('clean-design:config', JSON.stringify(legacyConfig));
 
     const config = loadConfig();
 
@@ -990,7 +917,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(persisted));
+    store.set('clean-design:config', JSON.stringify(persisted));
 
     const config = loadConfig();
 
@@ -1010,7 +937,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(persisted));
+    store.set('clean-design:config', JSON.stringify(persisted));
 
     expect(loadConfig().baseUrl).toBe('https://api.example.com/v1');
   });
@@ -1028,7 +955,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(persisted));
+    store.set('clean-design:config', JSON.stringify(persisted));
 
     const config = loadConfig();
 
@@ -1037,7 +964,7 @@ describe('loadConfig', () => {
     expect(config.apiVersion).toBe('2024-01-01');
     expect(config.baseUrl).toBe('https://proxy.example.com/bedrock-runtime/v1');
     expect(config.model).toBe('gpt-4o');
-    expect(store.get('open-design:config')).not.toContain('sk-proxy');
+    expect(store.get('clean-design:config')).not.toContain('sk-proxy');
   });
 
   it('migrates legacy Anthropic API configs to an explicit apiProtocol', () => {
@@ -1050,7 +977,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(legacyConfig));
+    store.set('clean-design:config', JSON.stringify(legacyConfig));
 
     const config = loadConfig();
 
@@ -1068,7 +995,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(legacyConfig));
+    store.set('clean-design:config', JSON.stringify(legacyConfig));
 
     const config = loadConfig();
 
@@ -1106,7 +1033,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(savedConfig));
+    store.set('clean-design:config', JSON.stringify(savedConfig));
 
     const config = loadConfig();
 
@@ -1124,7 +1051,7 @@ describe('loadConfig', () => {
     });
 
     const persisted = JSON.parse(
-      store.get('open-design:config') ?? '{}',
+      store.get('clean-design:config') ?? '{}',
     ) as Partial<AppConfig>;
     expect(persisted.apiProtocol).toBe('anthropic');
     expect(persisted.apiKey).toBe('');
@@ -1148,7 +1075,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(daemonConfig));
+    store.set('clean-design:config', JSON.stringify(daemonConfig));
 
     const config = loadConfig();
 
@@ -1167,7 +1094,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(legacyConfig));
+    store.set('clean-design:config', JSON.stringify(legacyConfig));
 
     const config = loadConfig();
 
@@ -1189,7 +1116,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(legacyConfig));
+    store.set('clean-design:config', JSON.stringify(legacyConfig));
 
     const config = loadConfig();
 
@@ -1208,7 +1135,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(legacyConfig));
+    store.set('clean-design:config', JSON.stringify(legacyConfig));
 
     const config = loadConfig();
 
@@ -1227,7 +1154,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(explicitConfig));
+    store.set('clean-design:config', JSON.stringify(explicitConfig));
 
     const config = loadConfig();
 
@@ -1244,7 +1171,7 @@ describe('loadConfig', () => {
       skillId: null,
       designSystemId: null,
     };
-    store.set('open-design:config', JSON.stringify(legacyConfig));
+    store.set('clean-design:config', JSON.stringify(legacyConfig));
 
     const config = loadConfig();
 
@@ -1260,7 +1187,7 @@ describe('loadConfig', () => {
       theme: 'dark',
       accentColor: '#4F46E5',
     };
-    store.set('open-design:config', JSON.stringify(savedConfig));
+    store.set('clean-design:config', JSON.stringify(savedConfig));
 
     const config = loadConfig();
 
@@ -1272,7 +1199,7 @@ describe('loadConfig', () => {
     const savedConfig: Partial<AppConfig> = {
       accentColor: 'blue',
     };
-    store.set('open-design:config', JSON.stringify(savedConfig));
+    store.set('clean-design:config', JSON.stringify(savedConfig));
 
     expect(loadConfig().accentColor).toBe(DEFAULT_CONFIG.accentColor);
   });
@@ -1285,13 +1212,13 @@ describe('loadConfig', () => {
         templateSkillId: 'orbit-general',
       },
     };
-    store.set('open-design:config', JSON.stringify(savedConfig));
+    store.set('clean-design:config', JSON.stringify(savedConfig));
 
     expect(loadConfig().orbit?.time).toBe(DEFAULT_CONFIG.orbit?.time);
   });
 
   it('returns defaults for malformed localStorage JSON', () => {
-    store.set('open-design:config', '{broken-json');
+    store.set('clean-design:config', '{broken-json');
 
     expect(loadConfig()).toEqual(DEFAULT_CONFIG);
   });
@@ -1304,20 +1231,6 @@ describe('loadConfig', () => {
 });
 
 describe('saveConfig', () => {
-  it('keeps daemon-owned privacy fields out of localStorage', () => {
-    saveConfig({
-      ...DEFAULT_CONFIG,
-      installationId: 'install-1',
-      privacyDecisionAt: 1778244000000,
-      telemetry: { metrics: true },
-    });
-
-    const saved = JSON.parse(store.get('open-design:config') ?? '{}');
-    expect(saved.installationId).toBeUndefined();
-    expect(saved.privacyDecisionAt).toBeUndefined();
-    expect(saved.telemetry).toBeUndefined();
-  });
-
   it('keeps CLI API key env values out of localStorage while preserving intent and non-secret env', () => {
     saveConfig({
       ...DEFAULT_CONFIG,
@@ -1341,7 +1254,7 @@ describe('saveConfig', () => {
       },
     });
 
-    const saved = JSON.parse(store.get('open-design:config') ?? '{}');
+    const saved = JSON.parse(store.get('clean-design:config') ?? '{}');
     expect(saved.agentCliEnv.claude).toEqual({
       ANTHROPIC_BASE_URL: 'https://proxy.example/anthropic',
       CLAUDE_CONFIG_DIR: '~/.claude-2',

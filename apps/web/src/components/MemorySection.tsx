@@ -134,7 +134,7 @@ const MEMORY_CONNECTOR_APP_LABELS: Record<string, string> = {
 type ConnectorMemoryAttempt = ConnectorMemorySuggestionResponse['connectors'][number];
 type ConnectorStatusMap = ConnectorStatusResponse['statuses'];
 
-const CONNECTOR_CALLBACK_MESSAGE_TYPE = 'open-design:connector-connected';
+const CONNECTOR_CALLBACK_MESSAGE_TYPE = 'clean-design:connector-connected';
 const MEMORY_CONNECTOR_PENDING_AUTH_STORAGE_KEY = 'od:memory:pending-connector-auth';
 
 function isTrustedConnectorCallbackOrigin(origin: string): boolean {

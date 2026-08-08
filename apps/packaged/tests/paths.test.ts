@@ -40,14 +40,12 @@ describe("resolvePackagedNamespacePaths", () => {
     restorePlatform();
   });
 
-  it("models update downloads as a namespace-scoped root beside data", () => {
+  it("keeps runtime data namespace-scoped", () => {
     const config = fakeConfig();
     const paths = resolvePackagedNamespacePaths(config, config.namespace);
 
     expect(paths.namespaceRoot).toBe(join(config.namespaceBaseRoot, config.namespace));
     expect(paths.dataRoot).toBe(join(paths.namespaceRoot, "data"));
-    expect(paths.updateRoot).toBe(join(paths.namespaceRoot, "updates"));
-    expect(paths.installerObservationRoot).toBe(join(paths.dataRoot, "observations", "installer"));
   });
 
   it("rejects namespace overrides that would escape the namespace base root", () => {

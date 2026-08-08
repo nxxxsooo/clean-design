@@ -43,7 +43,6 @@ function durableRunState(run) {
     errorCode: run.errorCode,
     artifactCount: Number.isFinite(run.artifactCount) ? run.artifactCount : 0,
     endedWithUnfinishedWork: Boolean(run.endedWithUnfinishedWork),
-    ...(typeof run.userPrompt === 'string' ? { userPrompt: run.userPrompt } : {}),
     ...(typeof run.model === 'string' ? { model: run.model } : {}),
     ...(typeof run.reasoning === 'string' ? { reasoning: run.reasoning } : {}),
     ...(typeof run.skillId === 'string' ? { skillId: run.skillId } : {}),
@@ -53,13 +52,8 @@ function durableRunState(run) {
       ? { designSystemSelectionSource: run.designSystemSelectionSource }
       : {}),
     ...(typeof run.clientType === 'string' ? { clientType: run.clientType } : {}),
-    ...(run.analyticsTelemetry ? { analyticsTelemetry: run.analyticsTelemetry } : {}),
-    ...(run.promptTelemetry ? { promptTelemetry: run.promptTelemetry } : {}),
+    ...(run.lifecycleTimings ? { lifecycleTimings: run.lifecycleTimings } : {}),
     ...(run.promptCache ? { promptCache: run.promptCache } : {}),
-    ...(run.analyticsRecovery ? { analyticsRecovery: run.analyticsRecovery } : {}),
-    ...(typeof run.langfuseCompletedAt === 'number'
-      ? { langfuseCompletedAt: run.langfuseCompletedAt }
-      : {}),
   };
 }
 
@@ -192,28 +186,6 @@ export function createChatRunService({
 
   const persistState = (run) => {
     if (run?.statePath) atomicWriteJson(run.statePath, durableRunState(run));
-  };
-
-  const setAnalyticsRecovery = (run, recovery) => {
-    if (!run || !recovery) return;
-    run.analyticsRecovery = {
-      context: recovery.context,
-      properties: recovery.properties,
-      insertId: recovery.insertId,
-    };
-    persistState(run);
-  };
-
-  const markAnalyticsCompleted = (run) => {
-    if (!run?.analyticsRecovery) return;
-    run.analyticsRecovery.completedAt = Date.now();
-    persistState(run);
-  };
-
-  const markLangfuseCompleted = (run) => {
-    if (!run) return;
-    run.langfuseCompletedAt = Date.now();
-    persistState(run);
   };
 
   const get = (id) => runs.get(id) ?? null;
@@ -693,9 +665,6 @@ export function createChatRunService({
     wait,
     emit,
     persistState,
-    setAnalyticsRecovery,
-    markAnalyticsCompleted,
-    markLangfuseCompleted,
     finish,
     fail,
     drop,

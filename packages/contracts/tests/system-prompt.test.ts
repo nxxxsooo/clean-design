@@ -36,9 +36,10 @@ describe('DISCOVERY_AND_PHILOSOPHY (contracts copy) — TodoWrite plan item coun
     const prompt = composeSystemPrompt({ sessionMode: 'chat' });
 
     expect(prompt).toContain('# Ask mode — bare conversation');
-    expect(prompt).toContain('https://github.com/nexu-io/open-design');
-    expect(prompt).toContain('https://open-design.ai/');
-    expect(prompt).toContain('https://discord.gg/mHAjSMV6gz');
+    expect(prompt).toContain('This conversation is in Clean Design Ask mode');
+    expect(prompt).not.toContain('https://open-design.ai/');
+    expect(prompt).not.toContain('https://discord.gg/');
+    expect(prompt).not.toContain('connectors, MCP servers');
     expect(prompt).toContain('Do not emit a default discovery `<question-form>`');
     // Ask mode is deliberately light: neither the ~3k-token discovery layer nor
     // the full designer charter is composed in. That omission IS the feature —

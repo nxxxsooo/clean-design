@@ -18,7 +18,6 @@ export type ToolPackPlatform = "mac" | "win" | "linux";
 export type ToolPackBuildOutput = "all" | "app" | "appimage" | "dir" | "dmg" | "nsis" | "zip";
 export type ToolPackMacCompression = "store" | "normal" | "maximum";
 export type ToolPackWebOutputMode = "server" | "standalone";
-export type ToolPackAmrProfile = "prod" | "test" | "local";
 
 export type ToolPackCliOptions = {
   appVersion?: string;
@@ -84,46 +83,6 @@ export type ToolPackConfig = {
   roots: ToolPackRoots;
   silent: boolean;
   signed: boolean;
-  amrProfile?: ToolPackAmrProfile;
-  telemetryRelayUrl?: string;
-  /**
-   * PostHog product-analytics ingest key, sourced from process.env.POSTHOG_KEY
-   * at packaging time. Baked into open-design-config.json so the packaged
-   * daemon can read it as POSTHOG_KEY env at launch — only official Open
-   * Design builds (CI with the secret set) ship with this; forks compiling
-   * locally produce binaries that omit the key and the integration
-   * short-circuits cleanly. Apache-2.0 keeps the bundle public, but `phc_`
-   * keys are write-only event ingest keys (cannot read your project data),
-   * so embedding them in the binary is the PostHog-recommended pattern.
-   */
-  posthogKey?: string;
-  posthogHost?: string;
-  /**
-   * Personal API key (`phx_...`) used by the @posthog/cli sourcemap helper to
-   * upload browser sourcemaps to PostHog after `next build` and before the
-   * web bundle is copied into the Electron package. Sourced from
-   * `POSTHOG_CLI_API_KEY` (or the legacy `POSTHOG_PERSONAL_API_KEY` alias)
-   * in CI; when missing (local packaging by a contributor, fork builds, PRs)
-   * the helper still strips the .map files so source never leaks into the
-   * shipped installer — it just skips the upload step.
-   */
-  posthogCliApiKey?: string;
-  /**
-   * PostHog project ID (e.g. `420348` for the official Clean Design project)
-   * used by `@posthog/cli sourcemap upload`. Sourced from
-   * `POSTHOG_CLI_PROJECT_ID` (or the alias `POSTHOG_PROJECT_ID`) in CI.
-   * Required for upload to be attempted; missing → strip-only path.
-   */
-  posthogCliProjectId?: string;
-  /**
-   * PostHog **management** host used by `@posthog/cli sourcemap upload`. This
-   * is the regional app host (e.g. `https://us.posthog.com`) — distinct from
-   * `posthogHost` above, which is the **ingest** host (`us.i.posthog.com`)
-   * used by the runtime SDK and accepts `/capture/` traffic only. Sourced
-   * from `POSTHOG_CLI_HOST`; when missing, the CLI defaults to the US Cloud
-   * app host on its own, which is correct for the official project.
-   */
-  posthogCliHost?: string;
   to: ToolPackBuildOutput;
   webOutputMode: ToolPackWebOutputMode;
   workspaceRoot: string;
@@ -165,100 +124,6 @@ function resolveToolPackWebOutputMode(platform: ToolPackPlatform, value: string 
   if (value == null || value.length === 0) return "standalone";
   if (value === "server" || value === "standalone") return value;
   throw new Error(`unsupported OD_WEB_OUTPUT_MODE value: ${value}`);
-}
-
-function resolveToolPackAmrProfile(value: string | undefined): ToolPackAmrProfile | undefined {
-  if (value == null) return undefined;
-  const normalized = value.trim();
-  if (normalized.length === 0) return undefined;
-  if (normalized === "prod" || normalized === "test" || normalized === "local") return normalized;
-  throw new Error(`OPEN_DESIGN_AMR_PROFILE must be prod, test, or local: ${value}`);
-}
-
-function resolveToolPackPosthogKey(value: string | undefined): string | undefined {
-  if (value == null) return undefined;
-  const normalized = value.trim();
-  if (normalized.length === 0) return undefined;
-  // PostHog public keys start with `phc_`. We don't hard-fail on other
-  // shapes — third-party PostHog deployments may use different prefixes —
-  // but flag obviously-wrong values (whitespace, control chars) so a
-  // misconfigured CI secret doesn't silently bake garbage into the bundle.
-  if (/[\s\x00-\x1f]/.test(normalized)) {
-    throw new Error(`POSTHOG_KEY contains whitespace or control chars: ${value}`);
-  }
-  return normalized;
-}
-
-function resolveToolPackPosthogHost(value: string | undefined): string | undefined {
-  if (value == null) return undefined;
-  const normalized = value.trim();
-  if (normalized.length === 0) return undefined;
-  let parsed: URL;
-  try {
-    parsed = new URL(normalized);
-  } catch {
-    throw new Error(`POSTHOG_HOST must be an absolute URL: ${value}`);
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    throw new Error(`POSTHOG_HOST must be http(s): ${value}`);
-  }
-  return normalized.replace(/\/+$/, "");
-}
-
-function resolveToolPackPosthogCliApiKey(value: string | undefined): string | undefined {
-  if (value == null) return undefined;
-  const normalized = value.trim();
-  if (normalized.length === 0) return undefined;
-  // Personal API keys start with `phx_`. As with POSTHOG_KEY, third-party
-  // PostHog deployments may use different prefixes; only flag obviously-wrong
-  // values (whitespace, control chars) so a misconfigured CI secret doesn't
-  // silently corrupt the upload step.
-  if (/[\s\x00-\x1f]/.test(normalized)) {
-    throw new Error(`POSTHOG_CLI_API_KEY contains whitespace or control chars`);
-  }
-  return normalized;
-}
-
-function resolveToolPackPosthogCliProjectId(value: string | undefined): string | undefined {
-  if (value == null) return undefined;
-  const normalized = value.trim();
-  if (normalized.length === 0) return undefined;
-  if (!/^[0-9]+$/.test(normalized)) {
-    throw new Error(`POSTHOG_CLI_PROJECT_ID must be a numeric project id: ${value}`);
-  }
-  return normalized;
-}
-
-function resolveToolPackPosthogCliHost(value: string | undefined): string | undefined {
-  if (value == null) return undefined;
-  const normalized = value.trim();
-  if (normalized.length === 0) return undefined;
-  let parsed: URL;
-  try {
-    parsed = new URL(normalized);
-  } catch {
-    throw new Error(`POSTHOG_CLI_HOST must be an absolute URL: ${value}`);
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    throw new Error(`POSTHOG_CLI_HOST must be http(s): ${value}`);
-  }
-  return normalized.replace(/\/+$/, "");
-}
-
-function resolveToolPackTelemetryRelayUrl(value: string | undefined): string | undefined {
-  if (value == null) return undefined;
-  const normalized = value.trim();
-  if (normalized.length === 0) return undefined;
-  let parsed: URL;
-  try {
-    parsed = new URL(normalized);
-  } catch {
-    throw new Error(`OPEN_DESIGN_TELEMETRY_RELAY_URL must be an absolute https URL: ${value}`);
-  }
-  if (parsed.protocol !== "https:") {
-    throw new Error(`OPEN_DESIGN_TELEMETRY_RELAY_URL must use https: ${value}`);
-  }
-  return normalized.replace(/\/+$/, "");
 }
 
 function resolveElectronVersion(workspaceRoot: string): string {
@@ -335,17 +200,6 @@ export function resolveToolPackConfig(
     requireVelaCli: options.requireVelaCli === true,
     silent: options.silent !== false,
     signed: options.signed === true,
-    amrProfile: resolveToolPackAmrProfile(process.env.OPEN_DESIGN_AMR_PROFILE),
-    telemetryRelayUrl: resolveToolPackTelemetryRelayUrl(process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL),
-    posthogKey: resolveToolPackPosthogKey(process.env.POSTHOG_KEY),
-    posthogHost: resolveToolPackPosthogHost(process.env.POSTHOG_HOST),
-    posthogCliApiKey: resolveToolPackPosthogCliApiKey(
-      process.env.POSTHOG_CLI_API_KEY ?? process.env.POSTHOG_PERSONAL_API_KEY,
-    ),
-    posthogCliProjectId: resolveToolPackPosthogCliProjectId(
-      process.env.POSTHOG_CLI_PROJECT_ID ?? process.env.POSTHOG_PROJECT_ID,
-    ),
-    posthogCliHost: resolveToolPackPosthogCliHost(process.env.POSTHOG_CLI_HOST),
     to: resolveToolPackBuildOutput(platform, options.to),
     webOutputMode: resolveToolPackWebOutputMode(platform, process.env.OD_WEB_OUTPUT_MODE),
     workspaceRoot: WORKSPACE_ROOT,

@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   agentRefreshOptionsForConfig,
-  amrWalletValueLabel,
   canFetchProviderModels,
   canRunProviderConnectionTest,
   deriveComposioCredentialState,

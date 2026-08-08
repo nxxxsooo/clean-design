@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'open-design:config';
-const TOGGLE_EVENT = 'open-design:critique-theater-toggle';
+const STORAGE_KEY = 'clean-design:config';
+const TOGGLE_EVENT = 'clean-design:critique-theater-toggle';
 
 interface ConfigShape {
   critiqueTheaterEnabled?: boolean;
@@ -11,7 +11,7 @@ interface ConfigShape {
 /**
  * Read the Settings-toggle flag for Critique Theater (Phase 15.3).
  *
- * Source of truth is the existing `open-design:config` localStorage
+ * Source of truth is the isolated `clean-design:config` localStorage
  * blob the Settings panel already round-trips. The web layer reads the
  * stored boolean; the daemon-side `isCritiqueEnabled` makes the final
  * routing decision (project-level override, env override, rollout
@@ -22,7 +22,7 @@ interface ConfigShape {
  *
  *   1. The platform `storage` event fires for other tabs and is how
  *      the toggle stays in sync across browser windows.
- *   2. A same-tab `open-design:critique-theater-toggle` CustomEvent so
+ *   2. A same-tab `clean-design:critique-theater-toggle` CustomEvent so
  *      a Settings save in the same window updates this hook without
  *      a page reload. The Settings save handler emits the event after
  *      it writes the new config blob.

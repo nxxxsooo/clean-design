@@ -36,7 +36,7 @@ describe('createRunLifecycleTracer', () => {
     lifecycle.markFirstModelEvent('text_delta', 4_000);
 
     expect(run).toEqual({
-      analyticsTelemetry: {
+      lifecycleTimings: {
         firstArtifactWriteAt: 1_000,
         firstModelEventAt: 3_000,
         firstModelEventType: 'tool_use',

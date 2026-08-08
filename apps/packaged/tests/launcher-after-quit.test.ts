@@ -41,12 +41,10 @@ function fakePaths(root: string): PackagedNamespacePaths {
     electronUserDataRoot: join(root, "user-data"),
     headlessIdentityPath: join(root, "runtime", "headless-root.json"),
     installationRoot: root,
-    installerObservationRoot: join(root, "data", "observations", "installer"),
     logsRoot: join(root, "logs"),
     namespaceRoot: root,
     resourceRoot: join(root, "resources", "open-design"),
     runtimeRoot: join(root, "runtime"),
-    updateRoot: join(root, "updates"),
     webIdentityPath: join(root, "runtime", "web-root.json"),
   };
 }

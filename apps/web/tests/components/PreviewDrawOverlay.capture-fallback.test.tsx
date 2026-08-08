@@ -65,7 +65,7 @@ describe('PreviewDrawOverlay capture fallback (issue #4064)', () => {
       const detail = (event as CustomEvent<{ ack?: (result: { ok: boolean }) => void }>).detail;
       detail.ack?.({ ok: true });
     });
-    window.addEventListener('opendesign:annotation', annotation);
+    window.addEventListener('cleandesign:annotation', annotation);
 
     try {
       const { container, getByRole, getByText } = render(
@@ -99,13 +99,13 @@ describe('PreviewDrawOverlay capture fallback (issue #4064)', () => {
         ).toBeTruthy(),
       );
     } finally {
-      window.removeEventListener('opendesign:annotation', annotation);
+      window.removeEventListener('cleandesign:annotation', annotation);
     }
   });
 
   it('still blocks a box-only annotation with no note when the snapshot fails', async () => {
     const annotation = vi.fn();
-    window.addEventListener('opendesign:annotation', annotation);
+    window.addEventListener('cleandesign:annotation', annotation);
 
     try {
       const { container, getByRole, getByText } = render(
@@ -127,7 +127,7 @@ describe('PreviewDrawOverlay capture fallback (issue #4064)', () => {
       );
       expect(annotation).not.toHaveBeenCalled();
     } finally {
-      window.removeEventListener('opendesign:annotation', annotation);
+      window.removeEventListener('cleandesign:annotation', annotation);
     }
   });
 });

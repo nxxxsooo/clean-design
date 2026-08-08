@@ -58,13 +58,13 @@ const DICTS: Record<Locale, Dict> = {
   'it': it,
 };
 
-const LS_KEY = 'open-design:locale';
+const LS_KEY = 'clean-design:locale';
 // Marker that says "the value in LS_KEY came from a deliberate user
 // action through setLocale, not from some auto-detection path". Only
 // values tagged this way win over the desktop host's injected OS
 // locale, so a stale auto-detected pick can't pin the app forever once
 // the user changes their system language.
-const LS_SOURCE_KEY = 'open-design:locale-source';
+const LS_SOURCE_KEY = 'clean-design:locale-source';
 const MANUAL_LOCALE_SOURCE = 'manual';
 
 export function resolveSystemLocale(languages: readonly string[]): Locale | null {

@@ -233,7 +233,6 @@ const baseConfig: AppConfig = {
   mediaProviders: {},
   agentModels: {},
   agentCliEnv: {},
-  privacyDecisionAt: 1778244000000,
 };
 
 const project: Project = {

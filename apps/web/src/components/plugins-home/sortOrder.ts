@@ -13,7 +13,7 @@ export type PluginSortOrder = 'hot' | 'newest';
 
 export const DEFAULT_PLUGIN_SORT_ORDER: PluginSortOrder = 'hot';
 
-const SORT_ORDER_KEY = 'open-design:plugins-sort-order';
+const SORT_ORDER_KEY = 'clean-design:plugins-sort-order';
 
 function isBrowserStorageAvailable(): boolean {
   try {

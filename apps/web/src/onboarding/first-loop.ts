@@ -21,9 +21,9 @@ import type { OnboardingEntry } from './onboarding-entry';
 
 type Track = (event: string, properties: Record<string, unknown>) => void;
 
-const ENTRY_KEY = (projectId: string) => `open-design:first-loop-entry:${projectId}`;
-const STEPS_KEY = (projectId: string) => `open-design:first-loop-steps:${projectId}`;
-const DONE_KEY = (projectId: string) => `open-design:first-loop-completed:${projectId}`;
+const ENTRY_KEY = (projectId: string) => `clean-design:first-loop-entry:${projectId}`;
+const STEPS_KEY = (projectId: string) => `clean-design:first-loop-steps:${projectId}`;
+const DONE_KEY = (projectId: string) => `clean-design:first-loop-completed:${projectId}`;
 
 // Called once by the project view after it consumes the pending onboarding
 // entry: pins the entry for THIS project so later taps (e.g. the FileViewer

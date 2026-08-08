@@ -100,10 +100,7 @@ vi.mock('../../src/analytics/provider', () => ({
 }));
 
 import { SettingsDialog } from '../../src/components/SettingsDialog';
-import { IntegrationsView } from '../../src/components/IntegrationsView';
 import type { AgentRefreshOptions, SettingsSection } from '../../src/components/SettingsDialog';
-import { reconcileAmrModelChoice } from '../../src/components/SettingsDialog';
-import { reconcileAmrProfileEnv } from '../../src/components/SettingsDialog';
 import { providerModelsCacheKey } from '../../src/components/providerModelsCache';
 import { I18nProvider } from '../../src/i18n';
 import { LOCALES } from '../../src/i18n/types';
@@ -281,26 +278,6 @@ function renderSettingsDialog(
     onRefreshAgents,
     ...view,
   };
-}
-
-function renderIntegrationsView(
-  initial: Partial<AppConfig> = {},
-  options: {
-    initialTab?: 'mcp' | 'connectors' | 'skills' | 'use-everywhere';
-  } = {},
-) {
-  const onConfigPersist = vi.fn();
-  const onPersistComposioKey = vi.fn();
-  const view = render(
-    <IntegrationsView
-      config={{ ...baseConfig, ...initial }}
-      initialTab={options.initialTab ?? 'mcp'}
-      onConfigPersist={onConfigPersist}
-      onPersistComposioKey={onPersistComposioKey}
-    />,
-  );
-
-  return { onConfigPersist, onPersistComposioKey, ...view };
 }
 
 function renderLanguageSettingsDialog(initialLocale: Parameters<typeof I18nProvider>[0]['initial'] = 'en') {
@@ -3144,7 +3121,7 @@ describe('SettingsDialog media providers interactions', () => {
 describe('SettingsDialog language interactions', () => {
   afterEach(() => {
     cleanup();
-    window.localStorage.removeItem('open-design:locale');
+    window.localStorage.removeItem('clean-design:locale');
     document.documentElement.removeAttribute('lang');
     document.documentElement.removeAttribute('dir');
   });
@@ -3164,7 +3141,7 @@ describe('SettingsDialog language interactions', () => {
     fireEvent.click(screen.getByRole('radio', { name: /简体中文/i }));
 
     expect(screen.getByRole('radio', { name: /简体中文/i }).getAttribute('aria-checked')).toBe('true');
-    expect(window.localStorage.getItem('open-design:locale')).toBe('zh-CN');
+    expect(window.localStorage.getItem('clean-design:locale')).toBe('zh-CN');
     expect(document.documentElement.getAttribute('lang')).toBe('zh-CN');
     expect(document.documentElement.getAttribute('dir')).toBe('ltr');
   });
@@ -3174,7 +3151,7 @@ describe('SettingsDialog language interactions', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: /فارسی/i }));
 
-    expect(window.localStorage.getItem('open-design:locale')).toBe('fa');
+    expect(window.localStorage.getItem('clean-design:locale')).toBe('fa');
     expect(document.documentElement.getAttribute('lang')).toBe('fa');
     expect(document.documentElement.getAttribute('dir')).toBe('rtl');
   });
@@ -3184,13 +3161,13 @@ describe('SettingsDialog language interactions', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: /Deutsch/i }));
 
-    expect(window.localStorage.getItem('open-design:locale')).toBe('de');
+    expect(window.localStorage.getItem('clean-design:locale')).toBe('de');
     expect(document.documentElement.getAttribute('lang')).toBe('de');
 
     fireEvent.click(screen.getByTitle(/close|schließen/i));
     expect(onPersist).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(window.localStorage.getItem('open-design:locale')).toBe('de');
+    expect(window.localStorage.getItem('clean-design:locale')).toBe('de');
     expect(document.documentElement.getAttribute('lang')).toBe('de');
     expect(document.documentElement.getAttribute('dir')).toBe('ltr');
   });
@@ -3404,74 +3381,6 @@ describe('SettingsDialog appearance interactions', () => {
       {},
     );
   });
-
-  it('reconciles the open settings draft when the parent agent CLI env changes', async () => {
-    const view = renderSettingsDialog(
-      {
-        mode: 'daemon',
-        agentId: 'amr',
-        theme: 'dark',
-        agentModels: {
-          amr: {
-            model: 'prod-only-model',
-            reasoning: 'default',
-          },
-        },
-        agentCliEnv: {
-          codex: { CODEX_BIN: '/tmp/codex-dev' },
-          amr: {
-            OPEN_DESIGN_AMR_PROFILE: 'prod',
-            AMR_API_BASE_URL: 'https://draft.example.test',
-          },
-        },
-      },
-      { initialSection: 'appearance', agents: [amrAgent, ...availableAgents] },
-    );
-
-    view.rerender(
-      <SettingsDialog
-        initial={{
-          ...baseConfig,
-          mode: 'daemon',
-          agentId: 'amr',
-          theme: 'dark',
-          agentCliEnv: {
-            amr: {
-              OPEN_DESIGN_AMR_PROFILE: 'local',
-              AMR_API_BASE_URL: 'https://daemon.example.test',
-            },
-          },
-        }}
-        agents={[amrAgent, ...availableAgents]}
-        daemonLive={true}
-        appVersionInfo={null}
-        initialSection="appearance"
-        onPersist={view.onPersist}
-        onPersistComposioKey={view.onPersistComposioKey}
-        onClose={view.onClose}
-        onRefreshAgents={view.onRefreshAgents}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Light' }));
-
-    await waitForPersist(
-      view.onPersist,
-      expect.objectContaining({
-        theme: 'light',
-        agentModels: {},
-        agentCliEnv: {
-          codex: { CODEX_BIN: '/tmp/codex-dev' },
-          amr: {
-            OPEN_DESIGN_AMR_PROFILE: 'local',
-            AMR_API_BASE_URL: 'https://draft.example.test',
-          },
-        },
-      }),
-      {},
-    );
-  });
-
 
   it('switches back to the default accent color and persists it explicitly', async () => {
     const { onPersist } = renderSettingsDialog(
@@ -3754,151 +3663,6 @@ describe('SettingsDialog pets interactions', () => {
       );
       expect(screen.getByRole('button', { name: 'Copied!' })).toBeTruthy();
     });
-  });
-});
-
-describe('IntegrationsView skills tab', () => {
-  afterEach(() => {
-    cleanup();
-  });
-
-  it('lists functional skills and filters them by mode + search', async () => {
-    renderIntegrationsView(
-      { mode: 'daemon', agentId: 'codex' },
-      { initialTab: 'skills' },
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('blog-post')).toBeTruthy();
-      expect(screen.getByText('sales-deck')).toBeTruthy();
-    });
-
-    fireEvent.change(screen.getByRole('combobox', { name: 'Type' }), {
-      target: { value: 'deck' },
-    });
-    expect(screen.queryByText('blog-post')).toBeNull();
-    expect(screen.getByText('sales-deck')).toBeTruthy();
-
-    fireEvent.change(screen.getByPlaceholderText('Search...'), {
-      target: { value: 'sales' },
-    });
-    expect(screen.getByText('sales-deck')).toBeTruthy();
-    expect(screen.queryByText('dashboard')).toBeNull();
-  });
-
-  it('updates skill filter counts from the current filter context', async () => {
-    fetchSkillsMock.mockResolvedValue([
-      {
-        id: 'product-image',
-        name: 'product-image',
-        description: 'Product image generation.',
-        mode: 'image',
-        category: 'marketing',
-        previewType: 'PNG',
-        source: 'built-in',
-      },
-      {
-        id: 'document-brief',
-        name: 'document-brief',
-        description: 'Document brief.',
-        mode: 'deck',
-        category: 'documents',
-        previewType: 'HTML',
-        source: 'built-in',
-      },
-      {
-        id: 'landing-page',
-        name: 'landing-page',
-        description: 'Landing page.',
-        mode: 'prototype',
-        category: 'marketing',
-        previewType: 'HTML',
-        source: 'built-in',
-      },
-    ]);
-
-    renderIntegrationsView(
-      { mode: 'daemon', agentId: 'codex' },
-      { initialTab: 'skills' },
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('product-image')).toBeTruthy();
-      expect(screen.getByText('document-brief')).toBeTruthy();
-    });
-
-    fireEvent.change(screen.getByRole('combobox', { name: 'Type' }), {
-      target: { value: 'image' },
-    });
-
-    const categorySelect = screen.getByRole('combobox', { name: 'Category' });
-    expect(
-      within(categorySelect).getByRole('option', { name: 'Documents (0)' }),
-    ).toBeTruthy();
-    expect(
-      within(categorySelect).getByRole('option', { name: 'Marketing (1)' }),
-    ).toBeTruthy();
-
-    fireEvent.change(categorySelect, {
-      target: { value: 'documents' },
-    });
-
-    expect(screen.getByText('No items match your search.')).toBeTruthy();
-    expect(
-      within(screen.getByRole('combobox', { name: 'Category' })).getByRole(
-        'option',
-        { name: 'Documents (0)' },
-      ),
-    ).toBeTruthy();
-    expect(
-      within(screen.getByRole('combobox', { name: 'Type' })).getByRole('option', {
-        name: 'image (0)',
-      }),
-    ).toBeTruthy();
-  });
-
-  it('opens a skill detail panel and persists disabled skills from toggle switches', async () => {
-    const { onConfigPersist } = renderIntegrationsView(
-      { mode: 'daemon', agentId: 'codex' },
-      { initialTab: 'skills' },
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('blog-post')).toBeTruthy();
-    });
-
-    fireEvent.click(screen.getByText('blog-post'));
-    await waitFor(() => {
-      expect(fetchSkillMock).toHaveBeenCalledWith('blog-post');
-      expect(screen.getByText('skill body for blog-post')).toBeTruthy();
-    });
-
-    const toggles = screen.getAllByTitle('Toggle');
-    fireEvent.click(toggles[0] as HTMLElement);
-
-    await waitFor(() => {
-      expect(onConfigPersist).toHaveBeenCalledWith(
-        expect.objectContaining({
-          disabledSkills: ['blog-post'],
-        }),
-      );
-    });
-  });
-
-  it('shows an empty state when search matches nothing', async () => {
-    renderIntegrationsView(
-      { mode: 'daemon', agentId: 'codex' },
-      { initialTab: 'skills' },
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('blog-post')).toBeTruthy();
-    });
-
-    fireEvent.change(screen.getByPlaceholderText('Search...'), {
-      target: { value: 'zzz-no-match' },
-    });
-    expect(screen.getByText('No items match your search.')).toBeTruthy();
   });
 });
 

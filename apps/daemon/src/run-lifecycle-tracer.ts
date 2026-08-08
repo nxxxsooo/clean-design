@@ -1,4 +1,4 @@
-import type { RunTelemetryTimestamps } from './run-analytics-observability.js';
+import type { RunLifecycleTimestamps } from './run-analytics-observability.js';
 import type { TrackingFirstModelEventType } from '@open-design/contracts/analytics';
 
 export type RunLifecycleMark =
@@ -19,7 +19,7 @@ export type RunLifecycleMark =
   | 'first_artifact_write'
   | 'finalize_start';
 
-const MARK_TO_FIELD: Record<RunLifecycleMark, keyof RunTelemetryTimestamps> = {
+const MARK_TO_FIELD: Record<RunLifecycleMark, keyof RunLifecycleTimestamps> = {
   start_requested: 'startRequestedAt',
   chat_run_started: 'startChatRunStartedAt',
   prompt_build_start: 'promptBuildStartAt',
@@ -39,7 +39,7 @@ const MARK_TO_FIELD: Record<RunLifecycleMark, keyof RunTelemetryTimestamps> = {
 };
 
 export interface RunWithLifecycleTelemetry {
-  analyticsTelemetry?: RunTelemetryTimestamps | null;
+  lifecycleTimings?: RunLifecycleTimestamps | null;
 }
 
 export interface RunLifecycleStreamEventMarkers {
@@ -86,9 +86,9 @@ export function createRunLifecycleTracer(run: RunWithLifecycleTelemetry): {
 } {
   const mark = (lifecycleMark: RunLifecycleMark, timestamp = Date.now()) => {
     const field = MARK_TO_FIELD[lifecycleMark];
-    const current = run.analyticsTelemetry ?? {};
+    const current = run.lifecycleTimings ?? {};
     if (current[field] !== undefined) return;
-    run.analyticsTelemetry = {
+    run.lifecycleTimings = {
       ...current,
       [field]: timestamp,
     };
@@ -97,20 +97,20 @@ export function createRunLifecycleTracer(run: RunWithLifecycleTelemetry): {
   return {
     mark,
     markFirstModelEvent(type: TrackingFirstModelEventType, timestamp = Date.now()) {
-      const current = run.analyticsTelemetry ?? {};
+      const current = run.lifecycleTimings ?? {};
       if (current.firstModelEventAt !== undefined) return;
-      run.analyticsTelemetry = {
+      run.lifecycleTimings = {
         ...current,
         firstModelEventAt: timestamp,
         firstModelEventType: type,
       };
     },
     resetForAttempt(attemptIndex: number, timestamp = Date.now()) {
-      run.analyticsTelemetry = {
+      run.lifecycleTimings = {
         attemptIndex,
         attemptStartedAt: timestamp,
-        ...(run.analyticsTelemetry?.startRequestedAt !== undefined
-          ? { startRequestedAt: run.analyticsTelemetry.startRequestedAt }
+        ...(run.lifecycleTimings?.startRequestedAt !== undefined
+          ? { startRequestedAt: run.lifecycleTimings.startRequestedAt }
           : {}),
       };
     },

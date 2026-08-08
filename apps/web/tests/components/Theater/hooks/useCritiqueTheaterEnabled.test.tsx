@@ -2,9 +2,9 @@
 
 /**
  * Coverage for the M1 Settings-toggle hook (Phase 15.3). The hook
- * reads from the existing `open-design:config` localStorage blob and
+ * reads from the existing `clean-design:config` localStorage blob and
  * stays in sync via the platform `storage` event (cross-tab) and a
- * `open-design:critique-theater-toggle` CustomEvent (same-tab).
+ * `clean-design:critique-theater-toggle` CustomEvent (same-tab).
  */
 
 import { act, cleanup, render } from '@testing-library/react';
@@ -36,9 +36,9 @@ describe('useCritiqueTheaterEnabled (Phase 15.3)', () => {
     expect(sink.enabled).toBe(false);
   });
 
-  it('reads the toggle from the existing open-design:config blob', () => {
+  it('reads the toggle from the existing clean-design:config blob', () => {
     window.localStorage.setItem(
-      'open-design:config',
+      'clean-design:config',
       JSON.stringify({
         critiqueTheaterEnabled: true,
         mode: 'daemon',
@@ -65,7 +65,7 @@ describe('useCritiqueTheaterEnabled (Phase 15.3)', () => {
 
   it('preserves the rest of the stored config when writing the toggle', () => {
     window.localStorage.setItem(
-      'open-design:config',
+      'clean-design:config',
       JSON.stringify({
         mode: 'daemon',
         apiKey: 'sk-test',
@@ -73,7 +73,7 @@ describe('useCritiqueTheaterEnabled (Phase 15.3)', () => {
       }),
     );
     setCritiqueTheaterEnabled(true);
-    const stored = JSON.parse(window.localStorage.getItem('open-design:config') ?? '{}');
+    const stored = JSON.parse(window.localStorage.getItem('clean-design:config') ?? '{}');
     expect(stored.critiqueTheaterEnabled).toBe(true);
     // Other fields stay intact: the toggle handshake does not stomp
     // user config.
@@ -82,7 +82,7 @@ describe('useCritiqueTheaterEnabled (Phase 15.3)', () => {
   });
 
   it('tolerates corrupted JSON in the stored config (returns false, does not throw)', () => {
-    window.localStorage.setItem('open-design:config', 'not json');
+    window.localStorage.setItem('clean-design:config', 'not json');
     const sink: { enabled?: boolean } = {};
     render(<Probe sink={sink} />);
     expect(sink.enabled).toBe(false);
@@ -94,12 +94,12 @@ describe('useCritiqueTheaterEnabled (Phase 15.3)', () => {
     expect(sink.enabled).toBe(false);
     act(() => {
       window.localStorage.setItem(
-        'open-design:config',
+        'clean-design:config',
         JSON.stringify({ critiqueTheaterEnabled: true }),
       );
       window.dispatchEvent(
         new StorageEvent('storage', {
-          key: 'open-design:config',
+          key: 'clean-design:config',
           newValue: JSON.stringify({ critiqueTheaterEnabled: true }),
         }),
       );
@@ -119,7 +119,7 @@ describe('useCritiqueTheaterEnabled (Phase 15.3)', () => {
     // `JSON.parse('[1,2,3]')` is a valid array, not an object. The hook must
     // not treat that as a config blob; the `critiqueTheaterEnabled` lookup
     // would fall through to `undefined` and the function should return false.
-    window.localStorage.setItem('open-design:config', '[1,2,3]');
+    window.localStorage.setItem('clean-design:config', '[1,2,3]');
     const sink: { enabled?: boolean } = {};
     render(<Probe sink={sink} />);
     expect(sink.enabled).toBe(false);
@@ -129,7 +129,7 @@ describe('useCritiqueTheaterEnabled (Phase 15.3)', () => {
     // `null` is JSON-valid and `typeof null === 'object'` in JS, so the
     // guard has to check for null explicitly. If it did not, `null.critique...`
     // would throw on read.
-    window.localStorage.setItem('open-design:config', 'null');
+    window.localStorage.setItem('clean-design:config', 'null');
     const sink: { enabled?: boolean } = {};
     render(<Probe sink={sink} />);
     expect(sink.enabled).toBe(false);
@@ -169,7 +169,7 @@ describe('useCritiqueTheaterEnabled (Phase 15.3)', () => {
     // localStorage path so cross-tab semantics still work for a stale
     // emitter. Siri-Ray + lefarcen P2 on PR #1320.
     window.localStorage.setItem(
-      'open-design:config',
+      'clean-design:config',
       JSON.stringify({ critiqueTheaterEnabled: true }),
     );
     const sink: { enabled?: boolean } = {};
@@ -177,7 +177,7 @@ describe('useCritiqueTheaterEnabled (Phase 15.3)', () => {
     expect(sink.enabled).toBe(true);
     act(() => {
       window.dispatchEvent(
-        new CustomEvent('open-design:critique-theater-toggle', {
+        new CustomEvent('clean-design:critique-theater-toggle', {
           // No detail at all.
         }),
       );
@@ -187,11 +187,11 @@ describe('useCritiqueTheaterEnabled (Phase 15.3)', () => {
     expect(sink.enabled).toBe(true);
     act(() => {
       window.localStorage.setItem(
-        'open-design:config',
+        'clean-design:config',
         JSON.stringify({ critiqueTheaterEnabled: false }),
       );
       window.dispatchEvent(
-        new CustomEvent('open-design:critique-theater-toggle', {
+        new CustomEvent('clean-design:critique-theater-toggle', {
           // Detail with wrong shape: not a boolean.
           detail: { enabled: 'maybe' },
         }),

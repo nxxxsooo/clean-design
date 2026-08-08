@@ -80,16 +80,7 @@ type ManagedSidecarChild = {
 type PackagedDaemonManagedPathEnv = {
   OD_DATA_DIR: string;
   OD_RESOURCE_ROOT: string;
-  /**
-   * Channel-root path. Lives one level above the namespaces directory so
-   * the daemon can persist installationId (and any future fields that
-   * must outlive a namespace-scoped data-dir reset) outside the
-   * `<namespace>/data/` subtree.
-   *
-   * Required so PostHog person identity survives a reinstall of the same
-   * channel even when the baked namespace token changes or per-namespace
-   * data is cleared. See `apps/daemon/src/installation.ts`.
-   */
+  /** Channel-root path used by launcher runtime metadata. */
   OD_INSTALLATION_DIR: string;
 };
 
@@ -558,7 +549,6 @@ export async function startPackagedSidecars(
   await mkdir(paths.logsRoot, { recursive: true });
   await mkdir(paths.desktopLogsRoot, { recursive: true });
   await mkdir(paths.runtimeRoot, { recursive: true });
-  await mkdir(paths.updateRoot, { recursive: true });
   await mkdir(paths.electronUserDataRoot, { recursive: true });
   await mkdir(paths.electronSessionDataRoot, { recursive: true });
 

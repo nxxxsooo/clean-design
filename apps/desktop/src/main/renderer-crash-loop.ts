@@ -6,18 +6,14 @@
  * instead of leaving a blank window. But when a renderer crashes
  * *deterministically* — a GPU/V8 CHECK failure, a wedged extension, a corrupt
  * profile that aborts on every load — that same reload turns into an infinite
- * loop: load → crash → reload → crash. A single 0.14.0 device did exactly this
- * and emitted 26,011 `desktop_renderer_crash` events in one day while its
- * window stayed blank; that one machine was 96% of all renderer crashes on the
- * release.
+ * loop: load → crash → reload → crash.
  *
  * This breaker bounds the loop. Every crash is recorded with its timestamp;
  * once `limit` crashes fall inside a rolling `windowMs`, the breaker "opens".
  * While open the caller must stop auto-reloading (show a recoverable error
- * screen instead) and suppress the per-crash telemetry so one wedged device
- * cannot flood analytics. After `cooldownMs` with no further crashes the
- * breaker re-arms on its own, so a transient fault still self-heals without a
- * user reinstall.
+ * screen instead). After `cooldownMs` with no further crashes the breaker
+ * re-arms on its own, so a transient fault still self-heals without a user
+ * reinstall.
  *
  * The class is deliberately pure — it takes `now` as a parameter and touches no
  * Electron API — so the loop policy can be unit-tested without a BrowserWindow.
@@ -39,12 +35,6 @@ export interface RendererCrashLoopBreakerOptions {
 export interface RendererCrashOutcome {
   /** True once the breaker is open — the caller must not auto-reload. */
   readonly tripped: boolean;
-  /**
-   * True when this crash happened while the breaker was *already* open. The
-   * caller reports the crash that trips the breaker (so the loop is visible in
-   * analytics) but suppresses every crash after it.
-   */
-  readonly suppressTelemetry: boolean;
   /** True only for the single crash that transitioned the breaker open. */
   readonly justOpened: boolean;
 }
@@ -65,8 +55,7 @@ export class RendererCrashLoopBreaker {
 
   /**
    * Record a renderer crash at `now` (ms). Returns whether the breaker is now
-   * open, whether this crash's telemetry should be suppressed, and whether this
-   * crash is the one that just opened the breaker.
+   * open and whether this crash is the one that just opened the breaker.
    */
   recordCrash(now: number): RendererCrashOutcome {
     const wasOpen = this.open;
@@ -77,7 +66,6 @@ export class RendererCrashLoopBreaker {
     if (this.crashTimes.length >= this.limit) this.open = true;
     return {
       tripped: this.open,
-      suppressTelemetry: wasOpen,
       justOpened: this.open && !wasOpen,
     };
   }

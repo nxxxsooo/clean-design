@@ -333,12 +333,10 @@ describe('buildPackagedDaemonSpawnEnv', () => {
       electronUserDataRoot: '/tmp/od-pkg/user-data',
       headlessIdentityPath: '/tmp/od-pkg/runtime/headless-root.json',
       installationRoot: '/tmp/od-pkg/..',
-      installerObservationRoot: '/tmp/od-pkg/data/observations/installer',
       logsRoot: '/tmp/od-pkg/logs',
       namespaceRoot: '/tmp/od-pkg',
       resourceRoot: '/tmp/od-pkg/resources',
       runtimeRoot: '/tmp/od-pkg/runtime',
-      updateRoot: '/tmp/od-pkg/updates',
       webIdentityPath: '/tmp/od-pkg/runtime/web-root.json',
     };
   }

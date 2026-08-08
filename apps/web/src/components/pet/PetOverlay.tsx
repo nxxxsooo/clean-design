@@ -16,7 +16,7 @@ interface Props {
   persistentBubble?: boolean;
 }
 
-const STORAGE_KEY = 'open-design:pet-position';
+const STORAGE_KEY = 'clean-design:pet-position';
 
 export interface PetTaskSummary {
   projectId: string;

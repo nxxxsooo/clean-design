@@ -5,21 +5,11 @@ import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 
 import { appendMessageStatusEvent } from '../db.js';
-import { classifyRunFailure } from '../run-failure-classification.js';
-import { deriveRunErrorCode, runResultFromStatus } from '../run-result.js';
-import { runAskedUserQuestion } from './run-artifacts.js';
 
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'canceled']);
 const RESTART_ERROR_CODE = 'DAEMON_RESTARTED';
 const RESTART_ERROR_MESSAGE = 'Run interrupted because the daemon restarted.';
 const RECONCILED_STATUS_MESSAGE = 'Run terminal state reconciled after daemon restart.';
-
-interface AnalyticsRecovery {
-  context: Record<string, unknown>;
-  properties: Record<string, unknown>;
-  insertId: string;
-  completedAt?: number;
-}
 
 interface DurableRunState {
   schemaVersion: 1;
@@ -37,7 +27,6 @@ interface DurableRunState {
   errorCode?: string | null;
   artifactCount?: number;
   endedWithUnfinishedWork?: boolean;
-  userPrompt?: string;
   model?: string;
   reasoning?: string;
   skillId?: string;
@@ -45,30 +34,11 @@ interface DurableRunState {
   designSystemDigest?: string;
   designSystemSelectionSource?: string;
   clientType?: 'desktop' | 'web' | 'unknown';
-  analyticsTelemetry?: Record<string, unknown>;
-  promptTelemetry?: Record<string, unknown>;
   promptCache?: Record<string, unknown>;
-  analyticsRecovery?: AnalyticsRecovery;
-  langfuseCompletedAt?: number;
-  terminalRecoveryReason?: 'daemon_restart' | 'analytics_incomplete';
-}
-
-interface AnalyticsLike {
-  capture(args: {
-    eventName: string;
-    context: Record<string, unknown>;
-    appVersion: string;
-    properties: Record<string, unknown>;
-    insertId: string;
-  }): void | Promise<void>;
 }
 
 interface ReconciliationOptions {
-  analytics: AnalyticsLike;
-  appVersion: string;
-  appVersionInfo?: unknown;
   db: Database.Database;
-  reportLangfuse(args: Record<string, unknown>): unknown | Promise<unknown>;
   runsLogDir: string;
 }
 
@@ -76,8 +46,6 @@ export interface RunTerminalReconciliationResult {
   scanned: number;
   interrupted: number;
   messagesReconciled: number;
-  analyticsReplayed: number;
-  langfuseReplayed: number;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -106,55 +74,6 @@ function writeState(filePath: string, state: DurableRunState): void {
   }
 }
 
-function readEvents(runsLogDir: string, runId: string): Array<{
-  id: number;
-  event: string;
-  data: unknown;
-  timestamp?: number;
-}> {
-  try {
-    return fs.readFileSync(path.join(runsLogDir, runId, 'events.jsonl'), 'utf8')
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line) as unknown)
-      .filter((value): value is { id: number; event: string; data: unknown; timestamp?: number } =>
-        isObject(value) && typeof value.id === 'number' && typeof value.event === 'string');
-  } catch {
-    return [];
-  }
-}
-
-function hydrateRun(state: DurableRunState, events: ReturnType<typeof readEvents>) {
-  return {
-    id: state.id,
-    projectId: state.projectId ?? null,
-    conversationId: state.conversationId ?? null,
-    assistantMessageId: state.assistantMessageId ?? null,
-    agentId: state.agentId ?? null,
-    status: state.status,
-    exitCode: state.exitCode ?? null,
-    signal: state.signal ?? null,
-    error: state.error ?? null,
-    errorCode: state.errorCode ?? null,
-    analyticsTelemetry: state.analyticsTelemetry ?? null,
-    createdAt: state.createdAt,
-    updatedAt: state.updatedAt,
-    events,
-    ...(state.userPrompt !== undefined ? { userPrompt: state.userPrompt } : {}),
-    ...(state.model !== undefined ? { model: state.model } : {}),
-    ...(state.reasoning !== undefined ? { reasoning: state.reasoning } : {}),
-    ...(state.skillId !== undefined ? { skillId: state.skillId } : {}),
-    ...(state.designSystemId !== undefined ? { designSystemId: state.designSystemId } : {}),
-    ...(state.designSystemDigest !== undefined ? { designSystemDigest: state.designSystemDigest } : {}),
-    ...(state.designSystemSelectionSource !== undefined
-      ? { designSystemSelectionSource: state.designSystemSelectionSource }
-      : {}),
-    ...(state.clientType !== undefined ? { clientType: state.clientType } : {}),
-    ...(state.promptTelemetry !== undefined ? { promptTelemetry: state.promptTelemetry } : {}),
-    ...(state.promptCache !== undefined ? { promptCache: state.promptCache } : {}),
-  };
-}
-
 function reconcileMessages(
   db: Database.Database,
   statesByRunId: Map<string, DurableRunState>,
@@ -178,8 +97,7 @@ function reconcileMessages(
           SET run_status = ?, ended_at = COALESCE(ended_at, ?)
         WHERE id = ? AND run_status IN ('queued', 'running')`,
     ).run(status, state?.updatedAt ?? now, row.id);
-    const isDaemonRestart = state?.terminalRecoveryReason === 'daemon_restart'
-      || state?.errorCode === RESTART_ERROR_CODE;
+    const isDaemonRestart = state?.errorCode === RESTART_ERROR_CODE;
     appendMessageStatusEvent(db, row.id, status === 'failed'
       ? {
           label: 'error',
@@ -199,8 +117,6 @@ export async function reconcileDurableRunTerminals(
     scanned: 0,
     interrupted: 0,
     messagesReconciled: 0,
-    analyticsReplayed: 0,
-    langfuseReplayed: 0,
   };
   let entries: fs.Dirent[] = [];
   try {
@@ -227,95 +143,12 @@ export async function reconcileDurableRunTerminals(
     entry.state.signal = null;
     entry.state.error = RESTART_ERROR_MESSAGE;
     entry.state.errorCode = RESTART_ERROR_CODE;
-    entry.state.terminalRecoveryReason = 'daemon_restart';
     writeState(entry.filePath, entry.state);
     result.interrupted += 1;
   }
 
   const statesByRunId = new Map(states.map((entry) => [entry.state.id, entry.state]));
   result.messagesReconciled = reconcileMessages(options.db, statesByRunId, now);
-
-  for (const entry of states) {
-    const { state } = entry;
-    const needsAnalytics = Boolean(
-      state.analyticsRecovery && !state.analyticsRecovery.completedAt,
-    );
-    const needsLangfuse = !state.langfuseCompletedAt;
-    if (!needsAnalytics && !needsLangfuse) continue;
-
-    const recoveryReason = state.terminalRecoveryReason ?? 'analytics_incomplete';
-    const events = readEvents(options.runsLogDir, state.id);
-    if (needsAnalytics && state.analyticsRecovery) {
-      const failed = state.status === 'failed';
-      const runResult = runResultFromStatus(state.status);
-      const errorCode = failed
-        ? recoveryReason === 'daemon_restart'
-          ? state.errorCode ?? RESTART_ERROR_CODE
-          : deriveRunErrorCode(state)
-        : undefined;
-      const failure = failed
-        ? recoveryReason === 'daemon_restart'
-          ? {
-              failure_category: 'process_exit' as const,
-              failure_detail: 'interrupted' as const,
-              failure_stage: 'finalize' as const,
-              retryable: true,
-              user_action: 'retry' as const,
-            }
-          : classifyRunFailure({
-              result: runResult,
-              status: state,
-              ...(errorCode ? { errorCode } : {}),
-              agentId: state.agentId,
-              events,
-            })
-        : undefined;
-      await Promise.resolve(options.analytics.capture({
-        eventName: 'run_finished',
-        context: state.analyticsRecovery.context,
-        appVersion: options.appVersion,
-        properties: {
-          ...state.analyticsRecovery.properties,
-          area: state.analyticsRecovery.properties.area === 'design_system_generation'
-            ? 'design_system_generation'
-            : 'chat_panel',
-          result: runResult,
-          artifact_count: state.artifactCount ?? 0,
-          asked_user_question: runAskedUserQuestion(events),
-          total_duration_ms: Math.max(0, state.updatedAt - state.createdAt),
-          langfuse_trace_id: state.id,
-          terminal_reconciled: true,
-          terminal_recovery_reason: recoveryReason,
-          ...(errorCode ? { error_code: errorCode } : {}),
-          ...(failure ?? {}),
-        },
-        insertId: `${state.analyticsRecovery.insertId}-finish`,
-      }));
-      state.analyticsRecovery.completedAt = Date.now();
-      writeState(entry.filePath, state);
-      result.analyticsReplayed += 1;
-    }
-
-    if (needsLangfuse) {
-      const delivery = await Promise.resolve(options.reportLangfuse({
-        db: options.db,
-        dataDir: path.dirname(options.runsLogDir),
-        run: hydrateRun(state, events),
-        persistedRunStatus: state.status,
-        persistedEndedAt: state.updatedAt,
-        appVersion: options.appVersionInfo ?? null,
-      }));
-      if (
-        isObject(delivery)
-        && (delivery.langfuse_expected === false
-          || delivery.langfuse_delivery_status === 'accepted')
-      ) {
-        state.langfuseCompletedAt = Date.now();
-        writeState(entry.filePath, state);
-      }
-      result.langfuseReplayed += 1;
-    }
-  }
 
   return result;
 }

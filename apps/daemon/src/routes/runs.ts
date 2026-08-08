@@ -13,17 +13,7 @@ import {
   type ProjectMetadata as ContractProjectMetadata,
   type RunResultPackageResponse,
 } from '@open-design/contracts';
-import {
-  deriveConfigureGlobals,
-  modelIdForTracking,
-  sessionModeToTracking,
-  type TrackingDesignSystemSource,
-  type TrackingDesignSystemKind,
-  type TrackingDesignSystemEditSurface,
-} from '@open-design/contracts/analytics';
 import type { OdNativeEvent } from '@open-design/agui-adapter';
-import { newInsertId, readAnalyticsContext } from '../analytics.js';
-import type { AnalyticsContext } from '../analytics.js';
 import { spawnEnvForAgent } from '../agents.js';
 import { agentCliEnvForAgent, readAppConfig } from '../app-config.js';
 import {
@@ -55,25 +45,10 @@ import {
   resolveProjectDir,
   SandboxImportedProjectError,
 } from '../projects.js';
-import {
-  agentProviderIdForRunAnalytics,
-  hasExplicitRequestedModelForAnalytics,
-  runtimeTypeForRunAnalytics,
-  scanRunEventsForUsageAnalytics,
-  summarizeRunTimingAnalytics,
-  type RunEventForAnalyticsObservability,
-  type RunTelemetryTimestamps,
-} from '../run-analytics-observability.js';
-import {
-  diffRunArtifacts,
-  snapshotProjectArtifacts,
-  type RunArtifactBaseline,
-} from '../run-artifact-fs.js';
 import type { RunEventForDiagnostics } from '../run-diagnostics.js';
-import { summarizeRunDiagnosticsForAnalytics } from '../run-diagnostics.js';
 import type { RunEventForFailureClassification } from '../run-failure-classification.js';
 import { classifyRunFailure } from '../run-failure-classification.js';
-import { deriveRunErrorCode, runResultFromStatus } from '../run-result.js';
+import { runResultFromStatus } from '../run-result.js';
 import type { RunStatusForAnalytics } from '../run-result.js';
 import {
   parseRunToolBundleForRequest,
@@ -85,15 +60,6 @@ import {
   BYOK_OPENCODE_AGENT_ID,
   BYOK_OPENCODE_PROVIDER_REQUIRED_MESSAGE,
 } from '../runtimes/byok-opencode.js';
-import {
-  deriveActivationMilestones,
-  runAskedUserQuestion,
-} from '../runtimes/run-artifacts.js';
-import {
-  runArtifactCountForRun,
-  runDesignSystemCreatedForRun,
-  runPreviewModuleCountForRun,
-} from '../runtimes/run-lifecycle-analytics.js';
 
 type SqliteDb = Database.Database;
 type JsonRecord = Record<string, unknown>;
@@ -117,8 +83,7 @@ interface ConversationRecord {
 }
 
 interface RunEventRecord
-  extends RunEventForAnalyticsObservability,
-    RunEventForDiagnostics,
+  extends RunEventForDiagnostics,
     RunEventForFailureClassification {
   id: number;
   event: string;
@@ -155,8 +120,6 @@ interface ChatRun {
   context?: Record<string, unknown> | null;
   events: RunEventRecord[];
   clients: Set<SseClient>;
-  analyticsContext?: AnalyticsContext;
-  analyticsTelemetry?: RunTelemetryTimestamps;
   // E-lite root-cause telemetry read at run_finished. `stdinBackpressure`: the
   // prompt write to child stdin was queued (pipe buffer full). `lastAgentActivityAt`:
   // the inactivity-watchdog clock, used to derive `last_progress_age_ms`.
@@ -234,28 +197,10 @@ interface ChatRunService {
   cancel(run: ChatRun): Promise<ChatRunStatusResponse>;
   isTerminal(status: ChatRunStatus): boolean;
   emit?(run: ChatRun, event: string, data: unknown): RunEventRecord;
-  setAnalyticsRecovery?(run: ChatRun, recovery: {
-    context: AnalyticsContext;
-    properties: Record<string, unknown>;
-    insertId: string;
-  }): void;
-  markAnalyticsCompleted?(run: ChatRun): void;
-}
-
-interface AnalyticsService {
-  capture(input: {
-    eventName: string;
-    context: AnalyticsContext;
-    appVersion: string;
-    properties: Record<string, unknown>;
-    insertId: string;
-  }): void | Promise<void>;
 }
 
 interface RunRoutesDesignService {
   runs: ChatRunService;
-  analytics: AnalyticsService;
-  getAppVersion(): string;
 }
 
 interface ProjectFileEntry {

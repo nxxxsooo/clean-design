@@ -22,13 +22,9 @@ function createPackagedConfig(
   entrypoints: PackagedConfigEntrypoints = {},
 ): Record<string, unknown> {
   return {
-    ...(config.amrProfile == null ? {} : { amrProfile: config.amrProfile }),
     appVersion: packagedVersion,
     ...entrypoints,
     namespace: config.namespace,
-    ...(config.telemetryRelayUrl == null ? {} : { telemetryRelayUrl: config.telemetryRelayUrl }),
-    ...(config.posthogKey == null ? {} : { posthogKey: config.posthogKey }),
-    ...(config.posthogHost == null ? {} : { posthogHost: config.posthogHost }),
     webOutputMode: config.webOutputMode,
     ...(config.portable ? {} : { namespaceBaseRoot: config.roots.runtime.namespaceBaseRoot }),
   };

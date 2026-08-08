@@ -4,7 +4,7 @@
 //   1. A successful submit → poll → download cycle (t2v)
 //   2. A failed job (status=failed / expired)
 //   3. Model ID prefix stripping (openrouter/ → bare slug)
-//   4. Attribution headers (HTTP-Referer, X-Title) on every request
+//   4. No product attribution headers on provider requests
 //   5. Progress callback invocation
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -157,7 +157,7 @@ describe('openrouter video generation', () => {
     expect(submitBody.model).not.toContain('openrouter/');
   });
 
-  it('sends OpenRouter attribution headers on submit and poll requests', async () => {
+  it('does not send product attribution headers on submit or poll requests', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(jsonResp({
         id: 'job-hdr',
@@ -176,14 +176,14 @@ describe('openrouter video generation', () => {
 
     // Submit headers
     const submitHeaders = fetchMock.mock.calls[0]![1].headers;
-    expect(submitHeaders['HTTP-Referer']).toBe('https://opendesign.dev');
-    expect(submitHeaders['X-Title']).toBe('Open Design');
+    expect(submitHeaders['HTTP-Referer']).toBeUndefined();
+    expect(submitHeaders['X-Title']).toBeUndefined();
     expect(submitHeaders.authorization).toBe('Bearer sk-or-test-key-1234');
 
     // Poll headers
     const pollHeaders = fetchMock.mock.calls[1]![1].headers;
-    expect(pollHeaders['HTTP-Referer']).toBe('https://opendesign.dev');
-    expect(pollHeaders['X-Title']).toBe('Open Design');
+    expect(pollHeaders['HTTP-Referer']).toBeUndefined();
+    expect(pollHeaders['X-Title']).toBeUndefined();
   });
 
   it('throws on a failed job with error details', async () => {
@@ -621,7 +621,7 @@ describe('openrouter image generation', () => {
     expect(body.model).not.toContain('openrouter/');
   });
 
-  it('sends OpenRouter attribution headers', async () => {
+  it('does not send product attribution headers', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       chatResp([{ type: 'image_url', image_url: { url: PNG_DATA_URL } }]),
     );
@@ -630,8 +630,8 @@ describe('openrouter image generation', () => {
     await generateMedia(imageArgs());
 
     const headers = fetchMock.mock.calls[0]![1].headers;
-    expect(headers['HTTP-Referer']).toBe('https://opendesign.dev');
-    expect(headers['X-Title']).toBe('Open Design');
+    expect(headers['HTTP-Referer']).toBeUndefined();
+    expect(headers['X-Title']).toBeUndefined();
     expect(headers.authorization).toBe('Bearer sk-or-img-test-key');
   });
 

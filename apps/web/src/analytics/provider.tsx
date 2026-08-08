@@ -76,11 +76,13 @@ function localAnalyticsValue(): AnalyticsContextValue {
   };
 }
 
+const LOCAL_ANALYTICS_VALUE = localAnalyticsValue();
+
 export function AnalyticsProvider({ children }: { children: ReactNode }) {
-  const value = useMemo(localAnalyticsValue, []);
+  const value = useMemo(() => LOCAL_ANALYTICS_VALUE, []);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 export function useAnalytics(): AnalyticsContextValue {
-  return useContext(Ctx) ?? localAnalyticsValue();
+  return useContext(Ctx) ?? LOCAL_ANALYTICS_VALUE;
 }

@@ -39,7 +39,7 @@ export interface OnboardingEntry {
   seedPrompt?: string;
 }
 
-const KEY_PREFIX = 'open-design:onboarding-entry:';
+const KEY_PREFIX = 'clean-design:onboarding-entry:';
 
 function keyForProject(projectId: string): string {
   return `${KEY_PREFIX}${projectId}`;

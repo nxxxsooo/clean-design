@@ -270,8 +270,8 @@ const EMPTY_PROMPT_TEMPLATES: PromptTemplateSummary[] = [];
 // template, skill, staged files, working directory) are intentionally NOT
 // persisted here — they reference live catalogue records / File handles / a
 // desktop auth token that cannot round-trip through JSON safely.
-const HOME_COMPOSER_PROMPT_KEY = 'open-design:home-composer:prompt';
-const HOME_COMPOSER_DESIGN_SYSTEM_KEY = 'open-design:home-composer:design-system';
+const HOME_COMPOSER_PROMPT_KEY = 'clean-design:home-composer:prompt';
+const HOME_COMPOSER_DESIGN_SYSTEM_KEY = 'clean-design:home-composer:design-system';
 
 function readHomeComposerDraft(key: string): string | null {
   if (typeof window === 'undefined') return null;
@@ -534,10 +534,10 @@ export function HomeView({
     };
     load();
     const onChanged = () => load(true);
-    window.addEventListener('open-design:plugins-changed', onChanged);
+    window.addEventListener('clean-design:plugins-changed', onChanged);
     return () => {
       cancelled = true;
-      window.removeEventListener('open-design:plugins-changed', onChanged);
+      window.removeEventListener('clean-design:plugins-changed', onChanged);
     };
   }, []);
 

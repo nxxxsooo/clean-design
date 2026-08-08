@@ -7,14 +7,6 @@ import { Icon } from './Icon';
 
 interface Props {
   projectId: string;
-  projectName?: string;
-  projectDir?: string | null;
-  agents?: unknown[];
-  artifactId?: string;
-  artifactKind?: string;
-  metricsConsent?: boolean;
-  installationId?: string | null;
-  onRequestRevealInFinder?: () => void;
 }
 
 type ExportState =

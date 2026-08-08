@@ -27,7 +27,6 @@ import type {
   AgentInfo,
   AppVersionInfo,
   AppVersionResponse,
-  WhatsNewResponse,
   ChatAttachment,
   CodexPetSummary,
   CodexPetsResponse,
@@ -1230,24 +1229,6 @@ export async function fetchAppVersionInfo(): Promise<AppVersionInfo | null> {
     if (!resp.ok) return null;
     const json = (await resp.json()) as Partial<AppVersionResponse>;
     return isAppVersionInfo(json.version) ? json.version : null;
-  } catch {
-    return null;
-  }
-}
-
-export async function fetchWhatsNew(): Promise<WhatsNewResponse | null> {
-  try {
-    const resp = await fetch('/api/whats-new');
-    if (!resp.ok) return null;
-    const json = (await resp.json()) as Partial<WhatsNewResponse>;
-    if (typeof json.version !== 'string') {
-      return null;
-    }
-    return {
-      version: json.version,
-      id: typeof json.id === 'string' ? json.id : null,
-      content: json.content ?? null,
-    };
   } catch {
     return null;
   }

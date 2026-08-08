@@ -168,8 +168,8 @@ export function PluginsView({
 
   useEffect(() => {
     void refresh();
-    window.addEventListener('open-design:plugins-changed', refresh);
-    return () => window.removeEventListener('open-design:plugins-changed', refresh);
+    window.addEventListener('clean-design:plugins-changed', refresh);
+    return () => window.removeEventListener('clean-design:plugins-changed', refresh);
   }, []);
 
   const userPlugins = useMemo(

@@ -60,8 +60,8 @@ interface Props {
   onboardingCompleted?: boolean;
 }
 
-const STORAGE_KEY = 'open-design:workspace-tabs:v1';
-const OPEN_WORKSPACE_TAB_EVENT = 'open-design:workspace-tabs:open';
+const STORAGE_KEY = 'clean-design:workspace-tabs:v1';
+const OPEN_WORKSPACE_TAB_EVENT = 'clean-design:workspace-tabs:open';
 const MAX_SEARCH_RESULTS = 80;
 const TAB_DRAG_HAPTIC_MS = 8;
 const TAB_DROP_HAPTIC_MS = 12;

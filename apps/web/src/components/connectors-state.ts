@@ -14,11 +14,9 @@ export function connectorAuthSnapshotChanged(
 ): boolean {
   if (current == null && next == null) return false;
   if (current == null || next == null) return true;
-  return (
-    next.status !== current.status ||
-    next.accountLabel !== current.accountLabel ||
-    next.lastError !== current.lastError
-  );
+  return next.status !== current.status
+    || next.accountLabel !== current.accountLabel
+    || next.lastError !== current.lastError;
 }
 
 export function hasConnectorStatusChanges(

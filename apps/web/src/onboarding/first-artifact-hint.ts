@@ -12,7 +12,7 @@
 // only owns the "seen" bit. Storage-denied contexts degrade to "not seen"
 // (the hint may show once and then silently fail to persist — acceptable).
 
-const STORAGE_KEY = 'open-design:seen-first-artifact-hint';
+const STORAGE_KEY = 'clean-design:seen-first-artifact-hint';
 
 export function hasSeenFirstArtifactHint(): boolean {
   try {

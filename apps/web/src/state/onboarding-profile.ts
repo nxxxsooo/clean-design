@@ -11,7 +11,7 @@
 // Values are kept as open strings (mirroring onboarding's own open-string
 // options), trimmed and length/count-capped defensively.
 
-const STORAGE_KEY = 'open-design:onboarding-profile:v1';
+const STORAGE_KEY = 'clean-design:onboarding-profile:v1';
 const MAX_VALUE_LENGTH = 64;
 const MAX_USE_CASES = 20;
 

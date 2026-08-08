@@ -39,7 +39,6 @@ import {
   switchApiProtocolConfig,
   updateCurrentApiProtocolConfig,
   type SettingsSection,
-  type SettingsHighlight,
 } from './components/SettingsDialog';
 import {
   daemonIsLive,
@@ -126,7 +125,7 @@ type AppCreateProjectInput = Omit<CreateInput, 'metadata'> & {
   linkedDirs?: string[] | null;
 };
 
-const APP_CONFIG_CHANGED_EVENT = 'open-design:app-config-changed';
+const APP_CONFIG_CHANGED_EVENT = 'clean-design:app-config-changed';
 const AGENT_FOCUS_REFRESH_THROTTLE_MS = 10_000;
 
 export function shouldSyncMediaProvidersOnSave(
@@ -181,18 +180,9 @@ export async function persistComposioConfigChange(
 }
 
 export function buildPersistedConfig(next: AppConfig, current: AppConfig): AppConfig {
-  const stalePrivacySnapshot =
-    current.privacyDecisionAt != null && next.privacyDecisionAt == null;
   return {
     ...next,
     onboardingCompleted: current.onboardingCompleted ? true : next.onboardingCompleted,
-    ...(stalePrivacySnapshot
-      ? {
-          installationId: current.installationId,
-          privacyDecisionAt: current.privacyDecisionAt,
-          telemetry: current.telemetry,
-        }
-      : {}),
     composio: next.composio
       ? {
           apiKey: '',
@@ -317,13 +307,7 @@ function AppInner() {
   const iframeKeepAlivePool = useIframeKeepAlivePool();
   const clientType = useMemo(() => detectClientType(), []);
   useModalWindowDragGuard();
-  // Observability marker. `apps/web/src/observability/white-screen.ts`
-  // keys its "app actually mounted" success condition on this attribute
-  // because the dynamic-import loading shell (`<div class="od-loading-shell">
-  // Loading Clean Design…</div>`) is itself >MIN_VISIBLE_TEXT and would
-  // otherwise be mistaken for a real mount. Survives subsequent render
-  // crashes — once App has mounted at least once, it's no longer a white
-  // screen (subsequent failures show up as `$exception`).
+  // Stable shell marker used by UI automation and packaged startup checks.
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.documentElement.setAttribute('data-od-app-mounted', '1');
@@ -345,7 +329,6 @@ function AppInner() {
   const [projectOpenError, setProjectOpenError] = useState<string | null>(null);
   const [settingsWelcome, setSettingsWelcome] = useState(false);
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSection>('execution');
-  const [settingsHighlight, setSettingsHighlight] = useState<SettingsHighlight>(null);
   const [daemonLive, setDaemonLive] = useState(false);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const agentStreamRequestSeqRef = useRef(0);
@@ -1678,17 +1661,13 @@ function AppInner() {
     };
   }, [route, loadedActiveProject, projects, daemonLive, beginProjectListRequest, reconcileFetchedProjects, t]);
 
-  const openSettings = useCallback((
-    section: SettingsSection = 'execution',
-    opts?: { highlight?: SettingsHighlight },
-  ) => {
+  const openSettings = useCallback((section: SettingsSection = 'execution') => {
     const localSection =
       section === 'composio' || section === 'mcpClient' || section === 'integrations'
         ? 'execution'
         : section;
     setSettingsWelcome(false);
     setSettingsInitialSection(localSection);
-    setSettingsHighlight(opts?.highlight ?? null);
     setSettingsOpen(true);
   }, []);
 
@@ -1984,7 +1963,6 @@ function AppInner() {
           appVersionInfo={appVersionInfo}
           welcome={settingsWelcome}
           initialSection={settingsInitialSection}
-          initialHighlight={settingsHighlight}
           onPersist={handleConfigPersist}
           onDraftChange={handleSettingsDraftChange}
           onPersistComposioKey={async () => undefined}
@@ -2003,7 +1981,6 @@ function AppInner() {
             }
             setSettingsOpen(false);
             settingsDraftConfigRef.current = null;
-            setSettingsHighlight(null);
           }}
           onRefreshAgents={refreshAgents}
           daemonMediaProviders={daemonMediaProviders}

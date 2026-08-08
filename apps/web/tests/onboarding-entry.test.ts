@@ -109,7 +109,7 @@ describe('onboarding entry (id-keyed session hand-off)', () => {
     const first = consumeOnboardingEntryForProject(id);
     expect(first).toMatchObject({ recommendationId: 'product_ui_prototype' });
     // The storage slot is gone...
-    expect(window.sessionStorage.getItem(`open-design:onboarding-entry:${id}`)).toBeNull();
+    expect(window.sessionStorage.getItem(`clean-design:onboarding-entry:${id}`)).toBeNull();
     // ...but the committed remount still gets the entry from the cache.
     expect(consumeOnboardingEntryForProject(id)).toEqual(first);
   });
@@ -144,7 +144,7 @@ describe('onboarding entry (id-keyed session hand-off)', () => {
   it('ignores a malformed stored value', () => {
     const id = nextProjectId();
     window.sessionStorage.setItem(
-      `open-design:onboarding-entry:${id}`,
+      `clean-design:onboarding-entry:${id}`,
       '{"source":"nope"}',
     );
     expect(consumeOnboardingEntryForProject(id)).toBeNull();

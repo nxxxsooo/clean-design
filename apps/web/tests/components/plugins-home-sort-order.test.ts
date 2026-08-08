@@ -237,7 +237,7 @@ describe('sort-order persistence', () => {
   });
 
   it('falls back to the default on an unknown stored value', () => {
-    window.localStorage.setItem('open-design:plugins-sort-order', 'bogus');
+    window.localStorage.setItem('clean-design:plugins-sort-order', 'bogus');
     expect(readStoredSortOrder()).toBe('hot');
   });
 });

@@ -1,4 +1,4 @@
-export const VISUAL_STABILITY_STORAGE_KEY = 'open-design:visual-stability';
+export const VISUAL_STABILITY_STORAGE_KEY = 'clean-design:visual-stability';
 
 export function isVisualStabilityMode(): boolean {
   if (typeof window === 'undefined') return false;

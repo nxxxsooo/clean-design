@@ -7,10 +7,6 @@ const AGENT_INSTALL_LINKS: Record<
     installUrl: 'https://ampcode.com/manual#install',
     docsUrl: 'https://ampcode.com/manual',
   },
-  amr: {
-    installUrl: 'https://open-design.ai/amr',
-    docsUrl: 'https://github.com/nexu-io/open-design/blob/main/docs/new-agent-runtime-acp.md',
-  },
   claude: {
     installUrl: 'https://docs.anthropic.com/en/docs/claude-code/setup',
     docsUrl: 'https://docs.anthropic.com/en/docs/claude-code',

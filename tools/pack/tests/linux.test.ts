@@ -140,28 +140,6 @@ describe("buildDockerArgs", () => {
     expect(args).toContain("ELECTRON_BUILDER_CACHE=/home/builder/.cache/electron-builder");
   });
 
-  it("passes the telemetry relay URL into containerized builds when configured", () => {
-    const args = buildDockerArgs(
-      {
-        ...makeConfig(),
-        telemetryRelayUrl: "https://telemetry.open-design.ai/api/langfuse",
-      },
-      { uid: 1000, gid: 1000 },
-    );
-    expect(args).toContain("OPEN_DESIGN_TELEMETRY_RELAY_URL=https://telemetry.open-design.ai/api/langfuse");
-  });
-
-  it("passes the AMR profile into containerized builds when configured", () => {
-    const args = buildDockerArgs(
-      {
-        ...makeConfig(),
-        amrProfile: "test",
-      },
-      { uid: 1000, gid: 1000 },
-    );
-    expect(args).toContain("OPEN_DESIGN_AMR_PROFILE=test");
-  });
-
   it("bind-mounts the host Vela binary directory and rewrites the env path into the container", () => {
     const previous = process.env.OPEN_DESIGN_VELA_CLI_BIN;
     process.env.OPEN_DESIGN_VELA_CLI_BIN = "/host/bin/vela";

@@ -390,7 +390,7 @@ describe('composeSystemPrompt', () => {
     it('prioritizes question forms over native tool calls when clarifying', () => {
       const prompt = composeSystemPrompt({ agentId: 'amr' });
       expect(prompt).toContain('## Clarifying questions mid-conversation');
-      expect(prompt).toContain('`<question-form>` is assistant text for the Open Design UI, not a native tool call');
+      expect(prompt).toContain('`<question-form>` is assistant text for the Clean Design UI, not a native tool call');
       expect(prompt).toContain(
         'emit the complete `<question-form>...</question-form>` block directly in the assistant message before any TodoWrite, file write/edit, Bash, or other native tool call',
       );

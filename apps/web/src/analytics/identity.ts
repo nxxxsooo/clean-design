@@ -7,11 +7,11 @@
 import type { AnalyticsClientType } from '@open-design/contracts/analytics';
 import { detectOpenDesignHostClientType } from '@open-design/host';
 
-const ANONYMOUS_ID_KEY = 'open-design:analytics.anonymous_id';
-const SESSION_ID_KEY = 'open-design:analytics.session_id';
-const RUN_TURN_INDEX_KEY = 'open-design:analytics.run_turn_index';
+const ANONYMOUS_ID_KEY = 'clean-design:analytics.anonymous_id';
+const SESSION_ID_KEY = 'clean-design:analytics.session_id';
+const RUN_TURN_INDEX_KEY = 'clean-design:analytics.run_turn_index';
 // Per-project counter keys are this prefix + the project id (localStorage).
-const PROJECT_TURN_INDEX_KEY_PREFIX = 'open-design:analytics.project_turn_index:';
+const PROJECT_TURN_INDEX_KEY_PREFIX = 'clean-design:analytics.project_turn_index:';
 
 function randomUuid(): string {
   // Prefer the standard crypto.randomUUID — present in every modern browser
@@ -56,7 +56,7 @@ export function getSessionId(): string {
   }
 }
 
-const FIRST_SESSION_ID_KEY = 'open-design:analytics.first_session_id';
+const FIRST_SESSION_ID_KEY = 'clean-design:analytics.first_session_id';
 
 // Whether the current browser session is this install's FIRST analytics
 // session. The first analytics session's `getSessionId()` value is pinned in

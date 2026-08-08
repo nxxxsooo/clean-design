@@ -63,7 +63,7 @@ export interface RunEventForAnalyticsObservability {
   timestamp?: number;
 }
 
-export interface RunTelemetryTimestamps {
+export interface RunLifecycleTimestamps {
   startRequestedAt?: number;
   startChatRunStartedAt?: number;
   promptBuildStartAt?: number;
@@ -575,7 +575,7 @@ export function summarizeRunTimingAnalytics(args: {
   runCreatedAt: number;
   runUpdatedAt: number;
   analyticsCapturedAt: number;
-  telemetry?: RunTelemetryTimestamps | null;
+  telemetry?: RunLifecycleTimestamps | null;
   events: RunEventForAnalyticsObservability[];
 }): RunTimingAnalytics {
   const telemetry = args.telemetry ?? {};

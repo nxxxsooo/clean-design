@@ -29,7 +29,7 @@ export interface PetImageResult {
 
 // Hard cap on the data URL we are willing to stash in localStorage.
 // localStorage typically has a 5 MB budget per origin and we already
-// share that bucket with the rest of `open-design:config`. 800 KB
+// share that bucket with the rest of `clean-design:config`. 800 KB
 // keeps room for a beefy spritesheet without blowing the budget.
 const MAX_DATA_URL_BYTES = 800 * 1024;
 

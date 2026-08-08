@@ -115,7 +115,7 @@ export type QuestionFormSubmitHandler = (
 
 const DISCORD_INVITE_URL = "https://discord.gg/mHAjSMV6gz";
 const viewedInlineQuestionForms = new Set<string>();
-const QUESTION_FORM_DRAFT_STORAGE_PREFIX = "open-design:question-form-draft:";
+const QUESTION_FORM_DRAFT_STORAGE_PREFIX = "clean-design:question-form-draft:";
 
 interface ActionNotice {
   message: string;
@@ -253,7 +253,7 @@ function SkillPluginCandidateCard({
           setNotice({ message: install?.message ?? "Plugin draft created, but install failed." });
         } else {
           if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("open-design:plugins-changed"));
+            window.dispatchEvent(new CustomEvent("clean-design:plugins-changed"));
           }
           setNotice({ message: install?.message ?? "Plugin draft created and added to My plugins." });
         }

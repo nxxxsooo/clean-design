@@ -1,5 +1,5 @@
-export const CONNECTOR_CALLBACK_MESSAGE_TYPE = 'open-design:connector-connected';
-export const CONNECTORS_CHANGED_EVENT = 'open-design:connectors-changed';
+export const CONNECTOR_CALLBACK_MESSAGE_TYPE = 'clean-design:connector-connected';
+export const CONNECTORS_CHANGED_EVENT = 'clean-design:connectors-changed';
 
 export function notifyConnectorsChanged(): void {
   if (typeof window === 'undefined') return;
@@ -11,7 +11,7 @@ export function notifyConnectorsChanged(): void {
 }
 
 export function listenForConnectorsChanged(listener: () => void): () => void {
-  if (typeof window === 'undefined') return () => {};
+  if (typeof window === 'undefined') return () => undefined;
   let scheduled = false;
   let active = true;
   const scheduleListener = () => {
@@ -19,8 +19,7 @@ export function listenForConnectorsChanged(listener: () => void): () => void {
     scheduled = true;
     queueMicrotask(() => {
       scheduled = false;
-      if (!active) return;
-      listener();
+      if (active) listener();
     });
   };
   window.addEventListener(CONNECTORS_CHANGED_EVENT, scheduleListener);

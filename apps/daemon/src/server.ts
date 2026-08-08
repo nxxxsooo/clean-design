@@ -382,13 +382,11 @@ import {
   snapshotAiHtmlVersionsForRun,
 } from './run-html-version-snapshots.js';
 import { reconcileDurableRunTerminals } from './runtimes/run-terminal-reconciliation.js';
-import { buildPromptStackTelemetry } from './prompt-telemetry.js';
 import {
   agentIdToTracking,
   modelIdForTracking,
 } from '@open-design/contracts/analytics';
 
-const reportRunCompletedFromDaemon = async (..._args: any[]): Promise<unknown> => undefined;
 import {
   mergeNoProxyWithLoopbackDefaults,
   redactSecrets,
@@ -474,7 +472,6 @@ import {
   deleteProject as dbDeleteProject,
   deleteTemplate,
   getConversation,
-  getMessageTelemetryFinalizationState,
   getProject,
   getTemplate,
   insertConversation,
@@ -1028,7 +1025,6 @@ export function composeProjectDisplayStatus(
 }
 
 const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'canceled']);
-const LANGFUSE_TERMINAL_FALLBACK_DELAY_MS = 15_000;
 
 // Fold per-run work-completeness signals off the agent event stream (#1247 /
 // #1060). Invoked for EVERY agent event via the single emitAgentEvent choke
@@ -1113,20 +1109,6 @@ export function __forTestFilesystemEmptyAnswerFallbackText(fileNames) {
   return filesystemEmptyAnswerFallbackText(fileNames);
 }
 
-
-export function shouldReportRunCompletedFromMessage(saved, body = {}) {
-  return Boolean(
-    saved &&
-      saved.runId &&
-      typeof saved.runStatus === 'string' &&
-      TERMINAL_RUN_STATUSES.has(saved.runStatus) &&
-      body?.telemetryFinalized === true,
-  );
-}
-
-export function telemetryPromptFromRunRequest(message, currentPrompt) {
-  return typeof currentPrompt === 'string' ? currentPrompt : message;
-}
 
 const FORM_ANSWERS_HEADER_RE = /^\s*\[form answers\s+(?:\u2014|-)\s*([^\]\r\n]+)\]/i;
 
@@ -1238,164 +1220,6 @@ export function composeChatUserRequestForAgent(
     '## Full conversation transcript',
     body,
   ].join('\n\n');
-}
-
-export function createFinalizedMessageTelemetryReporter({
-  design,
-  db,
-  dataDir,
-  reportedRuns,
-  getAppVersion = () => null,
-  report = reportRunCompletedFromDaemon,
-}: {
-  design: any;
-  db: unknown;
-  dataDir: string;
-  reportedRuns: Set<string>;
-  getAppVersion?: () => any;
-  report?: typeof reportRunCompletedFromDaemon;
-}) {
-  const appVersionForCapture = () => {
-    const appVersion = getAppVersion();
-    if (typeof appVersion === 'string') return appVersion;
-    if (appVersion && typeof appVersion.version === 'string') return appVersion.version;
-    if (typeof design?.getAppVersion === 'function') return design.getAppVersion();
-    return 'unknown';
-  };
-  const captureResult = ({
-    analyticsContext,
-    conversationId,
-    delivery,
-    durationMs,
-    projectId,
-    reportResult,
-    reportTrigger = 'final_message',
-    run,
-    runId,
-    skipReason,
-    status,
-  }) => {
-    const context = analyticsContext ?? run?.analyticsContext ?? null;
-    if (!context || !design?.analytics?.capture || !runId || !delivery) return;
-    const terminalResult = status ? runResultFromStatus(status) : undefined;
-    design.analytics.capture({
-      eventName: 'langfuse_report_result',
-      context,
-      appVersion: appVersionForCapture(),
-      properties: {
-        page_name: 'chat_panel',
-        area: 'chat_panel',
-        project_id: run?.projectId ?? projectId ?? null,
-        conversation_id: run?.conversationId ?? conversationId ?? null,
-        run_id: runId,
-        langfuse_trace_id: runId,
-        langfuse_expected: delivery.langfuse_expected,
-        langfuse_delivery_status: delivery.langfuse_delivery_status,
-        ...(delivery.langfuse_drop_reason
-          ? { langfuse_drop_reason: delivery.langfuse_drop_reason }
-          : {}),
-        langfuse_report_result: reportResult,
-        langfuse_report_trigger: reportTrigger,
-        ...(skipReason ? { langfuse_report_skip_reason: skipReason } : {}),
-        ...(durationMs !== undefined ? { report_duration_ms: durationMs } : {}),
-        ...(terminalResult ? { result: terminalResult } : {}),
-        ...(run?.errorCode ? { error_code: run.errorCode } : {}),
-        ...(run?.agentId ? { agent_provider_id: agentIdToTracking(run.agentId) } : {}),
-        ...(run?.model !== undefined ? { model_id: modelIdForTracking(run.model) } : {}),
-      },
-      insertId: `${runId}-langfuse-report-${reportTrigger}-${reportResult}${skipReason ? `-${skipReason}` : ''}`,
-    });
-  };
-  return (saved, body = {}, options = {}) => {
-    if (!shouldReportRunCompletedFromMessage(saved, body)) return;
-    const runId = saved.runId;
-    const run = design.runs.get(runId);
-    if (!run) {
-      captureResult({
-        analyticsContext: options.analyticsContext,
-        conversationId: options.conversationId ?? saved.conversationId,
-        delivery: {
-          langfuse_expected: true,
-          langfuse_delivery_status: 'failed',
-          langfuse_drop_reason: 'network_error',
-        },
-        projectId: options.projectId,
-        reportTrigger: options.reportTrigger,
-        reportResult: 'skipped',
-        runId,
-        skipReason: 'run_not_found',
-        status: saved.runStatus,
-      });
-      return;
-    }
-    const reportTrigger = options.reportTrigger ?? 'final_message';
-    if (reportedRuns.has(run.id)) {
-      captureResult({
-        analyticsContext: options.analyticsContext,
-        conversationId: options.conversationId ?? saved.conversationId,
-        delivery: {
-          langfuse_expected: true,
-          langfuse_delivery_status: 'failed',
-          langfuse_drop_reason: 'network_error',
-        },
-        projectId: options.projectId,
-        reportTrigger: options.reportTrigger,
-        reportResult: 'skipped',
-        run,
-        runId: run.id,
-        skipReason: 'duplicate_run',
-        status: saved.runStatus,
-      });
-      return;
-    }
-    if (reportTrigger !== 'terminal_fallback') {
-      reportedRuns.add(run.id);
-    }
-    void (async () => {
-      const start = Date.now();
-      const delivery = await report({
-        db,
-        dataDir,
-        run,
-        persistedRunStatus: saved.runStatus,
-        persistedEndedAt: saved.endedAt,
-        appVersion: getAppVersion(),
-      });
-      const state = delivery ?? {
-        langfuse_expected: true,
-        langfuse_delivery_status: 'accepted',
-      };
-      captureResult({
-        analyticsContext: options.analyticsContext,
-        conversationId: options.conversationId ?? saved.conversationId,
-        delivery: state,
-        durationMs: Date.now() - start,
-        projectId: options.projectId,
-        reportTrigger,
-        reportResult: state.langfuse_expected === false
-          ? 'skipped'
-          : state.langfuse_delivery_status === 'accepted'
-            ? 'accepted'
-            : state.langfuse_delivery_status === 'failed'
-              ? 'failed'
-              : 'skipped',
-        run,
-        runId: run.id,
-        skipReason: state.langfuse_expected === false ? 'not_expected' : undefined,
-        status: saved.runStatus,
-      });
-      if (
-        state.langfuse_expected === false
-        || state.langfuse_delivery_status === 'accepted'
-      ) {
-        design.runs.markLangfuseCompleted?.(run);
-      }
-    })();
-  };
-}
-
-export function shouldReportRunCompletionTelemetryFallbackStatus(status: unknown): boolean {
-  return status === 'failed' || status === 'canceled';
 }
 
 const PROJECT_PREVIEW_SCOPE_TTL_MS = 60 * 60 * 1000;
@@ -2217,17 +2041,6 @@ export async function startServer({
   // follow-up — see reconcile decision log.
   // (legacy POST /api/projects body deleted — see registerProjectRoutes below.)
 
-  const analyticsService = {
-    capture: async () => undefined,
-    captureSafety: async () => undefined,
-    mergeAnonymousPerson: async () => undefined,
-    shutdown: async () => undefined,
-  };
-  const telemetry = {
-    getCachedAppVersion: () => null,
-    reportFeedback: async () => ({ status: 'skipped_no_sink' }),
-  };
-  const readAnalyticsContext = () => null;
   const design = {
     runs: createChatRunService({
       createSseResponse,
@@ -2242,21 +2055,11 @@ export async function startServer({
         foldEventIntoRunSideEffectLedger(run.sideEffectLedger, record);
       },
     }),
-    analytics: analyticsService,
-    getAppVersion: () => telemetry.getCachedAppVersion()?.version ?? '0.0.0',
-    readAnalyticsContext,
   };
 
-  // Runs are process-local, but their terminal obligations are durable. On a
-  // fresh daemon boot, repair stale message rows and replay any PostHog or
-  // Langfuse terminal work whose checkpoint was not committed. Network work
-  // stays off the startup critical path.
+  // Runs are process-local, but interrupted message state is durable.
   void reconcileDurableRunTerminals({
-    analytics: analyticsService,
-    appVersion: telemetry.getCachedAppVersion()?.version ?? '0.0.0',
-    appVersionInfo: telemetry.getCachedAppVersion(),
     db,
-    reportLangfuse: reportRunCompletedFromDaemon,
     runsLogDir: path.join(RUNTIME_DATA_DIR, 'runs'),
   }).then((reconciled) => {
     if (reconciled.interrupted > 0 || reconciled.messagesReconciled > 0) {
@@ -2269,58 +2072,6 @@ export async function startServer({
   // Interactive Terminal sessions (node-pty). In-memory, process-local, and
   // killed on daemon shutdown — see shutdownDaemonRuns below.
   const terminalService = createTerminalService();
-
-  // Tracks runs whose finalized assistant message has already been forwarded
-  // to Langfuse so repeated message updates only emit one final trace per run.
-  // Terminal fallback reports intentionally do not claim this set; a delayed
-  // telemetry-finalized message can still replace the synthetic fallback.
-  const reportedRuns = new Set();
-
-  const reportFinalizedMessage = createFinalizedMessageTelemetryReporter({
-    design,
-    db,
-    dataDir: RUNTIME_DATA_DIR,
-    reportedRuns,
-    getAppVersion: telemetry.getCachedAppVersion,
-  });
-  const reportRunCompletionTelemetryFallback = ({
-    analyticsContext,
-    run,
-    status,
-  }: {
-    analyticsContext: any;
-    run: any;
-    status: string;
-  }) => {
-    if (!shouldReportRunCompletionTelemetryFallbackStatus(status)) return;
-    const timer = setTimeout(() => {
-      if (reportedRuns.has(run.id)) return;
-      if (run.assistantMessageId) {
-        const messageTelemetry = getMessageTelemetryFinalizationState(db, run.assistantMessageId);
-        if (messageTelemetry.finalizedAt !== null) return;
-      }
-      reportFinalizedMessage(
-        {
-          id: run.assistantMessageId ?? `${run.id}-terminal`,
-          conversationId: run.conversationId,
-          endedAt: run.updatedAt,
-          role: 'assistant',
-          runId: run.id,
-          runStatus: status,
-        },
-        { telemetryFinalized: true },
-        {
-          analyticsContext,
-          conversationId: run.conversationId,
-          projectId: run.projectId,
-          reportTrigger: 'terminal_fallback',
-        },
-      );
-    }, LANGFUSE_TERMINAL_FALLBACK_DELAY_MS);
-    timer.unref?.();
-  };
-
-  const reportFeedback = telemetry.reportFeedback;
 
   // DNS-aware wrapper. The sync `validateBaseUrl` only inspects the literal
   // hostname string, so a public DNS name pointing at an internal address
@@ -3750,13 +3501,6 @@ export async function startServer({
         source: activeDesignSystemId ? designSystemSelection.source : 'none',
         digest: designSystemDigest,
       },
-      promptTelemetryParts: {
-        skillPrompt: skillBody ?? '',
-        designSystemPrompt: designSystemBody ?? '',
-        pluginStagePrompt: [pluginBlock, ...(activeStageBlocks ?? [])]
-          .filter((part) => typeof part === 'string' && part.trim().length > 0)
-          .join('\n\n---\n\n'),
-      },
     };
   };
 
@@ -3885,12 +3629,6 @@ export async function startServer({
     if (typeof clientRequestId === 'string' && clientRequestId)
       run.clientRequestId = clientRequestId;
     if (typeof agentId === 'string' && agentId) run.agentId = agentId;
-    // Stash the original user prompt + per-turn config so the
-    // langfuse-bridge report path can include them without reaching back
-    // into chatBody across the createChatRunService boundary. Each field
-    // is optional and only set when the chat body actually carried it.
-    const telemetryPrompt = telemetryPromptFromRunRequest(message, currentPrompt);
-    if (typeof telemetryPrompt === 'string') run.userPrompt = telemetryPrompt;
     if (typeof model === 'string' && model) run.model = model;
     if (typeof reasoning === 'string' && reasoning) run.reasoning = reasoning;
     if (typeof skillId === 'string' && skillId) run.skillId = skillId;
@@ -4164,7 +3902,6 @@ export async function startServer({
       activeSkillDirs,
       critiqueShouldRun,
       designSystemSelection,
-      promptTelemetryParts,
     } =
       await composeDaemonSystemPrompt({
         agentId,
@@ -4588,53 +4325,6 @@ export async function startServer({
         ? `\n\n${promptImagePaths.map((p) => `@${p}`).join(' ')}`
         : '',
     ].join('');
-    run.promptTelemetry = buildPromptStackTelemetry({
-      composedPrompt: composed,
-      sections: [
-        { kind: 'formOverride', content: formOverride },
-        // Phase 1 explicitly needs redactedContent for these aggregate prompts:
-        // they are the quickest way to inspect the system context sent to the
-        // model when diagnosing Langfuse traces.
-        { kind: 'daemonSystemPrompt', content: daemonSystemPrompt },
-        { kind: 'runtimeToolPrompt', content: runtimeToolPrompt },
-        { kind: 'researchCommandContract', content: researchCommandContract },
-        { kind: 'runContextPrompt', content: runContextPrompt },
-        { kind: 'browserUsePromptGuard', content: browserUsePromptGuard },
-        { kind: 'clientSystemPrompt', content: clientInstructionPrompt },
-        { kind: 'echoGuard', content: ECHO_GUARD },
-        { kind: 'userRequest', content: userRequestPrompt },
-        { kind: 'skillPrompt', content: promptTelemetryParts?.skillPrompt },
-        {
-          kind: 'designSystemPrompt',
-          content: promptTelemetryParts?.designSystemPrompt,
-        },
-        {
-          kind: 'pluginStagePrompt',
-          content: promptTelemetryParts?.pluginStagePrompt,
-        },
-        { kind: 'cwdHint', content: cwdHint, metadata: cwd ? [cwd] : [] },
-        {
-          kind: 'linkedDirsHint',
-          content: linkedDirsHint,
-          metadata: linkedDirs,
-        },
-        {
-          kind: 'attachments',
-          content: attachmentHint,
-          metadata: safeAttachments,
-        },
-        {
-          kind: 'commentAttachments',
-          content: commentHint,
-          metadata: safeCommentAttachments,
-        },
-        {
-          kind: 'promptImagePaths',
-          content: promptImagePaths.join('\n'),
-          metadata: promptImagePaths,
-        },
-      ],
-    });
     lifecycle.mark('prompt_build_end');
     lifecycle.mark('launch_preflight_start');
     // (model resolution is hoisted above the resume guard)
@@ -4836,8 +4526,8 @@ export async function startServer({
       // attempt 2, classifying the run 'succeeded' off a stale flag.
       run.turnCompletedCleanly = false;
       lifecycle.resetForAttempt(run.retryAttemptCount ?? 0);
-      run.analyticsTelemetry = {
-        startRequestedAt: run.analyticsTelemetry?.startRequestedAt ?? run.createdAt,
+      run.lifecycleTimings = {
+        startRequestedAt: run.lifecycleTimings?.startRequestedAt ?? run.createdAt,
       };
     };
     const spawnRetryAttempt = () => {
@@ -6169,7 +5859,7 @@ export async function startServer({
       'thinking_delta',
     ]);
     const noteFirstTokenAt = (timestamp = Date.now()) => {
-      if (run.analyticsTelemetry?.firstTokenAt) return;
+      if (run.lifecycleTimings?.firstTokenAt) return;
       lifecycle.mark('first_token', timestamp);
       lifecycle.mark('first_visible_output', timestamp);
     };
@@ -6184,16 +5874,16 @@ export async function startServer({
     // anchored to a fabricated marker. Both are first-write-wins like
     // `firstTokenAt` so a later chunk cannot move an already-stamped boundary.
     const noteCliReadyAt = (timestamp = Date.now()) => {
-      if (run.analyticsTelemetry?.cliReadyAt) return;
-      run.analyticsTelemetry = {
-        ...(run.analyticsTelemetry ?? {}),
+      if (run.lifecycleTimings?.cliReadyAt) return;
+      run.lifecycleTimings = {
+        ...(run.lifecycleTimings ?? {}),
         cliReadyAt: timestamp,
       };
     };
     const noteSessionInitDoneAt = (timestamp = Date.now()) => {
-      if (run.analyticsTelemetry?.sessionInitDoneAt) return;
-      run.analyticsTelemetry = {
-        ...(run.analyticsTelemetry ?? {}),
+      if (run.lifecycleTimings?.sessionInitDoneAt) return;
+      run.lifecycleTimings = {
+        ...(run.lifecycleTimings ?? {}),
         sessionInitDoneAt: timestamp,
       };
     };
@@ -7537,7 +7227,6 @@ export async function startServer({
       daemonShuttingDown = true;
       await design.runs.shutdownActive({ graceMs: resolveChatRunShutdownGraceMs() });
       await terminalService.shutdownActive();
-      await design.analytics.shutdown();
     };
     let server;
     try {

@@ -10,7 +10,6 @@
  *                 non-zero (tail appended to the error message).
  */
 import type { AgentEvent, ChatCommentAttachment, ChatMessage } from '../types';
-import type { AmrEntryAttribution } from '../analytics/amr-attribution';
 import type {
   ChatAnalyticsHints,
   ChatRunCreateResponse,
@@ -22,8 +21,6 @@ import type {
   ChatSseEvent,
   ChatSseStartPayload,
   DaemonAgentPayload,
-  AmrModelsResponse,
-  AmrWalletSnapshot,
   ByokChatProviderConfig,
   MediaExecutionPolicy,
   ResearchOptions,
@@ -32,28 +29,11 @@ import type {
 } from '@open-design/contracts';
 import type { StreamHandlers } from './anthropic';
 
-/**
- * Returns the front-end carrier that's about to send this request:
- * - 'desktop' when running inside the Electron shell
- * - 'web' when running in a regular browser
- * - 'unknown' in non-browser test environments (jsdom without a UA)
- *
- * The daemon uses this to label telemetry traces. Cheap, called once per
- * run so caching isn't worth the complexity.
- */
-function detectClientType(): 'desktop' | 'web' | 'unknown' {
-  if (typeof navigator === 'undefined') return 'unknown';
-  const ua = navigator.userAgent ?? '';
-  if (ua.includes('Electron/')) return 'desktop';
-  if (ua) return 'web';
-  return 'unknown';
-}
 import { parseSseFrame } from './sse';
 import {
   summarizeArtifactsForTranscript,
   type PersistedArtifactFileRef,
 } from '../artifacts/strip';
-import { trackRunProgress, trackRunStart, trackRunTerminal } from '../observability/stuck-run';
 
 const MAX_TRANSCRIPT_MESSAGE_CHARS = 12_000;
 const LARGE_TOOL_RESULT_CHARS = 8_000;
@@ -337,8 +317,8 @@ export interface DaemonReattachOptions {
   publishRunFinishedEvent?: boolean;
 }
 
-export const RUNS_CHANGED_EVENT = 'open-design:runs-changed';
-export const DAEMON_RUN_FINISHED_EVENT = 'open-design:daemon-run-finished';
+export const RUNS_CHANGED_EVENT = 'clean-design:runs-changed';
+export const DAEMON_RUN_FINISHED_EVENT = 'clean-design:daemon-run-finished';
 
 export interface DaemonRunFinishedEventDetail {
   runId: string;
@@ -698,11 +678,6 @@ export async function streamViaDaemon({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Tells the daemon which front-end carrier started the run so the
-        // telemetry trace can be tagged 'client:desktop' vs 'client:web'.
-        // The daemon falls back to a User-Agent sniff when this header is
-        // absent (e.g. third-party clients), so omitting it in tests is OK.
-        'X-OD-Client': detectClientType(),
       },
       body,
     });
@@ -717,15 +692,6 @@ export async function streamViaDaemon({
     const created = (await createResp.json()) as ChatRunCreateResponse;
     const runId = created.runId;
     onRunCreated?.(runId);
-    // Start the stuck-run watchdog. trackRunProgress is called inside the
-    // SSE consumer below on every event; trackRunTerminal fires when the
-    // stream resolves to a terminal state (or errors out).
-    trackRunStart(runId, {
-      agent_id: agentId,
-      project_id: projectId ?? undefined,
-      conversation_id: conversationId ?? undefined,
-      client_type: detectClientType(),
-    });
     notifyRunsChanged();
     emitRunStatus('queued');
     await consumeDaemonRun({
@@ -808,122 +774,6 @@ export async function launchAntigravityOauth(): Promise<LaunchAntigravityOauthRe
   }
 }
 
-export interface VelaUser {
-  id: string;
-  email: string;
-  name?: string;
-  image?: string | null;
-  plan?: string;
-  /** Wallet balance (USD, string) from the live `/api/v1/me` projection; `null` when unknown. */
-  balanceUsd?: string | null;
-}
-
-/**
- * Format a raw wallet `balanceUsd` string (e.g. "12.3") into a display string
- * (e.g. "$12.30"). Returns `null` when the balance is unknown/unparseable so
- * callers can simply hide the balance area.
- */
-export function formatVelaBalanceUsd(raw?: string | null): string | null {
-  if (raw == null || raw === '') return null;
-  const amount = Number(raw);
-  if (!Number.isFinite(amount)) return null;
-  // Sign before the currency symbol: an overdrawn wallet reads "-$1.25",
-  // never the malformed "$-1.25".
-  const sign = amount < 0 ? '-' : '';
-  return `${sign}$${Math.abs(amount).toFixed(2)}`;
-}
-
-/** Top subscription tier — no upgrade affordance is shown at/above this. */
-export const VELA_TOP_PLAN_TIER = 'max';
-
-/**
- * Whether to surface an "Upgrade" affordance for the given plan tier. True for
- * a KNOWN tier below the top (free/plus/pro); false at the top tier AND when
- * the plan is unknown. The unknown case matters: a signed-in session whose live
- * billing summary has not resolved yet has no plan, and treating that as
- * upgradeable would flash an Upgrade CTA at top-tier users until billing loads.
- */
-export function canUpgradeVelaPlan(plan?: string | null): boolean {
-  const normalized = plan?.trim().toLowerCase();
-  if (!normalized) return false;
-  return normalized !== VELA_TOP_PLAN_TIER;
-}
-
-/**
- * Live billing projection (plan tier + wallet balance) for the signed-in
- * account, surfaced on its OWN field rather than on {@link VelaUser} so
- * env-backed sessions (where `user` is null) can show plan/balance without a
- * fabricated identity. Absent means unknown → hide the fields.
- */
-export interface VelaLiveAccount {
-  plan?: string;
-  balanceUsd?: string | null;
-}
-
-export interface VelaLoginStatus {
-  loggedIn: boolean;
-  loginInFlight?: boolean;
-  profile: string;
-  user: VelaUser | null;
-  account?: VelaLiveAccount;
-  configPath: string;
-  // Device-authorization details parsed from `vela login` output while a login
-  // is in flight, so the UI can offer a manual sign-in link when the browser
-  // did not auto-open. See parseVelaLoginActivation in the daemon's vela.ts.
-  activationUrl?: string;
-  userCode?: string;
-  browserOpenFailed?: boolean;
-}
-
-// AMR (vela) login surfaces three thin endpoints on the daemon:
-//   GET  /api/integrations/vela/status   — read ~/.amr/config.json projection
-//   POST /api/integrations/vela/login    — spawn `vela login` (vela opens browser itself)
-//   POST /api/integrations/vela/login/cancel — terminate a still-pending login
-//   POST /api/integrations/vela/logout   — clear ~/.amr auth and Settings-backed AMR auth env
-// The Settings UI polls /status after kicking off /login to detect completion.
-export async function fetchVelaLoginStatus(options: { refresh?: boolean } = {}): Promise<VelaLoginStatus | null> {
-  void options;
-  return null;
-}
-
-export async function fetchAmrWalletSnapshot(options: { refresh?: boolean } = {}): Promise<AmrWalletSnapshot | null> {
-  void options;
-  return null;
-}
-
-export async function fetchAmrModels(): Promise<AmrModelsResponse | null> {
-  return null;
-}
-
-export interface StartVelaLoginResult {
-  ok: boolean;
-  status: number;
-  pid?: number;
-  alreadyRunning?: boolean;
-  error?: string;
-}
-
-export async function startVelaLogin(
-  attribution?: AmrEntryAttribution | null,
-  odDeviceId?: string | null,
-): Promise<StartVelaLoginResult> {
-  void attribution;
-  void odDeviceId;
-  return { ok: false, status: 410, error: 'AMR is not available in Clean Design.' };
-}
-
-export async function cancelVelaLogin(): Promise<{ ok: boolean; canceled?: boolean }> {
-  return { ok: false, canceled: false };
-}
-
-export async function velaLogout(): Promise<{ ok: boolean }> {
-  return { ok: false };
-}
-
-// Forwards the user's assistant-turn rating to the daemon so it can emit
-// a Langfuse `score-create`. Fire-and-forget — failures are not surfaced
-// to the UI (the rating is already persisted on the message itself via
-// the PUT /messages/:id round-trip).
 export async function listActiveChatRuns(
   projectId: string,
   conversationId: string,
@@ -1058,12 +908,10 @@ async function consumeDaemonRun({
           if (!parsed) continue;
           if (parsed.kind === 'comment') {
             sawStreamProgress = true;
-            trackRunProgress(runId);
             continue;
           }
           if (parsed.kind !== 'event') continue;
           sawStreamProgress = true;
-          trackRunProgress(runId);
           if (parsed.id) {
             lastEventId = parsed.id;
             onRunEventId?.(parsed.id);
@@ -1276,11 +1124,6 @@ async function consumeDaemonRun({
     handlers.onDone(acc);
   } finally {
     cancelSignal?.removeEventListener('abort', cancelRun);
-    // Settle the stuck-run watchdog with whatever terminal state we
-    // resolved. If the watchdog was never armed (reattach paths that
-    // hit the daemon for an already-finished run), trackRunTerminal
-    // is a no-op for unknown runIds.
-    trackRunTerminal(runId, endStatus ?? (canceled ? 'canceled' : 'unknown'));
   }
 }
 

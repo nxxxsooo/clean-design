@@ -19,7 +19,6 @@ import {
 import { useAnalytics } from '../analytics/provider';
 import { exportErrorCode } from '../analytics/export-error-code';
 import { deployErrorCode } from '../analytics/deploy-error-code';
-import { trackIframeLoad } from '../observability/iframe-error';
 import {
   trackArtifactExportResult,
   trackArtifactDeployResult,
@@ -373,7 +372,7 @@ function previewViewportIcon(viewport: PreviewViewportId): string {
   return 'computer-line';
 }
 
-const EXPORT_READY_NUDGE_STORAGE_PREFIX = 'open-design:export-ready-nudge:';
+const EXPORT_READY_NUDGE_STORAGE_PREFIX = 'clean-design:export-ready-nudge:';
 const COMMENT_SIDE_DOCK_WIDTH = 320;
 const COMMENT_SIDE_DOCK_RAIL_WIDTH = 42;
 const COMMENT_SIDE_DOCK_GAP = 12;
@@ -1622,22 +1621,6 @@ export function LiveArtifactViewer({
     [projectId, liveArtifact.artifactId, reloadKey],
   );
   const previewScale = zoom / 100;
-
-  // Instrument the live-artifact iframe so failed loads — usually a
-  // missing artifact file or a stuck `od://` resolver — surface in
-  // PostHog. iframe load errors don't propagate to window.error, so
-  // observability/install.ts cannot catch them globally.
-  useEffect(() => {
-    if (mode !== 'preview') return undefined;
-    const node = iframeRef.current;
-    if (!node) return undefined;
-    return trackIframeLoad({
-      iframe: node,
-      surface: 'live_artifact_preview',
-      artifactId: liveArtifact.artifactId,
-      projectId,
-    });
-  }, [mode, previewUrl, liveArtifact.artifactId, projectId]);
 
   async function handleRefresh() {
     if (refreshing) return;

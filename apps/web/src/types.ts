@@ -8,9 +8,6 @@ import type {
   AgentTestRequest,
   AppVersionInfo,
   AppVersionResponse,
-  WhatsNewContent,
-  WhatsNewLocaleContent,
-  WhatsNewResponse,
   AudioKind,
   ChatAttachment,
   ChatCommentAttachment,
@@ -446,34 +443,9 @@ export interface AppConfig {
   // IDs of skills/design-systems the user has explicitly disabled.
   disabledSkills?: string[];
   disabledDesignSystems?: string[];
-  // Anonymous install identifier for telemetry. Generated locally the first
-  // time a user opts in via Settings → Privacy. `null` after the user
-  // explicitly opts out (or rotates "Delete my data"); `undefined` when the
-  // daemon has not assigned an anonymous id yet.
-  installationId?: string | null;
-  // Unix-millis timestamp recording that the first-run privacy prompt was
-  // resolved. This is independent from installationId so Delete my data can
-  // rotate or clear the anonymous id without re-opening the consent banner.
-  privacyDecisionAt?: number | null;
-  // Privacy preferences governing what (if anything) is shipped to the
-  // PostHog / Langfuse telemetry endpoints. `metrics` and `content`
-  // default ON (set by `DEFAULT_CONFIG.telemetry` in state/config.ts) so
-  // the onboarding funnel actually captures the first-run events. The
-  // post-onboarding disclosure modal explains this and Settings → Privacy is
-  // the one-click opt-out. Complete-context object manifests follow the
-  // content switch. A daemon-stored override always wins over these client
-  // defaults — once the user picks a value the modal / PrivacySection persist
-  // it through `syncConfigToDaemon`.
-  telemetry?: TelemetryConfig;
   customInstructions?: string;
   projectLocations?: ProjectLocationPrefs[];
   defaultProjectLocationId?: string | null;
-}
-
-export interface TelemetryConfig {
-  metrics?: boolean;
-  content?: boolean;
-  artifactManifest?: boolean;
 }
 
 export interface ComposioSettings {
@@ -582,9 +554,6 @@ export type {
   AgentTestRequest,
   AppVersionInfo,
   AppVersionResponse,
-  WhatsNewContent,
-  WhatsNewLocaleContent,
-  WhatsNewResponse,
   AudioKind,
   ConnectionTestKind,
   ConnectionTestProtocol,

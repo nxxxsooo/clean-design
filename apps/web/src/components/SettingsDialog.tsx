@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, Dispatch, SetStateAction } from 'react';
 import { Button, VisuallyHidden } from '@open-design/components';
-import type { AmrWalletSnapshot } from '@open-design/contracts';
 import { validateBaseUrl } from '@open-design/contracts/api/connectionTest';
 import {
   agentIdToTracking,
@@ -11,13 +10,6 @@ import {
 } from '@open-design/contracts/analytics';
 import { useAnalytics } from '../analytics/provider';
 import { byokErrorCode } from '../analytics/byok-error-code';
-import {
-  amrHandoffDeviceId,
-  attributedAmrUrl,
-  recordAmrEntry,
-  type TrackingAmrEntrySource,
-} from '../analytics/amr-attribution';
-import { getResolvedDeviceId } from '../analytics/client';
 import {
   trackSettingsAppearanceClick,
   trackByokPreflightBlocked,
@@ -41,31 +33,13 @@ import type { Locale } from '../i18n';
 import type { Dict } from '../i18n/types';
 import { AgentIcon } from './AgentIcon';
 import { AgentDiagnosticRow } from './AgentDiagnosticRow';
-import { AmrLoginPill } from './AmrLoginPill';
-import { PlanBadge } from './PlanBadge';
 import { orderAgentsWithOpenDesignFirst } from './agentOrdering';
-import {
-  AMR_LOGIN_STATUS_EVENT,
-  amrLoginStatusEventReason,
-} from './amrLoginPolling';
-import {
-  canUpgradeVelaPlan,
-  fetchAmrWalletSnapshot,
-  fetchVelaLoginStatus,
-  formatVelaBalanceUsd,
-  type VelaLoginStatus,
-} from '../providers/daemon';
-import {
-  amrPlansUrlForProfile,
-  amrProfileBadgeLabel,
-} from '../runtime/amr-guidance';
 import { isVisibleLocalCliAgent } from '../utils/visibleAgents';
 import { ExportDiagnosticsRow } from './ExportDiagnosticsButton';
 import { Icon } from './Icon';
 import { defaultAgentModelId, effectiveAgentModelChoice } from './agentModelSelection';
 import {
   CUSTOM_MODEL_SENTINEL,
-  orderModelOptionsByAvailability,
   SearchableModelSelect,
 } from './modelOptions';
 import {
@@ -112,7 +86,6 @@ import {
 } from '../state/maxTokens';
 import type {
   AgentInfo,
-  AgentModelChoice,
   ApiProtocol,
   ApiProtocolConfig,
   AppConfig,
@@ -141,12 +114,8 @@ import { byokProviderRequiresApiKey } from '../utils/byokProvider';
 import { XaiOAuthControl } from './XaiOAuthControl';
 import type { MediaProvider } from '../media/models';
 import { PetSettings } from './pet/PetSettings';
-import { McpClientSection } from './McpClientSection';
 import { DesignSystemsSection } from './DesignSystemsSection';
-import { PrivacySection } from './PrivacySection';
 import { ProjectLocationsSection } from './ProjectLocationsSection';
-import { RoutinesSection } from './RoutinesSection';
-import { ConnectorsBrowser } from './ConnectorsBrowser';
 import { MemoryModelInline } from './MemoryModelInline';
 import { MemorySection } from './MemorySection';
 import { ByokConnectionTestControl } from './byok/ByokConnectionTestControl';
@@ -186,6 +155,10 @@ import {
   showCompletionNotification,
 } from '../utils/notifications';
 
+const McpClientSection = (_props: { surface?: string }) => null;
+const RoutinesSection = (_props: { onClose: () => void }) => null;
+const ConnectorsBrowser = (_props: Record<string, unknown>) => null;
+
 export type SettingsSection =
   | 'execution'
   | 'instructions'
@@ -203,7 +176,6 @@ export type SettingsSection =
   | 'designSystems'
   | 'projectLocations'
   | 'memory'
-  | 'privacy'
   // 'library' is consumed by the EntryShell library route — App opens it
   // via this same openSettings entry point, so SettingsSection must
   // accept the token even though SettingsDialog itself has no Library
@@ -218,7 +190,6 @@ const LOCAL_ONLY_DISABLED_SETTINGS = new Set<SettingsSection>([
   'routines',
   'integrations',
   'mcpClient',
-  'privacy',
 ]);
 
 function localOnlySettingsSection(section: SettingsSection): SettingsSection {
@@ -234,11 +205,6 @@ interface ByokProviderPreset {
   custom?: boolean;
 }
 
-// One-shot focus hint when opening the dialog. `'amr'` scrolls the AMR agent
-// card into view on the execution section and plays a highlight (plus a
-// sign-in coachmark when the user has not authorized AMR yet).
-export type SettingsHighlight = 'amr' | null;
-
 interface Props {
   initial: AppConfig;
   agents: AgentInfo[];
@@ -247,7 +213,6 @@ interface Props {
   appVersionInfo: AppVersionInfo | null;
   welcome?: boolean;
   initialSection?: SettingsSection;
-  initialHighlight?: SettingsHighlight;
   providerModelsCache?: ProviderModelsCache;
   /**
    * Persist the current draft. Invoked by the dialog's autosave loop on
@@ -279,7 +244,6 @@ interface Props {
   onRefreshAgents: (
     options?: AgentRefreshOptions,
   ) => AgentInfo[] | Promise<AgentInfo[] | void> | void;
-  onAmrLoginStatusChange?: (status: VelaLoginStatus | null) => void;
   daemonMediaProviders?: AppConfig['mediaProviders'] | null;
   daemonMediaProvidersFetchState?: 'idle' | 'ok' | 'error';
   mediaProvidersNotice?: string | null;
@@ -293,27 +257,10 @@ interface Props {
   onProviderModelsCacheChange?: Dispatch<SetStateAction<ProviderModelsCache>>;
 }
 
-function telemetryPrefsEqual(
-  a: AppConfig['telemetry'],
-  b: AppConfig['telemetry'],
-): boolean {
-  return a?.metrics === b?.metrics
-    && a?.content === b?.content
-    && a?.artifactManifest === b?.artifactManifest;
-}
-
 export interface AgentRefreshOptions {
   throwOnError?: boolean;
   agentCliEnv?: AppConfig['agentCliEnv'];
 }
-
-// When AMR sign-in completes, vela's live `models` catalog can lag the
-// credential write by a beat (the link backend has to register the freshly
-// authorized device). Re-detect a few times so a momentarily-empty catalog
-// doesn't leave the model picker hidden — the symptom that previously needed
-// an app restart / reinstall to clear.
-const AMR_SIGN_IN_RESCAN_ATTEMPTS = 4;
-const AMR_SIGN_IN_RESCAN_RETRY_MS = 1500;
 
 function codexPathStrings(locale: Locale) {
   if (locale === 'zh-CN') {
@@ -664,7 +611,7 @@ function cleanAgentVersionLabel(
 }
 
 function displayAgentName(agent: Pick<AgentInfo, 'id' | 'name'>): string {
-  return agent.id === 'amr' ? 'Clean Design' : agent.name;
+  return agent.name;
 }
 
 const AGENT_CLI_ENV_FIELDS = [
@@ -1056,92 +1003,11 @@ export function updateAgentCliEnvValue(
   };
 }
 
-const AMR_PROFILE_AGENT_ID = 'amr';
-const AMR_PROFILE_ENV_KEY = 'OPEN_DESIGN_AMR_PROFILE';
-
-function sameAgentModelChoice(
-  left: AgentModelChoice | undefined,
-  right: AgentModelChoice | undefined,
-): boolean {
-  return (left?.model ?? null) === (right?.model ?? null)
-    && (left?.reasoning ?? null) === (right?.reasoning ?? null);
-}
-
-export function reconcileAmrProfileEnv(
-  currentAgentCliEnv: AppConfig['agentCliEnv'] | undefined,
-  nextInitialAgentCliEnv: AppConfig['agentCliEnv'] | undefined,
-): AppConfig['agentCliEnv'] | undefined {
-  const nextAmrProfile = nextInitialAgentCliEnv?.[AMR_PROFILE_AGENT_ID]?.[AMR_PROFILE_ENV_KEY];
-  const currentAmrProfile = currentAgentCliEnv?.[AMR_PROFILE_AGENT_ID]?.[AMR_PROFILE_ENV_KEY];
-  if (currentAmrProfile === nextAmrProfile) {
-    return currentAgentCliEnv;
-  }
-
-  const nextAgentCliEnv = { ...(currentAgentCliEnv ?? {}) };
-  const nextAmrEnv = { ...(nextAgentCliEnv[AMR_PROFILE_AGENT_ID] ?? {}) };
-
-  if (typeof nextAmrProfile === 'string' && nextAmrProfile.length > 0) {
-    nextAmrEnv[AMR_PROFILE_ENV_KEY] = nextAmrProfile;
-  } else {
-    delete nextAmrEnv[AMR_PROFILE_ENV_KEY];
-  }
-
-  if (Object.keys(nextAmrEnv).length > 0) {
-    nextAgentCliEnv[AMR_PROFILE_AGENT_ID] = nextAmrEnv;
-  } else {
-    delete nextAgentCliEnv[AMR_PROFILE_AGENT_ID];
-  }
-
-  return Object.keys(nextAgentCliEnv).length > 0 ? nextAgentCliEnv : {};
-}
-
-export function reconcileAmrModelChoice(
-  currentAgentModels: AppConfig['agentModels'] | undefined,
-  previousInitial: AppConfig,
-  nextInitial: AppConfig,
-): AppConfig['agentModels'] | undefined {
-  const previousAmrProfile = previousInitial.agentCliEnv?.[AMR_PROFILE_AGENT_ID]?.[AMR_PROFILE_ENV_KEY];
-  const nextAmrProfile = nextInitial.agentCliEnv?.[AMR_PROFILE_AGENT_ID]?.[AMR_PROFILE_ENV_KEY];
-  if (previousAmrProfile === nextAmrProfile) return currentAgentModels;
-
-  const previousChoice = previousInitial.agentModels?.[AMR_PROFILE_AGENT_ID];
-  const currentChoice = currentAgentModels?.[AMR_PROFILE_AGENT_ID];
-  if (!sameAgentModelChoice(currentChoice, previousChoice)) {
-    return currentAgentModels;
-  }
-
-  const nextChoice = nextInitial.agentModels?.[AMR_PROFILE_AGENT_ID];
-  const nextAgentModels = { ...(currentAgentModels ?? {}) };
-  if (nextChoice) {
-    nextAgentModels[AMR_PROFILE_AGENT_ID] = nextChoice;
-  } else {
-    delete nextAgentModels[AMR_PROFILE_AGENT_ID];
-  }
-  return Object.keys(nextAgentModels).length > 0 ? nextAgentModels : {};
-}
-
 export function agentRefreshOptionsForConfig(cfg: AppConfig): AgentRefreshOptions {
   return {
     throwOnError: true,
     agentCliEnv: cfg.agentCliEnv ?? {},
   };
-}
-
-export function amrWalletValueLabel(input: {
-  balance: string | null;
-  loadingLabel: string;
-  ready: boolean;
-  snapshot: AmrWalletSnapshot | null;
-  unavailableLabel: string;
-}): string {
-  if (input.balance) return input.balance;
-  if (!input.ready) return input.loadingLabel;
-  const code = input.snapshot?.error?.code;
-  if (code === 'missing_control_key' || code === 'unauthorized') {
-    const message = input.snapshot?.error?.message?.trim();
-    if (message) return message;
-  }
-  return input.unavailableLabel;
 }
 
 function apiModelOptionLabel(
@@ -1281,13 +1147,11 @@ export function SettingsDialog({
   appVersionInfo,
   welcome,
   initialSection = 'execution',
-  initialHighlight = null,
   onPersist,
   onPersistComposioKey,
   composioConfigLoading = false,
   onClose,
   onRefreshAgents,
-  onAmrLoginStatusChange,
   daemonMediaProviders,
   daemonMediaProvidersFetchState = 'idle',
   mediaProvidersNotice,
@@ -1318,7 +1182,6 @@ export function SettingsDialog({
   const [pendingMediaProviderEditIds, setPendingMediaProviderEditIds] = useState<
     ReadonlySet<string>
   >(() => new Set());
-  const previousInitialRef = useRef(initial);
   const lastSavedAppearanceRef = useRef({
     theme: initial.theme ?? 'system',
     accentColor: resolveAccentColor(initial.accentColor),
@@ -1340,57 +1203,6 @@ export function SettingsDialog({
       accentColor: resolveAccentColor(initial.accentColor),
     };
   }, [initial.theme, initial.accentColor]);
-
-  useEffect(() => {
-    const previousInitial = previousInitialRef.current;
-    const parentPrivacyChanged =
-      previousInitial.installationId !== initial.installationId ||
-      previousInitial.privacyDecisionAt !== initial.privacyDecisionAt ||
-      !telemetryPrefsEqual(previousInitial.telemetry, initial.telemetry);
-    setCfg((current) => {
-      const nextAgentCliEnv = reconcileAmrProfileEnv(current.agentCliEnv, initial.agentCliEnv);
-      const nextAgentModels = reconcileAmrModelChoice(current.agentModels, previousInitial, initial);
-      if (
-        nextAgentCliEnv === current.agentCliEnv
-        && nextAgentModels === current.agentModels
-        && !parentPrivacyChanged
-      ) {
-        return current;
-      }
-      return {
-        ...current,
-        agentCliEnv: nextAgentCliEnv,
-        agentModels: nextAgentModels,
-        ...(parentPrivacyChanged
-          ? {
-              installationId: initial.installationId,
-              privacyDecisionAt: initial.privacyDecisionAt,
-              telemetry: initial.telemetry ? { ...initial.telemetry } : undefined,
-            }
-          : {}),
-      };
-    });
-    autosaveLastSavedRef.current = {
-      ...autosaveLastSavedRef.current,
-      agentCliEnv: reconcileAmrProfileEnv(
-        autosaveLastSavedRef.current.agentCliEnv,
-        initial.agentCliEnv,
-      ),
-      agentModels: reconcileAmrModelChoice(
-        autosaveLastSavedRef.current.agentModels,
-        previousInitial,
-        initial,
-      ),
-      ...(parentPrivacyChanged
-        ? {
-            installationId: initial.installationId,
-            privacyDecisionAt: initial.privacyDecisionAt,
-            telemetry: initial.telemetry ? { ...initial.telemetry } : undefined,
-          }
-        : {}),
-    };
-    previousInitialRef.current = initial;
-  }, [initial]);
 
   // Revert the live theme preview to the most recently persisted appearance.
   // That is the initial appearance until autosave succeeds; after autosave,
@@ -1418,159 +1230,16 @@ export function SettingsDialog({
   // (About) keeps the previous scrollTop, so the new section's header
   // can land out of view and the panel reads as half-loaded. Issue #634.
   const settingsContentRef = useRef<HTMLDivElement | null>(null);
-  // AMR-card focus, driven by the failed-run nudge (`initialHighlight==='amr'`).
-  const amrCardRef = useRef<HTMLDivElement | null>(null);
-  // Card pulse: a brief attention flash that auto-clears after a few seconds.
-  const [amrHighlightActive, setAmrHighlightActive] = useState(false);
-  // Coachmark: persists (unlike the card pulse) until the real pointer reaches
-  // the authorize button — so it won't vanish while the user is still moving
-  // toward it.
-  const [amrCoachmarkArmed, setAmrCoachmarkArmed] = useState(false);
-  // The fake-cursor coachmark dismisses as soon as the real pointer reaches the
-  // authorize button — once the user has found it, the hint has done its job.
-  const [amrCoachmarkDismissed, setAmrCoachmarkDismissed] = useState(false);
   const [agentRescanRunning, setAgentRescanRunning] = useState(false);
   const [agentRescanNotice, setAgentRescanNotice] =
     useState<RescanNotice | null>(null);
   const [agentTestState, setAgentTestState] = useState<TestState>({
     status: 'idle',
   });
-  const [amrCardStatus, setAmrCardStatus] = useState<VelaLoginStatus | null>(null);
-  const [amrCardStatusReady, setAmrCardStatusReady] = useState(false);
-  const [amrWalletSnapshot, setAmrWalletSnapshot] = useState<AmrWalletSnapshot | null>(null);
-  const [amrWalletReady, setAmrWalletReady] = useState(false);
-  const [hoveredAgentCardId, setHoveredAgentCardId] = useState<string | null>(null);
   const [providerTestState, setProviderTestState] = useState<TestState>({
     status: 'idle',
   });
 
-  useEffect(() => {
-    onAmrLoginStatusChange?.(amrCardStatus);
-  }, [amrCardStatus, onAmrLoginStatusChange]);
-
-  const formatAmrWalletBalance = useCallback((balanceUsd: string | null | undefined) => {
-    if (!balanceUsd) return null;
-    const amount = Number(balanceUsd);
-    if (!Number.isFinite(amount)) return `$${balanceUsd}`;
-    return new Intl.NumberFormat(locale, {
-      currency: 'USD',
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2,
-      style: 'currency',
-    }).format(amount);
-  }, [locale]);
-
-  const refreshAmrWalletSnapshot = useCallback(async (options: { refresh?: boolean } = {}) => {
-    setAmrWalletReady(false);
-    const next = await fetchAmrWalletSnapshot(options);
-    setAmrWalletSnapshot(next);
-    setAmrWalletReady(true);
-  }, []);
-
-  useEffect(() => {
-    const hasAmrAgent = agents.some((agent) => agent.id === 'amr' && agent.available);
-    if (!hasAmrAgent) {
-      setAmrCardStatus(null);
-      setAmrCardStatusReady(false);
-      setHoveredAgentCardId(null);
-      return;
-    }
-    let cancelled = false;
-    // Refetch in place on every agents refresh, but do NOT flip
-    // `amrCardStatusReady` back to false here. The post-sign-in model-catalog
-    // rescan loop hands down a fresh `agents` array on each retry; tearing the
-    // pill down to the hidden `--placeholder` between the reset and the async
-    // status read made the Sign out action blink out and back on every tick.
-    // Readiness latches true after the first read and only resets when AMR
-    // becomes unavailable (handled above).
-    void fetchVelaLoginStatus().then((next) => {
-      if (!cancelled) {
-        setAmrCardStatus(next);
-        setAmrCardStatusReady(true);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [agents]);
-
-  useEffect(() => {
-    const hasAmrAgent = agents.some((agent) => agent.id === 'amr' && agent.available);
-    if (!hasAmrAgent || amrCardStatus?.loggedIn !== true) {
-      setAmrWalletSnapshot(null);
-      setAmrWalletReady(false);
-      return;
-    }
-    let cancelled = false;
-    setAmrWalletReady(false);
-    void fetchAmrWalletSnapshot().then((next) => {
-      if (cancelled) return;
-      setAmrWalletSnapshot(next);
-      setAmrWalletReady(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    agents,
-    amrCardStatus?.loggedIn,
-    amrCardStatus?.profile,
-    amrCardStatus?.user?.id,
-    amrCardStatus?.user?.email,
-  ]);
-
-  // Reconcile AMR sign-in state whenever the user returns to the window. The
-  // vela device-login flow completes in an external browser / AMR console; if
-  // the in-pill poll has already timed out (or the login finished fully
-  // out-of-band), the card would otherwise keep showing the stale signed-out
-  // state until Settings is closed and reopened. Refetching on focus /
-  // visibility keeps the signed-in state, email, and Sign out action live.
-  useEffect(() => {
-    const hasAmrAgent = agents.some((agent) => agent.id === 'amr' && agent.available);
-    if (!hasAmrAgent) return;
-    let cancelled = false;
-    // Passive read only. Push the daemon's current status down into the card;
-    // the pill mirrors it via `initialStatus` (and clears any stale login error
-    // when it sees a signed-in status). Do NOT republish the login-state-change
-    // event here — that restarts the pill's poll/pending machine on every focus
-    // and, while the external browser is stealing and returning focus during a
-    // login, ping-pongs the action between "Signing in…" and "Authorize".
-    const resyncAmrStatus = () => {
-      if (document.visibilityState === 'hidden') return;
-      void fetchVelaLoginStatus({ refresh: true }).then((next) => {
-        if (cancelled || !next) return;
-        setAmrCardStatus(next);
-        if (next.loggedIn) void refreshAmrWalletSnapshot({ refresh: true });
-      });
-    };
-    window.addEventListener('focus', resyncAmrStatus);
-    document.addEventListener('visibilitychange', resyncAmrStatus);
-    return () => {
-      cancelled = true;
-      window.removeEventListener('focus', resyncAmrStatus);
-      document.removeEventListener('visibilitychange', resyncAmrStatus);
-    };
-  }, [agents, refreshAmrWalletSnapshot]);
-
-  useEffect(() => {
-    const hasAmrAgent = agents.some((agent) => agent.id === 'amr' && agent.available);
-    if (!hasAmrAgent) return;
-    let cancelled = false;
-    const resyncAmrStatus = (event: Event) => {
-      const reason = amrLoginStatusEventReason(event);
-      if (reason === 'login-canceled') return;
-      void fetchVelaLoginStatus().then((next) => {
-        if (cancelled || !next) return;
-        setAmrCardStatus(next);
-        setAmrCardStatusReady(true);
-      });
-    };
-    window.addEventListener(AMR_LOGIN_STATUS_EVENT, resyncAmrStatus);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(AMR_LOGIN_STATUS_EVENT, resyncAmrStatus);
-    };
-  }, [agents]);
   const [byokPreconditionNotice, setByokPreconditionNotice] = useState<{
     action: ByokPreconditionAction;
     field?: ByokRequiredField;
@@ -1613,9 +1282,6 @@ export function SettingsDialog({
   const providerTestAbortRef = useRef<AbortController | null>(null);
   const providerModelsAbortRef = useRef<AbortController | null>(null);
   const pendingAgentInstallRescanRef = useRef(false);
-  // Guards the AMR catalog-chase loop so concurrent renders can't start it
-  // twice (see the re-detect effect below).
-  const amrRescanInFlightRef = useRef(false);
   const agentTestRevisionRef = useRef(0);
   const providerTestRevisionRef = useRef(0);
   const providerModelsRevisionRef = useRef(0);
@@ -1667,34 +1333,6 @@ export function SettingsDialog({
     const el = settingsContentRef.current;
     if (el) el.scrollTop = 0;
   }, [activeSection]);
-
-  // One-shot AMR-card focus from the failed-run nudge: scroll the card into
-  // view (on the next frame, so it wins over the section's scrollTop reset
-  // above) and play a brief highlight + arm the sign-in coachmark. The
-  // coachmark only actually shows when the AMR card reports a signed-out state
-  // (`amrCardStatus?.loggedIn === false`). If the execution pane is in API mode
-  // the AMR card is absent and this no-ops.
-  useEffect(() => {
-    if (initialHighlight !== 'amr' || activeSection !== 'execution') return;
-    let cancelled = false;
-    const raf = requestAnimationFrame(() => {
-      if (cancelled) return;
-      amrCardRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      setAmrCoachmarkDismissed(false);
-      setAmrHighlightActive(true);
-      setAmrCoachmarkArmed(true);
-    });
-    // Only the card pulse auto-clears; the coachmark persists until the pointer
-    // reaches the authorize button (or the user signs in).
-    const clear = setTimeout(() => {
-      if (!cancelled) setAmrHighlightActive(false);
-    }, 3200);
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(raf);
-      clearTimeout(clear);
-    };
-  }, [initialHighlight, activeSection]);
 
   const selectedMemoryChatAgent =
     cfg.mode === 'daemon' && cfg.agentId
@@ -1952,32 +1590,11 @@ export function SettingsDialog({
       setAgentRescanRunning(false);
     }
   };
-  const attributedAmrSettingsUrl = (
-    url: string,
-    sourceDetail: TrackingAmrEntrySource,
-  ) => {
-    const attribution = recordAmrEntry(analytics.track, sourceDetail, new Date(), {
-      metricsConsent: cfg.telemetry?.metrics === true,
-    });
-    const deviceId = amrHandoffDeviceId({
-      metricsConsent: cfg.telemetry?.metrics === true,
-      resolvedDeviceId: getResolvedDeviceId(),
-      installationId: cfg.installationId,
-    });
-    return attributedAmrUrl(url, attribution, deviceId);
-  };
-  const openAgentFixUrl = (
-    url: string | undefined,
-    amrEntrySourceDetail?: TrackingAmrEntrySource,
-  ) => {
+  const openAgentFixUrl = (url: string | undefined) => {
     const href = sanitizeHttpsUrl(url);
     if (!href) return;
     markAgentInstallIntent();
-    void openExternalUrl(
-      amrEntrySourceDetail
-        ? attributedAmrSettingsUrl(href, amrEntrySourceDetail)
-        : href,
-    );
+    void openExternalUrl(href);
   };
   const diagnosticHandlersForAgent = (agent: AgentInfo) => {
     const docsUrl = sanitizeHttpsUrl(agent.docsUrl);
@@ -1987,11 +1604,7 @@ export function SettingsDialog({
       ...(docsUrl ? { onOpenDocs: () => openAgentFixUrl(docsUrl) } : {}),
       ...(installUrl
         ? {
-            onOpenInstall: () =>
-              openAgentFixUrl(
-                installUrl,
-                agent.id === 'amr' ? 'settings_amr_install' : undefined,
-              ),
+            onOpenInstall: () => openAgentFixUrl(installUrl),
           }
         : {}),
     };
@@ -2015,67 +1628,6 @@ export function SettingsDialog({
       window.removeEventListener('focus', handleReturnToSettings);
     };
   }, [agentRescanRunning, handleRefreshAgents]);
-
-  // Chase AMR's live model catalog whenever the user is signed in but the
-  // model list hasn't arrived yet. AMR is detected at app start (often while
-  // signed out, so it comes back with an empty, fail-closed list), and the
-  // live `vela models` catalog only becomes fetchable once the credential
-  // lands — and can lag the credential write by a beat. We must cover every
-  // way Settings ends up "signed in + empty", not just an in-Settings
-  // sign-in edge: onboarding signs in and re-detects exactly once, so if that
-  // single call lands during the propagation window Settings later mounts
-  // already signed in with an empty list. Keying on `loggedIn === true` +
-  // "AMR has no models" handles both; the picker shows its loading state
-  // (see renderAgentModelConfig) until the catalog fills in.
-  //
-  // `onRefreshAgents` / `agents` are read through refs so re-detecting (which
-  // changes their identity) can't tear the retry loop down mid-flight — that
-  // is what made the loading row flash and vanish before the catalog arrived.
-  // The in-flight ref keeps a single loop running across renders.
-  const onRefreshAgentsRef = useRef(onRefreshAgents);
-  onRefreshAgentsRef.current = onRefreshAgents;
-  const agentsRef = useRef(agents);
-  agentsRef.current = agents;
-  useEffect(() => {
-    if (amrCardStatus?.loggedIn !== true) return;
-    const amr = agentsRef.current.find((agent) => agent.id === 'amr');
-    if (!amr || (amr.models?.length ?? 0) > 0) return;
-    if (amrRescanInFlightRef.current) return;
-    amrRescanInFlightRef.current = true;
-    let cancelled = false;
-    void (async () => {
-      try {
-        for (
-          let attempt = 0;
-          attempt < AMR_SIGN_IN_RESCAN_ATTEMPTS && !cancelled;
-          attempt += 1
-        ) {
-          let next: void | AgentInfo[];
-          try {
-            next = await onRefreshAgentsRef.current();
-          } catch {
-            return;
-          }
-          if (cancelled) return;
-          const detected = Array.isArray(next) ? next : [];
-          const refreshed = detected.find((agent) => agent.id === 'amr');
-          // Stop once the live catalog has caught up (or AMR vanished); a
-          // still-empty list means vela hasn't published the catalog yet, so
-          // retry.
-          if (!refreshed || (refreshed.models?.length ?? 0) > 0) return;
-          await new Promise((resolve) => {
-            setTimeout(resolve, AMR_SIGN_IN_RESCAN_RETRY_MS);
-          });
-        }
-      } finally {
-        amrRescanInFlightRef.current = false;
-      }
-    })();
-    return () => {
-      cancelled = true;
-      amrRescanInFlightRef.current = false;
-    };
-  }, [amrCardStatus?.loggedIn]);
 
   const handleTestAgent = async () => {
     if (agentTestState.status === 'running') {
@@ -3396,7 +2948,6 @@ export function SettingsDialog({
       subtitle: t('critiqueTheater.settingsNavHint'),
     },
     notifications: { title: t('settings.notifications'), subtitle: t('settings.notificationsHint') },
-    privacy: { title: t('settings.privacy'), subtitle: t('settings.privacyHint') },
     pet: { title: t('pet.title'), subtitle: t('pet.subtitle') },
     designSystems: {
       title: t('settings.designSystems'),
@@ -3449,54 +3000,14 @@ export function SettingsDialog({
     const hasReasoning =
       Array.isArray(selected.reasoningOptions) &&
       selected.reasoningOptions.length > 0;
-    // AMR's live catalog only lands a beat after sign-in. While the user is
-    // signed in but the model list hasn't arrived yet, show the picker in a
-    // loading state instead of hiding it — so the dropdown appears at sign-in
-    // and simply fills in, rather than popping in seconds later.
-    if (selected.id === 'amr' && !hasModels && (amrCardStatus?.loggedIn ?? false)) {
-      return (
-        <div className="agent-card-config">
-          <label className="field">
-            <span className="field-label">
-              {t('settings.modelPicker')}
-              <span
-                className="agent-model-source-badge live"
-                aria-hidden="true"
-              >
-                {t('settings.modelSourceLive')}
-              </span>
-            </span>
-            <div className="agent-model-select-wrap">
-              <div
-                className="settings-model-select agent-model-select-loading"
-                role="status"
-                aria-busy="true"
-                data-testid={`settings-agent-model-loading-${selected.id}`}
-              >
-                <Icon name="spinner" size={13} className="icon-spin" />
-                <span>{t('common.loading')}</span>
-              </div>
-            </div>
-          </label>
-          <p className="hint agent-model-row-hint">
-            {t('settings.modelPickerLiveHint')}
-          </p>
-        </div>
-      );
-    }
     if (!hasModels && !hasReasoning) return null;
     const choice = cfg.agentModels?.[selected.id] ?? {};
     const effectiveChoice = effectiveAgentModelChoice(selected, choice) ?? choice;
-    const modelsForSelect =
-      selected.id === 'amr' && selected.models
-        ? orderModelOptionsByAvailability(selected.models)
-        : selected.models;
+    const modelsForSelect = selected.models;
     const knownModelIds = selected.models?.map((m) => m.id) ?? [];
     // Adapters opt out via `supportsCustomModel: false` on their
-    // RuntimeAgentDef when their CLI has no `--model` flag (Antigravity,
-    // upstream issue #35) or when free-text ids silently fail at spawn
-    // (AMR routes through ACP `session/set_model` and validates against
-    // a live catalog). Undefined === allow, matching today's UX.
+    // RuntimeAgentDef when their CLI has no `--model` flag. Undefined means
+    // allow, matching the inherited local CLI behavior.
     const allowCustomModel = selected.supportsCustomModel !== false;
     const explicitCustomMode = agentCustomModelIds.has(selected.id);
     const configuredModel =
@@ -3521,12 +3032,7 @@ export function SettingsDialog({
         };
       });
     };
-    const fallbackModelValue =
-      selected.id === 'amr' &&
-      configuredModel &&
-      !knownModelIds.includes(configuredModel)
-        ? defaultAgentModelId(selected) ?? ''
-        : configuredModel ?? defaultAgentModelId(selected) ?? '';
+    const fallbackModelValue = configuredModel ?? defaultAgentModelId(selected) ?? '';
     const modelValue = customModelDraft ?? fallbackModelValue;
     const reasoningValue =
       effectiveChoice.reasoning ??
@@ -3605,25 +3111,6 @@ export function SettingsDialog({
                             label: t('settings.modelCustom'),
                           },
                         ]
-                      : undefined
-                  }
-                  disabledOptionHint={
-                    selected.id === 'amr'
-                      ? (option) =>
-                          option.enabled === false
-                            ? t('settings.amrModelUpgradeHint')
-                            : null
-                      : undefined
-                  }
-                  onDisabledOptionUpgrade={
-                    selected.id === 'amr'
-                      ? () =>
-                          void openExternalUrl(
-                            attributedAmrSettingsUrl(
-                              amrPlansUrlForProfile(amrCardStatus?.profile),
-                              'settings_amr_upgrade',
-                            ),
-                          )
                       : undefined
                   }
                 />
@@ -4119,89 +3606,27 @@ export function SettingsDialog({
                           const active = cfg.agentId === a.id;
                           const running =
                             active && agentTestState.status === 'running';
-                          const isAmrAgent = a.id === 'amr';
                           const description = AGENT_SHORT_DESCRIPTIONS[a.id];
                           const agentName = displayAgentName(a);
                           const diagnosticHandlers = diagnosticHandlersForAgent(a);
                           const modelSummary = agentModelSummary(a);
-                          const amrBenefits = [
-                            t('settings.amrBenefitOfficial'),
-                            t('settings.amrBenefitManyModels'),
-                          ];
-                          const versionLabel =
-                            isAmrAgent
-                              ? ''
-                              : cleanAgentVersionLabel(a.name, a.version);
+                          const versionLabel = cleanAgentVersionLabel(a.name, a.version);
                           const metaLabel =
                             a.authStatus === 'missing'
                               ? t('settings.agentAuthRequired')
                               : a.authStatus === 'unknown'
                                 ? t('settings.agentAuthUnknown')
-                                : versionLabel
-                                  ? versionLabel
-                                  : a.id === 'amr'
-                                    ? ''
-                                    : t('common.installed');
+                                : versionLabel || t('common.installed');
                           const metaTitle =
                             a.authStatus === 'missing' ||
                             a.authStatus === 'unknown'
                               ? (a.authMessage ?? a.path ?? '')
                               : (a.path ?? '');
-                          const amrHighlighted = isAmrAgent && amrHighlightActive;
-                          const amrCardEmail =
-                            isAmrAgent && active && amrCardStatus?.loggedIn
-                              ? amrCardStatus.user?.email || t('settings.amrSignedIn')
-                              : '';
-                          const amrCardProfileBadge =
-                            isAmrAgent && active && amrCardStatus?.loggedIn
-                              ? amrProfileBadgeLabel(amrCardStatus.profile)
-                              : null;
-                          const amrWalletVisible =
-                            isAmrAgent && active && amrCardStatus?.loggedIn === true;
-                          const amrStatusBalance =
-                            amrWalletVisible
-                              ? formatVelaBalanceUsd(amrCardStatus?.account?.balanceUsd)
-                              : null;
-                          const amrWalletBalance =
-                            amrWalletVisible && amrWalletSnapshot?.status === 'available'
-                              ? formatAmrWalletBalance(amrWalletSnapshot.balanceUsd)
-                              : null;
-                          const amrCardBalanceLabel =
-                            isAmrAgent && active && amrCardStatus?.loggedIn
-                              ? amrStatusBalance ?? amrWalletBalance
-                              : null;
-                          const amrCardPlanLabel =
-                            isAmrAgent && active && amrCardStatus?.loggedIn
-                              ? amrCardStatus.account?.plan?.trim() || null
-                              : null;
-                          const amrCardCanUpgrade =
-                            isAmrAgent && active && amrCardStatus?.loggedIn
-                              ? canUpgradeVelaPlan(amrCardStatus.account?.plan)
-                              : false;
-                          const amrRevealPendingCancelAction =
-                            isAmrAgent &&
-                            active &&
-                            hoveredAgentCardId === a.id &&
-                            amrCardStatus?.loggedIn !== true &&
-                            amrCardStatus?.loginInFlight === true;
                           const cardEl = (
                             <div
                               key={a.id}
-                              ref={isAmrAgent ? amrCardRef : undefined}
                               data-testid={`settings-agent-card-${a.id}`}
-                              className={
-                                'agent-card agent-card-installed' +
-                                (active ? ' active' : '') +
-                                (amrHighlighted ? ' agent-card--amr-highlight' : '')
-                              }
-                              onMouseEnter={() => {
-                                if (!isAmrAgent || !active) return;
-                                setHoveredAgentCardId(a.id);
-                              }}
-                              onMouseLeave={() => {
-                                if (hoveredAgentCardId !== a.id) return;
-                                setHoveredAgentCardId(null);
-                              }}
+                              className={`agent-card agent-card-installed${active ? ' active' : ''}`}
                             >
                               <div className="agent-card-main">
                                 <button
@@ -4216,49 +3641,17 @@ export function SettingsDialog({
                                       cli_provider_id: agentIdToTracking(a.id),
                                       install_status: 'installed',
                                     });
-                                    if (isAmrAgent) {
-                                      recordAmrEntry(
-                                        analytics.track,
-                                        'settings_amr_agent_card',
-                                        new Date(),
-                                        {
-                                          metricsConsent:
-                                            cfg.telemetry?.metrics === true,
-                                        },
-                                      );
-                                    }
                                     setCfg((c) => ({ ...c, agentId: a.id }));
                                   }}
                                   aria-pressed={active}
                                   >
                                     <AgentIcon id={a.id} size={32} />
                                     <div className="agent-card-body">
-                                      <div
-                                        className={
-                                          'agent-card-name' +
-                                          (isAmrAgent
-                                            ? ' agent-card-name--amr'
-                                            : '')
-                                        }
-                                      >
+                                      <div className="agent-card-name">
                                         <span className="agent-card-title">
                                           {agentName}
                                         </span>
-                                        {isAmrAgent ? (
-                                          <span
-                                            className="agent-card-benefits"
-                                            aria-hidden="true"
-                                          >
-                                            {amrBenefits.map((benefit) => (
-                                              <span
-                                                key={benefit}
-                                                className="agent-card-benefit"
-                                              >
-                                                {benefit}
-                                              </span>
-                                            ))}
-                                          </span>
-                                        ) : description ? (
+                                        {description ? (
                                           <>
                                             <span
                                               className="agent-card-name-divider"
@@ -4271,63 +3664,11 @@ export function SettingsDialog({
                                             </span>
                                           </>
                                         ) : null}
-                                        {isAmrAgent && amrCardPlanLabel ? (
-                                          <VisuallyHidden>
-                                            {`, ${t('settings.amrPlan')} ${amrCardPlanLabel}`}
-                                          </VisuallyHidden>
-                                        ) : null}
                                       </div>
                                       {metaLabel ? (
                                         <div className="agent-card-meta">
                                           <span title={metaTitle}>
                                             {metaLabel}
-                                          </span>
-                                        </div>
-                                      ) : null}
-                                      {amrCardEmail ? (
-                                        <div className="agent-card-amr-email">
-                                          <span className="agent-card-amr-email-text" title={amrCardEmail}>
-                                            {amrCardEmail}
-                                          </span>
-                                          {amrCardPlanLabel ? (
-                                            <span
-                                              className="agent-card-plan-badge-slot"
-                                              aria-hidden="true"
-                                            >
-                                              <PlanBadge
-                                                plan={amrCardPlanLabel}
-                                                size="sm"
-                                                className="agent-card-plan-badge"
-                                                title={
-                                                  amrCardPlanLabel
-                                                    ? `${t('settings.amrPlan')} ${amrCardPlanLabel}`
-                                                    : undefined
-                                                }
-                                              />
-                                            </span>
-                                          ) : null}
-                                          {amrCardProfileBadge ? (
-                                            <span className="agent-card-amr-profile-badge">
-                                              {amrCardProfileBadge}
-                                            </span>
-                                          ) : null}
-                                        </div>
-                                      ) : null}
-                                      {amrWalletVisible ? (
-                                        <div className="agent-card-amr-meta-row">
-                                          <span className="agent-card-amr-balance">
-                                            <span className="agent-card-amr-balance-label">
-                                              {t('settings.amrBalance')}
-                                            </span>
-                                            <span className="agent-card-amr-balance-value">
-                                              {amrWalletValueLabel({
-                                                balance: amrCardBalanceLabel,
-                                                loadingLabel: t('common.loading'),
-                                                ready: amrWalletReady || Boolean(amrCardBalanceLabel),
-                                                snapshot: amrWalletSnapshot,
-                                                unavailableLabel: t('settings.amrWalletUnavailable'),
-                                              })}
-                                            </span>
                                           </span>
                                         </div>
                                       ) : null}
@@ -4339,77 +3680,7 @@ export function SettingsDialog({
                                       ) : null}
                                   </div>
                                 </button>
-                                {isAmrAgent ? (
-                                  active && amrCardStatusReady ? (
-                                    <span
-                                      className="amr-auth-anchor"
-                                      onMouseEnter={() => setAmrCoachmarkDismissed(true)}
-                                    >
-                                      {amrCoachmarkArmed &&
-                                      amrCardStatus?.loggedIn === false &&
-                                      !amrCoachmarkDismissed ? (
-                                        <span className="amr-coachmark" aria-hidden="true">
-                                          <span className="amr-coachmark__ring" />
-                                          <svg
-                                            className="amr-coachmark__cursor"
-                                            width="22"
-                                            height="22"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                          >
-                                            <path
-                                              d="M9.4 13V8a1.8 1.8 0 0 1 3.6 0v4.6c.35-.55 1-.95 1.75-.95.65 0 1.25.32 1.6.85.32-.5.9-.8 1.55-.8.8 0 1.5.5 1.78 1.2.35-.3.8-.5 1.3-.5 1.1 0 2 .9 2 2v3.05a5.6 5.6 0 0 1-5.6 5.6h-2.5a5 5 0 0 1-3.75-1.7l-4.2-4.75a1.85 1.85 0 0 1 2.65-2.6L9.4 16Z"
-                                              fill="#fff"
-                                              stroke="#1a1a1a"
-                                              strokeWidth="1.1"
-                                              strokeLinejoin="round"
-                                            />
-                                          </svg>
-                                        </span>
-                                      ) : null}
-                                      {amrCardCanUpgrade ? (
-                                        <button
-                                          type="button"
-                                          className="agent-card-amr-upgrade"
-                                          data-testid="settings-agent-card-amr-upgrade"
-                                          onClick={() =>
-                                            void openExternalUrl(
-                                              attributedAmrSettingsUrl(
-                                                amrPlansUrlForProfile(
-                                                  amrCardStatus?.profile,
-                                                ),
-                                                'settings_amr_upgrade',
-                                              ),
-                                            )
-                                          }
-                                        >
-                                          {t('settings.amrUpgrade')}
-                                        </button>
-                                      ) : null}
-                                      <AmrLoginPill
-                                        className="agent-card-amr-auth"
-                                        hideSignedOutStatus
-                                        hideSignedInStatus
-                                        initialStatus={amrCardStatus}
-                                        skipInitialRefresh
-                                        signInLabel={t('settings.amrAuthorize')}
-                                        showConsoleAction={amrCardStatus?.loggedIn === true}
-                                        iconOnlySignOut
-                                        amrEntrySourceDetail="settings_amr_authorize"
-                                        metricsConsent={cfg.telemetry?.metrics === true}
-                                        installationId={cfg.installationId}
-                                        revealPendingCancelAction={amrRevealPendingCancelAction}
-                                        onStatusChange={setAmrCardStatus}
-                                      />
-                                    </span>
-                                  ) : (
-                                    <div
-                                      className="agent-card-amr-auth agent-card-amr-auth--placeholder"
-                                      aria-hidden="true"
-                                    />
-                                  )
-                                ) : null}
-                                {active && !isAmrAgent ? (
+                                {active ? (
                                   <button
                                     type="button"
                                     className={
@@ -4603,15 +3874,7 @@ export function SettingsDialog({
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="agent-card-link agent-card-link--ghost"
-                                        onClick={(event) => {
-                                          markAgentInstallIntent();
-                                          if (a.id === 'amr') {
-                                            event.currentTarget.href = attributedAmrSettingsUrl(
-                                              installUrl,
-                                              'settings_amr_install',
-                                            );
-                                          }
-                                        }}
+                                        onClick={markAgentInstallIntent}
                                       >
                                         {t('settings.agentInstall.install')}
                                       </a>
@@ -4675,17 +3938,11 @@ export function SettingsDialog({
                 const hasModels =
                   Array.isArray(selected.models) && selected.models.length > 0;
                 const choice = cfg.agentModels?.[selected.id] ?? {};
-                const knownModelIds = selected.models?.map((m) => m.id) ?? [];
                 const configuredModel =
                   typeof choice.model === 'string' && choice.model
                     ? choice.model
                     : null;
-                const modelValue =
-                  selected.id === 'amr' &&
-                  configuredModel &&
-                  !knownModelIds.includes(configuredModel)
-                    ? selected.models?.[0]?.id ?? ''
-                    : configuredModel ?? selected.models?.[0]?.id ?? '';
+                const modelValue = configuredModel ?? selected.models?.[0]?.id ?? '';
                 return (
                   <details className="agent-cli-env settings-memory-advanced">
                     <summary className="agent-cli-env-summary">
@@ -5377,10 +4634,6 @@ export function SettingsDialog({
               chatAgentId={cfg.mode === 'daemon' ? cfg.agentId ?? null : null}
               chatModel={selectedMemoryChatModel}
             />
-          ) : null}
-
-          {activeSection === 'privacy' ? (
-            <PrivacySection cfg={cfg} setCfg={setCfg} />
           ) : null}
 
           {activeSection === 'about' ? (
@@ -7958,7 +7211,7 @@ function AppearanceSection({
  * The toggle has two halves on opposite sides of the HTTP boundary:
  *
  *   * Browser-side: `useCritiqueTheaterEnabled` reads / writes the
- *     `open-design:config` localStorage blob; this is what gates
+ *     `clean-design:config` localStorage blob; this is what gates
  *     whether `<CritiqueTheaterMount>` actually renders.
  *   * Daemon-side: the rollout resolver in `server.ts` reads
  *     `project.metadata.critiqueTheaterEnabled`, so the daemon only

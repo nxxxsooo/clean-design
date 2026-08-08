@@ -626,7 +626,7 @@ export async function killTerminal(
 
 // ---------- tabs ----------
 
-const PROJECT_TABS_CACHE_PREFIX = 'open-design:project-tabs:v1:';
+const PROJECT_TABS_CACHE_PREFIX = 'clean-design:project-tabs:v1:';
 
 function tabsCacheKey(projectId: string): string {
   return `${PROJECT_TABS_CACHE_PREFIX}${projectId}`;
@@ -936,7 +936,7 @@ export async function installGeneratedPluginFolder(
     );
     const outcome = await readPluginInstallOutcome(resp);
     if (outcome.ok && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('open-design:plugins-changed'));
+      window.dispatchEvent(new CustomEvent('clean-design:plugins-changed'));
     }
     return outcome;
   } catch (err) {

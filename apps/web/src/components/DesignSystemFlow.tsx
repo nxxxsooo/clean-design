@@ -240,7 +240,7 @@ const EMPTY_SETUP: SetupState = {
 
 const GENERATION_JOB_STORAGE_PREFIX = 'od:design-system-generation-job:';
 const GITHUB_CONNECTOR_ID = 'github';
-const CONNECTOR_CALLBACK_MESSAGE_TYPE = 'open-design:connector-connected';
+const CONNECTOR_CALLBACK_MESSAGE_TYPE = 'clean-design:connector-connected';
 const GITHUB_CONNECTOR_STATUS_TIMEOUT_MS = 5000;
 const LOCAL_CODE_UPLOAD_ROOT = 'context/local-code';
 const ASSET_UPLOAD_ROOT = 'assets';

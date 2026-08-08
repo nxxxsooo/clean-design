@@ -8219,9 +8219,9 @@ export function ProjectView({
 
   // Wire the Critique Theater drop-in mount into the project workspace.
   // The hook reads the M1 Settings toggle out of the existing
-  // `open-design:config` localStorage blob and stays in sync with the
+  // `clean-design:config` localStorage blob and stays in sync with the
   // platform `storage` event (cross-tab) plus the same-tab
-  // `open-design:critique-theater-toggle` CustomEvent. The mount itself
+  // `clean-design:critique-theater-toggle` CustomEvent. The mount itself
   // returns `null` until the daemon emits a `critique.run_started` for
   // the active project, so the visual surface is unchanged for users
   // who have not opted in. The daemon-side gate
@@ -8600,13 +8600,6 @@ export function ProjectView({
             <>
               <HandoffButton
                 projectId={project.id}
-                projectName={project.name}
-                projectDir={projectDetail.resolvedDir}
-                agents={agents}
-                artifactId={headerArtifact.artifact_id}
-                artifactKind={headerArtifact.artifact_kind}
-                metricsConsent={config.telemetry?.metrics === true}
-                installationId={config.installationId}
               />
               <EntrySettingsMenu
                 config={config}
