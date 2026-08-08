@@ -1,191 +1,110 @@
 // @vitest-environment jsdom
 
-// Regression for the zero-editors fallback: when no editor is detected, the
-// fallback button must perform a real reveal (open the project folder via the
-// daemon's open-in catalogue: finder / explorer / file-manager) rather than a
-// no-op that advertises an action it never runs.
-
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HandoffButton } from '../../src/components/HandoffButton';
-import { I18nProvider } from '../../src/i18n';
-import type { AgentInfo, HostEditorsResponse } from '@open-design/contracts';
 
-const fetchHostEditors = vi.fn<() => Promise<HostEditorsResponse>>();
-const openProjectInEditor = vi.fn();
+const selectHostHandoffRoot = vi.fn();
 const copyToClipboard = vi.fn();
 
-vi.mock('../../src/providers/registry', () => ({
-  fetchHostEditors: () => fetchHostEditors(),
-  openProjectInEditor: (...args: unknown[]) => openProjectInEditor(...args),
+vi.mock('@open-design/host', () => ({
+  selectHostHandoffRoot: (...args: unknown[]) => selectHostHandoffRoot(...args),
 }));
 
 vi.mock('../../src/lib/copy-to-clipboard', () => ({
   copyToClipboard: (...args: unknown[]) => copyToClipboard(...args),
 }));
 
+const success = {
+  ok: true,
+  packetPath: '/Users/test/Handoffs/landing/20260809-123456-abcd1234',
+  prompt: '# Implement the approved Clean Design reference',
+  manifest: {
+    schemaVersion: 1,
+    packetId: '20260809-123456-abcd1234',
+    createdAt: '2026-08-09T12:34:56.000Z',
+    project: { id: 'p1', name: 'Landing', slug: 'landing', kind: 'prototype' },
+    viewports: [],
+    files: [],
+    warnings: [],
+  },
+  warnings: [],
+};
+
+function stubExport(options: { configured: boolean; packet?: unknown } = { configured: true }) {
+  const packet = options.packet ?? success;
+  const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+    const url = String(input);
+    if (url.endsWith('/handoff-root') && !init?.method) {
+      return new Response(JSON.stringify({ configured: options.configured, displayName: 'Handoffs' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (url.endsWith('/handoff-packet') && init?.method === 'POST') {
+      return new Response(JSON.stringify(packet), {
+        status: 'ok' in (packet as object) && (packet as { ok?: boolean }).ok === false ? 409 : 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
-  window.localStorage.clear();
-  fetchHostEditors.mockReset();
-  openProjectInEditor.mockReset();
+  selectHostHandoffRoot.mockReset();
   copyToClipboard.mockReset();
 });
 
-describe('HandoffButton zero-editors fallback', () => {
-  it('opens the project folder in the OS file manager via the daemon', async () => {
-    fetchHostEditors.mockResolvedValue({
-      platform: 'darwin',
-      editors: [],
-    });
-    openProjectInEditor.mockResolvedValue(undefined);
-
-    render(
-      <I18nProvider initial="en">
-        <HandoffButton projectId="p1" />
-      </I18nProvider>,
-    );
-
-    const fallback = (await screen.findByText('Finder')).closest('button') as HTMLButtonElement;
-    fireEvent.click(fallback);
-
-    await waitFor(() => expect(openProjectInEditor).toHaveBeenCalledWith('p1', 'finder'));
-  });
-
-  it('surfaces a daemon spawn failure inline so the fallback is not a silent no-op', async () => {
-    // The production caller (`ProjectView`) mounts `<HandoffButton projectId={…} />`
-    // with no `onRequestRevealInFinder` callback, so a rejected
-    // `openProjectInEditor` would otherwise leave users with a CTA that
-    // advertises Finder/Explorer/File Manager but does nothing visible.
-    fetchHostEditors.mockResolvedValue({
-      platform: 'darwin',
-      editors: [],
-    });
-    openProjectInEditor.mockRejectedValue(new Error('daemon refused: ENOENT'));
-
-    render(
-      <I18nProvider initial="en">
-        <HandoffButton projectId="p1" />
-      </I18nProvider>,
-    );
-
-    const fallback = (await screen.findByText('Finder')).closest('button') as HTMLButtonElement;
-    fireEvent.click(fallback);
-
-    const errorEl = await screen.findByTestId('handoff-fallback-error');
-    expect(errorEl.textContent).toContain('daemon refused: ENOENT');
-  });
-
-  it('copies a framework-specific CLI handoff prompt with the local project path', async () => {
-    const fetchMock = vi.fn(async () => new Response('{}', { status: 202 }));
-    vi.stubGlobal('fetch', fetchMock);
-    fetchHostEditors.mockResolvedValue({
-      platform: 'darwin',
-      editors: [
-        {
-          id: 'cursor',
-          label: 'Cursor',
-          available: true,
-        },
-      ],
-    });
+describe('HandoffButton deterministic export', () => {
+  it('chooses a trusted root once when the project has none, then creates a packet', async () => {
+    const fetchMock = stubExport({ configured: false });
+    selectHostHandoffRoot.mockResolvedValue({ ok: true, displayName: 'Handoffs' });
     copyToClipboard.mockResolvedValue(true);
-    const agents: AgentInfo[] = [
-      {
-        id: 'claude',
-        name: 'Claude Code',
-        bin: 'claude',
-        available: true,
-      },
-      {
-        id: 'codex',
-        name: 'Codex CLI',
-        bin: 'codex',
-        available: false,
-      },
-    ];
+    render(<HandoffButton projectId="p1" />);
 
-    render(
-      <I18nProvider initial="zh-CN">
-        <HandoffButton
-          projectId="p1"
-          projectName="Landing"
-          projectDir="/tmp/open-design/Landing"
-          agents={agents}
-          metricsConsent
-          installationId="od-install-abc"
-        />
-      </I18nProvider>,
-    );
+    fireEvent.click(screen.getByTestId('handoff-trigger'));
 
-    fireEvent.click(await screen.findByTestId('handoff-caret'));
-    fireEvent.click(await screen.findByRole('tab', { name: '复制给 CLI' }));
-    const amrWebsiteLink = screen.getByRole('link', { name: /打开 Open Design Cloud 官网/ }) as HTMLAnchorElement;
-    expect(amrWebsiteLink.getAttribute('href'))
-      .toBe('https://open-design.ai/amr');
-    fireEvent.click(amrWebsiteLink);
-    const amrWebsiteUrl = new URL(amrWebsiteLink.href);
-    expect(amrWebsiteUrl.searchParams.get('od_origin')).toBe('open_design');
-    expect(amrWebsiteUrl.searchParams.get('od_entry_source')).toBe('handoff_amr_website');
-    expect(amrWebsiteUrl.searchParams.get('od_device_id')).toBe('od-install-abc');
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/integrations/vela/analytics-entry',
+    await waitFor(() => expect(selectHostHandoffRoot).toHaveBeenCalledWith('p1'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/projects/p1/handoff-packet',
       expect.objectContaining({ method: 'POST' }),
-    );
-    expect(screen.getByTestId('handoff-cli-item-amr').textContent).toContain('Open Design');
-    expect(screen.getByTestId('handoff-cli-item-amr').textContent).not.toContain('未安装');
-    expect(
-      screen.getByTestId('handoff-cli-item-amr').compareDocumentPosition(
-        screen.getByTestId('handoff-cli-item-codex'),
-      ) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    fireEvent.click(await screen.findByRole('button', { name: 'Vue.js' }));
-    fireEvent.click(await screen.findByTestId('handoff-cli-item-claude'));
-
-    await waitFor(() => expect(copyToClipboard).toHaveBeenCalledTimes(1));
-    const prompt = copyToClipboard.mock.calls[0]?.[0] as string;
-    expect(prompt).toContain('/tmp/open-design/Landing');
-    expect(prompt).toContain('Vue.js');
-    expect(prompt).toContain('Claude Code');
-    expect(prompt).toContain('真实可运行');
+    ));
+    expect(await screen.findByText('Handoff exported')).toBeTruthy();
+    expect(copyToClipboard).toHaveBeenCalledWith(success.prompt);
   });
 
-  it('keeps the project path hidden behind a compact copy row', async () => {
-    fetchHostEditors.mockResolvedValue({
-      platform: 'darwin',
-      editors: [
-        {
-          id: 'cursor',
-          label: 'Cursor',
-          available: true,
-        },
-      ],
+  it('keeps the packet and exposes selectable prompt text when clipboard copy fails', async () => {
+    stubExport();
+    copyToClipboard.mockResolvedValue(false);
+    render(<HandoffButton projectId="p1" />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose handoff folder' }).getAttribute('title')).toContain('Handoffs'));
+    fireEvent.click(screen.getByTestId('handoff-trigger'));
+
+    const fallback = await screen.findByRole('textbox');
+    expect((fallback as HTMLTextAreaElement).value).toBe(success.prompt);
+    expect(screen.getByText(success.packetPath)).toBeTruthy();
+    fireEvent.focus(fallback);
+    expect((fallback as HTMLTextAreaElement).selectionEnd).toBe(success.prompt.length);
+  });
+
+  it('renders stable packet failures and clears an unavailable saved root', async () => {
+    stubExport({
+      configured: true,
+      packet: { ok: false, code: 'root_unavailable', message: 'volume was disconnected' },
     });
-    copyToClipboard.mockResolvedValue(true);
-    const projectDir = '/tmp/open-design/Landing';
+    render(<HandoffButton projectId="p1" />);
 
-    render(
-      <I18nProvider initial="en">
-        <HandoffButton
-          projectId="p1"
-          projectName="Landing"
-          projectDir={projectDir}
-        />
-      </I18nProvider>,
-    );
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Choose handoff folder' }).getAttribute('title')).toContain('Handoffs'));
+    fireEvent.click(screen.getByTestId('handoff-trigger'));
 
-    fireEvent.click(await screen.findByTestId('handoff-caret'));
-
-    const pathRow = await screen.findByTestId('handoff-project-path');
-    expect(pathRow.textContent).toContain('Copy path');
-    expect(pathRow.textContent).not.toContain(projectDir);
-
-    const copyPathButton = within(pathRow).getByRole('button', { name: 'Copy path' });
-    expect(copyPathButton.getAttribute('title')).toBe(projectDir);
-    fireEvent.click(copyPathButton);
-
-    await waitFor(() => expect(copyToClipboard).toHaveBeenCalledWith(projectDir));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The saved handoff folder is unavailable');
+    expect(screen.getByRole('button', { name: 'Choose handoff folder' }).getAttribute('title')).toBe('Choose handoff folder');
   });
 });

@@ -457,7 +457,7 @@ export function PreviewModal({
   const exportTitle = exportTitleFor(activeView?.id ?? '');
   const canExportFiles = Boolean(activeHtml);
   const previewShareTitle = shareTarget?.title || exportTitle || title;
-  const previewShareUrl = typeof shareTarget?.url === 'string' ? shareTarget.url : '';
+  const previewShareUrl = '';
   const previewShareText = t('preview.shareTextDefault', { title: previewShareTitle });
   const previewShareCopy = previewShareUrl
     ? `${previewShareText}\n${previewShareUrl}`
@@ -543,7 +543,7 @@ export function PreviewModal({
   }
 
   const showTabs = views.length > 1;
-  const showTemplateShareMenu = !isCustomView || Boolean(shareTarget?.url);
+  const showTemplateShareMenu = !isCustomView;
   const canOpenTemplateShareMenu = canExportFiles || Boolean(previewShareUrl);
 
   return (

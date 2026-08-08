@@ -98,6 +98,33 @@ describe("open-design sidecar contract", () => {
     expect(normalizeDaemonSidecarMessage(message)).toEqual(message);
   });
 
+  it("accepts a signed credential synchronization payload", () => {
+    const message = {
+      input: {
+        credentials: [{ ref: "credential://abcdefghijklmnop", mask: "****1234", secret: "secret-1234" }],
+        issuedAt: "2026-08-09T00:00:00.000Z",
+        nonce: "abcdefghijklmnopqrstuvwxyzABCDEFGH",
+        signature: "abcdefghijklmnopqrstuvwxyzABCDEFGHijklmnop",
+      },
+      type: SIDECAR_MESSAGES.SYNC_CREDENTIALS,
+    };
+    expect(normalizeDaemonSidecarMessage(message)).toEqual(message);
+  });
+
+  it('accepts a signed trusted handoff root payload', () => {
+    const message = {
+      input: {
+        projectId: 'project-1',
+        root: '/Users/u/Documents/handoffs',
+        issuedAt: '2026-08-09T00:00:00.000Z',
+        nonce: 'abcdefghijklmnopqrstuvwxyzABCDEFGH',
+        signature: 'abcdefghijklmnopqrstuvwxyzABCDEFGHijklmnop',
+      },
+      type: SIDECAR_MESSAGES.SET_HANDOFF_ROOT,
+    };
+    expect(normalizeDaemonSidecarMessage(message)).toEqual(message);
+  });
+
   it("rejects malformed mint-import-token payloads", () => {
     expect(() =>
       normalizeDaemonSidecarMessage({

@@ -313,53 +313,44 @@ describe('mergeDaemonConfig', () => {
     });
   });
 
-  it('copies privacyDecisionAt from daemon config', () => {
+  it('ignores legacy daemon telemetry identity while preserving a resolved decision', () => {
     const merged = mergeDaemonConfig(DEFAULT_CONFIG, {
       installationId: 'install-1',
       privacyDecisionAt: 1778244000000,
       telemetry: { metrics: true },
     });
 
-    expect(merged.installationId).toBe('install-1');
-    expect(merged.privacyDecisionAt).toBe(1778244000000);
-    expect(merged.telemetry).toEqual({ metrics: true });
+    expect(merged.installationId).toBeNull();
+    expect(typeof merged.privacyDecisionAt).toBe('number');
+    expect(merged.telemetry).toEqual({ metrics: false, content: false });
   });
 
-  it('migrates old daemon privacy config to a resolved decision', () => {
+  it('disables old daemon telemetry config without minting an identity', () => {
     const merged = mergeDaemonConfig(DEFAULT_CONFIG, {
       installationId: 'install-1',
       telemetry: { metrics: true },
     });
 
-    expect(merged.installationId).toBe('install-1');
+    expect(merged.installationId).toBeNull();
     expect(typeof merged.privacyDecisionAt).toBe('number');
   });
 
-  it('defaults reporting on and mints an installationId when the install never opted out', () => {
-    // Brand-new install: the daemon has no privacy state at all. The product
-    // default telemetry channels (metrics + content) are on and an anonymous
-    // id is assigned so events have a stable distinct id. This mirrors the
-    // first-run banner's "Share" payload; artifactManifest stays
-    // off, matching that surface.
+  it('defaults reporting off and does not mint an installationId', () => {
     const merged = mergeDaemonConfig(DEFAULT_CONFIG, {});
 
-    expect(merged.telemetry?.metrics).toBe(true);
-    expect(merged.telemetry?.content).toBe(true);
-    expect(merged.telemetry?.artifactManifest).toBe(false);
-    expect(typeof merged.installationId).toBe('string');
-    expect(merged.installationId).toBeTruthy();
+    expect(merged.telemetry?.metrics).toBe(false);
+    expect(merged.telemetry?.content).toBe(false);
+    expect(merged.installationId).toBeNull();
   });
 
-  it('mints an installationId for a reporting install that somehow has none', () => {
-    // The "on but no id" state that surfaces as "Opted out" in Settings:
-    // metrics is on but no anonymous id was ever assigned.
+  it('turns off a reporting install that somehow has no identity', () => {
     const merged = mergeDaemonConfig(DEFAULT_CONFIG, {
       telemetry: { metrics: true, content: false, artifactManifest: false },
       installationId: null,
     });
 
-    expect(merged.telemetry?.metrics).toBe(true);
-    expect(merged.installationId).toBeTruthy();
+    expect(merged.telemetry?.metrics).toBe(false);
+    expect(merged.installationId).toBeNull();
   });
 
   it('preserves an explicit opt-out and never re-mints an id', () => {
@@ -373,13 +364,13 @@ describe('mergeDaemonConfig', () => {
     expect(merged.installationId == null).toBe(true);
   });
 
-  it('uses daemon silent update preference and clears stale local values when absent', () => {
+  it('ignores daemon silent update preferences', () => {
     expect(
       mergeDaemonConfig(DEFAULT_CONFIG, { allowSilentUpdates: false }).allowSilentUpdates,
-    ).toBe(false);
+    ).toBeUndefined();
     expect(
       mergeDaemonConfig(DEFAULT_CONFIG, { allowSilentUpdates: true }).allowSilentUpdates,
-    ).toBe(true);
+    ).toBeUndefined();
     expect(
       mergeDaemonConfig({ ...DEFAULT_CONFIG, allowSilentUpdates: true }, {}).allowSilentUpdates,
     ).toBeUndefined();
@@ -1070,11 +1061,11 @@ describe('loadConfig', () => {
     const config = loadConfig();
 
     expect(config.apiProtocol).toBe('openai');
-    expect(config.apiKey).toBe('sk-proxy');
+    expect(config.apiKey).toBe('');
     expect(config.apiVersion).toBe('2024-01-01');
     expect(config.baseUrl).toBe('https://proxy.example.com/bedrock-runtime/v1');
     expect(config.model).toBe('gpt-4o');
-    expect(store.get('open-design:config')).toBe(JSON.stringify(persisted));
+    expect(store.get('open-design:config')).not.toContain('sk-proxy');
   });
 
   it('migrates legacy Anthropic API configs to an explicit apiProtocol', () => {
@@ -1155,7 +1146,7 @@ describe('loadConfig', () => {
     expect(config.apiProviderBaseUrl).toBe(DEFAULT_CONFIG.apiProviderBaseUrl);
     expect(config.apiProtocolConfigs?.bedrock).toBeUndefined();
     expect(config.apiProtocolConfigs?.openai).toEqual({
-      apiKey: 'sk-openai',
+      apiKey: '',
       baseUrl: 'https://api.openai.com/v1',
       model: 'gpt-4o',
     });
@@ -1169,7 +1160,7 @@ describe('loadConfig', () => {
     expect(persisted.baseUrl).toBe(DEFAULT_CONFIG.baseUrl);
     expect(persisted.apiProtocolConfigs?.bedrock).toBeUndefined();
     expect(persisted.apiProtocolConfigs?.openai).toEqual({
-      apiKey: 'sk-openai',
+      apiKey: '',
       baseUrl: 'https://api.openai.com/v1',
       model: 'gpt-4o',
     });
@@ -1286,7 +1277,7 @@ describe('loadConfig', () => {
     const config = loadConfig();
 
     expect(config.mode).toBe('api');
-    expect(config.apiKey).toBe('sk-test');
+    expect(config.apiKey).toBe('');
     expect(config.baseUrl).toBe('https://[broken-ipv6');
     expect(config.model).toBe('custom-model');
     expect(config.apiProtocol).toBe('anthropic');

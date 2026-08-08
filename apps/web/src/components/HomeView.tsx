@@ -46,7 +46,6 @@ import {
   resolvePluginQueryFallback,
 } from '../state/projects';
 import { FigmaImportModal } from './FigmaImportModal';
-import { fetchMcpServers } from '../state/mcp';
 import { takeHomeComposerAssetSeed } from '../state/libraryHandoff';
 import { useI18n, useT } from '../i18n';
 import {
@@ -258,6 +257,7 @@ interface Props {
 const EMPTY_DESIGN_SYSTEMS: DesignSystemSummary[] = [];
 const EMPTY_SKILLS: SkillSummary[] = [];
 const EMPTY_CONNECTORS: ConnectorDetail[] = [];
+const EMPTY_MCP_OPTIONS: McpServerConfig[] = [];
 const EMPTY_PROMPT_TEMPLATES: PromptTemplateSummary[] = [];
 
 // The Home composer lives inside EntryView, which App.tsx fully UNMOUNTS the
@@ -427,8 +427,6 @@ export function HomeView({
     const persisted = await pushRecentLinkedDir(dir);
     setRecentDirs(persisted);
   }, []);
-  const [mcpServers, setMcpServers] = useState<McpServerConfig[]>([]);
-  const [mcpLoading, setMcpLoading] = useState(true);
   const [prompt, setPrompt] = useState(() => restoredDraft.prompt);
   // Treat a restored non-empty prompt as user-edited so the plugin/skill
   // replacement guard still asks before clobbering it.
@@ -543,17 +541,6 @@ export function HomeView({
     };
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchMcpServers().then((result) => {
-      if (cancelled) return;
-      setMcpServers(result?.servers ?? []);
-      setMcpLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     if (active?.mediaSurface !== 'audio' || active.inputs.model !== 'elevenlabs-v3') return;
@@ -769,10 +756,7 @@ export function HomeView({
     [skills],
   );
 
-  const enabledMcpServers = useMemo(
-    () => mcpServers.filter((server) => server.enabled),
-    [mcpServers],
-  );
+  const enabledMcpServers = EMPTY_MCP_OPTIONS;
 
   const designSystemPickerSystems = useMemo(
     () => selectableHomeDesignSystems(designSystems, defaultDesignSystemId),
@@ -2104,9 +2088,6 @@ export function HomeView({
         onRemoveConnectorContext={removeConnectorContext}
         onAddWorkspaceContext={addWorkspaceContext}
         onRemoveWorkspaceContext={removeWorkspaceContext}
-        onAddPlugin={onBrowseRegistry}
-        onAddConnector={onOpenIntegrations}
-        onAddMcp={onOpenMcp}
         onOpenPluginDetails={setDetailsRecord}
         onOpenSkillDetails={setDetailsSkill}
         pluginInputFields={(active?.inputFields ?? []).filter(
@@ -2129,8 +2110,8 @@ export function HomeView({
         skillOptions={selectableSkills}
         skillsLoading={skillsLoading}
         mcpOptions={enabledMcpServers}
-        mcpLoading={mcpLoading}
-        connectorOptions={connectors.filter((connector) => connector.status === 'connected')}
+        mcpLoading={false}
+        connectorOptions={EMPTY_CONNECTORS}
         pendingPluginId={pendingApplyId}
         pendingChipId={pendingChipId}
         submitDisabled={

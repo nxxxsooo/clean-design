@@ -1,176 +1,164 @@
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, realpath, rm } from 'node:fs/promises';
+import path from 'node:path';
+
 import type { Express } from 'express';
 import type { RouteDeps } from '../server-context.js';
+import { buildDeckRenderInput } from '../deck-export.js';
+import { buildDesktopArtifactExportInput } from '../pdf-export.js';
+import { resolveProjectDir } from '../projects.js';
+import { createHandoffPacket, HandoffPacketError } from '../handoff/packet.js';
 
 export interface RegisterHandoffRoutesDeps
-  extends RouteDeps<
-    'db' | 'http' | 'paths' | 'projectStore' | 'conversations' | 'validation' | 'handoff'
-  > {}
+  extends RouteDeps<'db' | 'http' | 'paths' | 'projectStore' | 'validation' | 'handoff'> {}
 
-/**
- * `POST /api/projects/:id/handoff` — synthesise a "first user message"
- * prompt the next conversation can send so a fresh chat can resume the
- * work without replaying the full transcript.
- *
- * Handoff is conversation-scoped: the request carries a `conversationId`
- * the route validates belongs to `:id` (404 CONVERSATION_NOT_FOUND
- * otherwise), and only that conversation's transcript is synthesized.
- *
- * The validation block and BYOK upstream call mirror
- * `import-export-routes.ts::registerFinalizeRoutes`. Error mapping is
- * largely shared but diverges deliberately: handoff maps
- * `TranscriptExportLockedError` to 409 CONFLICT (the transcript-export
- * lock is acquired transitively, not a handoff lockfile of its own),
- * maps `EmptyTranscriptError` to 400 EMPTY_TRANSCRIPT (an empty
- * conversation is caller input, not a server fault), and maps an
- * upstream 400 to the caller's 400 BAD_REQUEST rather than 502.
- */
+function packetFailure(res: any, status: number, code: HandoffPacketError['code'], message: string) {
+  return res.status(status).json({ ok: false, code, message });
+}
+
 export function registerHandoffRoutes(app: Express, ctx: RegisterHandoffRoutesDeps) {
   const { db } = ctx;
-  const { sendApiError } = ctx.http;
-  const { PROJECTS_DIR } = ctx.paths;
+  const { PROJECTS_DIR, RUNTIME_DATA_DIR } = ctx.paths;
   const { getProject } = ctx.projectStore;
-  const { getConversation } = ctx.conversations;
-  const { isSafeId, validateExternalApiBaseUrl } = ctx.validation;
+  const { isSafeId } = ctx.validation;
   const {
-    synthesizeHandoffPrompt,
-    FinalizeUpstreamError,
-    TranscriptExportLockedError,
-    EmptyTranscriptError,
-    redactSecrets,
+    trustedRootStore,
+    daemonUrlRef,
+    desktopArtifactExporter,
+    desktopSlideRenderer,
   } = ctx.handoff;
 
-  app.post('/api/projects/:id/handoff', async (req, res) => {
-    const { conversationId, apiKey, baseUrl, model, maxTokens } = req.body || {};
+  app.get('/api/projects/:id/handoff-root', async (req, res) => {
+    if (!isSafeId(req.params.id)) return packetFailure(res, 400, 'write_failed', 'Invalid project id.');
+    if (!getProject(db, req.params.id)) return packetFailure(res, 404, 'write_failed', 'Project not found.');
     try {
-      if (!isSafeId(req.params.id)) {
-        return sendApiError(res, 400, 'BAD_REQUEST', 'invalid project id');
-      }
+      const root = await trustedRootStore.get(req.params.id);
+      return res.json({
+        configured: Boolean(root),
+        ...(root ? { displayName: path.basename(root) || root } : {}),
+      });
+    } catch (error) {
+      return packetFailure(
+        res,
+        409,
+        'root_unavailable',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  });
 
-      if (typeof apiKey !== 'string' || !apiKey.trim()) {
-        return sendApiError(res, 400, 'BAD_REQUEST', 'apiKey is required');
-      }
-      if (typeof model !== 'string' || !model.trim()) {
-        return sendApiError(res, 400, 'BAD_REQUEST', 'model is required');
-      }
-      if (baseUrl !== undefined) {
-        if (typeof baseUrl !== 'string' || !baseUrl.trim()) {
-          return sendApiError(
-            res,
-            400,
-            'BAD_REQUEST',
-            'baseUrl must be a non-empty string when provided',
-          );
-        }
-        const validated = await validateExternalApiBaseUrl(baseUrl);
-        if (validated.error) {
-          return sendApiError(
-            res,
-            validated.forbidden ? 403 : 400,
-            validated.forbidden ? 'FORBIDDEN' : 'BAD_REQUEST',
-            validated.error,
-          );
-        }
-      }
-      if (maxTokens !== undefined && (typeof maxTokens !== 'number' || maxTokens <= 0)) {
-        return sendApiError(
-          res,
-          400,
-          'BAD_REQUEST',
-          'maxTokens must be a positive number when provided',
-        );
-      }
-      if (typeof conversationId !== 'string' || !conversationId.trim()) {
-        return sendApiError(res, 400, 'BAD_REQUEST', 'conversationId is required');
-      }
-      if (!isSafeId(conversationId)) {
-        return sendApiError(res, 400, 'BAD_REQUEST', 'invalid conversationId');
-      }
+  app.post('/api/projects/:id/handoff-packet', async (req, res) => {
+    if (!isSafeId(req.params.id)) return packetFailure(res, 400, 'write_failed', 'Invalid project id.');
+    const project = getProject(db, req.params.id);
+    if (!project) return packetFailure(res, 404, 'write_failed', 'Project not found.');
 
-      const project = getProject(db, req.params.id);
-      if (!project) {
-        return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found');
+    let trustedRoot: string | null;
+    try {
+      trustedRoot = await trustedRootStore.get(req.params.id);
+    } catch (error) {
+      return packetFailure(
+        res,
+        409,
+        'root_unavailable',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+    if (!trustedRoot) {
+      return packetFailure(res, 409, 'root_required', 'Choose a handoff folder before exporting.');
+    }
+
+    const metadata = project.metadata ?? null;
+    const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, metadata);
+    const render = async (request: {
+      deck: boolean;
+      fileName: string;
+      format: 'png' | 'pdf';
+      height: number;
+      html: string;
+      title: string;
+      width: number;
+    }): Promise<Buffer> => {
+      if (typeof desktopArtifactExporter !== 'function') {
+        throw new Error('desktop renderer is unavailable');
       }
-
-      // Handoff is conversation-scoped — the conversation must exist AND
-      // belong to this project, otherwise the synthesized transcript would
-      // either be empty or (worse) summarize an unrelated project's chat.
-      const conversation = getConversation(db, conversationId);
-      if (!conversation || conversation.projectId !== req.params.id) {
-        return sendApiError(
-          res,
-          404,
-          'CONVERSATION_NOT_FOUND',
-          'conversation not found in this project',
-        );
-      }
-
-      const handoffAbort = new AbortController();
-      const abortFromRequest = (): void => {
-        if (!handoffAbort.signal.aborted) handoffAbort.abort();
-      };
-      res.on('close', abortFromRequest);
-
-      let result;
+      const input = await buildDesktopArtifactExportInput({
+        daemonUrl: daemonUrlRef.current,
+        deck: request.deck,
+        fileName: request.fileName,
+        format: request.format === 'pdf' ? 'pdf' : 'image',
+        ...(request.format === 'png' ? { imageFormat: 'png' as const } : {}),
+        metadata,
+        projectId: req.params.id,
+        projectsRoot: PROJECTS_DIR,
+        sourceHtml: request.html,
+        title: request.title,
+        width: request.width,
+        height: request.height,
+      });
+      const result = await desktopArtifactExporter(input);
+      if (!result.ok || !result.path) throw new Error(result.error || 'desktop renderer returned no file');
       try {
-        result = await synthesizeHandoffPrompt(db, PROJECTS_DIR, req.params.id, {
-          conversationId,
-          apiKey,
-          baseUrl,
-          model,
-          maxTokens,
-          signal: handoffAbort.signal,
-        });
+        return await readFile(result.path);
       } finally {
-        res.off('close', abortFromRequest);
+        await rm(path.dirname(result.path), { recursive: true, force: true }).catch(() => undefined);
       }
-      res.json(result);
-    } catch (err: any) {
-      // Concurrent handoff (or a handoff that overlaps a finalize / other
-      // transcript-export consumer) loses the race on `.transcript.lock`
-      // and surfaces as `TranscriptExportLockedError` from
-      // `exportProjectTranscript`. Map it to the same `409 CONFLICT` code
-      // finalize uses for its own lockfile contention
-      // (`import-export-routes.ts:603-605`) so callers see an intentional
-      // retryable response instead of an opaque 500.
-      if (err instanceof TranscriptExportLockedError) {
-        return sendApiError(res, 409, 'CONFLICT', err.message);
-      }
+    };
 
-      // The selected conversation has no messages — fail fast as caller
-      // input rather than spending BYOK tokens on an empty synthesis.
-      if (err instanceof EmptyTranscriptError) {
-        return sendApiError(res, 400, 'EMPTY_TRANSCRIPT', err.message);
-      }
-
-      if (err instanceof FinalizeUpstreamError) {
-        const safeDetails = redactSecrets(err.rawText || '', [apiKey]);
-        const init = safeDetails ? { details: safeDetails } : {};
-        if (err.status === 401) {
-          return sendApiError(res, 401, 'UNAUTHORIZED', err.message, init);
+    const renderPptx = async (request: { fileName: string; html: string; title: string }): Promise<Buffer> => {
+      if (typeof desktopSlideRenderer !== 'function') throw new Error('desktop slide renderer is unavailable');
+      const outputDir = path.join(RUNTIME_DATA_DIR, 'handoff-render', randomUUID());
+      await mkdir(outputDir, { recursive: true });
+      try {
+        const built = await buildDeckRenderInput({
+          daemonUrl: daemonUrlRef.current,
+          deck: true,
+          editable: true,
+          fileName: request.fileName,
+          metadata,
+          outputDir,
+          projectId: req.params.id,
+          projectsRoot: PROJECTS_DIR,
+          sourceHtml: request.html,
+          title: request.title,
+        });
+        const rendered = await desktopSlideRenderer(built.input);
+        if (!rendered.ok || !rendered.pptxFile) throw new Error(rendered.error || 'desktop renderer returned no PPTX');
+        const canonicalDir = await realpath(outputDir);
+        const canonicalPptx = await realpath(rendered.pptxFile);
+        const relative = path.relative(canonicalDir, canonicalPptx);
+        if (relative.startsWith('..') || path.isAbsolute(relative)) {
+          throw new Error('desktop renderer returned a PPTX outside its scratch directory');
         }
-        if (err.status === 429) {
-          return sendApiError(res, 429, 'RATE_LIMITED', err.message, init);
-        }
-        // An upstream 400 is a deterministic request-shape error (unknown
-        // model, invalid maxTokens, malformed body) — caller input, not a
-        // transient outage. Surface it as the caller's own BAD_REQUEST with
-        // the redacted upstream detail so they fix the offending field
-        // rather than retrying a 502.
-        if (err.status === 400) {
-          return sendApiError(res, 400, 'BAD_REQUEST', err.message, init);
-        }
-        return sendApiError(res, 502, 'UPSTREAM_UNAVAILABLE', err.message, init);
+        return await readFile(canonicalPptx);
+      } finally {
+        await rm(outputDir, { recursive: true, force: true }).catch(() => undefined);
       }
+    };
 
-      const errName =
-        err && typeof err === 'object' && 'name' in err ? (err as { name?: unknown }).name : '';
-      if (errName === 'AbortError') {
-        return sendApiError(res, 503, 'UPSTREAM_UNAVAILABLE', 'handoff timed out');
+    try {
+      const result = await createHandoffPacket({
+        project: {
+          id: project.id,
+          name: project.name,
+          metadata,
+        },
+        projectRoot,
+        trustedRoot,
+        render,
+        renderPptx,
+      });
+      return res.json(result);
+    } catch (error) {
+      if (error instanceof HandoffPacketError) {
+        const status = error.code === 'secret_detected' ? 422 : error.code.startsWith('root_') ? 409 : 500;
+        return packetFailure(res, status, error.code, error.message);
       }
-
-      console.error('[handoff]', err);
-      const safeMsg = redactSecrets(String(err?.message || err), [apiKey]);
-      return sendApiError(res, 500, 'INTERNAL_ERROR', safeMsg);
+      return packetFailure(
+        res,
+        500,
+        'write_failed',
+        error instanceof Error ? error.message : String(error),
+      );
     }
   });
 }

@@ -348,6 +348,47 @@ export type DesktopUpdaterScheduler = {
   stop(reason?: string): void;
 };
 
+export function createDisabledDesktopUpdater(
+  configInput: DesktopUpdaterConfigInput,
+): DesktopUpdater {
+  const config = resolveDesktopUpdaterConfig(configInput);
+  const status: DesktopUpdateStatusSnapshot = {
+    arch: config.arch,
+    capabilities: {
+      canApplyInPlace: false,
+      canDownload: false,
+      canOpenInstaller: false,
+      requiresManualInstall: false,
+    },
+    channel: config.channel,
+    currentVersion: config.currentVersion,
+    enabled: false,
+    error: {
+      code: 'updater-unavailable',
+      message: 'Desktop updates are disabled in Clean Design.',
+    },
+    mode: config.mode,
+    paths: {
+      downloadRoot: config.downloadRoot,
+      manifestPath: join(config.downloadRoot, STORE_METADATA_FILE),
+    },
+    platform: config.platform,
+    state: DESKTOP_UPDATE_STATES.UNSUPPORTED,
+    supported: false,
+  };
+  return {
+    checkForUpdates: async () => status,
+    config,
+    downloadUpdate: async () => status,
+    handle: async () => status,
+    installUpdate: async () => status,
+    shouldAutoCheck: () => false,
+    snapshot: () => status,
+    status: async () => status,
+    subscribe: () => () => undefined,
+  };
+}
+
 type StartupSilentPayloadUpdateOptions = {
   isEnabled(): Promise<boolean>;
   requestQuit(): void;

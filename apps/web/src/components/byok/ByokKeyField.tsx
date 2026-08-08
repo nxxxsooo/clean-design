@@ -5,6 +5,8 @@ import { cleanByokApiKey } from './validation';
 
 interface ByokKeyFieldProps {
   apiKey: string;
+  configured?: boolean;
+  savedTail?: string;
   apiKeyConsoleLink: { host: string; url: string };
   apiProtocol: ApiProtocol;
   inputRef: Ref<HTMLInputElement>;
@@ -25,12 +27,15 @@ interface ByokKeyFieldProps {
   showApiKey: boolean;
   onBlur: () => void;
   onChange: (value: string) => void;
+  onClear?: () => void;
   onFocus: () => void;
   onToggleShowApiKey: () => void;
 }
 
 export function ByokKeyField({
   apiKey,
+  configured = false,
+  savedTail,
   apiKeyConsoleLink,
   apiProtocol,
   inputRef,
@@ -40,12 +45,13 @@ export function ByokKeyField({
   showApiKey,
   onBlur,
   onChange,
+  onClear,
   onFocus,
   onToggleShowApiKey,
 }: ByokKeyFieldProps) {
   const [apiKeyCleanedNotice, setApiKeyCleanedNotice] = useState(false);
   const fieldClassName =
-    requiresApiKey && !apiKey.trim()
+    requiresApiKey && !apiKey.trim() && !configured
       ? 'field settings-byok-required-empty'
       : 'field';
   const handleChange = (value: string) => {
@@ -89,7 +95,9 @@ export function ByokKeyField({
           ref={inputRef}
           aria-label={labels.apiKey}
           type={showApiKey ? 'text' : 'password'}
-          placeholder={API_KEY_PLACEHOLDERS[apiProtocol]}
+          placeholder={configured
+            ? `Saved credential${savedTail ? ` (****${savedTail})` : ''}`
+            : API_KEY_PLACEHOLDERS[apiProtocol]}
           value={apiKey}
           aria-invalid={showApiKeyInvalid || undefined}
           onChange={(e) => handleChange(e.target.value)}
@@ -107,6 +115,16 @@ export function ByokKeyField({
         >
           {showApiKey ? labels.hide : labels.show}
         </button>
+        {configured && onClear ? (
+          <button
+            type="button"
+            className="ghost"
+            onClick={onClear}
+            title="Clear saved credential"
+          >
+            Clear
+          </button>
+        ) : null}
       </div>
       {apiKeyCleanedNotice && !showApiKeyInvalid ? (
         <span className="field-inline-status success" role="status">

@@ -217,7 +217,6 @@ import { historyWithApiAttachmentContext } from '../api-attachment-context';
 import { filterImplicitProducedFiles } from '../produced-files';
 import { AvatarMenu } from './AvatarMenu';
 import { EntrySettingsMenu } from './EntrySettingsMenu';
-import { MessageCenter } from './MessageCenter';
 import { HandoffButton } from './HandoffButton';
 import { Icon } from './Icon';
 import { localizePluginTitle } from './plugins-home/localization';
@@ -8593,8 +8592,6 @@ export function ProjectView({
               onRequestPluginFolderAgentAction={handlePluginFolderAgentAction}
               activePluginActionPaths={activePluginActionPaths}
               hiddenPluginActionPaths={hiddenAssistantPluginActionPaths}
-              onShareToOpenDesign={handleShareToOpenDesign}
-              shareToOpenDesignBusyMessageId={shareToOpenDesignBusyMessageId}
               forceStreamingMessageIds={forceStreamingPluginMessageIds}
               initialDraft={chatInitialDraft}
               onboardingStarterPath={onboardingEntryRef.current?.productType ?? null}
@@ -8634,12 +8631,7 @@ export function ProjectView({
                 setError(null);
                 onModeChange('daemon');
               }}
-              onOpenAmrSettings={onOpenAmrSettings}
-              onSwitchToAmrAndRetry={handleSwitchToAmrAndRetry}
               onLaunchAntigravityOauth={handleLaunchAntigravityOauth}
-              onOpenMcpSettings={onOpenMcpSettings}
-              onBrowsePlugins={onBrowsePlugins}
-              onOpenConnectors={onOpenConnectors}
               connectRepoNeeded={connectRepoNeeded}
               githubConnected={githubConnected}
               onConnectRepo={handleConnectRepo}
@@ -8840,7 +8832,6 @@ export function ProjectView({
           messages={messages}
           artifactHtml={artifact?.html}
           conversationError={error}
-          onAuthorizeAndRetry={handleSwitchToAmrAndRetry}
           onLaunchTerminalAuth={handleLaunchAntigravityOauth}
           conversationId={activeConversationId}
           headerActions={(
@@ -8854,9 +8845,6 @@ export function ProjectView({
                 artifactKind={headerArtifact.artifact_kind}
                 metricsConsent={config.telemetry?.metrics === true}
                 installationId={config.installationId}
-              />
-              <MessageCenter
-                onOpenNotificationSettings={() => onOpenSettings('notifications')}
               />
               <EntrySettingsMenu
                 config={config}

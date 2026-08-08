@@ -26,15 +26,12 @@ import { MarketplaceView } from './components/MarketplaceView';
 import { PluginDetailView } from './components/PluginDetailView';
 import type { CreateInput, ImportClaudeDesignOutcome } from './components/NewProjectPanel';
 import { MemoryToast } from './components/MemoryToast';
-import { UpdateDialog } from './components/UpdateDialog';
 import { Toast } from './components/Toast';
 import { CenteredLoader } from './components/Loading';
 import { PetOverlay, type PetTaskCenter } from './components/pet/PetOverlay';
 import { buildPetTaskCenter } from './components/pet/taskCenter';
 import { migrateCustomPetAtlas } from './components/pet/pets';
 import { ProjectView } from './components/ProjectView';
-import { AmrArtifactUpgradeGate } from './components/AmrArtifactUpgradeGate';
-import { AmrArtifactUpgradeHomeCard } from './components/AmrArtifactUpgradeHomeCard';
 import { TooltipLayer } from './components/TooltipLayer';
 import { openWorkspaceTab, WorkspaceTabsBar } from './components/WorkspaceTabsBar';
 import {
@@ -92,6 +89,7 @@ import {
 } from './state/config';
 import { createSilentUpdatePreferenceWriter } from './state/silent-update-preference';
 import { applyAppearanceToDocument } from './state/appearance';
+import { protectConfigCredentials } from './state/credentials';
 import { isMacPlatform } from './utils/platform';
 import {
   amrArtifactUpgradeHomeMockOffer,
@@ -758,10 +756,7 @@ function AppInner() {
   // is running. Settings is irrelevant to visibility; the banner sits above
   // the modal-backdrop layer in index.css so opening Settings does not hide
   // it.
-  const showPrivacyConsent =
-    daemonConfigLoaded &&
-    config.privacyDecisionAt == null &&
-    config.onboardingCompleted === true;
+  const showPrivacyConsent = false;
   useEffect(() => {
     const body = activeProjectId
       ? { projectId: activeProjectId, fileName: activeFileName }
@@ -1270,7 +1265,11 @@ function AppInner() {
     const nextForOptimistic = silentChanged
       ? { ...next, allowSilentUpdates: prevSilent }
       : next;
-    const persisted = buildPersistedConfig(nextForOptimistic, configRef.current);
+    const protectedNext = await protectConfigCredentials(
+      nextForOptimistic,
+      latestPersistedConfigRef.current,
+    );
+    const persisted = buildPersistedConfig(protectedNext, configRef.current);
     latestPersistedConfigRef.current = persisted;
     saveConfig(persisted);
     setConfig(persisted);
@@ -2476,10 +2475,6 @@ function AppInner() {
         onRefreshAgents={refreshAgents}
         onThemeChange={handleThemeChange}
         onOpenSettings={openSettings}
-        onOpenAmrSettings={openAmrSettings}
-        onOpenMcpSettings={openMcpSettings}
-        onBrowsePlugins={openPluginRegistry}
-        onOpenConnectors={openConnectorIntegrations}
         onAdoptPetInline={handleAdoptPet}
         onTogglePet={handleTogglePet}
         onOpenPetSettings={openPetSettings}
@@ -2552,39 +2547,6 @@ function AppInner() {
         onPersistComposioKey={handleConfigPersistComposioKey}
         onOpenSettings={openSettings}
         onCompleteOnboarding={handleCompleteOnboarding}
-        artifactUpgradeSlot={
-          amrArtifactUpgradeHomeOffer ? (
-            <AmrArtifactUpgradeHomeCard
-              key={amrArtifactUpgradeHomeOffer.sessionKey}
-              profile={amrLoginStatus?.profile ?? null}
-              metricsConsent={config.telemetry?.metrics === true}
-              installationId={config.installationId}
-              onViewArtifact={() => {
-                if (
-                  !amrArtifactUpgradeHomeOffer.projectId
-                  || !amrArtifactUpgradeHomeOffer.conversationId
-                ) {
-                  navigate({ kind: 'home', view: 'projects' });
-                  return;
-                }
-                navigate({
-                  kind: 'project',
-                  projectId: amrArtifactUpgradeHomeOffer.projectId,
-                  conversationId: amrArtifactUpgradeHomeOffer.conversationId,
-                  fileName: amrArtifactUpgradeHomeOffer.fileName,
-                });
-              }}
-              onDismiss={() => {
-                if (amrArtifactUpgradeHomeMock) return;
-                setAmrArtifactUpgradeHomeOffer((current) =>
-                  current?.sessionKey === amrArtifactUpgradeHomeOffer.sessionKey
-                    ? null
-                    : current,
-                );
-              }}
-            />
-          ) : undefined
-        }
       />
     );
   }
@@ -2611,28 +2573,6 @@ function AppInner() {
         />
       )}
       <TooltipLayer />
-      <UpdateDialog />
-      <AmrArtifactUpgradeGate
-        homeVisible={route.kind === 'home' && route.view === 'home'}
-        activeProjectId={route.kind === 'project' ? route.projectId : null}
-        activeConversationId={
-          route.kind === 'project' ? route.conversationId ?? null : null
-        }
-        activeFileName={route.kind === 'project' ? route.fileName : null}
-        plan={resolvedAmrPlan}
-        planResolved={
-          amrLoginStatus !== null
-          && (amrLoginStatus.loggedIn === false || resolvedAmrPlan !== null)
-        }
-        profile={amrLoginStatus?.profile ?? null}
-        metricsConsent={config.telemetry?.metrics === true}
-        installationId={config.installationId}
-        onHomeOfferChange={
-          amrArtifactUpgradeHomeMock
-            ? undefined
-            : setAmrArtifactUpgradeHomeOffer
-        }
-      />
       <AnimatePresence>
       {settingsOpen ? (
         <SettingsDialog

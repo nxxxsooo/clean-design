@@ -245,6 +245,8 @@ export interface MediaProviderCredentials {
 
 export interface ApiProtocolConfig {
   apiKey: string;
+  apiKeyConfigured?: boolean;
+  apiKeyTail?: string;
   baseUrl: string;
   model: string;
   apiVersion?: string;
@@ -381,6 +383,8 @@ export interface PetConfig {
 export interface AppConfig {
   mode: ExecMode;
   apiKey: string;
+  apiKeyConfigured?: boolean;
+  apiKeyTail?: string;
   baseUrl: string;
   model: string;
   apiProtocol?: ApiProtocol;

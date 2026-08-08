@@ -426,52 +426,15 @@ describe('buildPackagedDaemonSpawnEnv', () => {
     expect(env.OD_DAEMON_CLI_PATH).toBe('/path/to/cli/dist/index.js');
   });
 
-  it('forwards the packaged telemetry relay URL to the daemon when configured', () => {
+  it('never forwards AMR or telemetry configuration to the daemon', () => {
     const env = buildPackagedDaemonSpawnEnv(fakePaths(), {
       appVersion: null,
       daemonCliEntry: null,
       legacyDataDir: null,
       requireDesktopAuth: true,
-      telemetryRelayUrl: 'https://telemetry.open-design.ai/api/langfuse',
     });
-    expect(env.OPEN_DESIGN_TELEMETRY_RELAY_URL).toBe(
-      'https://telemetry.open-design.ai/api/langfuse',
-    );
-  });
-
-  it('forwards the packaged AMR profile to the daemon when configured', () => {
-    const env = buildPackagedDaemonSpawnEnv(fakePaths(), {
-      appVersion: null,
-      amrProfile: 'test',
-      daemonCliEntry: null,
-      legacyDataDir: null,
-      requireDesktopAuth: true,
-    });
-    expect(env.OPEN_DESIGN_AMR_PROFILE).toBe('test');
-  });
-
-  it('forwards POSTHOG_KEY/POSTHOG_HOST to the daemon spawn env when baked into the bundle', () => {
-    const env = buildPackagedDaemonSpawnEnv(fakePaths(), {
-      appVersion: null,
-      daemonCliEntry: null,
-      legacyDataDir: null,
-      requireDesktopAuth: true,
-      posthogKey: 'phc_packaged_test',
-      posthogHost: 'https://us.i.posthog.com',
-    });
-    expect(env.POSTHOG_KEY).toBe('phc_packaged_test');
-    expect(env.POSTHOG_HOST).toBe('https://us.i.posthog.com');
-  });
-
-  it('omits POSTHOG_KEY/POSTHOG_HOST for fork builds that lack the secret', () => {
-    const env = buildPackagedDaemonSpawnEnv(fakePaths(), {
-      appVersion: null,
-      daemonCliEntry: null,
-      legacyDataDir: null,
-      requireDesktopAuth: true,
-      posthogKey: null,
-      posthogHost: null,
-    });
+    expect(env.OPEN_DESIGN_AMR_PROFILE).toBeUndefined();
+    expect(env.OPEN_DESIGN_TELEMETRY_RELAY_URL).toBeUndefined();
     expect(env.POSTHOG_KEY).toBeUndefined();
     expect(env.POSTHOG_HOST).toBeUndefined();
   });

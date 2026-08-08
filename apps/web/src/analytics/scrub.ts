@@ -8,7 +8,11 @@
 // single function is easier to audit and harder to forget when a new
 // sensitive surface ships.
 
-import type { CaptureResult } from 'posthog-js';
+export interface CaptureResult {
+  event: string;
+  properties: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 // Tags whose text content can carry user-typed values. PostHog autocapture
 // does not capture input/textarea `value` properties by default, but it

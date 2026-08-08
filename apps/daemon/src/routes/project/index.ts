@@ -1582,6 +1582,14 @@ export function registerProjectRoutes(app: Express, ctx: RegisterProjectRoutesDe
             'fromTrustedPicker can only be set via POST /api/import/folder',
           );
         }
+        if ('handoffRoot' in metadata || 'trustedHandoffRoot' in metadata) {
+          return sendApiError(
+            res,
+            400,
+            'BAD_REQUEST',
+            'handoff root can only be set through the native desktop picker',
+          );
+        }
         if ('orchestratorWorkspace' in metadata) {
           return sendApiError(
             res, 400, 'BAD_REQUEST',
@@ -2122,6 +2130,14 @@ export function registerProjectRoutes(app: Express, ctx: RegisterProjectRoutesDe
       if (patch.metadata && typeof patch.metadata === 'object') {
         const existing = getProject(db, req.params.id);
         const existingMeta = existing?.metadata;
+        if ('handoffRoot' in patch.metadata || 'trustedHandoffRoot' in patch.metadata) {
+          return sendApiError(
+            res,
+            400,
+            'BAD_REQUEST',
+            'handoff root can only be set through the native desktop picker',
+          );
+        }
         if ('fromTrustedPicker' in patch.metadata
             && patch.metadata.fromTrustedPicker !== existingMeta?.fromTrustedPicker) {
           return sendApiError(

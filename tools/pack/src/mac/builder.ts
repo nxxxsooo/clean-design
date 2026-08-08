@@ -143,12 +143,6 @@ export async function runElectronBuilder(
         schemes: ["cleandesign"],
       },
     ],
-    publish: [
-      {
-        provider: "generic",
-        url: "https://updates.invalid/clean-design",
-      },
-    ],
   };
 
   await rm(paths.appBuilderOutputRoot, { force: true, recursive: true });

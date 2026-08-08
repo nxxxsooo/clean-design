@@ -21,19 +21,19 @@
 
 ## 4. Encrypted Credential References
 
-- [ ] 4.1 Add shared credential-reference contracts and authenticated desktop IPC/API boundaries
-- [ ] 4.2 Implement the Electron protected-storage vault with atomic mode-0600 writes, masking, deletion, and fail-closed behavior
-- [ ] 4.3 Replace renderer localStorage secrets for chat, media, and CLI overrides with credential references
-- [ ] 4.4 Register decrypted values ephemerally with the daemon and add authorization, persistence, and redaction tests
+- [x] 4.1 Add shared credential-reference contracts and authenticated desktop IPC/API boundaries
+- [x] 4.2 Implement the Electron protected-storage vault with atomic mode-0600 writes, masking, deletion, and fail-closed behavior
+- [x] 4.3 Replace renderer localStorage secrets for chat, media, and CLI overrides with credential references
+- [x] 4.4 Register decrypted values ephemerally with the daemon and add authorization, persistence, and redaction tests
 
 ## 5. Immutable Prompt Handoff
 
-- [ ] 5.1 Add manifest-v1, trusted-root, packet request/response, warning, and stable error contracts
-- [ ] 5.2 Implement desktop-authenticated folder selection and privileged canonical handoff-root metadata
-- [ ] 5.3 Refactor the symlink-safe archive walker into a size-limited, realpath-contained, secret-filtered packet collector
-- [ ] 5.4 Implement deterministic prompt, manifest hashing, immutable path allocation, temporary build, and atomic publication
-- [ ] 5.5 Integrate required HTML/deck/document/media/brand previews and optional PPTX warning behavior
-- [ ] 5.6 Replace agent-selector handoff UI with Export handoff, progress, warnings, stable errors, and clipboard fallback
+- [x] 5.1 Add manifest-v1, trusted-root, packet request/response, warning, and stable error contracts
+- [x] 5.2 Implement desktop-authenticated folder selection and privileged canonical handoff-root metadata
+- [x] 5.3 Refactor the symlink-safe archive walker into a size-limited, realpath-contained, secret-filtered packet collector
+- [x] 5.4 Implement deterministic prompt, manifest hashing, immutable path allocation, temporary build, and atomic publication
+- [x] 5.5 Integrate required HTML/deck/document/media/brand previews and optional PPTX warning behavior
+- [x] 5.6 Replace agent-selector handoff UI with Export handoff, progress, warnings, stable errors, and clipboard fallback
 - [ ] 5.7 Add unit, integration, and Playwright coverage for trust, secrets, atomicity, collisions, formats, and clipboard failure
 
 ## 6. Acceptance and Release Gate

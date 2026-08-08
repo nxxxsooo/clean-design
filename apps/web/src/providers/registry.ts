@@ -72,6 +72,7 @@ import type {
 } from '../types';
 import type { ArtifactManifest } from '../artifacts/types';
 import { GENERIC_DEPLOY_ENVELOPE_CODES } from '../analytics/deploy-error-code';
+import { isCleanDesignDisabledAgent } from '@open-design/contracts';
 import {
   isOpenDesignHostAvailable,
   openHostExternalUrl,
@@ -109,7 +110,7 @@ export async function fetchAgents(options?: { throwOnError?: boolean }): Promise
       return [];
     }
     const json = (await resp.json()) as { agents: AgentInfo[] };
-    return json.agents ?? [];
+    return (json.agents ?? []).filter((agent) => !isCleanDesignDisabledAgent(agent.id));
   } catch (err) {
     if (options?.throwOnError) throw err;
     return [];
@@ -176,6 +177,7 @@ export async function fetchAgentsStream(args: {
     if (eventName === 'agent' && data) {
       try {
         const agent = JSON.parse(data) as AgentInfo;
+        if (isCleanDesignDisabledAgent(agent.id)) return;
         collected.push(agent);
         onAgent(agent);
       } catch {

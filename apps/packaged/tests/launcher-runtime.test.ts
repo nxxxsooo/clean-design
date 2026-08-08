@@ -19,18 +19,13 @@ import { resolvePackagedNamespacePaths } from "../src/paths.js";
 
 function fakeConfig(root: string, appVersion = "1.2.3-beta.4"): PackagedConfig {
   return {
-    amrProfile: null,
     appVersion,
     daemonCliEntry: null,
     daemonSidecarEntry: null,
     namespace: "release-beta",
     namespaceBaseRoot: join(root, "namespaces"),
     nodeCommand: null,
-    posthogHost: null,
-    posthogKey: null,
     resourceRoot: join(root, "installed", "resources", "open-design"),
-    telemetryRelayUrl: null,
-    updateMetadataUrl: null,
     webOutputMode: "server",
     webSidecarEntry: null,
     webStandaloneRoot: null,

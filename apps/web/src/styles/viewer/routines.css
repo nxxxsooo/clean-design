@@ -2838,6 +2838,49 @@ body.od-quick-switcher-open .chat-composer-fixed-layer .composer-send:disabled {
   color: var(--text-danger, #c0392b);
   padding: 4px 10px 6px;
 }
+.app .handoff-export-result {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.app .handoff-export-result > p {
+  margin: 0;
+}
+.app .handoff-export-path {
+  display: block;
+  min-width: 0;
+  padding: 7px 8px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+.app .handoff-menu-warning {
+  color: var(--text-muted);
+}
+.app .handoff-prompt-fallback {
+  width: 100%;
+  min-height: 180px;
+  resize: vertical;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text);
+  font: 11px/1.45 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+.app .handoff-prompt-fallback:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  outline-offset: 1px;
+}
 
 /* -- Project-page design-system picker (project chrome header) -- */
 .project-ds-picker {

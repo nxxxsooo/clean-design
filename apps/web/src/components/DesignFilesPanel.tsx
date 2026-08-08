@@ -1234,28 +1234,6 @@ export function DesignFilesPanel({
                           >
                             {installingFolder === folder.path ? 'Sending…' : 'Add to My plugins'}
                           </button>
-                          <button
-                            type="button"
-                            className="df-plugin-install"
-                            data-testid={`design-plugin-folder-publish-${folder.path}`}
-                            disabled={actionBusy || installingFolder !== null || sharingFolder !== null}
-                            onClick={() =>
-                              void handlePluginFolderAgentAction(folder.path, 'publish')
-                            }
-                          >
-                            {sharingFolder === `publish:${folder.path}` ? 'Sending…' : 'Publish repo'}
-                          </button>
-                          <button
-                            type="button"
-                            className="df-plugin-install"
-                            data-testid={`design-plugin-folder-contribute-${folder.path}`}
-                            disabled={actionBusy || installingFolder !== null || sharingFolder !== null}
-                            onClick={() =>
-                              void handlePluginFolderAgentAction(folder.path, 'contribute')
-                            }
-                          >
-                            {sharingFolder === `contribute:${folder.path}` ? 'Sending…' : 'Clean Design PR'}
-                          </button>
                         </div>
                       ) : null}
                     </div>

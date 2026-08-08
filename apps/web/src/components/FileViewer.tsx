@@ -170,6 +170,8 @@ import { RemixIcon } from './RemixIcon';
 import { SocialShareGrid } from './SocialShareGrid';
 import { Toast } from './Toast';
 import { PreviewDrawOverlay, type DrawToolbarElement } from './PreviewDrawOverlay';
+
+const CLEAN_DESIGN_DEPLOY_ENABLED = false;
 import {
   buildBoardCommentAttachments,
   commentSnapshotEqual,
@@ -7070,6 +7072,7 @@ function HtmlViewer({
   ]);
 
   useEffect(() => {
+    if (!CLEAN_DESIGN_DEPLOY_ENABLED) return;
     let cancelled = false;
     setDeployResult(null);
     setDeployError(null);
@@ -10308,6 +10311,7 @@ function HtmlViewer({
     artifactKind === 'html' ||
     rendererId === 'html';
   const canShare = source !== null && isShareableArtifact;
+  const canPublish = CLEAN_DESIGN_DEPLOY_ENABLED && canShare;
   const canDownload = source !== null && (isShareableArtifact || isMarkdownArtifact);
   // PPTX export is slide-based, so show it only for explicit decks plus
   // structured deck runtimes. Do not key this off plain `.slide`: ordinary
@@ -11850,7 +11854,7 @@ function HtmlViewer({
           ) : null}
           {canShare || canDownload ? (
             <div className="chrome-file-action-menus" ref={shareRef}>
-              {canShare ? (
+              {canPublish ? (
                 <div className="share-menu chrome-share-menu">
                   <button
                     type="button"
@@ -12856,7 +12860,7 @@ function HtmlViewer({
         </div>,
         document.body,
       ) : null}
-      {deployModalOpen && typeof document !== 'undefined' ? createPortal(
+      {CLEAN_DESIGN_DEPLOY_ENABLED && deployModalOpen && typeof document !== 'undefined' ? createPortal(
         <div
           className="modal-backdrop viewer-modal-backdrop deploy-flow-backdrop"
           role="presentation"

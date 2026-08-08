@@ -46,6 +46,18 @@ export function isOpenDesignHostBridge(value: unknown): value is OpenDesignHostB
   const capture = value.capture;
   if (!isRecord(capture) || !hasFunction(capture, "page")) return false;
 
+  const credentials = value.credentials;
+  if (
+    credentials != null
+    && (!isRecord(credentials)
+      || !hasFunction(credentials, 'list')
+      || !hasFunction(credentials, 'save')
+      || !hasFunction(credentials, 'delete'))
+  ) return false;
+
+  const handoff = value.handoff;
+  if (handoff != null && (!isRecord(handoff) || !hasFunction(handoff, 'selectRoot'))) return false;
+
   const project = value.project;
   if (
     !isRecord(project) ||

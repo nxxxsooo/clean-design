@@ -16,6 +16,11 @@ import type {
   OpenDesignHostUpdaterOpenDialogRequest,
   OpenDesignHostUpdaterStatusListener,
   OpenDesignHostUpdaterStatusSnapshot,
+  CredentialDeleteResult,
+  CredentialListResult,
+  CredentialSaveResult,
+  SaveCredentialRequest,
+  OpenDesignHostHandoffRootResult,
 } from '@open-design/host';
 
 const OPEN_DESIGN_HOST_GLOBAL: typeof import('@open-design/host').OPEN_DESIGN_HOST_GLOBAL = '__od__';
@@ -243,6 +248,40 @@ const capture = {
   },
 };
 
+const credentials = {
+  list: async (): Promise<CredentialListResult> => {
+    try {
+      return await ipcRenderer.invoke('cd:credentials:list');
+    } catch (error) {
+      return { ok: false, reason: reasonFromError(error) };
+    }
+  },
+  save: async (input: SaveCredentialRequest): Promise<CredentialSaveResult> => {
+    try {
+      return await ipcRenderer.invoke('cd:credentials:save', input);
+    } catch (error) {
+      return { ok: false, reason: reasonFromError(error) };
+    }
+  },
+  delete: async (ref: string): Promise<CredentialDeleteResult> => {
+    try {
+      return await ipcRenderer.invoke('cd:credentials:delete', ref);
+    } catch (error) {
+      return { ok: false, reason: reasonFromError(error) };
+    }
+  },
+};
+
+const handoff = {
+  selectRoot: async (projectId: string): Promise<OpenDesignHostHandoffRootResult> => {
+    try {
+      return await ipcRenderer.invoke('cd:handoff:select-root', projectId);
+    } catch (error) {
+      return { ok: false, reason: reasonFromError(error) };
+    }
+  },
+};
+
 function invokeUpdater(
   action: 'check' | 'download' | 'install' | 'status',
   options?: OpenDesignHostUpdaterActionOptions,
@@ -310,6 +349,8 @@ const hostBridge = {
   shell,
   browser,
   capture,
+  credentials,
+  handoff,
   project,
   pdf: {
     print: async (html: string, nonce?: string, options?: PrintPdfOptions): Promise<OpenDesignHostActionResult> => {

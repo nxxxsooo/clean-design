@@ -90,6 +90,8 @@ export const SIDECAR_MESSAGES = Object.freeze({
   EXPORT_PDF: "export-pdf",
   MINT_IMPORT_TOKEN: "mint-import-token",
   REGISTER_DESKTOP_AUTH: "register-desktop-auth",
+  SET_HANDOFF_ROOT: "set-handoff-root",
+  SYNC_CREDENTIALS: "sync-credentials",
   RENDER_SLIDES: "render-slides",
   SCREENSHOT: "screenshot",
   SHUTDOWN: "shutdown",
@@ -516,6 +518,70 @@ export type RegisterDesktopAuthResult = {
   accepted: true;
 };
 
+export type SyncedCredential = {
+  ref: string;
+  mask: string;
+  secret: string;
+};
+
+export type SyncCredentialsInput = {
+  credentials: SyncedCredential[];
+  issuedAt: string;
+  nonce: string;
+  signature: string;
+};
+
+export type SyncCredentialsMessage = {
+  input: SyncCredentialsInput;
+  type: typeof SIDECAR_MESSAGES.SYNC_CREDENTIALS;
+};
+
+export type SyncCredentialsResult = {
+  accepted: true;
+  count: number;
+};
+
+export type SetHandoffRootInput = {
+  projectId: string;
+  root: string;
+  issuedAt: string;
+  nonce: string;
+  signature: string;
+};
+
+export type SetHandoffRootMessage = {
+  input: SetHandoffRootInput;
+  type: typeof SIDECAR_MESSAGES.SET_HANDOFF_ROOT;
+};
+
+export type SetHandoffRootResult = {
+  accepted: true;
+  displayName: string;
+};
+
+export function handoffRootSigningPayload(
+  input: Pick<SetHandoffRootInput, 'projectId' | 'root' | 'issuedAt' | 'nonce'>,
+): string {
+  return JSON.stringify({
+    projectId: input.projectId,
+    root: input.root,
+    issuedAt: input.issuedAt,
+    nonce: input.nonce,
+  });
+}
+
+export function credentialSyncSigningPayload(
+  input: Pick<SyncCredentialsInput, 'credentials' | 'issuedAt' | 'nonce'>,
+): string {
+  return JSON.stringify({
+    credentials: [...input.credentials]
+      .map(({ ref, mask, secret }) => ({ ref, mask, secret }))
+      .sort((a, b) => a.ref.localeCompare(b.ref)),
+    issuedAt: input.issuedAt,
+    nonce: input.nonce,
+  });
+}
+
 export type MintImportTokenInput = {
   baseDir: string;
 };
@@ -534,6 +600,8 @@ export type DaemonSidecarMessage =
   | SidecarStatusMessage
   | SidecarShutdownMessage
   | RegisterDesktopAuthMessage
+  | SetHandoffRootMessage
+  | SyncCredentialsMessage
   | MintImportTokenMessage;
 export type WebSidecarMessage = SidecarStatusMessage | SidecarShutdownMessage;
 export type DesktopSidecarMessage =
@@ -729,6 +797,52 @@ function normalizeRegisterDesktopAuthInput(input: unknown): RegisterDesktopAuthI
   return { secret };
 }
 
+function normalizeSyncCredentialsInput(input: unknown): SyncCredentialsInput {
+  const value = assertObject(input, "sync-credentials input");
+  assertKnownKeys(value, ["credentials", "issuedAt", "nonce", "signature"], "sync-credentials input");
+  if (!Array.isArray(value.credentials) || value.credentials.length > 256) {
+    throw new Error("sync-credentials credentials must be a bounded array");
+  }
+  const credentials = value.credentials.map((candidate, index) => {
+    const entry = assertObject(candidate, `sync-credentials credential ${index}`);
+    assertKnownKeys(entry, ["ref", "mask", "secret"], `sync-credentials credential ${index}`);
+    const ref = normalizeNonEmptyString(entry.ref, `sync-credentials credential ${index} ref`);
+    const mask = normalizeNonEmptyString(entry.mask, `sync-credentials credential ${index} mask`);
+    const secret = normalizeNonEmptyString(entry.secret, `sync-credentials credential ${index} secret`);
+    if (!/^credential:\/\/[A-Za-z0-9_-]{16,64}$/.test(ref)) {
+      throw new Error(`sync-credentials credential ${index} ref is invalid`);
+    }
+    if (mask.length > 128 || secret.length > 64 * 1024) {
+      throw new Error(`sync-credentials credential ${index} exceeds limits`);
+    }
+    return { ref, mask, secret };
+  });
+  const issuedAt = normalizeNonEmptyString(value.issuedAt, "sync-credentials issuedAt");
+  if (!Number.isFinite(Date.parse(issuedAt))) throw new Error("sync-credentials issuedAt is invalid");
+  const nonce = normalizeNonEmptyString(value.nonce, "sync-credentials nonce");
+  const signature = normalizeNonEmptyString(value.signature, "sync-credentials signature");
+  if (!/^[A-Za-z0-9_-]{32,128}$/.test(nonce) || !/^[A-Za-z0-9_-]{32,128}$/.test(signature)) {
+    throw new Error("sync-credentials authentication fields are invalid");
+  }
+  return { credentials, issuedAt, nonce, signature };
+}
+
+function normalizeSetHandoffRootInput(input: unknown): SetHandoffRootInput {
+  const value = assertObject(input, 'set-handoff-root input');
+  assertKnownKeys(value, ['projectId', 'root', 'issuedAt', 'nonce', 'signature'], 'set-handoff-root input');
+  const projectId = normalizeNonEmptyString(value.projectId, 'set-handoff-root projectId');
+  const root = normalizeNonEmptyString(value.root, 'set-handoff-root root');
+  const issuedAt = normalizeNonEmptyString(value.issuedAt, 'set-handoff-root issuedAt');
+  const nonce = normalizeNonEmptyString(value.nonce, 'set-handoff-root nonce');
+  const signature = normalizeNonEmptyString(value.signature, 'set-handoff-root signature');
+  if (!/^[A-Za-z0-9_-]{1,160}$/.test(projectId)) throw new Error('set-handoff-root projectId is invalid');
+  if (!Number.isFinite(Date.parse(issuedAt))) throw new Error('set-handoff-root issuedAt is invalid');
+  if (!/^[A-Za-z0-9_-]{32,128}$/.test(nonce) || !/^[A-Za-z0-9_-]{32,128}$/.test(signature)) {
+    throw new Error('set-handoff-root authentication fields are invalid');
+  }
+  return { projectId, root, issuedAt, nonce, signature };
+}
+
 function normalizeMintImportTokenInput(input: unknown): MintImportTokenInput {
   const value = assertObject(input, "mint-import-token input");
   assertKnownKeys(value, ["baseDir"], "mint-import-token input");
@@ -859,6 +973,14 @@ export function normalizeDaemonSidecarMessage(input: unknown): DaemonSidecarMess
   if (type === SIDECAR_MESSAGES.REGISTER_DESKTOP_AUTH) {
     assertKnownKeys(value, ["input", "type"], "daemon sidecar message");
     return { input: normalizeRegisterDesktopAuthInput(value.input), type };
+  }
+  if (type === SIDECAR_MESSAGES.SYNC_CREDENTIALS) {
+    assertKnownKeys(value, ["input", "type"], "daemon sidecar message");
+    return { input: normalizeSyncCredentialsInput(value.input), type };
+  }
+  if (type === SIDECAR_MESSAGES.SET_HANDOFF_ROOT) {
+    assertKnownKeys(value, ['input', 'type'], 'daemon sidecar message');
+    return { input: normalizeSetHandoffRootInput(value.input), type };
   }
   if (type === SIDECAR_MESSAGES.MINT_IMPORT_TOKEN) {
     assertKnownKeys(value, ["input", "type"], "daemon sidecar message");

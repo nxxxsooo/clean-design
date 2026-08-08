@@ -60,6 +60,13 @@ export type {
   OpenDesignHostUpdaterOpenDialogListener,
   OpenDesignHostBridge,
   OpenDesignHostGlobalScope,
+  OpenDesignHostHandoffRootResult,
+  CredentialDeleteResult,
+  CredentialKind,
+  CredentialListResult,
+  CredentialMetadata,
+  CredentialSaveResult,
+  SaveCredentialRequest,
 } from "./protocol.js";
 
 // --- detection: locate + validate the injected bridge ---
@@ -79,6 +86,10 @@ export {
 
 // --- actions: renderer-facing host action wrappers ---
 export {
+  deleteHostCredential,
+  listHostCredentials,
+  saveHostCredential,
+  selectHostHandoffRoot,
   openHostExternalUrl,
   openHostProjectPath,
   clearHostBrowserData,

@@ -35,6 +35,35 @@ export type OpenDesignHostFailure = {
   reason: string;
 };
 
+export type CredentialKind = 'chat-provider' | 'media-provider' | 'cli-override';
+export type CredentialMetadata = {
+  ref: string;
+  slot: string;
+  kind: CredentialKind;
+  label: string;
+  mask: string;
+  updatedAt: string;
+};
+export type SaveCredentialRequest = {
+  slot: string;
+  kind: CredentialKind;
+  label: string;
+  secret: string;
+};
+export type CredentialListResult =
+  | { ok: true; credentials: CredentialMetadata[] }
+  | { ok: false; reason: string };
+export type CredentialSaveResult =
+  | { ok: true; credential: CredentialMetadata }
+  | { ok: false; reason: string };
+export type CredentialDeleteResult =
+  | { ok: true; deleted: boolean }
+  | { ok: false; reason: string };
+export type OpenDesignHostHandoffRootResult =
+  | { ok: true; configured: true; displayName: string }
+  | { ok: false; canceled: true }
+  | OpenDesignHostFailure;
+
 export type OpenDesignHostActionResult =
   | { ok: true }
   | OpenDesignHostFailure;
@@ -298,6 +327,14 @@ export type OpenDesignHostBridge = {
   };
   capture: {
     page(options?: OpenDesignHostCaptureOptions): Promise<OpenDesignHostCaptureResult>;
+  };
+  credentials?: {
+    list(): Promise<CredentialListResult>;
+    save(input: SaveCredentialRequest): Promise<CredentialSaveResult>;
+    delete(ref: string): Promise<CredentialDeleteResult>;
+  };
+  handoff?: {
+    selectRoot(projectId: string): Promise<OpenDesignHostHandoffRootResult>;
   };
   client: OpenDesignHostClient;
   pdf: {

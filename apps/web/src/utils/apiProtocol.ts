@@ -55,7 +55,7 @@ export function usesAnthropicProxy(cfg: AppConfig): boolean {
   if (!cfg.apiProtocol && isOpenAICompatible(cfg.model, cfg.baseUrl)) {
     return false;
   }
-  return Boolean(cfg.baseUrl && cfg.baseUrl !== 'https://api.anthropic.com');
+  return true;
 }
 
 export function isAnthropicSupportedImagePath(path: string): boolean {

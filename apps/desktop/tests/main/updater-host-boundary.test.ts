@@ -23,15 +23,11 @@ describe("desktop updater host boundary", () => {
     expect(runtime).toContain("event.sender !== window.webContents");
   });
 
-  it("does not turn automatic startup checks into native desktop dialogs", () => {
+  it("does not start an automatic updater scheduler", () => {
     const main = source("src/main/index.ts");
-    const scheduleStart = main.indexOf("updateScheduler = createDesktopUpdaterScheduler");
-    const nextSection = main.indexOf("attachParentMonitor", scheduleStart);
-    expect(scheduleStart).toBeGreaterThanOrEqual(0);
-    expect(nextSection).toBeGreaterThan(scheduleStart);
-    const scheduleBody = main.slice(scheduleStart, nextSection);
-    expect(scheduleBody).toContain("updateScheduler.start()");
-    expect(scheduleBody).not.toContain("showUpdateResultDialog");
+    expect(main).toContain("createDisabledDesktopUpdater");
+    expect(main).not.toContain("createDesktopUpdaterScheduler");
+    expect(main).not.toContain("updateScheduler.start()");
   });
 
   it("starts desktop IPC before creating the BrowserWindow runtime", () => {
@@ -70,22 +66,11 @@ describe("desktop updater host boundary", () => {
     expect(main).not.toContain("return await updater.status()");
   });
 
-  it("adds updater access to the macOS app menu without changing the Windows File menu", () => {
+  it("does not expose updater access in the application menu", () => {
     const main = source("src/main/index.ts");
-    expect(main).toContain("deriveDesktopUpdateMenuItem");
-    expect(main).toContain("DEFAULT_DESKTOP_UPDATE_MENU_LABELS");
-    expect(main).toContain('source: "mac-app-menu"');
-    expect(main).toContain("updateMenuItem.visible");
-    const fileMenuStart = main.indexOf('label: "File"');
-    const editMenuStart = main.indexOf('label: "Edit"', fileMenuStart);
-    expect(fileMenuStart).toBeGreaterThanOrEqual(0);
-    expect(editMenuStart).toBeGreaterThan(fileMenuStart);
-    const fileMenu = main.slice(fileMenuStart, editMenuStart);
-    expect(fileMenu).not.toContain("updateMenuItem");
-    expect(main).not.toContain("showUpdateResultDialog");
-    const runtime = source("src/main/runtime.ts");
-    expect(runtime).toContain("pendingUpdateDialogRequest");
-    expect(runtime).toContain("if (!revealed)");
+    expect(main).not.toContain("deriveDesktopUpdateMenuItem");
+    expect(main).not.toContain("DEFAULT_DESKTOP_UPDATE_MENU_LABELS");
+    expect(main).not.toContain('id: "check-for-updates"');
   });
 
   it("keeps installer launch separate from desktop process shutdown", () => {

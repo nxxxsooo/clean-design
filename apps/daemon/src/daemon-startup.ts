@@ -32,7 +32,11 @@ export const DEFAULT_DAEMON_BIND_HOST = '127.0.0.1';
 
 export function normalizeDaemonBindHost(input: unknown): string {
   const host = String(input ?? '').trim();
-  return host || DEFAULT_DAEMON_BIND_HOST;
+  if (!host) return DEFAULT_DAEMON_BIND_HOST;
+  if (host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]') {
+    return host;
+  }
+  throw new Error(`Clean Design only permits loopback daemon binds, received: ${host}`);
 }
 
 function requiredOptionValue(flag: string, value: string | undefined, label: string): string | DaemonCliStartupParseResult {

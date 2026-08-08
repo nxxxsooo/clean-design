@@ -83,6 +83,10 @@ import {
   syncConfigToDaemon,
   syncMediaProvidersToDaemon,
 } from '../state/config';
+import {
+  credentialInputValue,
+  credentialIsConfigured,
+} from '../state/credentials';
 import type { KnownProvider } from '../state/config';
 import { navigate as navigateRoute, useRoute } from '../router';
 import {
@@ -223,6 +227,17 @@ export type SettingsSection =
   // navigate() call so openSettings only owns dialog-bound sections.
   | 'library'
   | 'about';
+
+const LOCAL_ONLY_DISABLED_SETTINGS = new Set<SettingsSection>([
+  'composio',
+  'integrations',
+  'mcpClient',
+  'privacy',
+]);
+
+function localOnlySettingsSection(section: SettingsSection): SettingsSection {
+  return LOCAL_ONLY_DISABLED_SETTINGS.has(section) ? 'execution' : section;
+}
 
 interface ByokProviderPreset {
   id: string;
@@ -1562,7 +1577,9 @@ export function SettingsDialog({
       ? { [initial.apiProtocol ?? 'anthropic']: byokProviderKeyForConfig(initial) }
       : {},
   );
-  const [activeSection, setActiveSection] = useState<SettingsSection>(initialSection);
+  const [activeSection, setActiveSection] = useState<SettingsSection>(
+    localOnlySettingsSection(initialSection),
+  );
   const [settingsSidebarCollapsed, setSettingsSidebarCollapsed] = useState(false);
   const [settingsFullscreen, setSettingsFullscreen] = useState(false);
   // Scroll the right-hand content pane back to the top whenever the user
@@ -1923,7 +1940,7 @@ export function SettingsDialog({
   // routes through this when the MCP tab is active so the user can press the
   // single Save button at the bottom instead of hunting for the inner one.
   useEffect(() => {
-    setActiveSection(initialSection);
+    setActiveSection(localOnlySettingsSection(initialSection));
   }, [initialSection]);
 
   // settings_view — fires whenever the active section changes (and once on
@@ -3417,6 +3434,10 @@ export function SettingsDialog({
     setProviderModelsCommittedKey(providerModelsKey);
   };
   const onByokKeyCommit = () => {
+    if (credentialIsConfigured(cfg.apiKey)) {
+      commitProviderModelsInputs();
+      return;
+    }
     // Normalize the stored key on blur so the value that flows into the
     // connection-test / model-fetch requests below (and back to the daemon
     // via autosave) is already free of pasted whitespace / zero-width
@@ -4130,39 +4151,6 @@ export function SettingsDialog({
             </button>
             <button
               type="button"
-              className={`settings-nav-item${activeSection === 'mcpClient' ? ' active' : ''}`}
-              onClick={() => setActiveSection('mcpClient')}
-            >
-              <Icon name="sparkles" size={18} />
-              <span>
-                <strong>{t('settings.externalMcpTitle')}</strong>
-                <small>{t('settings.externalMcpHint')}</small>
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`settings-nav-item${activeSection === 'composio' ? ' active' : ''}`}
-              onClick={() => setActiveSection('composio')}
-            >
-              <Icon name="sliders" size={18} />
-              <span>
-                <strong>{t('connectors.title')}</strong>
-                <small>{t('settings.connectorsNavHint')}</small>
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`settings-nav-item${activeSection === 'integrations' ? ' active' : ''}`}
-              onClick={() => setActiveSection('integrations')}
-            >
-              <Icon name="link" size={18} />
-              <span>
-                <strong>{t('settings.mcpServerTitle')}</strong>
-                <small>{t('settings.mcpServerHint')}</small>
-              </span>
-            </button>
-            <button
-              type="button"
               className={`settings-nav-item${activeSection === 'language' ? ' active' : ''}`}
               onClick={() => setActiveSection('language')}
             >
@@ -4236,17 +4224,6 @@ export function SettingsDialog({
               <span>
                 <strong>{t('settings.projectLocations')}</strong>
                 <small>{t('settings.projectLocationsHint')}</small>
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`settings-nav-item${activeSection === 'privacy' ? ' active' : ''}`}
-              onClick={() => setActiveSection('privacy')}
-            >
-              <Icon name="eye" size={18} />
-              <span>
-                <strong>{t('settings.privacy')}</strong>
-                <small>{t('settings.privacyHint')}</small>
               </span>
             </button>
             <button
@@ -5089,9 +5066,9 @@ export function SettingsDialog({
                                   : 'text'
                               }
                               value={
-                                cfg.agentCliEnv?.[field.agentId]?.[
-                                  field.envKey
-                                ] ?? ''
+                                'secret' in field && field.secret
+                                  ? credentialInputValue(cfg.agentCliEnv?.[field.agentId]?.[field.envKey])
+                                  : cfg.agentCliEnv?.[field.agentId]?.[field.envKey] ?? ''
                               }
                               placeholder={field.placeholder}
                               spellCheck={false}
@@ -5226,7 +5203,9 @@ export function SettingsDialog({
                 />
               ) : null}
               <ByokKeyField
-                apiKey={cfg.apiKey}
+                apiKey={credentialInputValue(cfg.apiKey)}
+                configured={credentialIsConfigured(cfg.apiKey)}
+                savedTail={cfg.apiKeyTail}
                 apiKeyConsoleLink={apiKeyConsoleLink}
                 apiProtocol={apiProtocol}
                 inputRef={apiKeyInputRef}
@@ -5255,6 +5234,11 @@ export function SettingsDialog({
                 onChange={(value) => {
                   committedClearedByokProviderKeyRef.current = null;
                   updateApiConfig({ apiKey: value });
+                }}
+                onClear={() => {
+                  committedClearedByokProviderKeyRef.current = byokProviderKeyForConfig(cfg);
+                  updateApiConfig({ apiKey: '', apiKeyConfigured: false, apiKeyTail: '' });
+                  setAutosaveCommitTick((tick) => tick + 1);
                 }}
                 onFocus={() => {
                   const byokProviderId = byokProtocolToTracking(apiProtocol);
@@ -7406,8 +7390,8 @@ function MediaProvidersSection({
       <div className="media-provider-list">
         {availableProviders.map((provider) => {
           const entry = cfg.mediaProviders?.[provider.id] ?? { apiKey: '', baseUrl: '', model: '' };
-          const hasPendingEdit = Boolean(entry.apiKey.trim());
-          const isSavedState = Boolean((hasPendingEdit || entry.apiKeyConfigured) && !hasPendingEdit);
+          const hasPendingEdit = Boolean(entry.apiKey.trim()) && !credentialIsConfigured(entry.apiKey);
+          const isSavedState = credentialIsConfigured(entry.apiKey) || Boolean(entry.apiKeyConfigured && !hasPendingEdit);
           const tail = entry.apiKeyTail?.trim();
           // Every provider rendered in the main list is integrated by
           // construction (see availableProviders filter), so the inputs
@@ -7462,7 +7446,7 @@ function MediaProvidersSection({
                   <div className="media-provider-secret-field">
                     <input
                       type={apiKeyVisible ? 'text' : 'password'}
-                      value={entry.apiKey}
+                      value={credentialInputValue(entry.apiKey)}
                       placeholder={isSavedState ? t('settings.connectorsReplaceKeyPlaceholder') : t('settings.mediaProviderPlaceholder')}
                       aria-label={`${provider.label} ${t('settings.mediaProviderApiKey')}`}
                       disabled={disabled}

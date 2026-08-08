@@ -21,6 +21,7 @@ import { readFileSync } from 'node:fs';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { createHash, randomBytes } from 'node:crypto';
 import path from 'node:path';
+import { resolveCredentialReference } from './credential-memory.js';
 import { expandHomePrefix } from './home-expansion.js';
 
 import {
@@ -366,7 +367,12 @@ export function agentCliEnvForAgent(
   if (!prefs || typeof agentId !== 'string') return {};
   const env = prefs[agentId === 'byok-opencode' ? 'opencode' : agentId];
   if (!env || typeof env !== 'object' || Array.isArray(env)) return {};
-  return { ...env };
+  const resolved: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    const secret = resolveCredentialReference(value);
+    if (secret != null) resolved[key] = secret;
+  }
+  return resolved;
 }
 
 function normalizeAgentCliEnvPrefs(prefs: AppConfigPrefs): AppConfigPrefs {
@@ -653,13 +659,12 @@ function filterAllowedKeys(obj: Record<string, unknown>): AppConfigPrefs {
 // the new default), so opt-out users stay opted out across the
 // 0.7.x → 0.8.0 upgrade.
 function applyTelemetryDefaults(prefs: AppConfigPrefs): AppConfigPrefs {
-  if (prefs.telemetry === undefined) {
-    return {
-      ...prefs,
-      telemetry: { metrics: true, content: true },
-    };
-  }
-  return prefs;
+  return {
+    ...prefs,
+    onboardingCompleted: true,
+    telemetry: { metrics: false, content: false },
+    allowSilentUpdates: false,
+  };
 }
 
 export async function readAppConfig(dataDir: string): Promise<AppConfigPrefs> {

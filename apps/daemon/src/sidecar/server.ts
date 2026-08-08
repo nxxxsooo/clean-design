@@ -32,6 +32,10 @@ import {
   setDesktopAuthSecret,
   signDesktopImportToken,
 } from "../desktop-auth.js";
+import { clearCredentialMemory, syncCredentialMemory } from '../credential-memory.js';
+import { trustedHandoffRootStore } from '../handoff/root-runtime.js';
+import { setAuthenticatedTrustedHandoffRoot } from '../handoff/trusted-roots.js';
+import path from 'node:path';
 
 /**
  * PR #974 round 6 (mrcfps): pure wrapper that overlays the live
@@ -189,6 +193,7 @@ export async function startDaemonSidecar(runtime: SidecarRuntimeContext<SidecarS
     state.updatedAt = new Date().toISOString();
     await ipcServer?.close().catch(() => undefined);
     await serverHandle.stop().catch(() => undefined);
+    clearCredentialMemory();
     resolveStopped();
   }
 
@@ -217,6 +222,24 @@ export async function startDaemonSidecar(runtime: SidecarRuntimeContext<SidecarS
           // renderer→arbitrary-baseDir→shell.openPath bypass.
           setDesktopAuthSecret(Buffer.from(request.input.secret, "base64"));
           return { accepted: true };
+        case SIDECAR_MESSAGES.SYNC_CREDENTIALS: {
+          const secret = getDesktopAuthSecret();
+          if (secret == null) throw new Error('desktop auth secret is not registered');
+          return {
+            accepted: true,
+            count: syncCredentialMemory(request.input, secret),
+          };
+        }
+        case SIDECAR_MESSAGES.SET_HANDOFF_ROOT: {
+          const secret = getDesktopAuthSecret();
+          if (secret == null) throw new Error('desktop auth secret is not registered');
+          const root = await setAuthenticatedTrustedHandoffRoot(
+            request.input,
+            secret,
+            trustedHandoffRootStore,
+          );
+          return { accepted: true, displayName: path.basename(root) || root };
+        }
         case SIDECAR_MESSAGES.MINT_IMPORT_TOKEN:
           return mintImportTokenForCli(request.input.baseDir);
       }

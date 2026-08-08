@@ -250,7 +250,7 @@ describe("renderMacPackagedConfig", () => {
     }
   });
 
-  it("bakes the configured updater metadata URL for mac beta validation", async () => {
+  it("omits updater metadata even when the build environment provides it", async () => {
     const root = await mkdtemp(join(tmpdir(), "open-design-tools-pack-mac-"));
     try {
       const config = makeConfig(root, {
@@ -265,7 +265,7 @@ describe("renderMacPackagedConfig", () => {
         }),
       ) as Record<string, unknown>;
 
-      expect(packagedConfig.updateMetadataUrl).toBe("http://127.0.0.1:4567/beta/latest/metadata.json");
+      expect(packagedConfig).not.toHaveProperty("updateMetadataUrl");
     } finally {
       await rm(root, { force: true, recursive: true });
     }

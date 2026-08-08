@@ -131,7 +131,7 @@ import {
   type ModelCapabilityTag,
 } from './modelCapabilityTags';
 import { LanguageMenu } from './LanguageMenu';
-import { IntegrationsView, type IntegrationTab } from './IntegrationsView';
+import type { IntegrationTab } from './IntegrationsView';
 import { InlineModelSwitcher } from './InlineModelSwitcher';
 import { enterpriseUrl } from './enterpriseUrl';
 import {
@@ -140,7 +140,6 @@ import {
 } from './EntrySettingsMenu';
 import { MessageCenter } from './MessageCenter';
 import { NewProjectModal } from './NewProjectModal';
-import { PluginsView } from './PluginsView';
 import type { CreateInput, CreateTab, ImportClaudeDesignOutcome } from './NewProjectPanel';
 import type { PluginLoopSubmit } from './PluginLoopHome';
 import {
@@ -148,7 +147,6 @@ import {
   type PluginShareAction,
   type PluginShareProjectOutcome,
 } from '../state/projects';
-import { TasksView } from './TasksView';
 import {
   API_KEY_PLACEHOLDERS,
   API_PROTOCOL_TABS,
@@ -1006,114 +1004,9 @@ export function EntryShell({
               <Icon name="panel-left" size={20} />
             </button>
             <div className="entry-main__topbar-chips entry-main__topbar-chips--icon-only">
-              <GithubStarBadge />
-              <a
-                className="entry-workspace-chip od-tooltip"
-                href={enterpriseUrl(uiLocale)}
-                target="_blank"
-                rel="noreferrer noopener"
-                onClick={() => {
-                  trackHomeToolbarClick(analytics.track, {
-                    page_name: 'home',
-                    area: 'toolbar',
-                    element: 'workspace_teams',
-                  });
-                }}
-                data-tooltip={t('entry.workspaceTeamsTitle')}
-                data-tooltip-placement="bottom"
-                aria-label={t('entry.workspaceTeamsAria')}
-                data-testid="entry-workspace-teams"
-              >
-                <Icon
-                  name="sparkles"
-                  size={14}
-                  className="entry-workspace-chip__icon"
-                />
-                <span className="entry-workspace-chip__label">
-                  {t('entry.workspaceTeamsLabel')}
-                </span>
-              </a>
-              <a
-                className="entry-discord-badge od-tooltip"
-                href={DISCORD_URL}
-                aria-label={discordAriaLabel}
-                data-tooltip={discordAriaLabel}
-                data-tooltip-placement="bottom"
-                data-testid="entry-discord-badge"
-              >
-                <Icon name="discord" size={14} className="entry-discord-badge__icon" />
-                <span className="entry-discord-badge__label">{t('entry.discordLabel')}</span>
-                {discordOnlineLabel ? (
-                  <>
-                    <span className="entry-discord-badge__sep" aria-hidden>
-                      ·
-                    </span>
-                    <span className="entry-discord-badge__online">
-                      {discordOnlineLabel}
-                    </span>
-                  </>
-                ) : null}
-              </a>
               {view === 'home' ? null : executionSwitcher}
-              <button
-                type="button"
-                className="use-everywhere-chip od-tooltip"
-                onClick={() => {
-                  trackHomeToolbarClick(analytics.track, {
-                    page_name: 'home',
-                    area: 'toolbar',
-                    element: 'use_everywhere',
-                  });
-                  openIntegrationTab('use-everywhere');
-                }}
-                data-tooltip={t('entry.useEverywhereTitle')}
-                data-tooltip-placement="bottom"
-                aria-label={t('entry.useEverywhereAria')}
-                data-testid="entry-use-everywhere-button"
-              >
-                <span className="use-everywhere-chip__icon" aria-hidden>
-                  <Icon name="hammer" size={13} />
-                </span>
-                <span className="use-everywhere-chip__label">
-                  {t('entry.useEverywhereTitle')}
-                </span>
-              </button>
             </div>
-            <UpdaterPopup
-              allowSilentUpdates={config.allowSilentUpdates}
-              silentUpdatePreferenceReady={daemonAppConfigReady}
-              onAllowSilentUpdatesChange={
-                onSilentUpdatePreferenceChange
-                  ?? ((allowSilentUpdates) => onConfigPersist({ ...config, allowSilentUpdates }))
-              }
-            />
-            <WhatsNewPopup active={view === 'home'} />
-            <MessageCenter
-              onOpenNotificationSettings={() => onOpenSettings('notifications')}
-            />
             {avatarMenu}
-            {amrBalanceGateBlock ? (
-              <AmrBalanceDialog
-                reason={amrBalanceGateBlock.reason}
-                balanceUsd={amrBalanceGateBlock.snapshot.balanceUsd}
-                profile={amrBalanceGateBlock.snapshot.profile}
-                entrySource="home_balance_gate_upgrade"
-                metricsConsent={config.telemetry?.metrics === true}
-                installationId={config.installationId}
-                onClose={() => amrBalanceGateBlock.resolve('dismiss')}
-                onResolved={() => amrBalanceGateBlock.resolve('retry')}
-              />
-            ) : null}
-            {amrLowBalanceWarn ? (
-              <AmrLowBalanceDialog
-                balanceUsd={amrLowBalanceWarn.snapshot.balanceUsd}
-                profile={amrLowBalanceWarn.snapshot.profile}
-                entrySource="home_low_balance_warn_recharge"
-                metricsConsent={config.telemetry?.metrics === true}
-                installationId={config.installationId}
-                onDecision={amrLowBalanceWarn.resolve}
-              />
-            ) : null}
           </div>
           <div
             className={`entry-main__inner${
@@ -1133,9 +1026,6 @@ export function EntryShell({
                 onDeleteProject={onDeleteProject}
                 onDuplicateProject={onDuplicateProject}
                 onRenameProject={onRenameProject}
-                onBrowseRegistry={() => changeView('plugins')}
-                onOpenIntegrations={() => openIntegrationTab('connectors')}
-                onOpenMcp={() => openIntegrationTab('mcp')}
                 onOpenNewProject={(tab) => {
                   openNewProject(tab);
                 }}
@@ -1143,7 +1033,6 @@ export function EntryShell({
                 promptHandoff={homePromptHandoff}
                 skills={skills}
                 skillsLoading={skillsLoading}
-                connectors={connectors}
                 promptTemplates={promptTemplates}
                 recommendation={onboardingRec}
                 onRecommendationStart={handleRecommendationStart}
@@ -1177,21 +1066,6 @@ export function EntryShell({
                   />
                 </div>
               )}
-            </div>
-            <div data-testid="entry-view-tasks" data-active={view === 'tasks' ? 'true' : 'false'} {...inactiveViewProps(view === 'tasks')}>
-              <TasksView
-                skills={skills}
-                designTemplates={designTemplates}
-                connectors={connectors}
-                connectorsLoading={connectorsLoading}
-              />
-            </div>
-            <div data-testid="entry-view-plugins" data-active={view === 'plugins' ? 'true' : 'false'} {...inactiveViewProps(view === 'plugins')}>
-              <PluginsView
-                onCreatePlugin={startPluginAuthoring}
-                onUsePlugin={usePluginFromLibrary}
-                onCreatePluginShareProject={onCreatePluginShareProject}
-              />
             </div>
             <div data-testid="entry-view-design-systems" data-active={view === 'design-systems' ? 'true' : 'false'} {...inactiveViewProps(view === 'design-systems')}>
               {designSystemsLoading ? (
@@ -1244,17 +1118,6 @@ export function EntryShell({
                 onDesignSystemsRefresh={onDesignSystemsRefresh}
               />
             </div>
-            {view === 'integrations' ? (
-              <IntegrationsView
-                config={config}
-                initialTab={integrationTab}
-                composioConfigLoading={composioConfigLoading}
-                onConfigPersist={onConfigPersist}
-                onPersistComposioKey={onPersistComposioKey}
-                onSkillsRefresh={onSkillsRefresh}
-                onSkillsChanged={onSkillsChanged}
-              />
-            ) : null}
           </div>
         </main>
       </div>
@@ -1276,10 +1139,6 @@ export function EntryShell({
         onImportClaudeDesign={onImportClaudeDesign}
         {...(onImportFolder ? { onImportFolder } : {})}
         {...(onImportFolderResponse ? { onImportFolderResponse } : {})}
-        onOpenConnectorsTab={() => {
-          setNewProjectOpen(false);
-          openIntegrationTab('connectors');
-        }}
         onClose={() => setNewProjectOpen(false)}
       />
     </div>

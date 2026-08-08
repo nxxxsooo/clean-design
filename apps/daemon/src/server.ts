@@ -10,6 +10,8 @@ import type {
 import express from 'express';
 import multer from 'multer';
 import JSZip from 'jszip';
+import { isCleanDesignDisabledApiPath } from '@open-design/contracts';
+import { resolveCredentialReferencesInValue } from './credential-memory.js';
 import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -400,7 +402,6 @@ import {
   AiHtmlVersionSnapshotError,
   snapshotAiHtmlVersionsForRun,
 } from './run-html-version-snapshots.js';
-import { reportRunCompletedFromDaemon } from './langfuse-bridge.js';
 import { reconcileDurableRunTerminals } from './runtimes/run-terminal-reconciliation.js';
 import { buildPromptStackTelemetry } from './prompt-telemetry.js';
 import { readAnalyticsContext } from './analytics.js';
@@ -408,6 +409,8 @@ import {
   agentIdToTracking,
   modelIdForTracking,
 } from '@open-design/contracts/analytics';
+
+const reportRunCompletedFromDaemon = async (..._args: any[]): Promise<unknown> => undefined;
 import {
   mergeNoProxyWithLoopbackDefaults,
   redactSecrets,
@@ -618,8 +621,7 @@ import { registerProjectRoutes, registerProjectArtifactRoutes, registerProjectFi
 import { registerVelaRoutes } from './routes/vela.js';
 import { registerFinalizeRoutes, registerImportRoutes, registerProjectExportRoutes } from './import-export-routes.js';
 import { registerHandoffRoutes } from './routes/handoff.js';
-import { EmptyTranscriptError, synthesizeHandoffPrompt } from './design/index.js';
-import { TranscriptExportLockedError } from './transcript-export.js';
+import { trustedHandoffRootStore } from './handoff/root-runtime.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerRunRoutes } from './routes/runs.js';
 import { registerTerminalRoutes } from './routes/terminal.js';
@@ -2067,6 +2069,30 @@ export async function startServer({
   // (registered before the global parser so it claims the body first).
   app.use('/api/brands/:id/extract-from-html', express.json({ limit: '32mb' }));
   app.use(express.json({ limit: '4mb' }));
+  app.use('/api', (req, res, next) => {
+    if (!isCleanDesignDisabledApiPath(req.path)) return next();
+    res.status(410).json({
+      error: {
+        code: 'SERVICE_DISABLED',
+        message: 'This network service is not available in Clean Design.',
+      },
+    });
+  });
+  app.use('/api', (req, res, next) => {
+    if (req.method === 'GET' || req.method === 'HEAD') return next();
+    if (req.path === '/app-config' || req.path === '/media/config') return next();
+    try {
+      req.body = resolveCredentialReferencesInValue(req.body);
+      return next();
+    } catch {
+      return res.status(400).json({
+        error: {
+          code: 'CREDENTIAL_UNAVAILABLE',
+          message: 'The selected credential is unavailable. Reopen Settings and save it again.',
+        },
+      });
+    }
+  });
   const projectPreviewScopes = createProjectPreviewScopeRegistry();
 
   // Plan §3.K1 — bearer-token middleware.
@@ -2293,10 +2319,8 @@ export async function startServer({
   projectMetadataLookup = (id) => {
     try { return getProject(db, id)?.metadata ?? null; } catch { return null; }
   };
-  configureConnectorCredentialStore(new FileConnectorCredentialStore(RUNTIME_DATA_DIR));
-  configureComposioConfigStore(RUNTIME_DATA_DIR);
-  composioConnectorProvider.configureCatalogCache(RUNTIME_DATA_DIR);
-  composioConnectorProvider.startCatalogRefreshLoop();
+  // External connector hosts and credential stores are not initialized in
+  // the local-only build. The retained local plugin catalog remains usable.
 
   // RoutineService persistence is a thin adapter over the SQLite helpers.
   // Routines are stored as DB rows; the service holds in-memory timers and
@@ -2909,11 +2933,10 @@ export async function startServer({
     redactSecrets,
   };
   const handoffDeps = {
-    synthesizeHandoffPrompt,
-    FinalizeUpstreamError,
-    TranscriptExportLockedError,
-    EmptyTranscriptError,
-    redactSecrets,
+    daemonUrlRef,
+    desktopArtifactExporter,
+    desktopSlideRenderer,
+    trustedRootStore: trustedHandoffRootStore,
   };
   const validationDeps = { isSafeId, validateExternalApiBaseUrl, validateBaseUrl, validateProjectDesignSystemId, validateProjectSkillId };
   const agentDeps = {
@@ -3174,7 +3197,6 @@ export async function startServer({
     http: httpDeps,
     paths: pathDeps,
     projectStore: projectStoreDeps,
-    conversations: conversationDeps,
     validation: validationDeps,
     handoff: handoffDeps,
   });

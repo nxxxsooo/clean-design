@@ -56,7 +56,7 @@ export function parseRoute(pathname: string): Route {
   const parts = pathname.replace(/\/+$/, '').split('/').filter(Boolean);
   if (parts.length === 0) return { kind: 'home', view: 'home' };
   if (parts[0] === 'onboarding') {
-    return { kind: 'home', view: 'onboarding' };
+    return { kind: 'home', view: 'home' };
   }
   if (parts[0] === 'projects') {
     if (parts[1]) {
@@ -103,16 +103,16 @@ export function parseRoute(pathname: string): Route {
     return { kind: 'home', view: 'design-systems' };
   }
   if (parts[0] === 'automations' || parts[0] === 'tasks') {
-    return { kind: 'home', view: 'tasks' };
+    return { kind: 'home', view: 'home' };
   }
   if (parts[0] === 'plugins' && !parts[1]) {
-    return { kind: 'home', view: 'plugins' };
+    return { kind: 'home', view: 'home' };
   }
   if (LIBRARY_UI_VISIBLE && parts[0] === 'library' && !parts[1]) {
     return { kind: 'home', view: 'library' };
   }
   if (parts[0] === 'integrations') {
-    return { kind: 'home', view: 'integrations' };
+    return { kind: 'home', view: 'home' };
   }
   // Phase 2B / spec §11.6 — marketplace deep UI routes. Two paths:
   //   /marketplace            → catalog grid (MarketplaceView)
@@ -120,30 +120,26 @@ export function parseRoute(pathname: string): Route {
   // Aliases to /plugins remain reserved for the public site (spec §13);
   // in-app we keep /marketplace canonical.
   if (parts[0] === 'marketplace' || parts[0] === 'plugins') {
-    if (parts[1]) {
-      return { kind: 'marketplace-detail', pluginId: decodeURIComponent(parts[1]) };
-    }
-    return { kind: 'marketplace' };
+    return { kind: 'home', view: 'home' };
   }
   return { kind: 'home', view: 'home' };
 }
 
 export function buildPath(route: Route): string {
   if (route.kind === 'home') {
-    if (route.view === 'onboarding') return '/onboarding';
+    if (route.view === 'onboarding') return '/';
     if (route.view === 'projects') return '/projects';
-    if (route.view === 'tasks') return '/automations';
-    if (route.view === 'plugins') return '/plugins';
+    if (route.view === 'tasks') return '/';
+    if (route.view === 'plugins') return '/';
     if (route.view === 'design-systems') return '/design-systems';
     if (route.view === 'library') return LIBRARY_UI_VISIBLE ? '/library' : '/';
     if (route.view === 'brands') {
       return route.brandId ? `/brands/${encodeURIComponent(route.brandId)}` : '/brands';
     }
-    if (route.view === 'integrations') return '/integrations';
+    if (route.view === 'integrations') return '/';
     return '/';
   }
-  if (route.kind === 'marketplace') return '/marketplace';
-  if (route.kind === 'marketplace-detail') return `/marketplace/${encodeURIComponent(route.pluginId)}`;
+  if (route.kind === 'marketplace' || route.kind === 'marketplace-detail') return '/';
   if (route.kind === 'design-system-create') return '/design-systems/create';
   if (route.kind === 'design-system-detail') {
     return `/design-systems/${encodeURIComponent(route.designSystemId)}`;

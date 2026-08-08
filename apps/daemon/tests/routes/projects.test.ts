@@ -1043,6 +1043,23 @@ describe('GET /api/projects/:id resolvedDir', () => {
     expect(body.error?.message).toMatch(/fromTrustedPicker/i);
   });
 
+  it.each(['handoffRoot', 'trustedHandoffRoot'])('rejects %s on POST /api/projects', async (field) => {
+    const resp = await fetch(`${baseUrl}/api/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: `proj-handoff-create-${field}-${Date.now()}`,
+        name: 'Smuggled handoff root',
+        skillId: null,
+        designSystemId: null,
+        metadata: { kind: 'prototype', [field]: '/tmp/untrusted' },
+      }),
+    });
+    expect(resp.status).toBe(400);
+    const body = (await resp.json()) as { error?: { message?: string } };
+    expect(body.error?.message).toMatch(/native desktop picker/i);
+  });
+
   it('rejects orchestratorWorkspace on POST /api/projects', async () => {
     const projectId = `proj-orchestrator-create-${Date.now()}`;
     const resp = await fetch(`${baseUrl}/api/projects`, {
@@ -1096,6 +1113,24 @@ describe('GET /api/projects/:id resolvedDir', () => {
     const body = (await patchResp.json()) as { error?: { code?: string; message?: string } };
     expect(body.error?.code).toBe('BAD_REQUEST');
     expect(body.error?.message).toMatch(/fromTrustedPicker/i);
+  });
+
+  it.each(['handoffRoot', 'trustedHandoffRoot'])('rejects %s on PATCH /api/projects/:id', async (field) => {
+    const projectId = `proj-handoff-patch-${field}-${Date.now()}`;
+    const createResp = await fetch(`${baseUrl}/api/projects`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: projectId, name: 'Native fixture', skillId: null, designSystemId: null }),
+    });
+    expect(createResp.status).toBe(200);
+    const patchResp = await fetch(`${baseUrl}/api/projects/${projectId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ metadata: { kind: 'prototype', [field]: '/tmp/untrusted' } }),
+    });
+    expect(patchResp.status).toBe(400);
+    const body = (await patchResp.json()) as { error?: { message?: string } };
+    expect(body.error?.message).toMatch(/native desktop picker/i);
   });
 
   it('rejects valid orchestratorWorkspace on PATCH for OD-owned projects', async () => {

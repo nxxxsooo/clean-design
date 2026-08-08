@@ -44,6 +44,10 @@ import { expandHomePrefix } from '../home-expansion.js';
 import { spawnEnvForAgent } from '../runtimes/env.js';
 import { resolveXAIBearer } from '../integrations/xai-credentials.js';
 import { isSandboxModeEnabled } from '../sandbox-mode.js';
+import {
+  credentialReferenceMask,
+  resolveCredentialReference,
+} from '../credential-memory.js';
 
 const PROVIDER_IDS = MEDIA_PROVIDERS.map((p) => p.id);
 type ProviderEntry = { apiKey?: string; baseUrl?: string; model?: string };
@@ -403,8 +407,9 @@ export async function resolveProviderConfig(projectRoot: string, providerId: str
         ? await resolveXAIOAuthCredential(projectRoot)
         : null
     : null;
+  const storedApiKey = entry.apiKey ? resolveCredentialReference(entry.apiKey) : '';
   return {
-    apiKey: envKey || entry.apiKey || externalCredential?.apiKey || '',
+    apiKey: envKey || storedApiKey || externalCredential?.apiKey || '',
     baseUrl: entry.baseUrl || '',
     ...(typeof entry.model === 'string' && entry.model.trim()
       ? { model: entry.model.trim() }
@@ -449,7 +454,9 @@ export async function readMaskedConfig(projectRoot: string): Promise<MaskedConfi
       // Show last 4 chars only when stored locally; never echo env-var
       // or borrowed auth-file/OAuth secrets so power users don't
       // accidentally see them in the DOM.
-      apiKeyTail: hasStoredKey && entry.apiKey ? entry.apiKey.slice(-4) : '',
+      apiKeyTail: hasStoredKey && entry.apiKey
+        ? credentialReferenceMask(entry.apiKey)?.replace(/^\*+/, '') ?? entry.apiKey.slice(-4)
+        : '',
       baseUrl: entry.baseUrl || '',
       ...(typeof entry.model === 'string' && entry.model.trim()
         ? { model: entry.model.trim() }

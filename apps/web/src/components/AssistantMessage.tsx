@@ -2263,38 +2263,6 @@ function PluginActionPanel({
                     {actionBusy && busyKey === `install:${folder.path}` ? "Sending..." : "Add to My plugins"}
                   </span>
                 </button>
-                <button
-                  type="button"
-                  className="plugin-action-button"
-                  data-testid={`assistant-plugin-publish-${folder.path}`}
-                  disabled={actionBusy || busyKey !== null || !onRequestPluginFolderAgentAction}
-                  onClick={() => void runAction(folder, "publish")}
-                >
-                  <Icon
-                    name={actionBusy && busyKey === `publish:${folder.path}` ? "spinner" : "github"}
-                    size={13}
-                  />
-                  <span>
-                    {actionBusy && busyKey === `publish:${folder.path}` ? "Sending..." : "Publish repo"}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className="plugin-action-button"
-                  data-testid={`assistant-plugin-contribute-${folder.path}`}
-                  disabled={actionBusy || busyKey !== null || !onRequestPluginFolderAgentAction}
-                  onClick={() => void runAction(folder, "contribute")}
-                >
-                  <Icon
-                    name={actionBusy && busyKey === `contribute:${folder.path}` ? "spinner" : "share"}
-                    size={13}
-                  />
-                  <span>
-                    {actionBusy && busyKey === `contribute:${folder.path}`
-                      ? "Sending..."
-                      : "Clean Design PR"}
-                  </span>
-                </button>
                 {onRequestOpenFile ? (
                   <button
                     type="button"

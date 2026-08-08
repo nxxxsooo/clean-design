@@ -882,35 +882,17 @@ export interface VelaLoginStatus {
 //   POST /api/integrations/vela/logout   — clear ~/.amr auth and Settings-backed AMR auth env
 // The Settings UI polls /status after kicking off /login to detect completion.
 export async function fetchVelaLoginStatus(options: { refresh?: boolean } = {}): Promise<VelaLoginStatus | null> {
-  try {
-    const query = options.refresh ? '?refresh=1' : '';
-    const resp = await fetch(`/api/integrations/vela/status${query}`, { cache: 'no-store' });
-    if (!resp.ok) return null;
-    return (await resp.json()) as VelaLoginStatus;
-  } catch {
-    return null;
-  }
+  void options;
+  return null;
 }
 
 export async function fetchAmrWalletSnapshot(options: { refresh?: boolean } = {}): Promise<AmrWalletSnapshot | null> {
-  try {
-    const query = options.refresh ? '?refresh=1' : '';
-    const resp = await fetch(`/api/integrations/vela/wallet${query}`, { cache: 'no-store' });
-    if (!resp.ok) return null;
-    return (await resp.json()) as AmrWalletSnapshot;
-  } catch {
-    return null;
-  }
+  void options;
+  return null;
 }
 
 export async function fetchAmrModels(): Promise<AmrModelsResponse | null> {
-  try {
-    const resp = await fetch('/api/amr/models', { cache: 'no-store' });
-    if (!resp.ok) return null;
-    return (await resp.json()) as AmrModelsResponse;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export interface StartVelaLoginResult {
@@ -925,48 +907,17 @@ export async function startVelaLogin(
   attribution?: AmrEntryAttribution | null,
   odDeviceId?: string | null,
 ): Promise<StartVelaLoginResult> {
-  try {
-    const loginAttribution =
-      attribution && odDeviceId ? { ...attribution, odDeviceId } : attribution;
-    const resp = await fetch('/api/integrations/vela/login', {
-      method: 'POST',
-      headers: loginAttribution ? { 'Content-Type': 'application/json' } : undefined,
-      body: loginAttribution ? JSON.stringify({ attribution: loginAttribution }) : undefined,
-    });
-    if (resp.ok) {
-      const body = (await resp.json()) as { pid?: number };
-      return { ok: true, status: resp.status, pid: body.pid };
-    }
-    const body = (await resp.json().catch(() => null)) as { error?: string } | null;
-    return {
-      ok: false,
-      status: resp.status,
-      alreadyRunning: resp.status === 409,
-      error: body?.error ?? '',
-    };
-  } catch (err) {
-    return { ok: false, status: 0, error: err instanceof Error ? err.message : String(err) };
-  }
+  void attribution;
+  void odDeviceId;
+  return { ok: false, status: 410, error: 'AMR is not available in Clean Design.' };
 }
 
 export async function cancelVelaLogin(): Promise<{ ok: boolean; canceled?: boolean }> {
-  try {
-    const resp = await fetch('/api/integrations/vela/login/cancel', { method: 'POST' });
-    if (!resp.ok) return { ok: false };
-    const body = (await resp.json().catch(() => null)) as { canceled?: boolean } | null;
-    return { ok: true, canceled: body?.canceled };
-  } catch {
-    return { ok: false };
-  }
+  return { ok: false, canceled: false };
 }
 
 export async function velaLogout(): Promise<{ ok: boolean }> {
-  try {
-    const resp = await fetch('/api/integrations/vela/logout', { method: 'POST' });
-    return { ok: resp.ok };
-  } catch {
-    return { ok: false };
-  }
+  return { ok: false };
 }
 
 // Forwards the user's assistant-turn rating to the daemon so it can emit
@@ -983,15 +934,7 @@ export async function reportChatRunFeedback(req: {
   hasCustomReason: boolean;
   customReason: string;
 }): Promise<void> {
-  try {
-    await fetch(`/api/runs/${encodeURIComponent(req.runId)}/feedback`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req),
-    });
-  } catch {
-    // Best-effort.
-  }
+  void req;
 }
 
 export async function listActiveChatRuns(

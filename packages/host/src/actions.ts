@@ -6,6 +6,7 @@ import type {
   OpenDesignHostCaptureResult,
   OpenDesignHostFailure,
   OpenDesignHostGlobalScope,
+  OpenDesignHostHandoffRootResult,
   OpenDesignHostPdfPrintOptions,
   OpenDesignHostPickWorkingDirResult,
   OpenDesignHostProjectImportInit,
@@ -19,6 +20,12 @@ import type {
   OpenDesignHostUpdaterStatusListener,
 } from "./protocol.js";
 import { getOpenDesignHost } from "./detection.js";
+import type {
+  CredentialDeleteResult,
+  CredentialListResult,
+  CredentialSaveResult,
+  SaveCredentialRequest,
+} from './protocol.js';
 
 /**
  * @module actions
@@ -41,6 +48,37 @@ function failure(reason: string, details?: unknown): OpenDesignHostFailure {
 /** @internal Uniform failure for when the host bridge is absent. */
 function unavailable(reason: string): OpenDesignHostFailure {
   return failure(reason);
+}
+
+export async function listHostCredentials(
+  scope: OpenDesignHostGlobalScope = globalThis,
+): Promise<CredentialListResult> {
+  const credentials = getOpenDesignHost(scope)?.credentials;
+  return credentials?.list() ?? { ok: false, reason: 'protected credential storage is unavailable' };
+}
+
+export async function saveHostCredential(
+  input: SaveCredentialRequest,
+  scope: OpenDesignHostGlobalScope = globalThis,
+): Promise<CredentialSaveResult> {
+  const credentials = getOpenDesignHost(scope)?.credentials;
+  return credentials?.save(input) ?? { ok: false, reason: 'protected credential storage is unavailable' };
+}
+
+export async function deleteHostCredential(
+  ref: string,
+  scope: OpenDesignHostGlobalScope = globalThis,
+): Promise<CredentialDeleteResult> {
+  const credentials = getOpenDesignHost(scope)?.credentials;
+  return credentials?.delete(ref) ?? { ok: false, reason: 'protected credential storage is unavailable' };
+}
+
+export async function selectHostHandoffRoot(
+  projectId: string,
+  scope: OpenDesignHostGlobalScope = globalThis,
+): Promise<OpenDesignHostHandoffRootResult> {
+  const handoff = getOpenDesignHost(scope)?.handoff;
+  return handoff?.selectRoot(projectId) ?? { ok: false, reason: 'desktop handoff picker is unavailable' };
 }
 
 /** Open an external URL through the host shell. */

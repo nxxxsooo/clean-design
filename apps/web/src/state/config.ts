@@ -1,4 +1,4 @@
-import type { AppConfigPrefs } from '@open-design/contracts';
+import { isCredentialReference, type AppConfigPrefs } from '@open-design/contracts';
 import { MEDIA_PROVIDERS } from '../media/models';
 import { isOpenAICompatible } from '../providers/openai-compatible';
 import type {
@@ -20,6 +20,7 @@ import {
   DEFAULT_SUCCESS_SOUND_ID,
 } from '../utils/notifications';
 import { randomUUID } from '../utils/uuid';
+import { stripPlaintextConfigCredentials } from './credentials';
 
 const STORAGE_KEY = 'open-design:config';
 const CONFIG_MIGRATION_VERSION = 2;
@@ -75,7 +76,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   agentId: null,
   skillId: null,
   designSystemId: null,
-  onboardingCompleted: false,
+  onboardingCompleted: true,
   theme: 'system',
   accentColor: DEFAULT_ACCENT_COLOR,
   mediaProviders: {},
@@ -97,7 +98,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   // existed yet — observed live on the prerelease.10 QA run, which left
   // zero `page_view pn=onboarding` rows on PostHog despite the user
   // completing the flow.
-  telemetry: { metrics: true, content: true },
+  telemetry: { metrics: false, content: false },
 };
 
 /** Well-known providers with pre-filled base URLs. */
@@ -678,6 +679,13 @@ export function loadConfig(): AppConfig {
       notifications: normalizeNotifications(parsed.notifications),
       orbit: normalizeOrbit(parsed.orbit),
     };
+    merged.onboardingCompleted = true;
+    if (merged.agentId === 'amr') merged.agentId = null;
+    delete merged.agentModels?.amr;
+    delete merged.agentCliEnv?.amr;
+    delete merged.agentCliEnvIntent?.amr;
+    merged.telemetry = { metrics: false, content: false };
+    delete merged.allowSilentUpdates;
 
     let migratedConfig = false;
     const parsedMigrationVersion =
@@ -758,7 +766,11 @@ export function loadConfig(): AppConfig {
       saveConfig(merged);
     }
 
-    return merged;
+    const credentialSafe = stripPlaintextConfigCredentials(merged);
+    if (JSON.stringify(credentialSafe) !== JSON.stringify(merged)) {
+      saveConfig(credentialSafe);
+    }
+    return credentialSafe;
   } catch {
     return {
       ...DEFAULT_CONFIG,
@@ -978,7 +990,8 @@ function sanitizeAgentCliEnv(agentCliEnv: AppConfig['agentCliEnv']): AppConfig['
   const sanitized: NonNullable<AppConfig['agentCliEnv']> = {};
   for (const [agentId, env] of Object.entries(agentCliEnv)) {
     const safeEnv = Object.fromEntries(
-      Object.entries(env ?? {}).filter(([key]) => !AGENT_CLI_SECRET_ENV_KEYS.has(key)),
+      Object.entries(env ?? {}).filter(([key, value]) =>
+        !AGENT_CLI_SECRET_ENV_KEYS.has(key) || isCredentialReference(value)),
     );
     sanitized[agentId] = safeEnv;
   }
@@ -986,7 +999,10 @@ function sanitizeAgentCliEnv(agentCliEnv: AppConfig['agentCliEnv']): AppConfig['
 }
 
 export function saveConfig(config: AppConfig): void {
-  const sanitized: AppConfig = { ...config, agentCliEnv: sanitizeAgentCliEnv(config.agentCliEnv) };
+  const sanitized: AppConfig = stripPlaintextConfigCredentials({
+    ...config,
+    agentCliEnv: sanitizeAgentCliEnv(config.agentCliEnv),
+  });
   for (const key of DAEMON_OWNED_KEYS) {
     delete (sanitized as unknown as Record<string, unknown>)[key];
   }
@@ -1000,11 +1016,9 @@ export function mergeDaemonConfig(
   const next = { ...localConfig };
   if (!daemonConfig) return next;
 
-  if (daemonConfig.onboardingCompleted != null) {
-    next.onboardingCompleted = daemonConfig.onboardingCompleted;
-  }
+  next.onboardingCompleted = true;
   if (daemonConfig.agentId !== undefined) {
-    next.agentId = daemonConfig.agentId;
+    next.agentId = daemonConfig.agentId === 'amr' ? null : daemonConfig.agentId;
   }
   if (daemonConfig.skillId !== undefined) {
     next.skillId = daemonConfig.skillId;
@@ -1018,8 +1032,11 @@ export function mergeDaemonConfig(
       ...daemonConfig.agentModels,
     };
   }
-  next.agentCliEnv = daemonConfig.agentCliEnv ?? {};
-  next.agentCliEnvIntent = daemonConfig.agentCliEnvIntent ?? {};
+  next.agentCliEnv = { ...(daemonConfig.agentCliEnv ?? {}) };
+  next.agentCliEnvIntent = { ...(daemonConfig.agentCliEnvIntent ?? {}) };
+  delete next.agentModels?.amr;
+  delete next.agentCliEnv.amr;
+  delete next.agentCliEnvIntent.amr;
   if (daemonConfig.disabledSkills !== undefined) {
     next.disabledSkills = daemonConfig.disabledSkills;
   }
@@ -1029,53 +1046,10 @@ export function mergeDaemonConfig(
   if (daemonConfig.orbit !== undefined) {
     next.orbit = normalizeOrbit(daemonConfig.orbit);
   }
-  if (daemonConfig.installationId !== undefined) {
-    next.installationId = daemonConfig.installationId;
-  }
-  if (daemonConfig.telemetry !== undefined) {
-    next.telemetry = { ...daemonConfig.telemetry };
-  }
-  if (daemonConfig.privacyDecisionAt !== undefined) {
-    next.privacyDecisionAt = daemonConfig.privacyDecisionAt;
-  } else if (
-    daemonConfig.installationId !== undefined ||
-    daemonConfig.telemetry !== undefined
-  ) {
-    // One-shot migration for configs created before privacyDecisionAt
-    // existed. If the daemon already has an id or telemetry prefs, the user
-    // has resolved the first-run prompt and should not see it again.
-    next.privacyDecisionAt = Date.now();
-  }
-  // Default-on reporting. Unless the user has explicitly opted out
-  // (Settings → "Don't share", which persists telemetry.metrics === false
-  // together with installationId: null), an install reports with the
-  // product's default telemetry channels on and carries a stable
-  // installationId. This is the single source of the "Opted out" state:
-  // previously an upgraded or never-prompted install could sit with
-  // telemetry on but no id (the daemon ships a metrics+content default but
-  // never mints an id), which the Settings → Privacy field rendered as
-  // "Opted out" even though the user never declined. We mint the id and
-  // keep the default channels on so the displayed state matches the product
-  // default — the same metrics+content surface the first-run banner's
-  // "Share" choice enables (artifactManifest stays off, as it
-  // does there).
-  // This does NOT override an explicit opt-out: metrics === false short-
-  // circuits the whole block, and any channel the user already turned off
-  // is preserved via the nullish-coalesce.
-  const explicitlyOptedOut = next.telemetry?.metrics === false;
-  if (!explicitlyOptedOut && !next.installationId) {
-    next.installationId = randomUUID();
-    next.telemetry = {
-      metrics: true,
-      content: next.telemetry?.content ?? true,
-      artifactManifest: next.telemetry?.artifactManifest ?? false,
-    };
-  }
-  if (daemonConfig.allowSilentUpdates !== undefined) {
-    next.allowSilentUpdates = daemonConfig.allowSilentUpdates;
-  } else {
-    delete next.allowSilentUpdates;
-  }
+  next.installationId = null;
+  next.telemetry = { metrics: false, content: false };
+  next.privacyDecisionAt = Date.now();
+  delete next.allowSilentUpdates;
   if (daemonConfig.customInstructions !== undefined) {
     next.customInstructions = daemonConfig.customInstructions ?? undefined;
   }

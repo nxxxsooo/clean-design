@@ -26,6 +26,12 @@ import type {
   OpenDesignHostUpdaterMenuLabels,
   OpenDesignHostUpdaterOpenDialogRequest,
 } from "@open-design/host";
+import type {
+  CredentialDeleteResult,
+  CredentialListResult,
+  CredentialSaveResult,
+  SaveCredentialRequest,
+} from '@open-design/contracts';
 
 import { renderDeckSlides } from "./deck-capture.js";
 import { openValidatedDirectory } from "./open-path.js";
@@ -41,6 +47,7 @@ import {
   parseUpdateActionRequest,
   updateRestartSafetyError,
 } from "./update-preflight.js";
+import type { DesktopCredentialVault } from './credential-vault.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -360,6 +367,7 @@ export type DesktopRuntime = {
 };
 
 export type DesktopRuntimeOptions = {
+  credentialVault?: Pick<DesktopCredentialVault, 'delete' | 'list' | 'save'>;
   // Per-process secret shared with the daemon at startup (over its
   // sidecar IPC) so the main process can mint HMAC tokens for the
   // `dialog:pick-and-import` flow. The secret stays in main-process
@@ -406,6 +414,8 @@ export type DesktopRuntimeOptions = {
    * skip it (the lazy retry then collapses into a single attempt).
    */
   registerDesktopAuthWithDaemon?: () => Promise<boolean>;
+  registerHandoffRoot?: (projectId: string, root: string) => Promise<{ displayName: string }>;
+  syncCredentialsToDaemon?: () => Promise<number>;
   /**
    * Optional file path to append renderer-process error/warning console
    * messages to. Lets the diagnostics export pick up UI errors that would
@@ -1904,6 +1914,10 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
   ipcMain.removeHandler("shell:open-external");
   ipcMain.removeHandler("shell:open-path");
   ipcMain.removeHandler("browser:clear-data");
+  ipcMain.removeHandler('cd:credentials:list');
+  ipcMain.removeHandler('cd:credentials:save');
+  ipcMain.removeHandler('cd:credentials:delete');
+  ipcMain.removeHandler('cd:handoff:select-root');
   for (const channel of UPDATER_IPC_CHANNELS) {
     ipcMain.removeHandler(channel);
   }
@@ -2036,6 +2050,24 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
       desktopAuthSecret: options.desktopAuthSecret,
       registerDesktopAuth: options.registerDesktopAuthWithDaemon,
     });
+  });
+  ipcMain.handle('cd:handoff:select-root', async (event, projectId: string) => {
+    if (!/^[A-Za-z0-9_-]{1,160}$/.test(projectId ?? '')) {
+      return { ok: false, reason: 'project id is invalid' };
+    }
+    if (!options.registerHandoffRoot) {
+      return { ok: false, reason: 'desktop handoff picker is unavailable' };
+    }
+    const result = await showDirectoryPickerForSender(event.sender);
+    if (result.canceled || result.filePaths.length === 0) {
+      return { ok: false, canceled: true };
+    }
+    try {
+      const registered = await options.registerHandoffRoot(projectId, result.filePaths[0]);
+      return { ok: true, configured: true, displayName: registered.displayName };
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+    }
   });
   // shell.openPath opens an absolute filesystem path in the OS file
   // manager (Finder / Explorer / Files). It resolves to '' on success
@@ -2285,6 +2317,37 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
       throw new Error("host IPC is only available to the main Clean Design window");
     }
   };
+  ipcMain.handle('cd:credentials:list', async (event): Promise<CredentialListResult> => {
+    requireMainWindowSender(event);
+    if (!options.credentialVault) return { ok: false, reason: 'protected credential storage is unavailable' };
+    try {
+      return { ok: true, credentials: await options.credentialVault.list() };
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('cd:credentials:save', async (event, input: SaveCredentialRequest): Promise<CredentialSaveResult> => {
+    requireMainWindowSender(event);
+    if (!options.credentialVault) return { ok: false, reason: 'protected credential storage is unavailable' };
+    try {
+      const credential = await options.credentialVault.save(input);
+      await options.syncCredentialsToDaemon?.();
+      return { ok: true, credential };
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  ipcMain.handle('cd:credentials:delete', async (event, ref: string): Promise<CredentialDeleteResult> => {
+    requireMainWindowSender(event);
+    if (!options.credentialVault) return { ok: false, reason: 'protected credential storage is unavailable' };
+    try {
+      const deleted = await options.credentialVault.delete(ref);
+      await options.syncCredentialsToDaemon?.();
+      return { ok: true, deleted };
+    } catch (error) {
+      return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+    }
+  });
   const discoverUpdateDaemonBaseUrl = async (): Promise<string> => {
     const daemonUrl = await options.discoverDaemonUrl?.();
     const baseUrl = daemonUrl ?? await options.discoverUrl();
