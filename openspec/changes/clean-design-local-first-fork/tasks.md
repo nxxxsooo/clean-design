@@ -34,7 +34,7 @@
 - [x] 5.4 Implement deterministic prompt, manifest hashing, immutable path allocation, temporary build, and atomic publication
 - [x] 5.5 Integrate required HTML/deck/document/media/brand previews and optional PPTX warning behavior
 - [x] 5.6 Replace agent-selector handoff UI with Export handoff, progress, warnings, stable errors, and clipboard fallback
-- [ ] 5.7 Add unit, integration, and Playwright coverage for trust, secrets, atomicity, collisions, formats, and clipboard failure
+- [x] 5.7 Add unit, integration, and Playwright coverage for trust, secrets, atomicity, collisions, formats, and clipboard failure
 
 ## 6. Acceptance and Release Gate
 
