@@ -114,10 +114,10 @@ Startup follows a connect-lock-recheck-start sequence:
 2. If unavailable, acquire an atomic namespace startup lock.
 3. Recheck the socket after acquiring the lock.
 4. Start one service only if it is still absent.
-5. Publish a permission-restricted process stamp after readiness.
+5. Publish the existing five-field sidecar process stamp plus a separate permission-restricted service runtime descriptor after readiness.
 6. Release the lock; losing contenders wait with bounded backoff and attach.
 
-The process stamp records the PID, executable/version fingerprint, namespace, data-root fingerprint, dynamic internal HTTP port when applicable, start time, and authentication material reference. A stale PID, mismatched executable, or incompatible protocol version is never treated as a valid service.
+The compatibility-critical `SidecarStamp` remains exactly five fields: `app`, `mode`, `namespace`, `ipc`, and `source`. A separate mode-`0600` `service-runtime.json` descriptor records the PID, executable/version fingerprint, namespace, data-root fingerprint, dynamic internal HTTP port when applicable, and start time. Authentication material lives in its own mode-`0600` file and is referenced only by a fixed runtime path, never embedded in either descriptor. A stale PID, mismatched executable, or incompatible protocol version is never treated as a valid service.
 
 Internal loopback HTTP ports remain dynamic transport details. The Unix socket and namespace are the stable identity.
 
@@ -126,7 +126,7 @@ Internal loopback HTTP ports remain dynamic transport details. The Unix socket a
 - The runtime directory and Unix socket are owner-only.
 - Startup creates a random 256-bit secret in a mode-`0600` runtime file.
 - The bridge and service use that secret for a challenge-response handshake and derive an ephemeral session key.
-- A readable stale process stamp without the matching secret cannot authenticate.
+- A readable stale runtime descriptor without the matching secret cannot authenticate.
 - MCP-authenticated sessions cannot read provider credentials and do not invoke providers.
 - Desktop-managed provider credentials remain in Electron `safeStorage` and are not copied into the headless runtime.
 - Logs never include authorization values, decrypted secrets, prompts, file contents, or provider headers.
@@ -217,7 +217,7 @@ MCP errors use stable codes and actionable messages:
 - `TOOL_NOT_AVAILABLE`: the requested capability is intentionally absent from the MCP profile.
 - `RENDER_FAILED`: a bounded render failed without leaking sensitive logs.
 
-Stale locks and process stamps are recoverable only after PID, executable, namespace, and socket liveness checks. Unknown or ambiguous state fails closed and tells the user how to inspect or stop the exact namespace; it never kills broad process groups.
+Stale locks and service runtime descriptors are recoverable only after PID, executable, namespace, and socket liveness checks. Unknown or ambiguous state fails closed and tells the user how to inspect or stop the exact namespace; it never kills broad process groups.
 
 ## Verification strategy
 
@@ -232,7 +232,7 @@ Stale locks and process stamps are recoverable only after PID, executable, names
 
 - Endpoint/namespace derivation and path permissions.
 - Connect-lock-recheck startup and stale-lock recovery.
-- Process-stamp PID, executable, namespace, data-root, and version validation.
+- Exact five-field `SidecarStamp` compatibility plus service-runtime PID, executable, namespace, data-root, and version validation.
 - Authentication handshake and session expiration.
 - Lease registration, heartbeat renewal, crash reclamation, and idle shutdown.
 - Capability allowlist, immutable client roles, and absence of any MCP-to-agent/provider dependency path.
@@ -242,7 +242,7 @@ Stale locks and process stamps are recoverable only after PID, executable, names
 ### Security tests
 
 - Traversal, symlink escape, system/credential/app-data roots, hidden state, and oversized/secret files.
-- Forged process stamps, copied runtime secrets, cross-namespace connections, and replayed handshakes.
+- Forged service runtime descriptors, copied runtime secrets, cross-namespace connections, and replayed handshakes.
 - Attempts to call agent, provider, arbitrary shell, or destructive tools through MCP.
 - Confirmation that local-only workflows make no outbound network requests.
 
