@@ -20,6 +20,9 @@ describe('Clean Design local-only policy', () => {
       '/api/media/generate',
       '/api/design-systems',
       '/api/plugins',
+      '/api/plugins/example-template/apply',
+      '/api/plugins/example-template/duplicate-project',
+      '/api/plugins/example-template/preview',
       '/api/projects/example/export',
     ]) {
       expect(isCleanDesignDisabledApiPath(path)).toBe(false);
@@ -33,7 +36,15 @@ describe('Clean Design local-only policy', () => {
       '/api/projects/project-1/handoff',
       '/api/projects/project-1/plugins/publish-github',
       '/api/projects/project-1/plugins/contribute-open-design',
+      '/api/projects/project-1/plugins/install-folder',
+      '/api/projects/project-1/plugin-candidates/candidate-1/draft',
+      '/api/plugins/install',
+      '/api/plugins/plugin-1/uninstall',
+      '/api/plugins/plugin-1/upgrade',
+      '/api/plugins/plugin-1/trust',
+      '/api/plugins/plugin-1/doctor',
       '/api/plugins/plugin-1/share-project',
+      '/api/applied-plugins/export',
       '/api/runs/run-1/feedback',
     ]) {
       expect(isCleanDesignDisabledApiPath(path)).toBe(true);

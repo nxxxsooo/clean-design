@@ -115,8 +115,9 @@ describe('PluginDetailsModal dispatch', () => {
     expect(html).toContain('plugin-media-stage');
     expect(html).toContain('https://cdn/anime.jpg');
     expect(html).toContain('Anime Battle');
-    // Inline share menu surfaces in the header extras.
-    expect(html).toContain('plugin-share-img-anime');
+    // Clean Design removed the plugin share menu with the rest of the
+    // downstream sharing surface, so no share control renders.
+    expect(html).not.toContain('plugin-share-img-anime');
   });
 
   it('routes video-template plugins to the unified chrome with a playable video', () => {
@@ -137,7 +138,7 @@ describe('PluginDetailsModal dispatch', () => {
     expect(html).toContain('plugin-media-stage__video');
     expect(html).toContain('https://cdn/clip.mp4');
     expect(html).toContain('controls');
-    expect(html).toContain('plugin-share-vid-decade');
+    expect(html).not.toContain('plugin-share-vid-decade');
   });
 
   it('routes audio plugins to the unified chrome with a playable audio element', () => {
@@ -152,7 +153,7 @@ describe('PluginDetailsModal dispatch', () => {
     expect(html).toContain('data-detail-variant="media"');
     expect(html).toContain('plugin-media-stage__audio');
     expect(html).toContain('https://cdn/jingle.mp3');
-    expect(html).toContain('plugin-share-aud-jingle');
+    expect(html).not.toContain('plugin-share-aud-jingle');
   });
 
   it('routes html-preview plugins to the example detail (sandboxed iframe + share menu)', () => {
@@ -200,7 +201,7 @@ describe('PluginDetailsModal dispatch', () => {
     expect(html).toContain('Showcase');
     expect(html).toContain('Tokens');
     expect(html).toContain('DESIGN.md');
-    expect(html).toContain('plugin-share-ds-airbnb');
+    expect(html).not.toContain('plugin-share-ds-airbnb');
   });
 
   it('falls back to the scenario inspector when the plugin has no rich preview', () => {
@@ -214,7 +215,7 @@ describe('PluginDetailsModal dispatch', () => {
     );
     expect(html).toContain('data-detail-variant="scenario"');
     expect(html).toContain('plugin-details-modal__title');
-    expect(html).toContain('plugin-share-plain-scenario');
+    expect(html).not.toContain('plugin-share-plain-scenario');
   });
 
   it('keeps the use action by default outside conversation context', () => {
@@ -319,9 +320,11 @@ describe('PluginDetailsModal common metadata coverage', () => {
     expect(html).toContain('Workflow');
     expect(html).toContain('Capabilities');
     expect(html).toContain('fs:read');
-    expect(html).toContain('Source');
-    expect(html).toMatch(/Path<\/dt>/);
-    expect(html).toContain('/tmp');
+    // Clean Design dropped the Source block: it exposed marketplace ids and
+    // origin URLs for a distribution surface the product no longer has.
+    expect(html).not.toContain('Source');
+    // The on-disk Path row lived inside that Source block, so it goes too.
+    expect(html).not.toMatch(/Path<\/dt>/);
   });
 
   it('collapses the example variant sidebar by default so the preview owns the stage', () => {
@@ -386,7 +389,7 @@ describe('PluginDetailsModal common metadata coverage', () => {
     expect(html).toContain('输入项');
     expect(html).toContain('工作流');
     expect(html).toContain('能力');
-    expect(html).toContain('来源');
+    expect(html).not.toContain('来源');
     expect(html).not.toContain('Plugin info');
     expect(html).not.toContain('Example query');
     expect(html).not.toContain('Developer details');
@@ -410,7 +413,7 @@ describe('PluginDetailsModal common metadata coverage', () => {
     expect(html).toContain('DESIGN.md');
     expect(html.indexOf('Plugin info')).toBeLessThan(html.indexOf('DESIGN.md'));
     expect(html).toContain('Workflow');
-    expect(html).toContain('Source');
+    expect(html).not.toContain('Source');
   });
 
   it('does not duplicate the plugin info heading inside the scenario fallback', () => {

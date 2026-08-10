@@ -593,14 +593,6 @@ export type PersistedAgentEvent =
       shape?: Record<string, unknown>;
     }
   | {
-      kind: 'plugin_candidate';
-      candidateId: string;
-      title: string;
-      description?: string;
-      confidence?: number;
-      draftPath?: string | null;
-    }
-  | {
       kind: 'usage';
       inputTokens?: number;
       /** Cache-inclusive provider input used for session rollover decisions. */

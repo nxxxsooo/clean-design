@@ -14,10 +14,10 @@
 
 ## 3. Local-Only Service Boundary
 
-- [ ] 3.1 Remove account, AMR/cloud, team, billing, promotion, news, deployment, updater, external MCP, and plugin-host UI surfaces
-- [ ] 3.2 Remove or deny corresponding daemon routes and background initializers without changing retained creation APIs
-- [ ] 3.3 Remove PostHog, Langfuse, telemetry relay, updater, and hosted-service egress from active runtime dependency graphs
-- [ ] 3.4 Add outbound allow-policy and forbidden-service regression tests proving zero egress for local-only workflows
+- [x] 3.1 Remove account, AMR/cloud, team, billing, promotion, news, deployment, updater, external MCP, and plugin-host UI surfaces
+- [x] 3.2 Remove or deny corresponding daemon routes and background initializers without changing retained creation APIs
+- [x] 3.3 Remove PostHog, Langfuse, telemetry relay, updater, and hosted-service egress from active runtime dependency graphs
+- [x] 3.4 Add outbound allow-policy and forbidden-service regression tests proving zero egress for local-only workflows
 
 ## 4. Encrypted Credential References
 

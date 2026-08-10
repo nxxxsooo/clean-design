@@ -7,8 +7,6 @@ await build({
     "./src/index.ts",
     "./src/critique.ts",
     "./src/api/connectionTest.ts",
-    "./src/api/amrWallet.ts",
-    "./src/api/orbit.ts",
     "./src/api/finalize.ts",
     "./src/api/handoff.ts",
     "./src/api/providerModels.ts",

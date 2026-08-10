@@ -268,10 +268,9 @@ describe('WorkspaceTabsBar navigation semantics', () => {
     );
     expect(screen.getAllByRole('tab')).toHaveLength(1);
 
-    const sections: Array<{ view: 'projects' | 'design-systems' | 'plugins'; label: string }> = [
+    const sections: Array<{ view: 'projects' | 'design-systems'; label: string }> = [
       { view: 'projects', label: 'Projects' },
       { view: 'design-systems', label: 'Design systems' },
-      { view: 'plugins', label: 'Plugins' },
     ];
 
     for (const section of sections) {

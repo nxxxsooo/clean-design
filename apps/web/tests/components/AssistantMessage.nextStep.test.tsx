@@ -100,25 +100,6 @@ describe('AssistantMessage next-step affordance', () => {
     expect(screen.queryByTestId('next-step-actions')).toBeNull();
   });
 
-  it('reaches Contribute (share to Open Design) through the More → Share cascade', () => {
-    const onShareToOpenDesign = vi.fn();
-    render(
-      <AssistantMessage
-        message={baseMessage({ producedFiles: [producedFile('landing.html')] })}
-        streaming={false}
-        projectId="proj-1"
-        isLast
-        onFeedback={vi.fn()}
-        onShareToOpenDesign={onShareToOpenDesign}
-        {...handlers()}
-      />,
-    );
-    fireEvent.mouseEnter(screen.getByTestId('next-step-toolbox-more'));
-    fireEvent.mouseEnter(screen.getByTestId('next-step-more-share'));
-    fireEvent.click(screen.getByTestId('next-step-share-contribute'));
-    expect(onShareToOpenDesign).toHaveBeenCalledTimes(1);
-  });
-
   it('renders the card after a simple answer with no previewable artifact', () => {
     render(
       <AssistantMessage

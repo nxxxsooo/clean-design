@@ -26,7 +26,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import net from 'node:net';
-import { executionProfileFromStreamFormat, PLUGIN_SHARE_ACTION_PLUGIN_IDS } from '@open-design/contracts';
+import { executionProfileFromStreamFormat } from '@open-design/contracts';
 import { isTodoWriteToolName, stopReasonIsTruncation, todoItemsFromTodoWriteInput } from '@open-design/contracts';
 import {
   composeSystemPrompt,
@@ -36,7 +36,6 @@ import {
   extractUserAuthoredSignalText,
   resolveExclusiveSurface,
 } from './prompts/system.js';
-import { emittedRenderableQuestionForm } from './question-form-detect.js';
 import { resolveProjectRoot } from './project-root.js';
 import {
   resolveDaemonCliPath,
@@ -293,32 +292,22 @@ import {
   applyDiffReviewDecisionToCwd,
   applyPlugin,
   defaultBundledRoot,
-  dismissSkillPluginCandidate,
-  doctorPlugin,
   FIRST_PARTY_ATOMS,
-  generateSkillPluginDraft,
   getInstalledPlugin,
   getSnapshot,
-  installFromLocalFolder,
-  installPlugin,
   isDiffReviewSurfaceId,
-  listSkillPluginCandidates,
   listInstalledPlugins,
   listIterationsForRun,
   MissingInputError,
   pluginPromptBlock,
   pruneExpiredSnapshots,
-  readPluginLockfile,
   registerBuiltInAtomWorkers,
   registerBundledPlugins,
   registryRootsForDataDir,
   restoreProjectSnapshotLink,
-  resolvePluginSnapshot,
   runPipelineForRun,
-  isSafePluginId,
   runStageWithRegistry,
   startSnapshotGc,
-  uninstallPlugin,
 } from './plugins/index.js';
 import {
   composeMemoryBody,
@@ -531,7 +520,7 @@ import { registerDaemonRoutes } from './routes/daemon.js';
 import { registerGenuiRoutes } from './routes/genui.js';
 import { registerDesignSystemRoutes } from './routes/design-systems.js';
 import { registerPluginAssetRoutes } from './routes/plugins/assets.js';
-import { registerPluginRoutes, registerProjectPluginRoutes } from './routes/plugins/index.js';
+import { registerPluginRoutes } from './routes/plugins/index.js';
 import { registerXaiRoutes } from './routes/xai.js';
 import { registerLiveArtifactRoutes } from './routes/live-artifact.js';
 import { registerDesignSystemToolRoutes } from './routes/design-system-tool.js';
@@ -552,8 +541,6 @@ import {
   rewriteSkillAssetUrls,
 } from './routes/static-resource.js';
 export { rewriteSkillAssetUrls } from './routes/static-resource.js';
-import { createPluginInstallationHelpers, normalizeProjectPluginFolderPath, resolveProjectChildDirectory } from './services/plugin-installation.js';
-import { createPluginShareTaskStore } from './services/plugin-share-tasks.js';
 import { getRouteRegistrationInventory, installRouteRegistrationGuard } from './route-registration-guard.js';
 import { assertServerContextSatisfiesRoutes } from './route-context-contract.js';
 import { CHAT_TOOL_ENDPOINTS, CHAT_TOOL_OPERATIONS, toolTokenRegistry } from './tool-tokens.js';
@@ -572,20 +559,9 @@ import {
 } from './library-tokens.js';
 import { listLibraryTokenOrigins } from './library-store.js';
 import { apiTokenFromEnv, isApiAuthDisabled, isApiTokenMiddlewareEnabled } from './api-token-auth.js';
-import { execCommandViaLoginShell } from './services/login-shell.js';
 import {
-  PLUGIN_SHARE_ACTION_LABELS,
-  USER_PLUGIN_SOURCE_KINDS,
-  copyPluginFolderForProjectContext,
-  detectSkillPluginCandidateOnRunSuccess,
-  ensureGhReady,
-  githubRepoNameFromPluginName,
-  hasGeneratedPluginArtifacts,
-  isPluginAuthoringRun,
-  normalizePluginShareAction,
   reconcileAssistantMessageOnRunEnd,
   renderPluginBriefTemplate,
-  renderPluginSharePrompt,
 } from './plugins/share-helpers.js';
 import { sanitizeArchiveFilename } from './projects/archive-filename.js';
 import {
@@ -687,7 +663,6 @@ const RUNTIME_DATA_DIR = resolveDataDir(process.env.OD_DATA_DIR, PROJECT_ROOT, {
 });
 const SANDBOX_RUNTIME = resolveSandboxRuntimeConfig(SANDBOX_MODE_ENABLED, RUNTIME_DATA_DIR);
 ensureSandboxRuntimeDirs(SANDBOX_RUNTIME);
-const PLUGIN_LOCKFILE_PATH = path.join(RUNTIME_DATA_DIR, 'od-plugin-lock.json');
 // Canonical (realpath-resolved) form of RUNTIME_DATA_DIR for the few callers
 // that compare it against a user-supplied realpath() result. On macOS, /var
 // is a symlink to /private/var, so an import realpath lands in /private/var
@@ -1370,29 +1345,12 @@ const importUpload = multer({
   limits: { fileSize: 100 * 1024 * 1024 },
 });
 
-const PLUGIN_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
-const pluginUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: PLUGIN_UPLOAD_MAX_BYTES,
-    files: 500,
-    fieldSize: 2 * 1024 * 1024,
-  },
-});
-
 // Figma `.fig` import — memory storage so the offline decoder gets the raw
 // bytes without a temp-file round-trip. The decoder unzips + kiwi-decodes
 // in-process and writes the snapshot under the project cwd.
 const figmaUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 200 * 1024 * 1024 },  // community kits run large
-});
-
-const pluginShareTaskStore = createPluginShareTaskStore({
-  randomUUID,
-  execCommandViaLoginShell,
-  OD_NODE_BIN,
-  OD_BIN,
 });
 
 // Project-scoped multi-file upload. Lands files directly in the project
@@ -1897,13 +1855,6 @@ export async function startServer({
   } catch {
     // best-effort: a fresh db with no library_tokens is fine
   }
-  const pluginInstallation = createPluginInstallationHelpers({
-    db,
-    installFromLocalFolder,
-    PLUGIN_REGISTRY_ROOTS,
-    PLUGIN_LOCKFILE_PATH,
-    PLUGIN_UPLOAD_MAX_BYTES,
-  });
   const mediaTaskStore = createMediaTaskStore(db);
   const {
     authorizeToolRequest,
@@ -2599,141 +2550,8 @@ export async function startServer({
     PLUGIN_PREVIEWS_DIR,
     applyBakedPreviews,
     assembleExample,
-    pluginUpload,
-    pluginInstallation,
-    sendMulterError,
-    decodeMultipartFilename,
     loadPluginRegistryView,
     requireLocalDaemonRequest,
-    getProject,
-    sendApiError,
-    isLocalSameOrigin,
-    resolvedPortRef,
-    pluginShareTaskStore,
-    installOrUpgradePlugin: async (req, res, mode) => {
-      const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const id = req.params.id;
-      let source = '';
-      let marketplaceResolution = null;
-      if (mode === 'upgrade') {
-        const policy = body.policy === 'pinned' ? 'pinned' : 'latest';
-        const plugin = getInstalledPlugin(db, id);
-        if (!plugin) return res.status(404).json({ error: { code: 'plugin-not-found', message: `No installed plugin with id "${id}".`, data: { id } } });
-        if (plugin.sourceKind === 'bundled') return res.status(409).json({ error: { code: 'bundled-plugin', message: `Plugin "${id}" was shipped bundled with the daemon and upgrades only via daemon-image upgrade. The bundled boot walker re-registers bundled plugins on every boot.`, data: { id, sourceKind: plugin.sourceKind } } });
-        source = plugin.source;
-        if (policy === 'latest' && plugin.sourceMarketplaceEntryName) {
-          const { resolvePluginInMarketplaces } = await import('./plugins/marketplaces.js');
-          marketplaceResolution = resolvePluginInMarketplaces(db, plugin.sourceMarketplaceEntryName);
-          if (marketplaceResolution) source = marketplaceResolution.source;
-        }
-        if (!source) return res.status(409).json({ error: { code: 'missing-source', message: `Plugin "${id}" has no recorded install source — cannot upgrade. Reinstall via 'od plugin install --source <...>' to set one.`, data: { id } } });
-      } else {
-        source = typeof body.source === 'string' ? body.source : '';
-        if (!source) return res.status(400).json({ error: 'source is required' });
-        const looksAbsolute = source.startsWith('/') || source.startsWith('./') || source.startsWith('~');
-        const looksGithub = source.startsWith('github:');
-        const looksHttps = /^https:\/\//i.test(source);
-        if (!looksAbsolute && !looksGithub && !looksHttps) {
-          const { resolvePluginInMarketplaces } = await import('./plugins/marketplaces.js');
-          let lookupName = source;
-          const lockfile = await readPluginLockfile(PLUGIN_LOCKFILE_PATH);
-          const locked = lockfile.plugins[source];
-          if (locked?.version && !source.includes('@')) lookupName = `${source}@${locked.version}`;
-          const resolved = resolvePluginInMarketplaces(db, lookupName);
-          if (!resolved) return res.status(404).json({ error: { code: 'plugin-not-found', message: `No marketplace plugin named "${source}". Add a marketplace via 'od marketplace add <url>' or pass a github: / https:// / local source.`, data: { name: source } } });
-          marketplaceResolution = resolved;
-          source = resolved.source;
-        }
-      }
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.flushHeaders?.();
-      const writeEvent = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      if (mode === 'upgrade') writeEvent('progress', { kind: 'progress', phase: 'resolving', message: `Upgrading ${id} from ${source} (policy=${body.policy === 'pinned' ? 'pinned' : 'latest'})` });
-      try {
-        const basePlugin = mode === 'upgrade' ? getInstalledPlugin(db, id) : null;
-        for await (const ev of installPlugin(db, {
-          source,
-          roots: PLUGIN_REGISTRY_ROOTS,
-          ...(mode === 'upgrade' ? { eventKind: 'upgraded' } : {}),
-          sourceMarketplaceId: marketplaceResolution?.marketplaceId ?? basePlugin?.sourceMarketplaceId,
-          sourceMarketplaceEntryName: marketplaceResolution?.pluginName ?? basePlugin?.sourceMarketplaceEntryName,
-          sourceMarketplaceEntryVersion: marketplaceResolution?.pluginVersion ?? basePlugin?.sourceMarketplaceEntryVersion,
-          marketplaceTrust: marketplaceResolution?.marketplaceTrust ?? basePlugin?.marketplaceTrust,
-          resolvedSource: marketplaceResolution?.source ?? basePlugin?.resolvedSource,
-          resolvedRef: marketplaceResolution?.ref ?? basePlugin?.resolvedRef,
-          manifestDigest: marketplaceResolution?.manifestDigest ?? basePlugin?.manifestDigest,
-          archiveIntegrity: marketplaceResolution?.archiveIntegrity ?? basePlugin?.archiveIntegrity,
-          lockfilePath: PLUGIN_LOCKFILE_PATH,
-        })) {
-          writeEvent(ev.kind, ev);
-          if (ev.kind === 'success' || ev.kind === 'error') break;
-        }
-      } catch (err) {
-        writeEvent('error', { kind: 'error', message: String(err), warnings: [] });
-      } finally {
-        res.end();
-      }
-    },
-    handleShareProject: async (req, res) => {
-      try {
-        const sourcePlugin = getInstalledPlugin(db, req.params.id);
-        if (!sourcePlugin) return sendApiError(res, 404, 'NOT_FOUND', 'plugin not found');
-        if (!USER_PLUGIN_SOURCE_KINDS.has(sourcePlugin.sourceKind)) return res.status(409).json({ ok: false, code: 'plugin-not-shareable', message: 'Only user-installed plugins can start a share project.' });
-        const body = req.body && typeof req.body === 'object' ? req.body : {};
-        const action = normalizePluginShareAction(body.action);
-        if (!action) return sendApiError(res, 400, 'BAD_REQUEST', 'action must be publish-github or contribute-open-design');
-        const actionPluginId = PLUGIN_SHARE_ACTION_PLUGIN_IDS[action];
-        const actionPlugin = getInstalledPlugin(db, actionPluginId);
-        if (!actionPlugin) return res.status(409).json({ ok: false, code: 'share-action-plugin-missing', message: `The bundled action plugin "${actionPluginId}" is not installed. Restart the daemon so bundled plugins are registered.` });
-        const now = Date.now(); const id = randomId(); const cid = randomId(); const sourceSlug = githubRepoNameFromPluginName(sourcePlugin.id); const stagedPath = `plugin-source/${sourceSlug}`; const prompt = renderPluginSharePrompt({ action, sourcePlugin, stagedPath }); const metadata = { kind: 'prototype' }; const projectRoot = await ensureProject(PROJECTS_DIR, id, metadata); await copyPluginFolderForProjectContext(sourcePlugin.fsPath, path.join(projectRoot, 'plugin-source', sourceSlug));
-        insertProject(db, { id, name: `${PLUGIN_SHARE_ACTION_LABELS[action]}: ${sourcePlugin.title || sourcePlugin.id}`, skillId: null, designSystemId: null, pendingPrompt: prompt, metadata, createdAt: now, updatedAt: now });
-        insertConversation(db, { id: cid, projectId: id, title: null, createdAt: now, updatedAt: now });
-        const registry = await loadPluginRegistryView(); const resolved = resolvePluginSnapshot({ db, body: { pluginId: actionPluginId, pluginInputs: { source_plugin_id: sourcePlugin.id, source_plugin_title: sourcePlugin.title || sourcePlugin.id, source_plugin_version: sourcePlugin.version, source_plugin_path: sourcePlugin.fsPath, plugin_context_path: stagedPath }, locale: typeof body.locale === 'string' ? body.locale : undefined }, projectId: id, conversationId: cid, registry });
-        if (resolved && !resolved.ok) return res.status(resolved.status).json(resolved.body);
-        const project = getProject(db, id); if (!project) return sendApiError(res, 500, 'INTERNAL_ERROR', 'created project could not be loaded');
-        res.json({ ok: true, project, conversationId: cid, ...(resolved?.ok ? { appliedPluginSnapshotId: resolved.snapshotId } : {}), actionPluginId, sourcePluginId: sourcePlugin.id, stagedPath, prompt, message: `Created a ${PLUGIN_SHARE_ACTION_LABELS[action]} task for ${sourcePlugin.title || sourcePlugin.id}.` });
-      } catch (err) { res.status(400).json({ ok: false, message: String(err?.message || err) }); }
-    },
-    handlePluginTrust: async (req, res) => {
-      try {
-        const plugin = getInstalledPlugin(db, req.params.id); if (!plugin) return res.status(404).json({ error: 'plugin not found' });
-        const body = req.body && typeof req.body === 'object' ? req.body : {}; const action = body.action === 'revoke' ? 'revoke' : 'grant';
-        const { validateCapabilityList, grantCapabilities, revokeCapabilities } = await import('./plugins/trust.js');
-        const { accepted, rejected } = validateCapabilityList(body.capabilities);
-        if (rejected.length > 0) return res.status(400).json({ error: { code: 'invalid-capability', message: `Capability validation failed: ${rejected.map((r) => r.capability).join(', ')}`, data: { rejected } } });
-        if (accepted.length === 0) return res.status(400).json({ error: { code: 'no-capabilities', message: 'capabilities[] is required and must contain at least one entry' } });
-        const next = action === 'revoke' ? revokeCapabilities({ db, pluginId: req.params.id, capabilities: accepted }) : grantCapabilities({ db, pluginId: req.params.id, capabilities: accepted });
-        const updated = getInstalledPlugin(db, req.params.id);
-        try { const { recordPluginEvent } = await import('./plugins/events.js'); recordPluginEvent({ kind: 'plugin.trust-changed', pluginId: req.params.id, details: { action, capabilities: accepted, total: next.length } }); } catch {}
-        res.status(action === 'grant' ? 201 : 200).json({ ok: true, id: req.params.id, action, capabilitiesGranted: next, plugin: updated });
-      } catch (err) { res.status(500).json({ error: String(err) }); }
-    },
-    handlePluginStats: async (res) => {
-      try { const { pluginInventoryStats, snapshotInventoryStats } = await import('./plugins/stats.js'); const installed = listInstalledPlugins(db); const inventoryRows = db.prepare(`SELECT status, project_id, run_id, applied_at FROM applied_plugin_snapshots`).all(); res.json({ plugins: pluginInventoryStats(installed), snapshots: snapshotInventoryStats(inventoryRows), generatedAt: Date.now() }); } catch (err) { res.status(500).json({ error: String(err) }); }
-    },
-    handleAppliedPluginExport: async (req, res) => {
-      try { const body = req.body && typeof req.body === 'object' ? req.body : {}; const target = body.target === 'od' || body.target === 'claude-plugin' || body.target === 'agent-skill' ? body.target : null; if (!target) return res.status(400).json({ error: 'target must be one of: od, claude-plugin, agent-skill' }); const outDir = typeof body.outDir === 'string' && body.outDir.length > 0 ? body.outDir : null; if (!outDir) return res.status(400).json({ error: 'outDir is required' }); const { exportPlugin, ExportError } = await import('./plugins/export.js'); try { const result = await exportPlugin({ db, target, outDir, ...(typeof body.snapshotId === 'string' ? { snapshotId: body.snapshotId } : {}), ...(typeof body.projectId === 'string' ? { projectId: body.projectId } : {}) }); res.json({ ok: true, ...result }); } catch (err) { if (err instanceof ExportError) return res.status(404).json({ error: err.message }); throw err; } } catch (err) { res.status(500).json({ error: String(err) }); }
-    },
-    handleProjectInstallFolder: async (req, res) => {
-      try { const project = getProject(db, req.params.id); if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found'); const body = req.body && typeof req.body === 'object' ? req.body : {}; const relativePath = normalizeProjectPluginFolderPath(body.path); const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata); const folder = await resolveProjectChildDirectory(projectRoot, relativePath); const warnings = []; const log = []; let plugin = null; let message = 'Install finished.'; for await (const ev of installPlugin(db, { source: folder, roots: PLUGIN_REGISTRY_ROOTS })) { if (ev.message) log.push(ev.message); if (Array.isArray(ev.warnings)) warnings.splice(0, warnings.length, ...ev.warnings); if (ev.kind === 'success') { plugin = ev.plugin; message = `Installed ${ev.plugin.title}.`; break; } if (ev.kind === 'error') { message = ev.message; break; } } res.status(plugin ? 200 : 400).json({ ok: Boolean(plugin), plugin, warnings, message, log }); } catch (err) { const code = err && err.code; const status = code === 'ENOENT' || code === 'ENOTDIR' ? 404 : 400; sendApiError(res, status, status === 404 ? 'PLUGIN_FOLDER_NOT_FOUND' : 'BAD_REQUEST', String(err?.message || err)); }
-    },
-    handleProjectPluginCli: async (req, res, action) => {
-      try { const project = getProject(db, req.params.id); if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found'); const body = req.body && typeof req.body === 'object' ? req.body : {}; const relativePath = normalizeProjectPluginFolderPath(body.path); const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata); const folder = await resolveProjectChildDirectory(projectRoot, relativePath); const subcommand = action === 'publish-github' ? 'publish-repo' : 'open-design-pr'; const timeout = action === 'publish-github' ? 240_000 : 300_000; const result = await execCommandViaLoginShell(OD_NODE_BIN, [OD_BIN, 'plugin', subcommand, folder, '--json'], { timeout }); const payload = result.stdout ? JSON.parse(result.stdout) : null; if (!result.ok || !payload?.ok) return res.status(500).json({ ok: false, code: payload?.error?.label || (action === 'publish-github' ? 'publish-repo-failed' : 'open-design-pr-failed'), message: payload?.error?.stderr || payload?.error?.stdout || (action === 'publish-github' ? 'GitHub repo publish failed.' : 'Open Design PR creation failed.'), log: payload?.steps?.map((step) => step.stderr || step.stdout || step.command).filter(Boolean) ?? [result.stderr || result.stdout || `${subcommand} failed`] }); res.json({ ok: true, message: action === 'publish-github' ? (payload.repoUrl ? `Published plugin to ${payload.repoUrl}.` : 'Published plugin to GitHub.') : (payload.prUrl ? `Opened Open Design PR flow at ${payload.prUrl}.` : 'Opened Open Design PR flow.'), ...(payload.repoUrl ? { url: payload.repoUrl } : {}), ...(payload.prUrl ? { url: payload.prUrl } : {}), log: payload.steps?.map((step) => step.stderr || step.stdout || step.command).filter(Boolean) ?? [] }); } catch (err) { res.status(400).json({ ok: false, message: String(err?.message || err), log: [] }); }
-    },
-    handleCandidateDraft: async (req, res) => {
-      if (!isLocalSameOrigin(req, resolvedPort)) return res.status(403).json({ error: 'cross-origin request rejected' });
-      try { const project = getProject(db, req.params.id); if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found'); const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata); const result = await generateSkillPluginDraft(db, projectRoot, req.params.id, req.params.candidateId); if (!result) return sendApiError(res, 404, 'NOT_FOUND', 'plugin candidate not found'); res.status(result.ok ? 200 : 422).json(result); } catch (err) { res.status(400).json({ ok: false, message: String(err?.message || err) }); }
-    },
-    handleCandidateShareTask: async (req, res) => {
-      if (!isLocalSameOrigin(req, resolvedPort)) return res.status(403).json({ error: 'cross-origin request rejected' });
-      try { const project = getProject(db, req.params.id); if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found'); const body = req.body && typeof req.body === 'object' ? req.body : {}; const action = body.action === 'publish-github' || body.action === 'contribute-open-design' ? body.action : null; if (!action) return sendApiError(res, 400, 'BAD_REQUEST', 'plugin share action is required'); const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata); const draft = await generateSkillPluginDraft(db, projectRoot, req.params.id, req.params.candidateId); if (!draft) return sendApiError(res, 404, 'NOT_FOUND', 'plugin candidate not found'); if (!draft.validation.ok) return res.status(422).json({ ok: false, code: 'plugin-draft-invalid', message: 'Generated plugin draft is invalid.', draft }); const task = pluginShareTaskStore.createAndStart(req.params.id, { action, path: draft.draftPath }, draft.folder); res.status(202).json({ taskId: task.id, action, path: draft.draftPath, status: task.status, startedAt: task.startedAt, draft }); } catch (err) { res.status(400).json({ ok: false, message: String(err?.message || err) }); }
-    },
-    handleProjectShareTask: async (req, res) => {
-      if (!isLocalSameOrigin(req, resolvedPort)) return res.status(403).json({ error: 'cross-origin request rejected' });
-      try { const project = getProject(db, req.params.id); if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found'); const body = req.body && typeof req.body === 'object' ? req.body : {}; const action: PluginShareAction | null = body.action === 'publish-github' || body.action === 'contribute-open-design' ? body.action : null; if (!action) return sendApiError(res, 400, 'BAD_REQUEST', 'plugin share action is required'); const relativePath = normalizeProjectPluginFolderPath(body.path); const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata); const folder = await resolveProjectChildDirectory(projectRoot, relativePath); const task = pluginShareTaskStore.createAndStart(req.params.id, { action, path: relativePath }, folder); res.status(202).json({ taskId: task.id, action, path: relativePath, status: task.status, startedAt: task.startedAt }); } catch (err) { const code = err && err.code; const status = code === 'ENOENT' || code === 'ENOTDIR' ? 404 : 400; sendApiError(res, status, status === 404 ? 'PLUGIN_FOLDER_NOT_FOUND' : 'BAD_REQUEST', String(err?.message || err)); }
-    },
   };
 
   // Plan §3.A1: shared helper used by every endpoint that has to resolve
@@ -2809,29 +2627,18 @@ export async function startServer({
 
   registerPluginRoutes(app, {
     db,
-    paths: { PROJECTS_DIR, PLUGIN_REGISTRY_ROOTS, PLUGIN_LOCKFILE_PATH },
+    paths: { PROJECTS_DIR },
     ids: idDeps,
     projectStore: projectStoreDeps,
     conversations: conversationDeps,
     plugins: {
       listInstalledPlugins,
       getInstalledPlugin,
-      installPlugin,
-      isSafePluginId,
-      uninstallPlugin,
-      installFromLocalFolder,
       applyPlugin,
-      doctorPlugin,
       getSnapshot,
       pruneExpiredSnapshots,
-      readPluginLockfile,
-      resolvePluginSnapshot,
       MissingInputError,
       pluginPromptBlock,
-      listSkillPluginCandidates,
-      dismissSkillPluginCandidate,
-      generateSkillPluginDraft,
-      FIRST_PARTY_ATOMS,
     },
     helpers: pluginRouteHelpers,
   });
@@ -2854,34 +2661,6 @@ export async function startServer({
     paths: { PROJECTS_DIR },
   });
 
-  registerProjectPluginRoutes(app, {
-    db,
-    paths: { PROJECTS_DIR, PLUGIN_REGISTRY_ROOTS, PLUGIN_LOCKFILE_PATH },
-    ids: idDeps,
-    projectStore: projectStoreDeps,
-    conversations: conversationDeps,
-    plugins: {
-      listInstalledPlugins,
-      getInstalledPlugin,
-      installPlugin,
-      isSafePluginId,
-      uninstallPlugin,
-      installFromLocalFolder,
-      applyPlugin,
-      doctorPlugin,
-      getSnapshot,
-      pruneExpiredSnapshots,
-      readPluginLockfile,
-      resolvePluginSnapshot,
-      MissingInputError,
-      pluginPromptBlock,
-      listSkillPluginCandidates,
-      dismissSkillPluginCandidate,
-      generateSkillPluginDraft,
-      FIRST_PARTY_ATOMS,
-    },
-    helpers: pluginRouteHelpers,
-  });
   registerProjectUploadRoutes(app, {
     db,
     http: httpDeps,
@@ -4324,21 +4103,6 @@ export async function startServer({
     lifecycle.mark('launch_preflight_start');
     // (model resolution is hoisted above the resume guard)
     const executionProfile = executionProfileFromStreamFormat(def.streamFormat);
-    // Accumulates the agent's visible text this run so the close handler can
-    // tell whether the turn ended on a clarifying question form. The
-    // `od-plugin-authoring` plugin's turn-1 flow is to emit a
-    // `<question-form>` collecting the plugin brief, then STOP and wait for
-    // the user to answer (see the `discovery-question-form` atom in
-    // `plugins/scaffold.ts`). That turn legitimately closes with `code === 0`
-    // and no `generated-plugin/` artifacts yet, so the missing-artifacts
-    // guard must not treat it as a failure. We buffer the streamed text
-    // rather than read the persisted message because the assistant message
-    // row may not be wired up at close time. The buffer is capped because a
-    // discovery form streams near the top of the turn; we only need enough to
-    // validate the first complete form block (see
-    // `emittedRenderableQuestionForm`).
-    const CLARIFYING_QUESTION_BUFFER_CAP = 256 * 1024;
-    let clarifyingQuestionText = '';
     let visibleAssistantText = '';
     // Reply text handed to the background memory extractor at child-close.
     // Captures the GUARDED, visible reply from BOTH channels a run can emit on:
@@ -4365,18 +4129,6 @@ export async function startServer({
       }
       if (lifecycleMarkers.firstArtifactWrite) {
         lifecycle.mark('first_artifact_write');
-      }
-      if (
-        event === 'agent' &&
-        data &&
-        data.type === 'text_delta' &&
-        typeof data.delta === 'string' &&
-        clarifyingQuestionText.length < CLARIFYING_QUESTION_BUFFER_CAP
-      ) {
-        clarifyingQuestionText = (clarifyingQuestionText + data.delta).slice(
-          0,
-          CLARIFYING_QUESTION_BUFFER_CAP,
-        );
       }
       if (
         event === 'agent' &&
@@ -6625,20 +6377,6 @@ export async function startServer({
         ));
         return finishWithRetryDecision('failed', code, signal);
       }
-      if (
-        code === 0 &&
-        !run.cancelRequested &&
-        isPluginAuthoringRun(db, run, getSnapshot) &&
-        !(await hasGeneratedPluginArtifacts(cwd)) &&
-        !emittedRenderableQuestionForm(clarifyingQuestionText)
-      ) {
-        send('error', createSseErrorPayload(
-          'AGENT_EXECUTION_FAILED',
-          'Plugin authoring ended before generating the required generated-plugin artifacts.',
-          { retryable: true },
-        ));
-        return finishWithRetryDecision('failed', code, signal);
-      }
       // Plain-stream auth-failure guard: plain adapters (today
       // antigravity, deepseek's TUI variants) may exit cleanly with
       // visible stdout that's actually an auth prompt — agy prints
@@ -7117,7 +6855,6 @@ export async function startServer({
     chat: { startChatRun },
     lifecycle: { isDaemonShuttingDown: () => daemonShuttingDown },
     plugins: {
-      detectSkillPluginCandidateOnRunSuccess,
       firePipelineForRun,
       loadPluginRegistryView,
       renderPluginBriefTemplate,
@@ -7154,7 +6891,6 @@ export async function startServer({
     nativeDialogs: nativeDialogDeps,
     research: researchDeps,
     plugins: {
-      detectSkillPluginCandidateOnRunSuccess,
       firePipelineForRun,
       loadPluginRegistryView,
       renderPluginBriefTemplate,

@@ -4,10 +4,10 @@ import { parseDaemonCliStartupArgs } from '../src/daemon-startup.js';
 
 describe('daemon startup CLI parsing', () => {
   it('parses the documented daemon startup flags', () => {
-    expect(parseDaemonCliStartupArgs(['--host', '0.0.0.0', '--port', '8123', '--no-open'], {})).toEqual({
+    expect(parseDaemonCliStartupArgs(['--host', 'localhost', '--port', '8123', '--no-open'], {})).toEqual({
       ok: true,
       config: {
-        host: '0.0.0.0',
+        host: 'localhost',
         open: false,
         port: 8123,
       },
@@ -15,14 +15,21 @@ describe('daemon startup CLI parsing', () => {
   });
 
   it('uses environment defaults when startup flags are omitted', () => {
-    expect(parseDaemonCliStartupArgs([], { OD_BIND_HOST: '127.0.0.2', OD_PORT: '7345' })).toEqual({
+    expect(parseDaemonCliStartupArgs([], { OD_BIND_HOST: '::1', OD_PORT: '7345' })).toEqual({
       ok: true,
       config: {
-        host: '127.0.0.2',
+        host: '::1',
         open: true,
         port: 7345,
       },
     });
+  });
+
+  it('refuses non-loopback bind hosts from flags or the environment', () => {
+    expect(() => parseDaemonCliStartupArgs(['--host', '0.0.0.0'], {}))
+      .toThrow(/only permits loopback daemon binds/);
+    expect(() => parseDaemonCliStartupArgs([], { OD_BIND_HOST: '127.0.0.2' }))
+      .toThrow(/only permits loopback daemon binds/);
   });
 
   it('falls back to loopback when bind host input is blank', () => {

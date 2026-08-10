@@ -52,10 +52,9 @@ import { EntryNavRail, type EntryView as EntryViewKind } from './EntryNavRail';
 import { LibrarySection } from './LibrarySection';
 import { HomeView } from './HomeView';
 import {
-  createPluginAuthoringHandoff,
   createPluginUseHandoff,
   type HomePromptHandoff,
-} from './home-hero/plugin-authoring';
+} from './home-hero/plugin-use-handoff';
 import type { PluginUseAction } from './plugins-home/useActions';
 import { Icon } from './Icon';
 import { InlineModelSwitcher } from './InlineModelSwitcher';
@@ -65,7 +64,7 @@ import {
 } from './EntrySettingsMenu';
 import { NewProjectModal } from './NewProjectModal';
 import type { CreateInput, CreateTab, ImportClaudeDesignOutcome } from './NewProjectPanel';
-import type { PluginLoopSubmit } from './PluginLoopHome';
+import type { PluginLoopSubmit } from './plugin-loop-types';
 import { smoothScrollToTop } from '../utils/smoothScrollToTop';
 import { summarizeProjectNameFromPrompt } from '../utils/projectName';
 import { LIBRARY_UI_VISIBLE } from '../features/libraryUi';
@@ -405,13 +404,6 @@ export function EntryShell({
       });
     }
     navigate({ kind: 'home', view: next });
-  }
-
-  function startPluginAuthoring(goal?: string) {
-    setHomePromptHandoff(
-      createPluginAuthoringHandoff(Date.now(), goal),
-    );
-    changeView('home');
   }
 
   function usePluginFromLibrary(

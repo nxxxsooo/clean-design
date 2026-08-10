@@ -234,7 +234,6 @@ export type TrackingRunFailureDetail =
   | 'timeout'
   | 'empty_output'
   | 'tool_error'
-  | 'plugin_artifact_missing'
   | 'cli_not_installed'
   | 'git_bash_missing'
   | 'agent_config_invalid'

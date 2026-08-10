@@ -13,7 +13,7 @@
 // with `plugins-preview-route.test.ts`.
 
 import http from 'node:http';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,8 @@ import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { startServer } from '../src/server.js';
+import { upsertInstalledPlugin } from '../src/plugins/registry.js';
+import type { InstalledPluginRecord, PluginManifest } from '@open-design/contracts';
 
 type StartedServer = { server: http.Server; url: string };
 
@@ -35,26 +37,6 @@ const PLUGIN_ID = `phase2b-preview-fallback-${Date.now()}`;
 let pluginRoot: string;
 let server: http.Server | undefined;
 let baseUrl: string;
-
-async function bootInstall(folder: string): Promise<void> {
-  const installResp = await fetch(`${baseUrl}/api/plugins/install`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify({ source: folder }),
-  });
-  if (!installResp.body) throw new Error('install: no SSE body');
-  const reader = installResp.body.getReader();
-  const decoder = new TextDecoder();
-  let raw = '';
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    raw += decoder.decode(value);
-  }
-  if (!raw.includes('event: success')) {
-    throw new Error(`installer did not finalize:\n${raw}`);
-  }
-}
 
 beforeEach(async () => {
   pluginRoot = await mkdtemp(path.join(os.tmpdir(), 'od-preview-fallback-'));
@@ -96,7 +78,23 @@ beforeEach(async () => {
   const started = (await startServer({ port: 0, returnServer: true })) as StartedServer;
   server = started.server;
   baseUrl = started.url;
-  await bootInstall(folder);
+  const now = Date.now();
+  const db = new Database(path.join(serverRuntimeDataRoot, 'app.sqlite'));
+  const manifest = JSON.parse(await readFile(path.join(folder, 'open-design.json'), 'utf8')) as PluginManifest;
+  upsertInstalledPlugin(db, {
+    id: PLUGIN_ID,
+    title: 'Preview fallback fixture',
+    version: '1.0.0',
+    sourceKind: 'bundled',
+    source: folder,
+    trust: 'bundled',
+    capabilitiesGranted: ['prompt:inject'],
+    manifest,
+    fsPath: folder,
+    installedAt: now,
+    updatedAt: now,
+  } as InstalledPluginRecord);
+  db.close();
 });
 
 afterEach(async () => {

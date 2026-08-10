@@ -677,13 +677,8 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
       window.clearTimeout(disarm);
     };
   }, [firstRunGuide, activeChipId, filteredExamplePlugins.length, activePromptExamples.length]);
-  const authoringLayoutActive =
-    activeChipId === 'create-plugin' || pendingChipId === 'create-plugin';
-  const promptMaxHeight = authoringLayoutActive
-    ? HOME_HERO_AUTHORING_PROMPT_MAX_HEIGHT
-    : HOME_HERO_PROMPT_MAX_HEIGHT;
   const inputCardStyle = {
-    '--home-hero-prompt-max-height': `${promptMaxHeight}px`,
+    '--home-hero-prompt-max-height': `${HOME_HERO_PROMPT_MAX_HEIGHT}px`,
   } as CSSProperties;
 
   useEffect(() => {
@@ -1138,9 +1133,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
       </p>
 
       <div
-        className={`home-hero__input-card${
-          authoringLayoutActive ? ' home-hero__input-card--compact-authoring' : ''
-        }${dragActive ? ' is-drag-active' : ''}`}
+        className={`home-hero__input-card${dragActive ? ' is-drag-active' : ''}`}
         style={inputCardStyle}
         onDragEnter={(event) => {
           if (event.dataTransfer.types.includes('Files')) setDragActive(true);
@@ -2315,7 +2308,6 @@ function formatFileSize(bytes: number): string {
 }
 
 const HOME_HERO_PROMPT_MAX_HEIGHT = 180;
-const HOME_HERO_AUTHORING_PROMPT_MAX_HEIGHT = 132;
 
 function pluginMentionText(record: InstalledPluginRecord): string {
   return inlineMentionToken(record.title);
@@ -3541,7 +3533,6 @@ function homeHeroChipTitle(chip: HomeHeroChip, t: ReturnType<typeof useT>): stri
     case 'live-artifact': return t('homeHero.chip.liveArtifactHint');
     case 'hyperframes': return t('homeHero.chip.hyperframesHint');
     case 'create-brand-kit': return t('homeHero.chip.createBrandKitHint');
-    case 'create-plugin': return t('homeHero.chip.createPluginHint');
     case 'figma': return t('homeHero.chip.figmaHint');
     case 'template': return t('homeHero.chip.templateHint');
     default: return homeHeroChipLabel(chip.id, t);

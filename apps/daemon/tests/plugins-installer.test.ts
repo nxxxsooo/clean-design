@@ -1,7 +1,9 @@
 // Installer integration: copies a local-folder plugin into a sandbox
 // userPluginsRoot, persists the installed_plugins row, and surfaces SSE
-// events. Phase 1 covers exactly the local-folder source path; tarball
-// arrival lands in Phase 2A.
+// events. Clean Design keeps only the local-folder source path — the
+// `github:` and `https://` archive backends were removed with the rest of
+// the hosted plugin surface, so the dispatcher must refuse a remote source
+// instead of fetching it.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
@@ -11,7 +13,6 @@ import Database from 'better-sqlite3';
 import { migratePlugins } from '../src/plugins/persistence.js';
 import { installFromLocalFolder, installPlugin, uninstallPlugin } from '../src/plugins/installer.js';
 import { listInstalledPlugins } from '../src/plugins/registry.js';
-import { addMarketplace, resolvePluginInMarketplaces } from '../src/plugins/marketplaces.js';
 import type { InstalledPluginRecord } from '@open-design/contracts';
 
 let tmpRoot: string;
@@ -108,131 +109,39 @@ describe('installFromLocalFolder', () => {
     expect(listInstalledPlugins(db)).toHaveLength(0);
   });
 
-  it('persists marketplace provenance and inherited trust for resolved installs', async () => {
-    const lockfilePath = path.join(tmpRoot, '.od', 'od-plugin-lock.json');
-    const manifest = JSON.stringify({
-      specVersion: '1.0.0',
-      name: 'fixture-registry',
-      version: '1.0.0',
-      plugins: [
-        {
-          name: 'vendor/sample-plugin',
-          title: 'Sample Plugin',
-          source: sourceFolder,
-          version: '1.0.0',
-          ref: 'abc123',
-          integrity: 'sha512-fixture',
-          manifestDigest: 'sha256-manifest',
-        },
-      ],
-    });
-    const added = await addMarketplace(db, {
-      url: 'https://example.com/open-design-marketplace.json',
-      trust: 'official',
-      fetcher: async () => ({
-        ok: true,
-        status: 200,
-        text: async () => manifest,
-      }),
-    });
-    if (!added.ok) throw new Error('marketplace setup failed');
-
-    const resolved = resolvePluginInMarketplaces(db, 'vendor/sample-plugin');
-    expect(resolved).not.toBeNull();
-
-    let installedRecord: InstalledPluginRecord | null = null;
-    for await (const ev of installPlugin(db, {
-      source: resolved!.source,
-      roots: { userPluginsRoot: pluginsRoot },
-      sourceMarketplaceId: resolved!.marketplaceId,
-      sourceMarketplaceEntryName: resolved!.pluginName,
-      sourceMarketplaceEntryVersion: resolved!.pluginVersion,
-      marketplaceTrust: resolved!.marketplaceTrust,
-      resolvedSource: resolved!.source,
-      resolvedRef: resolved!.ref!,
-      manifestDigest: resolved!.manifestDigest!,
-      archiveIntegrity: resolved!.archiveIntegrity!,
-      lockfilePath,
-    })) {
-      if (ev.kind === 'success') installedRecord = ev.plugin;
-      if (ev.kind === 'error') throw new Error(ev.message);
+  // Zero-egress regression: the removed github:/https: backends were the
+  // only outbound fetchers in the install path, and they had no SSRF guard.
+  // A remote source must now fail as a plain install error with no network
+  // call at all, so a hostile source string cannot reach loopback, RFC1918,
+  // or cloud-metadata addresses.
+  it.each([
+    'github:owner/repo',
+    'github:owner/repo@main/subpath',
+    'https://example.com/plugin.tar.gz',
+    'https://127.0.0.1/plugin.tgz',
+    'https://169.254.169.254/latest/meta-data',
+  ])('refuses the remote source %s without attempting a fetch', async (source) => {
+    const realFetch = globalThis.fetch;
+    let fetchCalls = 0;
+    globalThis.fetch = (async (...args: Parameters<typeof fetch>) => {
+      fetchCalls += 1;
+      throw new Error(`unexpected outbound fetch: ${String(args[0])}`);
+    }) as typeof fetch;
+    try {
+      const events: Array<{ kind: string; message?: string }> = [];
+      for await (const ev of installPlugin(db, {
+        source,
+        roots: { userPluginsRoot: pluginsRoot },
+      }) as AsyncGenerator<{ kind: string; message?: string }>) {
+        events.push(ev);
+      }
+      const error = events.find((ev) => ev.kind === 'error');
+      expect(error?.message).toMatch(/local folder only/);
+      expect(events.some((ev) => ev.kind === 'success')).toBe(false);
+    } finally {
+      globalThis.fetch = realFetch;
     }
-
-    expect(installedRecord?.id).toBe('sample-plugin');
-    expect(installedRecord?.sourceKind).toBe('local');
-    expect(installedRecord?.sourceMarketplaceId).toBe(added.row.id);
-    expect(installedRecord?.sourceMarketplaceEntryName).toBe('vendor/sample-plugin');
-    expect(installedRecord?.sourceMarketplaceEntryVersion).toBe('1.0.0');
-    expect(installedRecord?.marketplaceTrust).toBe('official');
-    expect(installedRecord?.trust).toBe('trusted');
-    expect(installedRecord?.resolvedSource).toBe(sourceFolder);
-    expect(installedRecord?.resolvedRef).toBe('abc123');
-    expect(installedRecord?.manifestDigest).toBe('sha256-manifest');
-    expect(installedRecord?.archiveIntegrity).toBe('sha512-fixture');
-
-    const [row] = listInstalledPlugins(db);
-    expect(row?.sourceMarketplaceId).toBe(added.row.id);
-    expect(row?.marketplaceTrust).toBe('official');
-    expect(row?.trust).toBe('trusted');
-    const lockfile = JSON.parse(await readFile(lockfilePath, 'utf8'));
-    expect(lockfile.plugins['vendor/sample-plugin']).toMatchObject({
-      name: 'vendor/sample-plugin',
-      version: '1.0.0',
-      sourceMarketplaceId: added.row.id,
-      sourceMarketplaceEntryName: 'vendor/sample-plugin',
-      resolvedRef: 'abc123',
-      manifestDigest: 'sha256-manifest',
-      archiveIntegrity: 'sha512-fixture',
-    });
-  });
-
-  it('keeps restricted marketplace installs restricted', async () => {
-    const manifest = JSON.stringify({
-      specVersion: '1.0.0',
-      name: 'restricted-registry',
-      version: '1.0.0',
-      plugins: [
-        {
-          name: 'vendor/sample-plugin',
-          title: 'Sample Plugin',
-          source: sourceFolder,
-          version: '1.0.0',
-        },
-      ],
-    });
-    const added = await addMarketplace(db, {
-      url: 'https://example.com/restricted-marketplace.json',
-      trust: 'restricted',
-      fetcher: async () => ({
-        ok: true,
-        status: 200,
-        text: async () => manifest,
-      }),
-    });
-    if (!added.ok) throw new Error('marketplace setup failed');
-
-    const resolved = resolvePluginInMarketplaces(db, 'vendor/sample-plugin');
-    expect(resolved).not.toBeNull();
-
-    let installedRecord: InstalledPluginRecord | null = null;
-    for await (const ev of installPlugin(db, {
-      source: resolved!.source,
-      roots: { userPluginsRoot: pluginsRoot },
-      sourceMarketplaceId: resolved!.marketplaceId,
-      sourceMarketplaceEntryName: resolved!.pluginName,
-      sourceMarketplaceEntryVersion: resolved!.pluginVersion,
-      marketplaceTrust: resolved!.marketplaceTrust,
-      resolvedSource: resolved!.source,
-    })) {
-      if (ev.kind === 'success') installedRecord = ev.plugin;
-      if (ev.kind === 'error') throw new Error(ev.message);
-    }
-
-    expect(installedRecord?.sourceMarketplaceId).toBe(added.row.id);
-    expect(installedRecord?.marketplaceTrust).toBe('restricted');
-    expect(installedRecord?.trust).toBe('restricted');
-    const [row] = listInstalledPlugins(db);
-    expect(row?.marketplaceTrust).toBe('restricted');
-    expect(row?.trust).toBe('restricted');
+    expect(fetchCalls).toBe(0);
+    expect(listInstalledPlugins(db)).toHaveLength(0);
   });
 });

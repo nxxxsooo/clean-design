@@ -17,7 +17,6 @@ import { VisuallyHidden } from '@open-design/components';
 import type { InstalledPluginRecord } from '@open-design/contracts';
 import { useI18n } from '../../i18n';
 import { useDeckPreviewScale } from '../../lib/use-deck-preview-scale';
-import type { PluginShareAction } from '../../state/projects';
 import { Icon } from '../Icon';
 import { TrustBadge } from '../TrustBadge';
 import { PreviewSurface } from './cards/PreviewSurface';
@@ -34,7 +33,6 @@ interface Props {
   pendingAny: boolean;
   isDuplicatePending: boolean;
   pendingDuplicateAny: boolean;
-  pendingShareAction?: { pluginId: string; action: PluginShareAction } | null;
   isFeatured: boolean;
   // Saved collection (rich layout only — the gallery tile has no save UI).
   isSaved: boolean;
@@ -42,10 +40,6 @@ interface Props {
   onUse: (record: InstalledPluginRecord, action: PluginUseAction) => void;
   onDuplicate?: (record: InstalledPluginRecord) => void;
   onOpenDetails: (record: InstalledPluginRecord) => void;
-  onShareAction?: (
-    record: InstalledPluginRecord,
-    action: PluginShareAction,
-  ) => void;
   // 'rich' (default) keeps the hover-overlay metadata card. 'gallery'
   // is the minimal preview tile: a top bar (dot + name + open fullscreen)
   // over the same lazy PreviewSurface used by the rich cards.
@@ -61,14 +55,12 @@ export function PluginCard({
   pendingAny,
   isDuplicatePending,
   pendingDuplicateAny,
-  pendingShareAction = null,
   isFeatured,
   isSaved,
   onSave,
   onUse,
   onDuplicate,
   onOpenDetails,
-  onShareAction,
   layout = 'rich',
 }: Props) {
   const { locale, t } = useI18n();
@@ -90,12 +82,9 @@ export function PluginCard({
     [record.manifest?.tags],
   );
   const hasQuery = Boolean(record.manifest?.od?.useCase?.query);
-  const sharePendingAction =
-    pendingShareAction?.pluginId === record.id ? pendingShareAction.action : null;
-  const shareBusy = sharePendingAction !== null;
-  const useDisabled = isPending || pendingAny || shareBusy;
+  const useDisabled = isPending || pendingAny;
   const canDuplicate = Boolean(onDuplicate) && canDuplicatePluginPreview(record);
-  const duplicateDisabled = isDuplicatePending || pendingDuplicateAny || pendingAny || shareBusy;
+  const duplicateDisabled = isDuplicatePending || pendingDuplicateAny || pendingAny;
 
   // Gallery deck tiles render the iframe at a fixed 1280 design width scaled to
   // fit the 16:9 frame, so a template's first slide previews proportionally
@@ -228,7 +217,6 @@ export function PluginCard({
       className={[
         'plugins-home__card',
         `plugins-home__card--${preview.kind}`,
-        onShareAction ? 'plugins-home__card--shareable' : '',
         isActive ? 'is-active' : '',
         isFeatured ? 'is-featured' : '',
       ]
@@ -361,45 +349,6 @@ export function PluginCard({
               </button>
             ) : null}
           </div>
-          {onShareAction ? (
-            <div
-              className="plugins-home__share-actions"
-              aria-label={t('pluginCard.shareAria', { title })}
-            >
-              <button
-                type="button"
-                className="plugins-home__action plugins-home__action--secondary plugins-home__action--compact"
-                onClick={() => onShareAction(record, 'publish-github')}
-                disabled={pendingAny || shareBusy}
-                aria-busy={sharePendingAction === 'publish-github' ? 'true' : undefined}
-                aria-label={t('pluginCard.publishAria', { title })}
-                title={t('pluginCard.publishTitle')}
-                data-testid={`plugins-home-publish-github-${record.id}`}
-              >
-                <Icon
-                  name={sharePendingAction === 'publish-github' ? 'spinner' : 'github'}
-                  size={12}
-                />
-                <span>{sharePendingAction === 'publish-github' ? t('pluginCard.starting') : t('pluginCard.publish')}</span>
-              </button>
-              <button
-                type="button"
-                className="plugins-home__action plugins-home__action--secondary plugins-home__action--compact"
-                onClick={() => onShareAction(record, 'contribute-open-design')}
-                disabled={pendingAny || shareBusy}
-                aria-busy={sharePendingAction === 'contribute-open-design' ? 'true' : undefined}
-                aria-label={t('pluginCard.contributeAria', { title })}
-                title={t('pluginCard.contributeTitle')}
-                data-testid={`plugins-home-contribute-open-design-${record.id}`}
-              >
-                <Icon
-                  name={sharePendingAction === 'contribute-open-design' ? 'spinner' : 'share'}
-                  size={12}
-                />
-                <span>{sharePendingAction === 'contribute-open-design' ? t('pluginCard.starting') : t('pluginCard.contribute')}</span>
-              </button>
-            </div>
-          ) : null}
         </div>
       </div>
 

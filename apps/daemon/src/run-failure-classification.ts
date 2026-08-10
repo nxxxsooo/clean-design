@@ -182,14 +182,8 @@ function isEmptyOutputText(text: string): boolean {
 }
 
 function isToolErrorText(text: string): boolean {
-  if (isPluginArtifactMissingText(text)) return true;
   return /\b(tool|mcp|connector|plugin)\b/i.test(text) &&
     /\b(error|failed|failure)\b/i.test(text);
-}
-
-function isPluginArtifactMissingText(text: string): boolean {
-  return /\bPlugin authoring ended before generating the required generated-plugin artifacts\b/i
-    .test(text);
 }
 
 function isAgentConfigInvalidText(text: string): boolean {
@@ -453,7 +447,6 @@ function signalInterruptClassification(
 }
 
 function toolErrorDetail(text: string): TrackingRunFailureDetail {
-  if (isPluginArtifactMissingText(text)) return 'plugin_artifact_missing';
   return 'tool_error';
 }
 
@@ -831,11 +824,11 @@ export function classifyRunFailure(
   }
 
   if (isToolErrorText(text)) {
-    const retryable = retryableHint ?? !isPluginArtifactMissingText(text);
+    const retryable = retryableHint ?? true;
     return classification(
       'tool_error',
       toolErrorDetail(text),
-      isPluginArtifactMissingText(text) ? 'artifact_write' : 'tool_execution',
+      'tool_execution',
       retryable,
       retryable ? 'retry' : 'none',
     );

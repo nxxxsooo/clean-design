@@ -21,13 +21,6 @@ type WorkspaceChromeTab =
       fileName: string | null;
       createdAt: number;
       lastActiveAt: number;
-    }
-  | {
-      id: string;
-      kind: 'marketplace';
-      pluginId: string | null;
-      createdAt: number;
-      lastActiveAt: number;
     };
 
 interface WorkspaceTabsState {
@@ -110,16 +103,6 @@ function tabFromRoute(route: Route, timestamp = Date.now()): WorkspaceChromeTab 
       lastActiveAt: timestamp,
     };
   }
-  if (route.kind === 'marketplace' || route.kind === 'marketplace-detail') {
-    const pluginId = route.kind === 'marketplace-detail' ? route.pluginId : null;
-    return {
-      id: `marketplace:${pluginId ?? 'index'}:${nowId()}`,
-      kind: 'marketplace',
-      pluginId,
-      createdAt: timestamp,
-      lastActiveAt: timestamp,
-    };
-  }
   return createEntryTab(route.kind === 'home' ? route.view : 'design-systems', timestamp);
 }
 
@@ -131,11 +114,6 @@ function routeForTab(tab: WorkspaceChromeTab): Route {
       conversationId: tab.conversationId,
       fileName: tab.fileName,
     };
-  }
-  if (tab.kind === 'marketplace') {
-    return tab.pluginId
-      ? { kind: 'marketplace-detail', pluginId: tab.pluginId }
-      : { kind: 'marketplace' };
   }
   return { kind: 'home', view: tab.view };
 }
@@ -152,7 +130,6 @@ function reviveTab(value: unknown): WorkspaceChromeTab | null {
     if (
       view === 'home'
       || view === 'projects'
-      || view === 'plugins'
       || view === 'design-systems'
     ) {
       return { id, kind: 'entry', view, createdAt, lastActiveAt };
@@ -169,23 +146,11 @@ function reviveTab(value: unknown): WorkspaceChromeTab | null {
       lastActiveAt,
     };
   }
-  if (record.kind === 'marketplace') {
-    return {
-      id,
-      kind: 'marketplace',
-      pluginId: typeof record.pluginId === 'string' ? record.pluginId : null,
-      createdAt,
-      lastActiveAt,
-    };
-  }
   return null;
 }
 
 function uniqueIdForTab(tab: WorkspaceChromeTab): string {
   if (tab.kind === 'project') return `project:${tab.projectId}:${nowId()}`;
-  if (tab.kind === 'marketplace') {
-    return `marketplace:${tab.pluginId ?? 'index'}:${nowId()}`;
-  }
   return `entry:${tab.view}:${nowId()}`;
 }
 
@@ -216,7 +181,7 @@ function normalizeTabsState(state: WorkspaceTabsState): WorkspaceTabsState {
 
   // Pin the single entry tab to the leftmost position (Figma-style). It is the
   // one permanent, non-closable tab regardless of which section it currently
-  // shows; project / marketplace tabs always sit to its right in insertion
+  // shows; project tabs always sit to its right in insertion
   // order. If no entry tab survives normalization — e.g. a user who reopens on
   // a saved `[project, ...]` workspace — create one so the invariant "an entry
   // tab always exists and is leftmost" holds for migrated state too.
@@ -312,8 +277,8 @@ function syncStateToRoute(state: WorkspaceTabsState, route: Route): WorkspaceTab
   const current = normalizeTabsState(state);
   const currentActive = current.tabs.find((tab) => tab.id === current.activeTabId) ?? null;
 
-  // 1. If we are navigating to any entry view (home / projects / tasks /
-  // design-systems / plugins / onboarding), reuse the single
+  // 1. If we are navigating to any entry view (home / projects /
+  // design-systems / onboarding), reuse the single
   // entry tab and switch its view IN PLACE — all sidebar sections collapse
   // into the one leftmost tab. Only create one if none exists.
   if (route.kind === 'home') {
@@ -1156,9 +1121,6 @@ function describePreviewDetail(
     }
     return null;
   }
-  if (tab.kind === 'marketplace') {
-    return tab.pluginId ? tab.pluginId : null;
-  }
   return null;
 }
 
@@ -1177,20 +1139,10 @@ function displayTabFor(
       tab,
     };
   }
-  if (tab.kind === 'marketplace') {
-    return {
-      id: tab.id,
-      title: tab.pluginId ? t('workspaceTabs.pluginDetails') : t('workspaceTabs.marketplace'),
-      meta: t('entry.navPlugins'),
-      icon: 'grid',
-      tab,
-    };
-  }
   const entryTitle: Record<EntryHomeView, string> = {
     home: t('entry.navHome'),
     onboarding: t('settings.welcomeTitle'),
     projects: t('entry.navProjects'),
-    plugins: t('entry.navPlugins'),
     'design-systems': t('entry.navDesignSystems'),
     library: 'Library',
     brands: t('entry.navBrands'),
@@ -1199,7 +1151,6 @@ function displayTabFor(
     home: 'home',
     onboarding: 'sparkles',
     projects: 'folder',
-    plugins: 'grid',
     'design-systems': 'blocks',
     library: 'image',
     brands: 'blocks',

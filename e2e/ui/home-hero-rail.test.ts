@@ -1080,7 +1080,7 @@ test('[P2] home hero exposes the template picker, starter cards, blank project, 
   await page.getByTestId('home-hero-shortcuts-trigger').click();
   const menu = page.getByTestId('home-hero-shortcuts-menu');
   await expect(menu).toBeVisible();
-  for (const id of ['create-plugin', 'figma', 'template']) {
+  for (const id of ['figma', 'template']) {
     await expect(menu.getByTestId(`home-hero-rail-${id}`)).toBeVisible();
   }
 });

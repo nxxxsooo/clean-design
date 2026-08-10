@@ -44,8 +44,6 @@ import type {
   LiveArtifactStatus,
   LiveArtifactSummary,
   MediaAspect,
-  OrbitRunSummary,
-  OrbitStatusResponse,
   ProviderTestRequest,
   PersistedAgentEvent,
   ProviderModelOption,
@@ -88,8 +86,6 @@ import type {
 
 export type {
   ChatCommentSelectionKind,
-  OrbitRunSummary,
-  OrbitStatusResponse,
   ProjectLocation,
   PreviewCommentMember,
   PreviewAnnotationStyle,

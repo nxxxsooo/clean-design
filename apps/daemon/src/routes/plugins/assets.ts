@@ -30,6 +30,7 @@ interface PluginManifestLike {
 
 interface InstalledPluginLike {
   fsPath: string;
+  sourceKind?: string;
   title?: string;
   manifest?: PluginManifestLike;
   [key: string]: unknown;
@@ -43,7 +44,7 @@ export function registerPluginAssetRoutes(app: Express, deps: RegisterPluginAsse
     try {
       const { getInstalledPlugin } = await import('../../plugins/index.js');
       const plugin = getInstalledPlugin(db, routeParam(req.params.id)) as InstalledPluginLike | null;
-      if (!plugin) return res.status(404).json({ error: 'plugin not found' });
+      if (!plugin || plugin.sourceKind !== 'bundled') return res.status(404).json({ error: 'plugin not found' });
       const candidates = (await pickCandidates(plugin)).filter((p): p is string => typeof p === 'string' && p.length > 0);
       const fsp = await import('node:fs/promises');
       const root = path.resolve(plugin.fsPath) + path.sep;
@@ -227,7 +228,7 @@ export function registerPluginAssetRoutes(app: Express, deps: RegisterPluginAsse
     try {
       const { getInstalledPlugin } = await import('../../plugins/index.js');
       const plugin = getInstalledPlugin(db, routeParam(req.params.id)) as InstalledPluginLike | null;
-      if (!plugin) return res.status(404).json({ error: 'plugin not found' });
+      if (!plugin || plugin.sourceKind !== 'bundled') return res.status(404).json({ error: 'plugin not found' });
       const splatParam = req.params.splat;
       const relpath = Array.isArray(splatParam) ? splatParam.join('/') : String(splatParam ?? '');
       if (!relpath || relpath.includes('..') || relpath.startsWith('/') || relpath.includes('\0')) return res.status(400).json({ error: 'invalid asset path' });

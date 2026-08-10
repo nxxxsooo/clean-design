@@ -15,8 +15,6 @@ import {
 } from '../utils/fileSystemErrors';
 import { isVisualStabilityMode } from '../utils/visualStability';
 import { selectInitialDesignPreviewFile } from './design-files/designArtifacts';
-import type { PluginFolderAgentAction } from './design-files/pluginFolderActions';
-import { getPluginFolderCandidates } from './design-files/pluginFolders';
 import { Icon } from './Icon';
 import { LiveArtifactBadges } from './LiveArtifactBadges';
 import { isRenderableSketchJson, SketchPreview } from './SketchPreview';
@@ -75,19 +73,8 @@ interface Props {
   onClearUploadError?: () => void;
   preferredPreviewFile?: string | null;
   autoPreviewDesignArtifacts?: boolean;
-  onPluginFolderAgentAction?: (
-    relativePath: string,
-    action: PluginFolderAgentAction,
-  ) => Promise<{ message?: string; url?: string } | void> | { message?: string; url?: string } | void;
-  activePluginActionPaths?: Set<string>;
-  hiddenPluginActionPaths?: Set<string>;
   navState?: DesignFilesNavState;
   onNavStateChange?: (state: DesignFilesNavState) => void;
-}
-
-interface ActionNotice {
-  message: string;
-  url?: string;
 }
 
 // Display-only refinement of ProjectFileKind. The contract `kind` lumps all
@@ -136,35 +123,6 @@ type FileSystemFileEntryWithFile = FileSystemFileEntry & {
 type DataTransferItemWithEntry = DataTransferItem & {
   webkitGetAsEntry?: () => FileSystemEntry | null;
 };
-
-function buildActionNotice(message: string, url?: string): ActionNotice {
-  const trimmedMessage = message.trim();
-  const trimmedUrl = url?.trim();
-  if (!trimmedUrl) return { message: trimmedMessage };
-  const normalizedMessage = trimmedMessage.replace(new RegExp(`\\s*${escapeRegExp(trimmedUrl)}\\s*$`), '');
-  return { message: normalizedMessage.trim() || trimmedUrl, url: trimmedUrl };
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function ActionNoticeView({ notice }: { notice: ActionNotice | null }) {
-  if (!notice) return null;
-  return (
-    <>
-      <span>{notice.message}</span>
-      {notice.url ? (
-        <>
-          {' '}
-          <a href={notice.url} target="_blank" rel="noreferrer">
-            {notice.url}
-          </a>
-        </>
-      ) : null}
-    </>
-  );
-}
 
 // Useful-info tips that rotate one at a time in the panel footer, ordered as
 // a loose journey: file basics → feeding context → generating → iterating →
@@ -300,9 +258,6 @@ export function DesignFilesPanel({
   preferredPreviewFile = null,
   autoPreviewDesignArtifacts = false,
   onCurrentDirChange,
-  onPluginFolderAgentAction,
-  activePluginActionPaths = new Set(),
-  hiddenPluginActionPaths = new Set(),
   navState,
   onNavStateChange,
 }: Props) {
@@ -320,9 +275,6 @@ export function DesignFilesPanel({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const lastKeyPress = useRef<Map<string, number>>(new Map());
   const [deleting, setDeleting] = useState(false);
-  const [installingFolder, setInstallingFolder] = useState<string | null>(null);
-  const [sharingFolder, setSharingFolder] = useState<string | null>(null);
-  const [installNotice, setInstallNotice] = useState<ActionNotice | null>(null);
   const [renaming, setRenaming] = useState<{ name: string; draft: string; saving: boolean } | null>(null);
   const [copiedLocalPath, setCopiedLocalPath] = useState<string | null>(null);
   const [currentDir, setCurrentDir] = useState<string>(() => navState?.currentDir ?? '');
@@ -424,8 +376,6 @@ export function DesignFilesPanel({
     }
     setCurrentDir('');
   }, [files, folders, currentDir]);
-
-  const pluginFolders = useMemo(() => getPluginFolderCandidates(files), [files]);
 
   // Prune selections that no longer exist in the current file list
   // (e.g. after a refresh or delete within the same project).
@@ -841,34 +791,6 @@ export function DesignFilesPanel({
     }
   }
 
-  async function handlePluginFolderAgentAction(
-    relativePath: string,
-    action: PluginFolderAgentAction,
-  ) {
-    if (!onPluginFolderAgentAction || installingFolder || sharingFolder) return;
-    setInstallNotice(null);
-    if (action === 'install') {
-      setInstallingFolder(relativePath);
-    } else {
-      setSharingFolder(`${action}:${relativePath}`);
-    }
-    try {
-      const outcome = await onPluginFolderAgentAction(relativePath, action);
-      const url = outcome && typeof outcome === 'object' && typeof outcome.url === 'string'
-        ? outcome.url
-        : '';
-      const message = outcome && typeof outcome === 'object' && typeof outcome.message === 'string'
-        ? outcome.message
-        : '';
-      if (message || url) setInstallNotice(buildActionNotice(message || url, url));
-    } catch (err) {
-      setInstallNotice({ message: err instanceof Error ? err.message : String(err) });
-    } finally {
-      setInstallingFolder(null);
-      setSharingFolder(null);
-    }
-  }
-
   const fileActions = (
     <div className="df-actions">
       {LIBRARY_UI_VISIBLE && onSelectFromLibrary ? (
@@ -1169,60 +1091,6 @@ export function DesignFilesPanel({
                       </span>
                     </button>
                   ))}
-                </div>
-              ) : null}
-              {pluginFolders.length > 0 ? (
-                <div className="df-section" key="plugin-folders">
-                  <div className="df-section-label">
-                    Plugin folders
-                    <span className="df-section-count">{pluginFolders.length}</span>
-                  </div>
-                  {installNotice ? (
-                    <div className="df-inline-notice" role="status">
-                      <ActionNoticeView notice={installNotice} />
-                    </div>
-                  ) : null}
-                  {pluginFolders.filter((folder) => !hiddenPluginActionPaths.has(folder.path)).map((folder) => {
-                    const actionBusy = activePluginActionPaths.has(folder.path);
-                    return (
-                    <div
-                      key={folder.path}
-                      className="df-row df-row-plugin-folder"
-                      data-testid={`design-plugin-folder-${folder.path}`}
-                    >
-                      <button
-                        type="button"
-                        className="df-row-folder-main"
-                        onClick={() => setPreview(folder.manifestPath)}
-                      >
-                        <span className="df-row-icon" data-kind="folder" aria-hidden>
-                          DIR
-                        </span>
-                        <span className="df-row-name-wrap">
-                          <span className="df-row-name">{folder.path}</span>
-                          <span className="df-row-sub">
-                            {folder.fileCount} files · ready to add to My plugins
-                          </span>
-                        </span>
-                      </button>
-                      <span className="df-row-time">{relativeTime(folder.updatedAt, t)}</span>
-                      {onPluginFolderAgentAction ? (
-                        <div className="df-plugin-actions">
-                          <button
-                            type="button"
-                            className="df-plugin-install"
-                            data-testid={`design-plugin-folder-install-${folder.path}`}
-                            disabled={actionBusy || installingFolder !== null || sharingFolder !== null}
-                            onClick={() =>
-                              void handlePluginFolderAgentAction(folder.path, 'install')
-                            }
-                          >
-                            {installingFolder === folder.path ? 'Sending…' : 'Add to My plugins'}
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  )})}
                 </div>
               ) : null}
               {dirsAtCurrentDir.length > 0 ? (

@@ -113,7 +113,6 @@ import {
   type BrowserPageSnapshotToastEvent,
   type BrowserPageInfo,
 } from './DesignBrowserPanel';
-import type { PluginFolderAgentAction } from './design-files/pluginFolderActions';
 import { designSystemGithubEvidenceState, repoConnectCopy } from './design-system-github-evidence';
 import { APP_CHROME_FILE_ACTIONS_ID } from './AppChromeHeader';
 import { FileViewer, LiveArtifactViewer } from './FileViewer';
@@ -205,12 +204,6 @@ interface Props {
   onSendBoardCommentAttachments?: (attachments: ChatCommentAttachment[], images?: File[]) => Promise<boolean | void> | boolean | void;
   onBrandExtractionStopRequest?: () => void;
   onRequestBrowserUsePrompt?: (prompt: string) => void;
-  onPluginFolderAgentAction?: (
-    relativePath: string,
-    action: PluginFolderAgentAction,
-  ) => Promise<{ message?: string; url?: string } | void> | { message?: string; url?: string } | void;
-  activePluginActionPaths?: Set<string>;
-  hiddenPluginActionPaths?: Set<string>;
   preferredPreviewFile?: string | null;
   autoPreviewDesignArtifacts?: boolean;
   focusMode?: boolean;
@@ -1212,9 +1205,6 @@ export function FileWorkspace({
   onSendBoardCommentAttachments,
   onBrandExtractionStopRequest,
   onRequestBrowserUsePrompt,
-  onPluginFolderAgentAction,
-  activePluginActionPaths,
-  hiddenPluginActionPaths,
   preferredPreviewFile = null,
   autoPreviewDesignArtifacts = false,
   focusMode = false,
@@ -3773,9 +3763,6 @@ export function FileWorkspace({
             onClearUploadError={() => setUploadError(null)}
             preferredPreviewFile={preferredPreviewFile}
             autoPreviewDesignArtifacts={autoPreviewDesignArtifacts}
-            onPluginFolderAgentAction={onPluginFolderAgentAction}
-            activePluginActionPaths={activePluginActionPaths}
-            hiddenPluginActionPaths={hiddenPluginActionPaths}
           />
         ) : isBrowserTabId(activeTab) ? (
           null

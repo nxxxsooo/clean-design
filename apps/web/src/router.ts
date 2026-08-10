@@ -14,7 +14,6 @@ export type EntryHomeView =
   | 'home'
   | 'onboarding'
   | 'projects'
-  | 'plugins'
   | 'design-systems'
   | 'library'
   | 'brands';
@@ -46,9 +45,7 @@ export type Route =
        */
       conversationId?: string | null;
       fileName: string | null;
-    }
-  | { kind: 'marketplace' }
-  | { kind: 'marketplace-detail'; pluginId: string };
+    };
 
 export function parseRoute(pathname: string): Route {
   const parts = pathname.replace(/\/+$/, '').split('/').filter(Boolean);
@@ -103,9 +100,6 @@ export function parseRoute(pathname: string): Route {
   if (parts[0] === 'automations' || parts[0] === 'tasks') {
     return { kind: 'home', view: 'home' };
   }
-  if (parts[0] === 'plugins' && !parts[1]) {
-    return { kind: 'home', view: 'home' };
-  }
   if (LIBRARY_UI_VISIBLE && parts[0] === 'library' && !parts[1]) {
     return { kind: 'home', view: 'library' };
   }
@@ -119,7 +113,6 @@ export function buildPath(route: Route): string {
   if (route.kind === 'home') {
     if (route.view === 'onboarding') return '/';
     if (route.view === 'projects') return '/projects';
-    if (route.view === 'plugins') return '/';
     if (route.view === 'design-systems') return '/design-systems';
     if (route.view === 'library') return LIBRARY_UI_VISIBLE ? '/library' : '/';
     if (route.view === 'brands') {
@@ -127,7 +120,6 @@ export function buildPath(route: Route): string {
     }
     return '/';
   }
-  if (route.kind === 'marketplace' || route.kind === 'marketplace-detail') return '/';
   if (route.kind === 'design-system-create') return '/design-systems/create';
   if (route.kind === 'design-system-detail') {
     return `/design-systems/${encodeURIComponent(route.designSystemId)}`;

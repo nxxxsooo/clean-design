@@ -3,7 +3,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { runDaemonCliStartup, startDaemonRuntime } from './daemon-startup.js';
-import { runLiveArtifactsMcpServer } from './mcp-live-artifacts-server.js';
 import { runArtifactsCli } from './artifacts-cli.js';
 import { runProjectHandoff } from './handoff-cli.js';
 import { runDesignToolCli } from './tools-design-cli.js';
@@ -73,36 +72,6 @@ const MEDIA_GENERATE_BOOLEAN_FLAGS = new Set([
   'help',
   'h',
   'loop',
-]);
-
-const MCP_STRING_FLAGS = new Set([
-  'daemon-url',
-]);
-const MCP_BOOLEAN_FLAGS = new Set([
-  'help',
-  'h',
-]);
-
-// Hoisted next to MCP_*_FLAGS for the same TDZ reason as the MEDIA flags
-// above: `od mcp install <agent>` dispatches through SUBCOMMAND_MAP during
-// top-level module evaluation, and runMcpInstall references these `const`
-// Sets — defining them next to runMcpInstall lower in the file would hit
-// the TDZ.
-const MCP_INSTALL_STRING_FLAGS = new Set([
-  'daemon-url',
-  'name',
-]);
-const MCP_INSTALL_CLI_PROBE_FLAG = 'open-design-cli-probe';
-const MCP_INSTALL_CLI_PROBE_TOKEN = 'open-design-cli:mcp-install:v1';
-const MCP_INSTALL_BOOLEAN_FLAGS = new Set([
-  'help',
-  'h',
-  MCP_INSTALL_CLI_PROBE_FLAG,
-  'json',
-  'print',
-  'dry-run',
-  'uninstall',
-  'remove',
 ]);
 
 const RESEARCH_SEARCH_STRING_FLAGS = new Set([
@@ -193,8 +162,6 @@ const DIAGNOSTICS_STRING_FLAGS = new Set(['daemon-url', 'output']);
 const DIAGNOSTICS_BOOLEAN_FLAGS = new Set(['help', 'h', 'json']);
 const CONFIG_STRING_FLAGS = new Set(['daemon-url', 'value', 'value-json']);
 const CONFIG_BOOLEAN_FLAGS = new Set(['help', 'h', 'json']);
-const AMR_STRING_FLAGS = new Set(['daemon-url']);
-const AMR_BOOLEAN_FLAGS = new Set(['help', 'h', 'json', 'refresh']);
 const MESSAGE_CENTER_STRING_FLAGS = new Set([
   'daemon-url',
   'locale',
@@ -220,26 +187,12 @@ const TEMPLATES_STRING_FLAGS = new Set([
   'daemon-url', 'name', 'description',
 ]);
 const TEMPLATES_BOOLEAN_FLAGS = new Set(['help', 'h', 'json']);
-// `od automation …` mirrors the Automations tab. Same surface, same
-// /api/routines store. The CLI form is the embeddability contract:
-// external agents (hermes-agent, openclaw, etc.) can drive Open Design
-// automations headlessly without going through the web UI.
-const AUTOMATION_STRING_FLAGS = new Set([
-  'daemon-url', 'name', 'prompt', 'prompt-file', 'schedule', 'target',
-  'project', 'skill', 'agent', 'limit', 'plugin', 'mcp', 'connector',
-  'status', 'reason', 'template', 'source-kind', 'source-ref', 'title',
-  'body', 'body-file', 'compression', 'sensitivity', 'account',
-  'candidate-sinks', 'memory-type',
-]);
-const AUTOMATION_BOOLEAN_FLAGS = new Set([
-  'help', 'h', 'json', 'disabled', 'enabled',
-]);
 const MEMORY_STRING_FLAGS = new Set([
   'daemon-url', 'name', 'description', 'type', 'body', 'body-file',
   // `od memory profile set` reads structured fields verbatim and/or a prose
   // body; `--field "Label=Value"` is repeatable (scanned manually below since
   // parseFlags collapses duplicate keys). `--prompt-file <path|->` mirrors the
-  // long-prose embeddability contract used by `od automation`/`od brand`.
+  // long-prose embeddability contract used by `od brand`.
   'field', 'prompt-file', 'assertion', 'check', 'rationale',
   // `od memory rule suggest` distils annotations into rule proposals: a single
   // `--note` plus optional target context, or a `--prompt-file` carrying a JSON
@@ -275,15 +228,6 @@ const BRAND_STRING_FLAGS = new Set([
 const BRAND_BOOLEAN_FLAGS = new Set([
   'help', 'h', 'json',
 ]);
-// Hoisted because `runAutomation` is reachable through the top-of-file
-// SUBCOMMAND_MAP dispatch, which runs during module evaluation —
-// any `const` declared further down would still be in TDZ when
-// `parseScheduleFlag` reads this map. Same reason the other dispatch-
-// touched constants live near the top.
-const AUTOMATION_WEEKDAY_TOKENS = {
-  sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6,
-  sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6,
-};
 const RECOVERABLE_EXIT_CODES = {
   'daemon-not-running':       64,
   'plugin-not-found':         65,
@@ -467,17 +411,6 @@ async function runExport(args) {
     );
   }
   console.log(`wrote ${out} (${buffer.length} bytes)`);
-}
-
-if (argv[0] === 'mcp' && argv[1] === 'live-artifacts') {
-  try {
-    const { exitCode } = await runLiveArtifactsMcpServer();
-    process.exit(exitCode);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`${JSON.stringify({ ok: false, error: { message } })}\n`);
-    process.exit(1);
-  }
 }
 
 const first = argv.find((a) => !a.startsWith('-'));
@@ -800,7 +733,7 @@ async function runMediaGenerate(rawArgs) {
   // Long-form media prompts (detailed image/video descriptions, program-
   // generated prompts) arrive via --prompt-file <path|-> (stdin) per the CLI
   // contract; readPromptFromFlags prefers an inline --prompt and otherwise reads
-  // the file/stdin, matching od run / od brand / od automation.
+  // the file/stdin, matching od run / od brand.
   const prompt = await readPromptFromFlags(flags);
 
   const body = {
@@ -1250,36 +1183,21 @@ async function runPlugin(args) {
   switch (sub) {
     case 'list':      return runPluginList(rest);
     case 'search':    return runPluginSearch(rest);
-    case 'stats':     return runPluginStats(rest);
     case 'sources':   return runPluginSources(rest);
     case 'info':      return runPluginInfo(rest);
     case 'manifest':  return runPluginManifest(rest);
-    case 'install':   return runPluginInstall(rest);
-    case 'upgrade':   return runPluginUpgrade(rest);
-    case 'uninstall': return runPluginUninstall(rest);
     case 'apply':     return runPluginApply(rest);
     case 'duplicate': return runPluginDuplicate(rest);
     case 'canon':     return runPluginCanon(rest);
     case 'diff':      return runPluginDiff(rest);
-    case 'doctor':    return runPluginDoctor(rest);
     case 'replay':    return runPluginReplay(rest);
-    case 'trust':     return runPluginTrust(rest);
     case 'snapshots': return runPluginSnapshots(rest);
     case 'simulate':  return runPluginSimulate(rest);
     case 'verify':    return runPluginVerify(rest);
-    case 'events':    return runPluginEvents(rest);
     case 'run':       return runPluginRun(rest);
     case 'scaffold': return runPluginScaffold(rest);
     case 'validate': return runPluginValidate(rest);
     case 'pack':     return runPluginPack(rest);
-    case 'candidates': return runPluginCandidates(rest);
-    case 'login':    return runPluginLogin(rest);
-    case 'whoami':   return runPluginWhoami(rest);
-    case 'export':   return runPluginExport(rest);
-    case 'publish':  return runPluginPublish(rest);
-    case 'publish-repo': return runPluginPublishRepo(rest);
-    case 'open-design-pr': return runPluginOpenDesignPr(rest);
-    case 'yank':     return runPluginYank(rest);
     default:
       console.error(`unknown subcommand: od plugin ${sub}`);
       printPluginHelp();
@@ -1337,7 +1255,7 @@ Writes <out|cwd>/<id>/{SKILL.md,open-design.json,README.md}.`);
     if (flags.json) return process.stdout.write(JSON.stringify(result, null, 2) + '\n');
     console.log(`[scaffold] ${result.folder}`);
     for (const file of result.files) console.log(`  ${file}`);
-    console.log(`\nNext: od plugin install ${result.folder}`);
+    console.log(`\nNext: od plugin validate ${result.folder}`);
   } catch (err) {
     if (err instanceof ScaffoldError) {
       console.error(`[scaffold] ${err.message}`);
@@ -1453,7 +1371,7 @@ async function runPluginPack(rest) {
 
 Builds a gzip-compressed tar archive of <folder> at --out (default
 '<folder>/../<basename>-<manifest.version>.tgz'). The archive is the
-exact shape \`od plugin install --source <https://...>\` consumes.
+portable distribution shape for a plugin folder.
 
 Skipped when packing:
   node_modules / .git / .next / dist / build / out / coverage /
@@ -1506,85 +1424,11 @@ Exit codes:
       console.log(`[pack] out:    ${result.outPath}`);
       console.log(`[pack] files:  ${result.files.length}`);
       console.log(`[pack] bytes:  ${result.bytes}`);
-      console.log(`\nNext: od plugin install --source ${result.outPath}`);
+      console.log(`\nNext: share ${result.outPath} with the target runtime.`);
     }
   } catch (err) {
     console.error(`[pack] failed: ${err?.message ?? err}`);
     process.exit(2);
-  }
-}
-
-async function runPluginLogin(rest) {
-  const flags = parseFlags(rest, {
-    string: new Set(['host']),
-    boolean: new Set(['help', 'h']),
-  });
-  if (flags.help || flags.h) {
-    console.log(`Usage:
-  od plugin login [--host github.com]
-
-Wraps GitHub CLI auth for Open Design registry publishing. The token stays in gh.`);
-    return;
-  }
-  const host = typeof flags.host === 'string' ? flags.host : 'github.com';
-  const version = await execGhBuffered(['--version'], { timeout: 10_000 });
-  if (!version.ok) {
-    console.error('[plugin login] GitHub CLI is required. Install gh from https://cli.github.com/ and retry.');
-    process.exit(1);
-  }
-  const result = await spawnGhPassthrough(['auth', 'login', '--hostname', host, '--web']);
-  process.exit(result.code ?? 0);
-}
-
-async function runPluginWhoami(rest) {
-  const flags = parseFlags(rest, {
-    string: new Set(['host']),
-    boolean: new Set(['help', 'h', 'json']),
-  });
-  if (flags.help || flags.h) {
-    console.log(`Usage:
-  od plugin whoami [--host github.com] [--json]
-
-Shows the GitHub account gh will use for Open Design registry publishing.`);
-    return;
-  }
-  const host = typeof flags.host === 'string' ? flags.host : 'github.com';
-  const auth = await execGhBuffered(['auth', 'status', '--hostname', host], { timeout: 10_000 });
-  if (!auth.ok) {
-    if (flags.json) {
-      process.stdout.write(JSON.stringify({
-        ok: false,
-        host,
-        message: 'GitHub CLI is not authenticated for this host.',
-        log: auth.stderr || auth.stdout,
-      }, null, 2) + '\n');
-      return;
-    }
-    console.error(`[plugin whoami] gh is not authenticated for ${host}. Run: od plugin login --host ${host}`);
-    if (auth.stderr || auth.stdout) console.error(auth.stderr || auth.stdout);
-    process.exit(1);
-  }
-  const user = await execGhBuffered(['api', 'user', '--hostname', host], { timeout: 10_000 });
-  let login = '';
-  let name = '';
-  try {
-    const parsed = JSON.parse(user.stdout || '{}');
-    login = typeof parsed.login === 'string' ? parsed.login : '';
-    name = typeof parsed.name === 'string' ? parsed.name : '';
-  } catch {
-    // Keep the auth status useful even if gh api output is unavailable.
-  }
-  const payload = {
-    ok: true,
-    host,
-    login,
-    name,
-    auth: auth.stderr || auth.stdout,
-  };
-  if (flags.json) {
-    process.stdout.write(JSON.stringify(payload, null, 2) + '\n');
-  } else {
-    console.log(`[plugin whoami] ${login || 'authenticated'}${name ? ` (${name})` : ''} @ ${host}`);
   }
 }
 
@@ -1657,66 +1501,6 @@ function inferGithubHost(target) {
   }
 }
 
-// Phase 4 / spec §14 — `od plugin export <projectId> --as <target>`.
-//
-// Produces a publish-ready folder from the AppliedPluginSnapshot
-// behind a given project (or directly from a snapshot id). Three
-// targets: 'od', 'claude-plugin', 'agent-skill'.
-async function runPluginExport(rest) {
-  const flags = parseFlags(rest, {
-    string: new Set(['daemon-url', 'as', 'out', 'snapshot-id', 'project']),
-    boolean: new Set(['help', 'h', 'json']),
-  });
-  if (rest.length === 0 || flags.help || flags.h) {
-    console.log(`Usage:
-  od plugin export <projectId> --as od|claude-plugin|agent-skill --out <dir>
-  od plugin export --snapshot-id <id> --as od|claude-plugin|agent-skill --out <dir>
-
-The export resolves through the daemon HTTP \`POST /api/applied-plugins/export\`
-endpoint so the running daemon's installed_plugins / applied_plugin_snapshots
-view is the single source of truth.`);
-    process.exit(rest.length === 0 ? 2 : 0);
-  }
-  const positional = rest.find((a) => !a.startsWith('-'));
-  const projectId = flags.project ?? positional ?? null;
-  const snapshotId = typeof flags['snapshot-id'] === 'string' ? flags['snapshot-id'] : null;
-  if (!projectId && !snapshotId) {
-    console.error('Usage: od plugin export <projectId> --as <target> --out <dir>');
-    process.exit(2);
-  }
-  const target = String(flags.as ?? 'od');
-  if (target !== 'od' && target !== 'claude-plugin' && target !== 'agent-skill') {
-    console.error(`--as must be one of: od, claude-plugin, agent-skill (got "${target}")`);
-    process.exit(2);
-  }
-  const out = typeof flags.out === 'string' && flags.out.length > 0
-    ? flags.out
-    : process.cwd();
-  const base = (await pluginDaemonUrl(flags)).replace(/\/$/, '');
-  const resp = await fetch(`${base}/api/applied-plugins/export`, {
-    method:  'POST',
-    headers: { 'content-type': 'application/json' },
-    body:    JSON.stringify({
-      ...(snapshotId ? { snapshotId } : { projectId }),
-      target,
-      outDir: out,
-    }),
-  });
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    console.error(`POST /api/applied-plugins/export failed: ${resp.status} ${JSON.stringify(data)}`);
-    process.exit(1);
-  }
-  if (flags.json) return process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-  console.log(`[export] ${data.folder} (snapshot ${data.snapshotId})`);
-  for (const f of data.files ?? []) console.log(`  ${f}`);
-}
-
-// Plan §3.A5 / spec §16 Phase 5: operator escape hatch for snapshot GC.
-// Two subcommands:
-//   - `od plugin snapshots list [--project <id>]` — list snapshots
-//   - `od plugin snapshots prune [--before <ts>]` — force-delete expired
-//     (and optionally older-than-cutoff unreferenced) rows.
 async function runPluginSnapshots(args) {
   const sub = args[0];
   if (!sub || sub === 'help' || args.includes('--help') || args.includes('-h')) {
@@ -1899,7 +1683,7 @@ async function runPluginRun(rest) {
     if (runResp.status === 409 && runData?.error?.code === 'capabilities-required') {
       const missing = (runData.error.data?.missing ?? []).join(',');
       console.error(`[run] capabilities required: ${missing}`);
-      console.error(`[run] retry with --grant-caps ${missing} or run \`od plugin trust ${id} --capabilities ${missing}\``);
+      console.error(`[run] retry with --grant-caps ${missing}`);
       process.exit(66);
     }
     console.error(`run failed: ${runResp.status} ${JSON.stringify(runData)}`);
@@ -1980,66 +1764,6 @@ flags as 'od plugin list'.`);
   });
 }
 
-// Plan §3.DD1 — `od plugin stats`. Pretty-prints the
-// pluginInventoryStats + snapshotInventoryStats aggregation. The
-// daemon-side route owns the SQLite reads; the CLI is a thin
-// formatter.
-async function runPluginStats(rest) {
-  const flags = parseFlags(rest, {
-    string:  PLUGIN_STRING_FLAGS,
-    boolean: PLUGIN_BOOLEAN_FLAGS,
-  });
-  if (flags.help || flags.h) {
-    console.log(`Usage:
-  od plugin stats [--json]
-
-Prints an at-a-glance plugin + snapshot inventory:
-  - Plugin counts by sourceKind, trust, taskKind.
-  - Bundled vs. third-party split.
-  - Plugins with elevated capabilities (fs:write, subprocess,
-    bash, network, connector:*).
-  - Snapshot total, status breakdown, project / run linkage.
-  - Oldest / newest applied snapshot timestamps.`);
-    process.exit(0);
-  }
-  const base = (await pluginDaemonUrl(flags)).replace(/\/$/, '');
-  const url = `${base}/api/plugins/stats`;
-  const resp = await fetch(url);
-  if (!resp.ok) {
-    console.error(`GET ${url} failed: ${resp.status} ${await resp.text()}`);
-    process.exit(1);
-  }
-  const data = await resp.json();
-  if (flags.json) {
-    process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-    return;
-  }
-  const p = data?.plugins ?? {};
-  const s = data?.snapshots ?? {};
-  const lastInstalled = formatTimestamp(p.lastInstalledAt);
-  const lastUpdated   = formatTimestamp(p.lastUpdatedAt);
-  const oldestApplied = formatTimestamp(s.oldestAppliedAt);
-  const newestApplied = formatTimestamp(s.newestAppliedAt);
-  console.log('# Plugins');
-  console.log(`  total:            ${p.total ?? 0}`);
-  console.log(`  bundled:          ${p.bundled ?? 0}`);
-  console.log(`  third-party:      ${p.thirdParty ?? 0}`);
-  console.log(`  with elevated:    ${p.withElevatedCapabilities ?? 0}`);
-  console.log(`  by sourceKind:    ${formatCounts(p.bySourceKind)}`);
-  console.log(`  by trust:         ${formatCounts(p.byTrust)}`);
-  console.log(`  by taskKind:      ${formatCounts(p.byTaskKind)}`);
-  console.log(`  last installed:   ${lastInstalled}`);
-  console.log(`  last updated:     ${lastUpdated}`);
-  console.log('');
-  console.log('# Snapshots');
-  console.log(`  total:            ${s.total ?? 0}`);
-  console.log(`  by status:        ${formatCounts(s.byStatus)}`);
-  console.log(`  with project:     ${s.withProject ?? 0}`);
-  console.log(`  with run:         ${s.withRun ?? 0}`);
-  console.log(`  oldest applied:   ${oldestApplied}`);
-  console.log(`  newest applied:   ${newestApplied}`);
-}
-
 function formatCounts(counts) {
   if (!counts || typeof counts !== 'object') return '(none)';
   const entries = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
@@ -2116,29 +1840,12 @@ async function runPluginInfo(rest) {
     && a !== flags.source
     && a !== flags.version);
   if (!id) {
-    console.error('Usage: od plugin info <id-or-marketplace-name> [--version <version|tag|range>] [--json]');
+    console.error('Usage: od plugin info <id> [--json]');
     process.exit(2);
   }
   const base = (await pluginDaemonUrl(flags)).replace(/\/$/, '');
   const url = `${base}/api/plugins/${encodeURIComponent(id)}`;
   const resp = await fetch(url);
-  if (resp.ok && !flags.version) {
-    const data = await resp.json();
-    process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-    return;
-  }
-  const mpResp = await fetch(`${base}/api/marketplaces`);
-  if (mpResp.ok) {
-    const mpData = await mpResp.json().catch(() => ({}));
-    const resolved = resolveMarketplacePluginFromList(
-      mpData?.marketplaces ?? [],
-      flags.version ? `${id}@${flags.version}` : id,
-    );
-    if (resolved) {
-      process.stdout.write(JSON.stringify({ marketplace: resolved }, null, 2) + '\n');
-      return;
-    }
-  }
   if (!resp.ok) {
     console.error(`GET /api/plugins/${id} failed: ${resp.status} ${await resp.text()}`);
     process.exit(1);
@@ -2147,62 +1854,6 @@ async function runPluginInfo(rest) {
   process.stdout.write(JSON.stringify(data, null, 2) + '\n');
 }
 
-function resolveMarketplacePluginFromList(marketplaces, specifier) {
-  const parsed = parseCliPluginSpecifier(specifier);
-  const target = parsed.name.toLowerCase();
-  for (const marketplace of marketplaces) {
-    for (const entry of marketplace?.manifest?.plugins ?? []) {
-      if (String(entry.name ?? '').toLowerCase() !== target) continue;
-      const version = resolveCliEntryVersion(entry, parsed.range);
-      if (!version) return null;
-      return {
-        marketplaceId: marketplace.id,
-        marketplaceTrust: marketplace.trust,
-        name: entry.name,
-        version: version.version,
-        source: version.source,
-        ref: version.ref,
-        integrity: version.integrity,
-        manifestDigest: version.manifestDigest,
-        entry,
-      };
-    }
-  }
-  return null;
-}
-
-function parseCliPluginSpecifier(input) {
-  const trimmed = String(input ?? '').trim();
-  const slash = trimmed.indexOf('/');
-  const at = trimmed.lastIndexOf('@');
-  if (slash > 0 && at > slash + 1) {
-    return { name: trimmed.slice(0, at), range: trimmed.slice(at + 1) };
-  }
-  return { name: trimmed, range: undefined };
-}
-
-function resolveCliEntryVersion(entry, range) {
-  if (entry?.yanked) return null;
-  const versions = Array.isArray(entry?.versions) ? entry.versions : [];
-  const target = range && range !== 'latest'
-    ? (entry?.distTags?.[range] ?? range)
-    : (entry?.distTags?.latest ?? entry?.version);
-  const version = versions.find((item) => item.version === target) ?? null;
-  if (version?.yanked) return null;
-  return {
-    version: target,
-    source: version?.source ?? entry?.source,
-    ref: version?.ref ?? entry?.ref,
-    integrity: version?.integrity ?? version?.dist?.integrity ?? entry?.integrity ?? entry?.dist?.integrity,
-    manifestDigest: version?.manifestDigest ?? version?.dist?.manifestDigest ?? entry?.manifestDigest ?? entry?.dist?.manifestDigest,
-  };
-}
-
-// Plan §3.MM1 — `od plugin manifest <id>`. Prints just the parsed
-// manifest JSON, no wrapper. Useful for plugin authors who want to
-// compare the daemon's view to their on-disk open-design.json
-// without scrolling past the registry record fields (sourceKind /
-// fsPath / installedAt etc).
 async function runPluginManifest(rest) {
   const flags = parseFlags(rest, { string: PLUGIN_STRING_FLAGS, boolean: PLUGIN_BOOLEAN_FLAGS });
   const id = rest.find((a) => !a.startsWith('--') && a !== flags['daemon-url'] && a !== flags.source);
@@ -2273,287 +1924,6 @@ async function runPluginSources(rest) {
   }
 }
 
-async function runPluginInstall(rest) {
-  const flags = parseFlags(rest, { string: PLUGIN_STRING_FLAGS, boolean: PLUGIN_BOOLEAN_FLAGS });
-  const source = typeof flags.source === 'string' ? flags.source : rest.find((a) => !a.startsWith('-'));
-  if (!source) {
-    console.error('Usage: od plugin install <source-or-name>\n' +
-      '       od plugin install ./local-folder\n' +
-      '       od plugin install github:owner/repo[@ref][/subpath]\n' +
-      '       od plugin install https://example.com/plugin.tar.gz\n' +
-      '       od plugin install <name>[@version|tag|range]  # resolves through configured marketplaces');
-    process.exit(2);
-  }
-  const url = `${(await pluginDaemonUrl(flags)).replace(/\/$/, '')}/api/plugins/install`;
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify({ source }),
-  });
-  if (!resp.ok || !resp.body) {
-    console.error(`POST /api/plugins/install failed: ${resp.status} ${await resp.text()}`);
-    process.exit(1);
-  }
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let exitCode = 0;
-  const events = [];
-  let finalEvent = null;
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const blocks = buffer.split('\n\n');
-    buffer = blocks.pop() ?? '';
-    for (const block of blocks) {
-      const lines = block.split('\n');
-      const eventLine = lines.find((l) => l.startsWith('event: '));
-      const dataLine  = lines.find((l) => l.startsWith('data: '));
-      const event = eventLine ? eventLine.slice('event: '.length) : 'message';
-      const data = dataLine ? safeParseJson(dataLine.slice('data: '.length)) : null;
-      events.push({ event, data });
-      if (event === 'progress') {
-        if (!flags.json) console.log(`[install] ${data?.phase ?? '...'}: ${data?.message ?? ''}`);
-      } else if (event === 'success') {
-        finalEvent = data;
-        if (!flags.json) console.log(`[install] ok — ${data?.plugin?.id}@${data?.plugin?.version} (trust=${data?.plugin?.trust})`);
-        if (!flags.json && Array.isArray(data?.warnings) && data.warnings.length > 0) {
-          for (const w of data.warnings) console.log(`[install] warn: ${w}`);
-        }
-      } else if (event === 'error') {
-        finalEvent = data;
-        if (!flags.json) console.error(`[install] error: ${data?.message ?? 'unknown'}`);
-        exitCode = 1;
-      }
-    }
-  }
-  if (flags.json) {
-    process.stdout.write(JSON.stringify({
-      ok: exitCode === 0,
-      result: finalEvent,
-      events,
-    }, null, 2) + '\n');
-  }
-  process.exit(exitCode);
-}
-
-// Plan §3.Z2 — `od plugin upgrade <id>`. Re-installs the plugin
-// from its recorded source. Streams the same SSE event shape as
-// install, so 'progress' / 'success' / 'error' arrive verbatim.
-// Plan §3.II1 — `od plugin events tail`. Tails the daemon's
-// in-memory plugin event ring buffer via SSE. -f keeps the
-// connection open and prints live events; otherwise prints the
-// backlog and exits when the daemon closes the stream.
-async function runPluginEvents(rest) {
-  const sub = rest[0];
-  if (!sub || sub === 'help' || rest.includes('--help') || rest.includes('-h')) {
-    console.log(`Usage:
-  od plugin events tail     [-f] [--since <id>] [--kind <k>] [--plugin-id <id>] [--json]
-  od plugin events snapshot [--since <id>] [--kind <k>] [--plugin-id <id>] [--json]
-  od plugin events stats    [--json]
-  od plugin events purge    [--confirm] [--json]    (loopback-only)
-
-Tail / snapshot / stats / purge over the daemon's in-memory
-plugin event ring buffer (capped at 1000 entries; resets on
-daemon restart).
-Lifecycle vocabulary:
-  plugin.installed | plugin.upgraded | plugin.uninstalled
-  plugin.trust-changed | plugin.snapshot-pruned
-  plugin.marketplace-refreshed | plugin.applied
-
-  --since <id>       Trim backlog to events strictly after id.
-  --kind <k>         Filter to a single kind.
-  --plugin-id <id>   Filter to events touching one plugin id.
-  -f / --follow      tail-only: keep the SSE stream open.
-  --json             Emit raw JSON (one event per line on tail,
-                     full report on snapshot/stats).`);
-    process.exit(sub ? 0 : 2);
-  }
-  const flags = parseFlags(rest.slice(1), {
-    string:  new Set([...PLUGIN_STRING_FLAGS, 'since', 'kind', 'plugin-id']),
-    boolean: new Set([...PLUGIN_BOOLEAN_FLAGS, 'f', 'follow']),
-  });
-  const base = (await pluginDaemonUrl(flags)).replace(/\/$/, '');
-  const since = typeof flags.since === 'string' ? Number(flags.since) : 0;
-  const kindFilter = typeof flags.kind === 'string' && flags.kind.length > 0 ? flags.kind : null;
-  const pluginIdFilter = typeof flags['plugin-id'] === 'string' && flags['plugin-id'].length > 0
-    ? flags['plugin-id']
-    : null;
-  const matches = (ev) => {
-    if (!ev) return false;
-    if (kindFilter && ev.kind !== kindFilter) return false;
-    if (pluginIdFilter && ev.pluginId !== pluginIdFilter) return false;
-    return true;
-  };
-
-  if (sub === 'snapshot') {
-    const url = `${base}/api/plugins/events/snapshot${Number.isFinite(since) && since > 0 ? `?since=${since}` : ''}`;
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      console.error(`GET ${url} failed: ${resp.status} ${await resp.text()}`);
-      process.exit(1);
-    }
-    const data = await resp.json();
-    const events = (Array.isArray(data?.events) ? data.events : []).filter(matches);
-    if (flags.json) {
-      process.stdout.write(JSON.stringify({ events, count: events.length, generatedAt: data?.generatedAt }, null, 2) + '\n');
-      return;
-    }
-    if (events.length === 0) {
-      console.log('[events snapshot] no events match filter');
-      return;
-    }
-    for (const ev of events) {
-      const ts = ev.at ? new Date(ev.at).toISOString() : '?';
-      const detailKeys = ev.details ? Object.keys(ev.details).slice(0, 3).join(',') : '';
-      console.log(`#${ev.id}  ${ts}  ${ev.kind}  pluginId=${ev.pluginId || '-'}` +
-        (detailKeys ? `  details=${detailKeys}` : ''));
-    }
-    return;
-  }
-
-  if (sub === 'purge') {
-    // Refuse to run without an explicit --confirm so 'od plugin
-    // events purge' alone never drops audit data accidentally.
-    const purgeFlags = parseFlags(rest.slice(1), {
-      string:  new Set(['daemon-url']),
-      boolean: new Set(['help', 'h', 'json', 'confirm']),
-    });
-    if (!purgeFlags.confirm) {
-      console.error('[events purge] refusing without --confirm. This drops every event in the in-memory buffer.');
-      process.exit(2);
-    }
-    const resp = await fetch(`${base}/api/plugins/events/purge`, { method: 'POST' });
-    if (!resp.ok) {
-      console.error(`POST /api/plugins/events/purge failed: ${resp.status} ${await resp.text()}`);
-      process.exit(1);
-    }
-    const data = await resp.json();
-    if (purgeFlags.json) {
-      process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-    } else {
-      console.log(`[events purge] dropped ${data.purged ?? 0} event${(data.purged ?? 0) === 1 ? '' : 's'} (id range: ${data.firstId ?? '(none)'} \u2192 ${data.lastId ?? '(none)'}; preNextId=${data.preNextId})`);
-    }
-    return;
-  }
-
-  if (sub === 'stats') {
-    const resp = await fetch(`${base}/api/plugins/events/stats`);
-    if (!resp.ok) {
-      console.error(`GET /api/plugins/events/stats failed: ${resp.status} ${await resp.text()}`);
-      process.exit(1);
-    }
-    const data = await resp.json();
-    if (flags.json) {
-      process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-      return;
-    }
-    const s = data?.stats ?? {};
-    console.log('# Plugin events');
-    console.log(`  total:           ${s.total ?? 0}`);
-    console.log(`  by kind:         ${formatCounts(s.byKind)}`);
-    console.log(`  by pluginId:     ${formatCounts(s.byPluginId)}`);
-    console.log(`  oldest at:       ${formatTimestamp(s.oldestAt)}`);
-    console.log(`  newest at:       ${formatTimestamp(s.newestAt)}`);
-    console.log(`  id range:        ${s.firstId ?? '(none)'} \u2192 ${s.lastId ?? '(none)'}`);
-    return;
-  }
-
-  if (sub !== 'tail') {
-    console.error(`unknown subcommand: od plugin events ${sub}`);
-    process.exit(2);
-  }
-  const follow = flags.f === true || flags.follow === true;
-  const url = `${base}/api/plugins/events${Number.isFinite(since) && since > 0 ? `?since=${since}` : ''}`;
-  const resp = await fetch(url, { headers: { accept: 'text/event-stream' } });
-  if (!resp.ok || !resp.body) {
-    console.error(`GET ${url} failed: ${resp.status} ${await resp.text()}`);
-    process.exit(1);
-  }
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  const renderEvent = (channel, data) => {
-    if (!matches(data)) return;
-    if (flags.json) {
-      process.stdout.write(JSON.stringify({ channel, ...data }) + '\n');
-      return;
-    }
-    const ts = data?.at ? new Date(data.at).toISOString() : '?';
-    const id = data?.id ?? '?';
-    const tag = channel === 'backlog' ? '[bk]' : '[ev]';
-    const detailKeys = data?.details ? Object.keys(data.details).slice(0, 3).join(',') : '';
-    console.log(`${tag} #${id}  ${ts}  ${data?.kind ?? '?'}  pluginId=${data?.pluginId ?? '-'}` +
-      (detailKeys ? `  details=${detailKeys}` : ''));
-  };
-  // Read until the daemon closes the stream OR --follow keeps it open
-  // forever. Without --follow we still let the daemon drain the
-  // backlog naturally; the route emits all backlog entries first,
-  // and our reader exits when the connection closes (which the
-  // daemon never does on its own, so we add a small idle timer).
-  if (!follow) {
-    // Non-follow: drain backlog, then exit after a short idle period
-    // (the route never naturally closes; the SSE backlog is a one-shot
-    // stream of event entries).
-    let lastChunkAt = Date.now();
-    const idleMs = 200;
-    const idleTimer = setInterval(() => {
-      if (Date.now() - lastChunkAt > idleMs) {
-        clearInterval(idleTimer);
-        try { reader.cancel(); } catch { /* ignore */ }
-      }
-    }, 100);
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        lastChunkAt = Date.now();
-        buffer += decoder.decode(value, { stream: true });
-        const blocks = buffer.split('\n\n');
-        buffer = blocks.pop() ?? '';
-        for (const block of blocks) {
-          const lines = block.split('\n');
-          const ev = lines.find((l) => l.startsWith('event: '))?.slice('event: '.length) ?? 'message';
-          const dat = lines.find((l) => l.startsWith('data: '))?.slice('data: '.length);
-          if (!dat) continue;
-          try { renderEvent(ev, JSON.parse(dat)); } catch { /* ignore */ }
-        }
-      }
-    } finally {
-      clearInterval(idleTimer);
-    }
-    return;
-  }
-  // Follow mode: read forever.
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const blocks = buffer.split('\n\n');
-    buffer = blocks.pop() ?? '';
-    for (const block of blocks) {
-      const lines = block.split('\n');
-      const ev = lines.find((l) => l.startsWith('event: '))?.slice('event: '.length) ?? 'message';
-      const dat = lines.find((l) => l.startsWith('data: '))?.slice('data: '.length);
-      if (!dat) continue;
-      try { renderEvent(ev, JSON.parse(dat)); } catch { /* ignore */ }
-    }
-  }
-}
-
-// Plan §3.FF1 — `od plugin verify <pluginId>` CI meta-command.
-//
-// Reads an optional .od-verify.json config from the plugin folder
-// or --config <path> and runs the enabled subset of:
-//
-//   doctor   — calls /api/plugins/<id>/doctor
-//   simulate — calls /api/plugins/<id> + simulatePipeline()
-//   canon    — fetches /api/applied-plugins/<snapshotId>/canon and
-//              compares against the on-disk fixture
-//
-// Aggregates into a unified pass/fail report. Exit 4 on any failed
-// check; useful as a one-liner CI check for a plugin's repo.
 async function runPluginVerify(rest) {
   const flags = parseFlags(rest, {
     string:  new Set([...PLUGIN_STRING_FLAGS, 'config']),
@@ -2963,89 +2333,6 @@ into 'added' / 'removed' / 'changed' with one line per field.`);
   }
 }
 
-async function runPluginUpgrade(rest) {
-  const flags = parseFlags(rest, { string: PLUGIN_STRING_FLAGS, boolean: PLUGIN_BOOLEAN_FLAGS });
-  const id = rest.find((a) => !a.startsWith('-') && a !== flags['daemon-url'] && a !== flags.source);
-  if (!id) {
-    console.error('Usage: od plugin upgrade <id> [--policy latest|pinned] [--json]');
-    process.exit(2);
-  }
-  const url = `${(await pluginDaemonUrl(flags)).replace(/\/$/, '')}/api/plugins/${encodeURIComponent(id)}/upgrade`;
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify({
-      policy: flags.policy === 'pinned' ? 'pinned' : 'latest',
-    }),
-  });
-  if (!resp.ok || !resp.body) {
-    let msg = '';
-    try { msg = await resp.text(); } catch { msg = ''; }
-    console.error(`POST /api/plugins/${id}/upgrade failed: ${resp.status} ${msg}`);
-    process.exit(1);
-  }
-  const reader = resp.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let exitCode = 0;
-  const events = [];
-  let finalEvent = null;
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const blocks = buffer.split('\n\n');
-    buffer = blocks.pop() ?? '';
-    for (const block of blocks) {
-      const lines = block.split('\n');
-      const eventLine = lines.find((l) => l.startsWith('event: '));
-      const dataLine  = lines.find((l) => l.startsWith('data: '));
-      const event = eventLine ? eventLine.slice('event: '.length) : 'message';
-      const data = dataLine ? safeParseJson(dataLine.slice('data: '.length)) : null;
-      events.push({ event, data });
-      if (event === 'progress') {
-        if (!flags.json) console.log(`[upgrade] ${data?.phase ?? '...'}: ${data?.message ?? ''}`);
-      } else if (event === 'success') {
-        finalEvent = data;
-        if (!flags.json) console.log(`[upgrade] ok — ${data?.plugin?.id}@${data?.plugin?.version} (trust=${data?.plugin?.trust})`);
-        if (!flags.json && Array.isArray(data?.warnings) && data.warnings.length > 0) {
-          for (const w of data.warnings) console.log(`[upgrade] warn: ${w}`);
-        }
-      } else if (event === 'error') {
-        finalEvent = data;
-        if (!flags.json) console.error(`[upgrade] error: ${data?.message ?? 'unknown'}`);
-        exitCode = 1;
-      }
-    }
-  }
-  if (flags.json) {
-    process.stdout.write(JSON.stringify({
-      ok: exitCode === 0,
-      policy: flags.policy === 'pinned' ? 'pinned' : 'latest',
-      result: finalEvent,
-      events,
-    }, null, 2) + '\n');
-  }
-  process.exit(exitCode);
-}
-
-async function runPluginUninstall(rest) {
-  const flags = parseFlags(rest, { string: PLUGIN_STRING_FLAGS, boolean: PLUGIN_BOOLEAN_FLAGS });
-  const id = rest.find((a) => !a.startsWith('-') && a !== flags['daemon-url'] && a !== flags.source);
-  if (!id) {
-    console.error('Usage: od plugin uninstall <id>');
-    process.exit(2);
-  }
-  const url = `${(await pluginDaemonUrl(flags)).replace(/\/$/, '')}/api/plugins/${encodeURIComponent(id)}/uninstall`;
-  const resp = await fetch(url, { method: 'POST' });
-  if (!resp.ok) {
-    console.error(`POST /api/plugins/${id}/uninstall failed: ${resp.status} ${await resp.text()}`);
-    process.exit(1);
-  }
-  const data = await resp.json();
-  console.log(`[uninstall] ${data?.removedFolder ? 'ok' : 'no-op'}${data?.warning ? ` (warning: ${data.warning})` : ''}`);
-}
-
 async function runPluginApply(rest) {
   const flags = parseFlags(rest, { string: PLUGIN_STRING_FLAGS, boolean: PLUGIN_BOOLEAN_FLAGS });
   const id = rest.find((a) => !a.startsWith('-')
@@ -3167,493 +2454,6 @@ function coerceCliValue(raw) {
   if (raw === 'false') return false;
   if (/^-?\d+(\.\d+)?$/.test(raw)) return Number(raw);
   return raw;
-}
-
-async function runPluginCandidates(rest) {
-  const sub = rest[0];
-  const args = rest.slice(1);
-  const flags = parseFlags(args, {
-    string: new Set(['daemon-url', 'project', 'action']),
-    boolean: new Set(['help', 'h', 'json', 'include-dismissed']),
-  });
-  if (!sub || flags.help || flags.h) {
-    console.log(`Usage:
-  od plugin candidates list --project <projectId> [--json] [--include-dismissed]
-  od plugin candidates draft <candidateId> --project <projectId> [--json]
-  od plugin candidates dismiss <candidateId> --project <projectId> [--json]
-
-Lists and formalizes persisted skill-to-plugin candidates.`);
-    process.exit(!sub ? 2 : 0);
-  }
-  const projectId = typeof flags.project === 'string' && flags.project.length > 0 ? flags.project : '';
-  if (!projectId) {
-    console.error('--project <projectId> is required');
-    process.exit(2);
-  }
-  const base = (await pluginDaemonUrl(flags)).replace(/\/$/, '');
-  if (sub === 'list') {
-    const qs = flags['include-dismissed'] ? '?includeDismissed=true' : '';
-    const resp = await fetch(`${base}/api/projects/${encodeURIComponent(projectId)}/plugin-candidates${qs}`);
-    const data = await resp.json().catch(() => null);
-    if (!resp.ok) {
-      console.error(`GET plugin candidates failed: ${resp.status} ${JSON.stringify(data)}`);
-      process.exit(1);
-    }
-    if (flags.json) return process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-    const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
-    if (candidates.length === 0) {
-      console.log('No plugin candidates.');
-      return;
-    }
-    for (const candidate of candidates) {
-      console.log(`${candidate.id}\t${candidate.status}\t${candidate.title}\t${candidate.draftPath ?? ''}`);
-    }
-    return;
-  }
-  const candidateId = args.find((a) => !a.startsWith('-') && a !== flags.project && a !== flags.action);
-  if (!candidateId) {
-    console.error(`candidate id is required for ${sub}`);
-    process.exit(2);
-  }
-  if (sub === 'draft') {
-    const resp = await fetch(`${base}/api/projects/${encodeURIComponent(projectId)}/plugin-candidates/${encodeURIComponent(candidateId)}/draft`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}',
-    });
-    const data = await resp.json().catch(() => null);
-    if (flags.json) {
-      process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-    } else if (resp.ok) {
-      console.log(`[candidate] draft: ${data.draftPath}`);
-      console.log(`[candidate] validation ok=${data.validation?.ok}`);
-    } else {
-      console.error(`[candidate] draft failed: ${data?.message ?? JSON.stringify(data)}`);
-    }
-    process.exit(resp.ok ? 0 : resp.status === 422 ? 4 : 1);
-  }
-  if (sub === 'dismiss') {
-    const resp = await fetch(`${base}/api/projects/${encodeURIComponent(projectId)}/plugin-candidates/${encodeURIComponent(candidateId)}/dismiss`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{}',
-    });
-    const data = await resp.json().catch(() => null);
-    if (flags.json) process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-    else if (resp.ok) console.log(`[candidate] dismissed ${candidateId}`);
-    else console.error(`[candidate] dismiss failed: ${data?.message ?? JSON.stringify(data)}`);
-    process.exit(resp.ok ? 0 : 1);
-  }
-  console.error(`unknown subcommand: od plugin candidates ${sub}`);
-  process.exit(2);
-}
-
-// Phase 4 / spec §14.1 — `od plugin publish --to <catalog>`.
-//
-// Reads the installed plugin's manifest metadata (or the snapshot's
-// frozen view via --snapshot-id) and prints the catalog submission URL
-// + PR body. With `--open` the CLI auto-launches the system browser
-// against the URL so the author lands on the catalog's submission form
-// in one step. We never POST anywhere — the upstream review flow is
-// always under the author's control.
-async function runPluginPublish(rest) {
-  const flags = parseFlags(rest, {
-    string: new Set(['daemon-url', 'to', 'snapshot-id', 'repo', 'catalog']),
-    boolean: new Set(['help', 'h', 'json', 'open']),
-  });
-  if (rest.length === 0 || flags.help || flags.h) {
-    console.log(`Usage:
-  od plugin publish <pluginId> --to open-design|anthropics-skills|awesome-agent-skills|clawhub|skills-sh
-                    [--repo <github-url>] [--snapshot-id <id>] [--open] [--json]
-  od plugin publish <pluginId> --to marketplace-json --catalog ./open-design-marketplace.json --repo <github-url>
-
-The CLI prints the catalog's submission URL + a pre-filled PR body.
-Pass --open to auto-launch the system browser. Use --snapshot-id to
-publish from a frozen run snapshot rather than the live installed copy.`);
-    process.exit(rest.length === 0 ? 2 : 0);
-  }
-  const id = rest.find((a) => !a.startsWith('-')
-    && a !== flags.to
-    && a !== flags.repo
-    && a !== flags['snapshot-id']);
-  const target = String(flags.to ?? '');
-  if (!id) {
-    console.error('Usage: od plugin publish <pluginId> --to <catalog>');
-    process.exit(2);
-  }
-  if (!target) {
-    console.error('--to <catalog> is required (one of: open-design, anthropics-skills, awesome-agent-skills, clawhub, skills-sh)');
-    process.exit(2);
-  }
-  const base = (await pluginDaemonUrl(flags)).replace(/\/$/, '');
-  // Pull the plugin metadata from the daemon. We do this through the
-  // existing /api/plugins/:id endpoint so the CLI never needs a direct
-  // SQLite handle; everything stays loopback-mediated.
-  let meta = { pluginId: id, pluginVersion: '0.0.0' };
-  try {
-    const resp = await fetch(`${base}/api/plugins/${encodeURIComponent(id)}`);
-    if (resp.ok) {
-      const row = await resp.json();
-      // The daemon's plugin row carries a stored `version` plus the full
-      // manifest. For project-local plugins (`generated-plugin/`, snapshots,
-      // freshly imported folders) the stored `version` is `'0.0.0'` until
-      // the registry handshake runs, but the manifest's `version` is the
-      // real value the author wrote. Mirror `plugins/marketplaces.ts:298,328`
-      // and prefer the manifest version when the stored row reads as the
-      // pre-handshake sentinel. Closes #1765.
-      const storedVersion = typeof row.version === 'string' && row.version.length > 0
-        ? row.version
-        : null;
-      const manifestVersion = typeof row.manifest?.version === 'string' && row.manifest.version.length > 0
-        ? row.manifest.version
-        : null;
-      const resolvedVersion = (storedVersion && storedVersion !== '0.0.0')
-        ? storedVersion
-        : (manifestVersion ?? storedVersion ?? '0.0.0');
-      meta = {
-        pluginId:          row.id ?? id,
-        pluginVersion:     resolvedVersion,
-        ...(row.title              ? { pluginTitle: row.title }                       : {}),
-        ...(row.manifest?.description ? { pluginDescription: row.manifest.description } : {}),
-      };
-    }
-  } catch {
-    // Best-effort; if the daemon isn't reachable we still try to build
-    // a link from the user's flags so the author doesn't need a daemon
-    // to publish.
-  }
-  if (typeof flags.repo === 'string' && flags.repo.length > 0) {
-    meta.repoUrl = flags.repo;
-  }
-  if (target === 'marketplace-json') {
-    if (typeof flags.catalog !== 'string' || flags.catalog.length === 0) {
-      console.error('--catalog <path> is required for --to marketplace-json');
-      process.exit(2);
-    }
-    if (!meta.repoUrl) {
-      console.error('--repo <github-url> is required for --to marketplace-json so the source can be reproduced');
-      process.exit(2);
-    }
-    const outcome = await publishToMarketplaceJson({
-      catalogPath: flags.catalog,
-      meta,
-    });
-    if (flags.json) {
-      process.stdout.write(JSON.stringify(outcome, null, 2) + '\n');
-    } else {
-      console.log(`[publish] updated ${outcome.catalogPath}`);
-      console.log(`[publish] ${outcome.entry.name}@${outcome.entry.version} -> ${outcome.entry.source}`);
-    }
-    return;
-  }
-  const { buildPublishLink, PublishError } = await import('./plugins/publish.js');
-  let link;
-  try {
-    link = buildPublishLink({ catalog: target, meta });
-  } catch (err) {
-    if (err instanceof PublishError) {
-      console.error(`[publish] ${err.message}`);
-      process.exit(2);
-    }
-    throw err;
-  }
-  if (flags.json) {
-    process.stdout.write(JSON.stringify(link, null, 2) + '\n');
-  } else {
-    console.log(`[publish] ${link.catalogLabel}`);
-    console.log(link.url);
-    console.log('---');
-    console.log(link.prBody);
-  }
-  if (flags.open) {
-    const opener = process.platform === 'darwin' ? 'open'
-      : process.platform === 'win32' ? 'start'
-      : 'xdg-open';
-    const { spawn } = await import('node:child_process');
-    spawn(opener, [link.url], { detached: true, stdio: 'ignore' }).unref();
-  }
-}
-
-async function runPluginPublishRepo(rest) {
-  const flags = parseFlags(rest, {
-    string: new Set(['host', 'owner']),
-    boolean: new Set(['help', 'h', 'json', 'dry-run']),
-  });
-  if (rest.length === 0 || flags.help || flags.h) {
-    console.log(`Usage:
-  od plugin publish-repo <folder> [--host github.com] [--owner github-login-or-org] [--dry-run] [--json]
-
-Creates or updates the public GitHub repository named by the plugin manifest.
-If plugin.repo is missing or uses a placeholder owner, the CLI resolves the
-target from --owner, a trusted manifest owner, local gh auth status, then the
-GitHub API as a last resort. It never publishes to placeholder owners.`);
-    process.exit(rest.length === 0 ? 2 : 0);
-  }
-  const folder = rest.find((a) => !a.startsWith('-') && a !== flags.host && a !== flags.owner);
-  if (!folder) {
-    console.error('Usage: od plugin publish-repo <folder>');
-    process.exit(2);
-  }
-
-  const [{ resolve, join }, { readFile, writeFile, stat, mkdtemp, readdir, rm, mkdir, cp }, { pathToFileURL }, os] = await Promise.all([
-    import('node:path'),
-    import('node:fs/promises'),
-    import('node:url'),
-    import('node:os'),
-  ]);
-  const absFolder = resolve(process.cwd(), folder);
-  const manifestPath = resolve(absFolder, 'open-design.json');
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-  const host = typeof flags.host === 'string' ? flags.host : 'github.com';
-  const target = await resolvePluginGithubTarget({ host, owner: flags.owner, manifest, purpose: 'publish-repo' });
-  const normalized = normalizeManifestRepoForOwner(manifest, target.owner);
-  if (normalized.changed && !flags['dry-run']) {
-    await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
-    await pluginCliValidateFolder(absFolder);
-  }
-
-  const repo = parseGithubRepoUrl(normalized.repoUrl);
-  if (!repo) {
-    console.error(`[publish-repo] invalid plugin.repo after normalization: ${normalized.repoUrl}`);
-    process.exit(2);
-  }
-  const steps = [];
-  const run = async (label, command, args, opts = {}) => {
-    steps.push({ label, command: [command, ...args].join(' ') });
-    if (flags['dry-run']) return { ok: true, stdout: '', stderr: '' };
-    const result = await (command === 'gh'
-      ? execGhBuffered(args, { cwd: opts.cwd ?? absFolder, timeout: opts.timeout ?? 120_000 })
-      : execFileBuffered(command, args, { cwd: opts.cwd ?? absFolder, timeout: opts.timeout ?? 120_000 }));
-    steps[steps.length - 1].ok = result.ok;
-    steps[steps.length - 1].stdout = result.stdout;
-    steps[steps.length - 1].stderr = result.stderr;
-    if (!result.ok) {
-      emitPluginWorkflowResult(flags, {
-        ok: false,
-        action: 'publish-repo',
-        folder: absFolder,
-        repoUrl: normalized.repoUrl,
-        login: target.login,
-        owner: target.owner,
-        ownerSource: target.ownerSource,
-        apiRateLimited: target.apiRateLimited,
-        steps,
-        error: { label, stdout: result.stdout, stderr: result.stderr, code: result.code },
-      });
-      process.exit(1);
-    }
-    return result;
-  };
-
-  let exists = false;
-  const view = flags['dry-run']
-    ? { ok: false, stderr: 'dry-run' }
-    : await execGhBuffered(['repo', 'view', repo.fullName], { cwd: absFolder, timeout: 30_000 });
-  steps.push({ label: 'check repo', command: `gh repo view ${repo.fullName}`, ok: view.ok, stdout: view.stdout, stderr: view.stderr });
-  if (view.ok) {
-    exists = true;
-  } else if (!flags['dry-run'] && !isRepoNotFound(view)) {
-    emitPluginWorkflowResult(flags, {
-      ok: false,
-      action: 'publish-repo',
-      folder: absFolder,
-      repoUrl: normalized.repoUrl,
-      login: target.login,
-      owner: target.owner,
-      ownerSource: target.ownerSource,
-      apiRateLimited: target.apiRateLimited,
-      steps,
-      error: { label: 'check repo', stdout: view.stdout, stderr: view.stderr, code: view.code },
-    });
-    process.exit(1);
-  }
-
-  let workdir = absFolder;
-  let cleanupDir = null;
-  if (exists && !flags['dry-run']) {
-    cleanupDir = await mkdtemp(join(os.tmpdir(), 'od-plugin-publish-sync-'));
-    workdir = join(cleanupDir, repo.name);
-    await run('clone repo', 'gh', ['repo', 'clone', repo.fullName, workdir], { cwd: cleanupDir, timeout: 240_000 });
-    for (const entry of await readdir(workdir)) {
-      if (entry === '.git') continue;
-      await rm(join(workdir, entry), { recursive: true, force: true });
-    }
-    await mkdir(workdir, { recursive: true });
-    for (const entry of await readdir(absFolder)) {
-      if (entry === '.git') continue;
-      await cp(join(absFolder, entry), join(workdir, entry), { recursive: true, force: true });
-    }
-  } else if (!flags['dry-run']) {
-    let hasGit = false;
-    try { await stat(resolve(absFolder, '.git')); hasGit = true; } catch {}
-    if (!hasGit) await run('git init', 'git', ['init']);
-  }
-
-  await run('git add', 'git', ['add', '-A'], { cwd: workdir });
-  const status = flags['dry-run']
-    ? { stdout: 'dry-run' }
-    : await execFileBuffered('git', ['status', '--porcelain'], { cwd: workdir });
-  if (status.stdout.trim().length > 0 || !exists) {
-    const commitMessage = exists
-      ? `Update: ${manifest.name} v${manifest.version ?? '0.0.0'}`
-      : `Initial commit: ${manifest.name} v${manifest.version ?? '0.0.0'}`;
-    await run('git commit', 'git', ['commit', '-m', commitMessage], { cwd: workdir });
-  }
-  const tag = `v${manifest.version ?? '0.0.0'}`;
-  if (!flags['dry-run']) {
-    const localTag = await execFileBuffered('git', ['rev-parse', '-q', '--verify', `refs/tags/${tag}`], { cwd: workdir });
-    if (!localTag.ok) await run('git tag', 'git', ['tag', tag], { cwd: workdir });
-  }
-
-  if (exists) {
-    await run('git push', 'git', ['push', 'origin', 'HEAD'], { cwd: workdir });
-  } else {
-    await run('gh repo create', 'gh', [
-      'repo', 'create', repo.fullName, '--public', '--source', '.', '--push',
-      '--description', String(manifest.description ?? ''),
-    ], { cwd: workdir });
-  }
-  await run('git push tags', 'git', ['push', '--tags'], { cwd: workdir });
-  const verify = flags['dry-run']
-    ? { ok: true, stdout: JSON.stringify({ nameWithOwner: repo.fullName, url: normalized.repoUrl }) }
-    : await run('verify repo', 'gh', ['repo', 'view', repo.fullName, '--json', 'url,nameWithOwner'], { cwd: workdir });
-  const parsedVerify = safeJson(verify.stdout);
-  if (cleanupDir && !flags['dry-run']) {
-    await rm(cleanupDir, { recursive: true, force: true }).catch(() => undefined);
-  }
-  emitPluginWorkflowResult(flags, {
-    ok: true,
-    action: 'publish-repo',
-    folder: absFolder,
-    login: target.login,
-    owner: target.owner,
-    ownerSource: target.ownerSource,
-    apiRateLimited: target.apiRateLimited,
-    repoUrl: parsedVerify?.url ?? normalized.repoUrl,
-    manifestRewritten: normalized.changed,
-    manifestPath: pathToFileURL(manifestPath).pathname,
-    steps,
-  });
-}
-
-async function runPluginOpenDesignPr(rest) {
-  const flags = parseFlags(rest, {
-    string: new Set(['host', 'owner']),
-    boolean: new Set(['help', 'h', 'json', 'dry-run']),
-  });
-  if (rest.length === 0 || flags.help || flags.h) {
-    console.log(`Usage:
-  od plugin open-design-pr <folder> [--host github.com] [--owner github-login-or-fork-owner] [--dry-run] [--json]
-
-Copies a local plugin folder into plugins/community/<name>/ on the author's
-fork of nexu-io/open-design, pushes a branch, and opens the PR form with --web.`);
-    process.exit(rest.length === 0 ? 2 : 0);
-  }
-  const folder = rest.find((a) => !a.startsWith('-') && a !== flags.host && a !== flags.owner);
-  if (!folder) {
-    console.error('Usage: od plugin open-design-pr <folder>');
-    process.exit(2);
-  }
-  const [{ resolve, join }, fsp, os] = await Promise.all([
-    import('node:path'),
-    import('node:fs/promises'),
-    import('node:os'),
-  ]);
-  const absFolder = resolve(process.cwd(), folder);
-  const manifestPath = resolve(absFolder, 'open-design.json');
-  const manifest = JSON.parse(await fsp.readFile(manifestPath, 'utf8'));
-  const host = typeof flags.host === 'string' ? flags.host : 'github.com';
-  const target = await resolvePluginGithubTarget({ host, owner: flags.owner, manifest, purpose: 'open-design-pr' });
-  const name = String(manifest.name ?? '').trim();
-  if (!name) {
-    console.error('[open-design-pr] manifest.name is required');
-    process.exit(2);
-  }
-  const title = String(manifest.title ?? name).trim();
-  const branch = `plugin/${name}-${Math.floor(Date.now() / 1000)}`;
-  const tmpRoot = await fsp.mkdtemp(join(os.tmpdir(), 'od-open-design-pr-'));
-  const checkout = join(tmpRoot, 'open-design');
-  const steps = [];
-  const run = async (label, command, args, opts = {}) => {
-    steps.push({ label, command: [command, ...args].join(' ') });
-    if (flags['dry-run']) return { ok: true, stdout: '', stderr: '' };
-    const result = await (command === 'gh'
-      ? execGhBuffered(args, { cwd: opts.cwd ?? process.cwd(), timeout: opts.timeout ?? 180_000 })
-      : execFileBuffered(command, args, { cwd: opts.cwd ?? process.cwd(), timeout: opts.timeout ?? 180_000 }));
-    steps[steps.length - 1].ok = result.ok;
-    steps[steps.length - 1].stdout = result.stdout;
-    steps[steps.length - 1].stderr = result.stderr;
-    if (!result.ok && !opts.tolerate?.(result)) {
-      emitPluginWorkflowResult(flags, {
-        ok: false,
-        action: 'open-design-pr',
-        folder: absFolder,
-        login: target.login,
-        owner: target.owner,
-        ownerSource: target.ownerSource,
-        apiRateLimited: target.apiRateLimited,
-        branch,
-        steps,
-        error: { label, stdout: result.stdout, stderr: result.stderr, code: result.code },
-      });
-      process.exit(1);
-    }
-    return result;
-  };
-
-  await run('fork', 'gh', ['repo', 'fork', 'nexu-io/open-design'], {
-    tolerate: (r) => /already exists|existing fork/i.test(`${r.stdout}\n${r.stderr}`),
-  });
-  await run('clone fork', 'git', [
-    'clone',
-    '--depth', '1',
-    '--single-branch',
-    '--branch', 'main',
-    '--filter=blob:none',
-    '--sparse',
-    `https://github.com/${target.owner}/open-design.git`,
-    checkout,
-  ], { timeout: 240_000 });
-  await run('sparse checkout', 'git', ['sparse-checkout', 'set', 'plugins/community'], { cwd: checkout });
-  await run('checkout branch', 'git', ['checkout', '-b', branch], { cwd: checkout });
-  const dest = join(checkout, 'plugins', 'community', name);
-  if (!flags['dry-run']) {
-    await fsp.rm(dest, { recursive: true, force: true });
-    await fsp.mkdir(dest, { recursive: true });
-    await fsp.cp(absFolder, dest, { recursive: true, force: true, filter: (src) => !src.includes(`${absFolder}/.git`) });
-  }
-  await run('git add', 'git', ['add', `plugins/community/${name}`], { cwd: checkout });
-  await run('git commit', 'git', ['commit', '-m', `Add ${title} plugin`], { cwd: checkout });
-  await run('git push branch', 'git', ['push', '-u', 'origin', branch], { cwd: checkout });
-  const body = [
-    `Add ${title} (${name}) plugin.`,
-    '',
-    `Version: ${manifest.version ?? '0.0.0'}`,
-    manifest.description ? `Description: ${manifest.description}` : '',
-  ].filter(Boolean).join('\n');
-  const pr = await run('open PR form', 'gh', [
-    'pr', 'create',
-    '--repo', 'nexu-io/open-design',
-    '--head', `${target.owner}:${branch}`,
-    '--base', 'main',
-    '--title', `Add ${title} plugin`,
-    '--body', body,
-    '--web',
-  ], { cwd: checkout });
-  const prUrl = extractFirstUrl(pr.stdout || pr.stderr) ?? `https://github.com/${target.owner}/open-design/pull/new/${branch}`;
-  emitPluginWorkflowResult(flags, {
-    ok: true,
-    action: 'open-design-pr',
-    folder: absFolder,
-    login: target.login,
-    owner: target.owner,
-    ownerSource: target.ownerSource,
-    apiRateLimited: target.apiRateLimited,
-    branch,
-    prUrl,
-    checkout,
-    steps,
-  });
 }
 
 async function publishToMarketplaceJson({ catalogPath, meta }) {
@@ -3891,121 +2691,6 @@ function extractFirstUrl(text) {
   return match ? match[0].replace(/[)\].,]+$/, '') : null;
 }
 
-async function runPluginYank(rest) {
-  const flags = parseFlags(rest, {
-    string: new Set(['daemon-url', 'reason', 'to']),
-    boolean: new Set(['help', 'h', 'json', 'open']),
-  });
-  if (rest.length === 0 || flags.help || flags.h) {
-    console.log(`Usage:
-  od plugin yank <vendor/plugin-name>@<version> --reason "<why>" [--to open-design] [--json]
-
-Yanking never deletes metadata or bytes. It opens the registry review flow that
-marks a version unresolvable for new installs while preserving lockfile replay.`);
-    process.exit(rest.length === 0 ? 2 : 0);
-  }
-  const spec = rest.find((a) => !a.startsWith('-') && a !== flags.reason && a !== flags.to);
-  const reason = typeof flags.reason === 'string' ? flags.reason.trim() : '';
-  const parsed = parseCliPluginSpecifier(spec);
-  if (!parsed.name || !parsed.range) {
-    console.error('Usage: od plugin yank <vendor/plugin-name>@<version> --reason "<why>"');
-    process.exit(2);
-  }
-  if (!reason) {
-    console.error('--reason is required for yanking');
-    process.exit(2);
-  }
-  const target = flags.to ?? 'open-design';
-  if (target !== 'open-design') {
-    console.error('Only --to open-design is supported in this v1 GitHub-backed yank flow.');
-    process.exit(2);
-  }
-  const title = `Yank ${parsed.name}@${parsed.range}`;
-  const body = [
-    `## Yank ${parsed.name}@${parsed.range}`,
-    '',
-    `Reason: ${reason}`,
-    '',
-    'Expected registry patch:',
-    '',
-    '```json',
-    JSON.stringify({
-      name: parsed.name,
-      version: parsed.range,
-      yanked: true,
-      yankReason: reason,
-    }, null, 2),
-    '```',
-    '',
-    'Generated by `od plugin yank`.',
-  ].join('\n');
-  const params = new URLSearchParams({ title, body });
-  const payload = {
-    catalog: 'open-design',
-    name: parsed.name,
-    version: parsed.range,
-    reason,
-    url: `https://github.com/nexu-io/open-design/issues/new?${params.toString()}`,
-    body,
-  };
-  if (flags.json) {
-    process.stdout.write(JSON.stringify(payload, null, 2) + '\n');
-  } else {
-    console.log(`[yank] ${payload.url}`);
-    console.log('---');
-    console.log(body);
-  }
-  if (flags.open) {
-    const opener = process.platform === 'darwin' ? 'open'
-      : process.platform === 'win32' ? 'start'
-      : 'xdg-open';
-    const { spawn } = await import('node:child_process');
-    spawn(opener, [payload.url], { detached: true, stdio: 'ignore' }).unref();
-  }
-}
-
-async function runPluginDoctor(rest) {
-  // Plan §3.HH1 — --strict promotes warnings to errors so CI can
-  // opt into 'no warnings allowed' mode without parsing the issue
-  // list manually.
-  const flags = parseFlags(rest, {
-    string:  PLUGIN_STRING_FLAGS,
-    boolean: new Set([...PLUGIN_BOOLEAN_FLAGS, 'strict']),
-  });
-  const id = rest.find((a) => !a.startsWith('-') && a !== flags['daemon-url'] && a !== flags.source);
-  if (!id) {
-    console.error('Usage: od plugin doctor <id> [--strict] [--json]');
-    process.exit(2);
-  }
-  const url = `${(await pluginDaemonUrl(flags)).replace(/\/$/, '')}/api/plugins/${encodeURIComponent(id)}/doctor`;
-  const resp = await fetch(url, { method: 'POST' });
-  if (!resp.ok) {
-    console.error(`POST /api/plugins/${id}/doctor failed: ${resp.status} ${await resp.text()}`);
-    process.exit(1);
-  }
-  const data = await resp.json();
-  const issues = Array.isArray(data?.issues) ? data.issues : [];
-  const warnings = issues.filter((i) => i?.severity === 'warning');
-  const strict = flags.strict === true;
-  // Strict mode: a clean issue list is still required, but the
-  // pass/fail bit also fails on any warning.
-  const passed = data.ok && (!strict || warnings.length === 0);
-  if (flags.json) {
-    process.stdout.write(JSON.stringify({ ...data, strict, passed }, null, 2) + '\n');
-  } else {
-    if (passed && issues.length === 0) {
-      console.log(`[doctor] ${data.pluginId} ok (digest ${data.freshDigest.slice(0, 12)}…)`);
-    } else {
-      const tier = !data.ok ? 'errors' : (strict && warnings.length > 0) ? 'warnings (--strict)' : 'warnings';
-      console.log(`[doctor] ${data.pluginId} ${tier}:`);
-      for (const issue of issues) {
-        console.log(`  [${issue.severity}] ${issue.code}: ${issue.message}`);
-      }
-    }
-  }
-  process.exit(passed ? 0 : (data.ok ? 4 : 1));
-}
-
 function safeParseJson(s) {
   try { return JSON.parse(s); } catch { return null; }
 }
@@ -4054,61 +2739,6 @@ async function runPluginReplay(rest) {
   console.log(`[replay] inputs: ${JSON.stringify(data.rerun?.inputs ?? {})}`);
   console.log('[replay] re-apply via: od plugin apply ' + data.rerun?.pluginId + ' --inputs ' + JSON.stringify(JSON.stringify(data.rerun?.inputs ?? {})));
 }
-
-// `od plugin trust <id> --capabilities <comma-sep>` — flip a plugin's
-// capabilities_granted set. Plan §3.A2 / spec §9.1: the CLI is the
-// canonical write surface (invariant I4). The daemon validates the
-// capability vocabulary; unknown / malformed entries surface as
-// exit-2 usage failures.
-async function runPluginTrust(rest) {
-  const flags = parseFlags(rest, { string: PLUGIN_STRING_FLAGS, boolean: PLUGIN_BOOLEAN_FLAGS });
-  const id = rest.find((a) => !a.startsWith('-')
-    && a !== flags['daemon-url']
-    && a !== flags.source
-    && a !== flags.inputs
-    && a !== flags.project
-    && a !== flags['snapshot-id']
-    && a !== flags.capabilities);
-  if (!id) {
-    console.error('Usage: od plugin trust <id> --capabilities connector:figma,connector:notion [--revoke]');
-    process.exit(2);
-  }
-  const capsCsv = typeof flags.capabilities === 'string' ? flags.capabilities : '';
-  const caps = capsCsv.split(',').map((c) => c.trim()).filter(Boolean);
-  if (caps.length === 0) {
-    console.error('--capabilities is required (comma-separated, e.g. connector:figma,fs:read)');
-    process.exit(2);
-  }
-  const action = flags.revoke ? 'revoke' : 'grant';
-  const url = `${(await pluginDaemonUrl(flags)).replace(/\/$/, '')}/api/plugins/${encodeURIComponent(id)}/trust`;
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ capabilities: caps, action }),
-  });
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    if (resp.status === 400 && data?.error?.code === 'invalid-capability') {
-      const rej = (data.error.data?.rejected ?? [])
-        .map((r) => `${r.capability} (${r.reason})`)
-        .join(', ');
-      console.error(`[trust] invalid capabilities: ${rej}`);
-      process.exit(2);
-    }
-    console.error(`POST ${url} failed: ${resp.status} ${JSON.stringify(data)}`);
-    process.exit(1);
-  }
-  if (flags.json) {
-    process.stdout.write(JSON.stringify(data, null, 2) + '\n');
-    return;
-  }
-  console.log(`[trust] ${action === 'grant' ? 'granted' : 'revoked'} on ${id}: ${caps.join(', ')}`);
-  console.log(`[trust] now: ${(data.capabilitiesGranted ?? []).join(', ')}`);
-}
-
-// ---------------------------------------------------------------------------
-// Subcommand: od ui …  (spec §10.3.4 headless GenUI surface inbox)
-// ---------------------------------------------------------------------------
 
 async function runUi(args) {
   if (args.length === 0 || args[0] === 'help' || args.includes('--help') || args.includes('-h')) {
@@ -4355,17 +2985,12 @@ function printPluginHelp() {
   console.log(`Usage:
   od plugin list [--task-kind <kind>]     List installed plugins (filterable).
   od plugin search <query> [--tag <t>]    Search installed plugins by id/title/desc/tag.
-  od plugin stats [--json]                Inventory + snapshot health report.
   od plugin info <id>                     Print a plugin's manifest + trust state as JSON.
   od plugin manifest <id>                 Print only the parsed manifest JSON (no wrapper).
   od plugin sources                       List distinct install sources + counts.
-  od plugin install --source <path>       Install a plugin from a local folder (Phase 1).
-  od plugin upgrade <id>                  Re-install a plugin from its recorded source.
-  od plugin uninstall <id>                Remove a plugin from the registry + on-disk staging.
   od plugin apply <id> [--inputs <json>]  Compute an ApplyResult (preview) for a plugin.
   od plugin duplicate <id> [--name <n>]   Copy a plugin HTML example into a new project
                                           without starting an agent run.
-  od plugin doctor <id>                   Lint a plugin's manifest, atoms and resolved refs.
   od plugin canon <snapshotId>            Print the canonical system-prompt block for a snapshot.
                                           (--check <file> for byte-equality fixtures.)
   od plugin simulate <pluginId> [-s k=v]  Walk the plugin's pipeline against caller-supplied
@@ -4373,36 +2998,20 @@ function printPluginHelp() {
                                           (no LLM in the loop).
   od plugin verify <pluginId>             CI meta-command: doctor + simulate + canon --check
                                           driven by an .od-verify.json config in the plugin folder.
-  od plugin events tail [-f] [--kind k]   Tail the in-memory plugin event ring buffer.
-  od plugin events snapshot               One-shot read (filterable, no SSE).
-  od plugin events stats                  Roll-up: counts by kind / pluginId / time range.
-  od plugin events purge                  Drop every event in the buffer (loopback-only).
   od plugin diff <a> <b> [--json]         Compare two installed plugins by id.
   od plugin replay <runId> --snapshot-id <id>
                                           Re-emit the immutable snapshot a run launched against.
-  od plugin trust <id> --capabilities a,b
-                                          Stage a capability grant (full mutation lands Phase 3).
   od plugin validate <folder> [--json]    Lint a plugin folder before installing
                                           (manifest parse + atom + ref checks).
   od plugin pack <folder> [--out <path>]  Build a .tgz archive of a plugin
                                           folder for distribution.
-  od plugin candidates list --project <id>
-                                          List persisted skill-to-plugin candidates.
-  od plugin publish-repo <folder>         Create/update the author's public
-                                          GitHub repo for a plugin folder.
-  od plugin open-design-pr <folder>       Push a community-catalog branch and
-                                          open the nexu-io/open-design PR form.
-  od plugin publish <folder> --to open-design|anthropics-skills|awesome-agent-skills|clawhub|skills-sh
-                                          Prepare a registry submission link.
-  od plugin login [--host github.com]      Authenticate registry publishing via gh.
-  od plugin whoami [--host github.com]     Show the gh account used for publishing.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base (default OD_DAEMON_URL, OD_SIDECAR_IPC_PATH discovery, or http://127.0.0.1:7456).
+  --daemon-url <url>   Clean Design daemon HTTP base (default OD_DAEMON_URL, OD_SIDECAR_IPC_PATH discovery, or http://127.0.0.1:7456).
   --json               Emit raw JSON (suitable for scripts) instead of human-readable output.
 
-Installs support local folders, github:owner/repo refs, HTTPS .tgz archives,
-and bare marketplace names resolved through configured registry sources.`);
+Clean Design works with the plugins already present in the local runtime.
+Installing, upgrading, publishing, and registry commands are not available.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -6219,7 +4828,7 @@ Common options:
   // that prefixes shared options (`od templates save --daemon-url ...
   // proj-1 --name Cards`) would hit the missing-id usage path before
   // ever reaching the daemon. Mirrors the `positionalArgs` helper in
-  // `runAutomation`.
+  // the other command parsers.
   const positionalArgs = (values) => {
     const out = [];
     for (let i = 0; i < values.length; i++) {
@@ -6243,7 +4852,7 @@ Common options:
       // surfaceFetchError when the daemon isn't running. Without
       // this Node throws a raw `TypeError: fetch failed`, which
       // matches the pattern the rest of the CLI uses
-      // (runAutomation, the project verbs, runResearch).
+      // (the project verbs and runResearch).
       let resp;
       try {
         resp = await fetch(`${base}/api/templates`);

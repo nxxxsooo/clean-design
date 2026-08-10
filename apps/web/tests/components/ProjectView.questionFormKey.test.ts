@@ -76,10 +76,8 @@ describe('mergeServerMessagesIntoConversation', () => {
         content: '',
         events: [
           {
-            kind: 'plugin_candidate',
-            candidateId: 'candidate-1',
-            title: 'Main',
-            description: 'This repo looks like a plugin.',
+            kind: 'diagnostic',
+            name: 'post-run-summary',
           },
         ],
       },

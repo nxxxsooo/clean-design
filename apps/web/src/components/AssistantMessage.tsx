@@ -66,11 +66,6 @@ import {
 } from "../runtime/visual-style-catalog";
 import { splitStreamingArtifact, stripArtifact, stripRecoveredHtmlFallbackForDisplay } from "../artifacts/strip";
 import { BRAND_BROWSER_TAB_ID } from "../runtime/brand-browser-bridge";
-import {
-  getPluginFolderCandidates,
-  type PluginFolderCandidate,
-} from "./design-files/pluginFolders";
-import type { PluginFolderAgentAction } from "./design-files/pluginFolderActions";
 import { Icon } from "./Icon";
 import { NextStepActions, type NextStepActionsVariant } from "./NextStepActions";
 import type { DesignToolboxActionId } from "../runtime/design-toolbox";
@@ -105,8 +100,8 @@ type TranslateFn = (
 ) => string;
 
 // The host reports whether it accepted the answer into a real chat turn. A
-// `false` result means a pre-run guard (for example the AMR balance gate)
-// prevented the send, so the inline form must remain editable.
+// `false` result means a pre-run guard prevented the send, so the inline form
+// must remain editable.
 export type QuestionFormSubmitHandler = (
   text: string,
   attachments?: ChatAttachment[],
@@ -116,22 +111,6 @@ export type QuestionFormSubmitHandler = (
 const DISCORD_INVITE_URL = "https://discord.gg/mHAjSMV6gz";
 const viewedInlineQuestionForms = new Set<string>();
 const QUESTION_FORM_DRAFT_STORAGE_PREFIX = "clean-design:question-form-draft:";
-
-interface ActionNotice {
-  message: string;
-  url?: string;
-}
-
-function buildActionNotice(message: string, url?: string): ActionNotice {
-  const trimmedMessage = message.trim();
-  const trimmedUrl = url?.trim();
-  if (!trimmedUrl) return { message: trimmedMessage };
-  const normalizedMessage = trimmedMessage.replace(
-    new RegExp(`\\s*${escapeRegExp(trimmedUrl)}\\s*$`),
-    "",
-  );
-  return { message: normalizedMessage.trim() || trimmedUrl, url: trimmedUrl };
-}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -178,157 +157,6 @@ function buildBrandBrowserAssistFallbackCard({
   };
 }
 
-function ActionNoticeView({ notice }: { notice: ActionNotice | null }) {
-  if (!notice) return null;
-  return (
-    <>
-      <span>{notice.message}</span>
-      {notice.url ? (
-        <>
-          {" "}
-          <a href={notice.url} target="_blank" rel="noreferrer">
-            {notice.url}
-          </a>
-        </>
-      ) : null}
-    </>
-  );
-}
-
-type SkillPluginCandidateBlock = Extract<Block, { kind: "plugin-candidate" }>;
-
-function SkillPluginCandidateCard({
-  block,
-  projectId,
-  onRequestOpenFile,
-}: {
-  block: SkillPluginCandidateBlock;
-  projectId?: string | null;
-  onRequestOpenFile?: (name: string) => void;
-}) {
-  const t = useT();
-  const [busy, setBusy] = useState<null | "draft" | "contribute">(null);
-  const [notice, setNotice] = useState<ActionNotice | null>(null);
-  const disabled = !projectId || busy !== null;
-  const description =
-    block.description === "Reusable skill material detected from a repository link." ||
-    block.description === "This repo looks like it could work as a plugin."
-      ? t("skillPluginCandidate.repoDescription")
-      : block.description || t("skillPluginCandidate.repoDescription");
-
-  async function post(path: string, body: Record<string, unknown> = {}) {
-    const resp = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await resp.json().catch(() => null);
-    if (!resp.ok) {
-      const message =
-        data?.message ??
-        (typeof data?.error === "string" ? data.error : data?.error?.message) ??
-        resp.statusText;
-      throw new Error(message || "Plugin candidate action failed.");
-    }
-    return data;
-  }
-
-  async function createDraft() {
-    if (!projectId) return;
-    setBusy("draft");
-    setNotice(null);
-    try {
-      const data = await post(
-        `/api/projects/${encodeURIComponent(projectId)}/plugin-candidates/${encodeURIComponent(block.candidateId)}/draft`,
-      );
-      const draftPath = String(data?.draftPath ?? "");
-      if (data?.validation?.ok === false) {
-        setNotice({ message: "Draft created with validation issues." });
-      } else if (draftPath) {
-        const install = await post(
-          `/api/projects/${encodeURIComponent(projectId)}/plugins/install-folder`,
-          { path: draftPath },
-        );
-        if (install?.ok === false) {
-          setNotice({ message: install?.message ?? "Plugin draft created, but install failed." });
-        } else {
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("clean-design:plugins-changed"));
-          }
-          setNotice({ message: install?.message ?? "Plugin draft created and added to My plugins." });
-        }
-      } else {
-        setNotice({ message: "Plugin draft created." });
-      }
-      if (draftPath && onRequestOpenFile) onRequestOpenFile(`${draftPath}/open-design.json`);
-    } catch (err) {
-      setNotice({ message: err instanceof Error ? err.message : String(err) });
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function share(action: "contribute-open-design") {
-    if (!projectId) return;
-    setBusy("contribute");
-    setNotice(null);
-    try {
-      const data = await post(
-        `/api/projects/${encodeURIComponent(projectId)}/plugin-candidates/${encodeURIComponent(block.candidateId)}/share-tasks`,
-        { action },
-      );
-      setNotice({
-        message: `Clean Design contribution task started for ${data?.path ?? "the draft"}.`,
-      });
-    } catch (err) {
-      setNotice({ message: err instanceof Error ? err.message : String(err) });
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <div className="plugin-action-panel" data-testid={`skill-plugin-candidate-${block.candidateId}`}>
-      <div className="plugin-action-card">
-        <div className="plugin-action-card__body">
-          <div className="plugin-action-card__title">
-            <Icon name="sparkles" size={14} />
-            <span>{block.title}</span>
-          </div>
-          <p className="plugin-action-card__description">
-            {description}
-          </p>
-          <div className="plugin-action-card__actions">
-            <button
-              type="button"
-              className="plugin-action-button plugin-action-button--primary"
-              disabled={disabled}
-              onClick={() => void share("contribute-open-design")}
-            >
-              <Icon name={busy === "contribute" ? "spinner" : "share"} size={13} />
-              <span>{busy === "contribute" ? "Starting..." : t("skillPluginCandidate.contributeToMain")}</span>
-            </button>
-            <button
-              type="button"
-              className="plugin-action-button"
-              disabled={disabled}
-              onClick={() => void createDraft()}
-            >
-              <Icon name={busy === "draft" ? "spinner" : "plus"} size={13} />
-              <span>{busy === "draft" ? "Creating..." : t("skillPluginCandidate.createForMe")}</span>
-            </button>
-          </div>
-          {notice ? (
-            <div className="plugin-action-card__notice" role="status">
-              <ActionNoticeView notice={notice} />
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 interface Props {
   message: ChatMessage;
   streaming: boolean;
@@ -361,17 +189,6 @@ interface Props {
   // or focus the Browser tab so the user can clear verification. Excluded from
   // the memo comparison (routed through ChatPane's stable callbacks ref).
   onBrandBrowserAssistConfirm?: BrandBrowserAssistConfirm;
-  onRequestPluginFolderAgentAction?: (
-    relativePath: string,
-    action: PluginFolderAgentAction,
-  ) => Promise<{ message?: string; url?: string } | void> | { message?: string; url?: string } | void;
-  activePluginActionPaths?: Set<string>;
-  hiddenPluginActionPaths?: Set<string>;
-  // Click handler for the post-completion "Share to Clean Design" submission
-  // action. ProjectView wires this to handleSend with the bundled
-  // `od-share-to-community` trigger prompt.
-  onShareToOpenDesign?: () => void;
-  shareToOpenDesignBusy?: boolean;
   // True only for the most recent assistant message.
   isLast?: boolean;
   // Assistant message id whose run-failure error is rendered as ChatPane's
@@ -441,15 +258,11 @@ const ASSISTANT_MESSAGE_COMPARED_PROPS: Array<keyof Props> = [
   'projectFileNames',
   'projectResolvedDir',
   'onRequestOpenFile',
-  'onRequestPluginFolderAgentAction',
-  'activePluginActionPaths',
-  'hiddenPluginActionPaths',
   'isLast',
   'errorCardOwnerId',
   'nextUserContent',
   'questionFormSubmitDisabled',
   'forking',
-  'shareToOpenDesignBusy',
   'suppressDirectionForms',
   'hasDesignSystemContext',
   'nextStepAiOptimizeBusy',
@@ -508,11 +321,6 @@ function AssistantMessageImpl({
   projectResolvedDir,
   onRequestOpenFile,
   onBrandBrowserAssistConfirm,
-  onRequestPluginFolderAgentAction,
-  activePluginActionPaths = new Set(),
-  hiddenPluginActionPaths = new Set(),
-  onShareToOpenDesign,
-  shareToOpenDesignBusy = false,
   isLast,
   errorCardOwnerId = null,
   nextUserContent,
@@ -630,72 +438,6 @@ function AssistantMessageImpl({
   const nextStepFileName = isPlanNextStep
     ? (planNextStepName ?? nextStepArtifactName)
     : nextStepArtifactName;
-  const pluginActionFolders = useMemo(
-    () =>
-      !streaming && isLast && projectId
-        ? pluginFoldersTouchedThisTurn(projectFiles, turnFileOps, displayedProduced, message.content)
-            .filter((folder) => !hiddenPluginActionPaths.has(folder.path))
-        : [],
-    [displayedProduced, hiddenPluginActionPaths, isLast, message.content, projectFiles, projectId, streaming, turnFileOps],
-  );
-  // Plugin action state lives at the AssistantMessage level (not inside
-  // PluginActionPanel) so the success notice survives the unmount/remount
-  // cycle ProjectView triggers via `hiddenPluginActionPaths` during install
-  // (issue #2876). If state lived inside the panel the setNoticeByFolder
-  // call after `await onRequestPluginFolderAgentAction(...)` would land on
-  // a dead fiber and the user would see nothing change after "Sending...".
-  const [pluginBusyKey, setPluginBusyKey] = useState<string | null>(null);
-  const [pluginNoticeByFolder, setPluginNoticeByFolder] = useState<Record<string, ActionNotice>>({});
-  const runPluginAction = useCallback(
-    async (folder: PluginFolderCandidate, action: PluginFolderAgentAction) => {
-      if (pluginBusyKey || !onRequestPluginFolderAgentAction) return;
-      const key = `${action}:${folder.path}`;
-      setPluginBusyKey(key);
-      setPluginNoticeByFolder((prev) => {
-        if (!(folder.path in prev)) return prev;
-        const next = { ...prev };
-        delete next[folder.path];
-        return next;
-      });
-      try {
-        const outcome = await onRequestPluginFolderAgentAction(folder.path, action);
-        const url =
-          outcome && typeof outcome === "object" && typeof outcome.url === "string"
-            ? outcome.url
-            : "";
-        const message =
-          outcome && typeof outcome === "object" && typeof outcome.message === "string"
-            ? outcome.message
-            : "";
-        // The install endpoint's PluginInstallOutcome contract leaves
-        // `message` optional. When both message and url are absent we still
-        // need to confirm success — the bug report explicitly describes
-        // "the plugin was in fact added successfully, but the original
-        // screen did not communicate that outcome." Default to a short
-        // success label keyed off the action.
-        const notice: ActionNotice | null =
-          message || url
-            ? buildActionNotice(message || url, url)
-            : action === "install"
-              ? { message: "Added to My plugins." }
-              : null;
-        if (notice) {
-          setPluginNoticeByFolder((prev) => ({
-            ...prev,
-            [folder.path]: notice,
-          }));
-        }
-      } catch (err) {
-        setPluginNoticeByFolder((prev) => ({
-          ...prev,
-          [folder.path]: { message: err instanceof Error ? err.message : String(err) },
-        }));
-      } finally {
-        setPluginBusyKey(null);
-      }
-    },
-    [pluginBusyKey, onRequestPluginFolderAgentAction],
-  );
   const usage = events.find((e) => e.kind === "usage") as
     | Extract<AgentEvent, { kind: "usage" }>
     | undefined;
@@ -763,9 +505,6 @@ function AssistantMessageImpl({
     hasEmptyResponse ||
     !!copyMarkdown ||
     canFork;
-  const canShowOpenDesignSubmission = !!onShareToOpenDesign && showFeedback && runSucceeded;
-  const showOpenDesignSubmission =
-    canShowOpenDesignSubmission && (!!isLast || shareToOpenDesignBusy);
   const effectiveNextStepVariant: NextStepActionsVariant =
     nextStepVariant === 'brand-extraction' && (!runSucceeded || !nextStepArtifactName)
       ? 'brand-programmatic-incomplete'
@@ -816,7 +555,8 @@ function AssistantMessageImpl({
     !streaming &&
     runTerminal &&
     !hasPendingQuestionForm &&
-    ((!!isLast && hasNextStepPrimary) || showOpenDesignSubmission);
+    !!isLast &&
+    hasNextStepPrimary;
   // Pre-output vs working: before any real content (text / thinking / tools /
   // files) the footer shimmers "Preparing…"; the moment content lands it
   // flips to "Working". The elapsed clock stays anchored to the persisted run
@@ -901,16 +641,6 @@ function AssistantMessageImpl({
           if (b.kind === "live-tool") {
             return <LiveCodeBox key={b.id} name={b.name} raw={b.raw} />;
           }
-          if (b.kind === "plugin-candidate") {
-            return (
-              <SkillPluginCandidateCard
-                key={i}
-                block={b}
-                projectId={projectId}
-                onRequestOpenFile={onRequestOpenFile}
-              />
-            );
-          }
           if (b.kind === "status") {
             // Suppress this message's gray error pill ONLY when ChatPane is
             // rendering the top-level error card for it (the last failed run).
@@ -953,39 +683,6 @@ function AssistantMessageImpl({
             onRequestOpenFile={onRequestOpenFile}
           />
         ) : null}
-        {!streaming && projectId && pluginActionFolders.length > 0 ? (
-          <PluginActionPanel
-            folders={pluginActionFolders}
-            notices={pluginNoticeByFolder}
-            busyKey={pluginBusyKey}
-            onRunAction={runPluginAction}
-            onRequestOpenFile={onRequestOpenFile}
-            onRequestPluginFolderAgentAction={onRequestPluginFolderAgentAction}
-            activePluginActionPaths={activePluginActionPaths}
-          />
-        ) : null}
-        {/*
-          Notices for folders that completed an action while the panel was
-          unmounted (the parent toggled `hiddenPluginActionPaths` during the
-          install) need a place to render once the panel goes away. Without
-          this fallback, a successful "Add to My plugins" that hides the
-          folder afterwards would silently swallow the confirmation
-          (issue #2876).
-         */}
-        {!streaming && projectId
-          ? Object.entries(pluginNoticeByFolder)
-              .filter(([path]) => !pluginActionFolders.some((folder) => folder.path === path))
-              .map(([path, notice]) => (
-                <div
-                  key={`plugin-orphan-notice-${path}`}
-                  className="plugin-action-orphan-notice"
-                  role="status"
-                  data-testid={`plugin-folder-notice-${path}`}
-                >
-                  <ActionNoticeView notice={notice} />
-                </div>
-              ))
-          : null}
         {!streaming && unfinishedTodos.length > 0 ? (
           <UnfinishedTodosPanel
             todos={unfinishedTodos}
@@ -1064,8 +761,6 @@ function AssistantMessageImpl({
             onDownload={isLast && nextStepFileName ? onArtifactDownload : undefined}
             skills={isLast ? nextStepSkills : undefined}
             toolboxSkillNames={isLast ? toolboxSkillNames : undefined}
-            onShareToOpenDesign={showOpenDesignSubmission ? onShareToOpenDesign : undefined}
-            shareToOpenDesignBusy={shareToOpenDesignBusy}
             variant={effectiveNextStepVariant}
           />
         ) : null}
@@ -2187,106 +1882,6 @@ function ProducedFiles({
   );
 }
 
-// Pure renderer. State (busyKey, notices) and the action runner live in the
-// AssistantMessage parent so they survive the panel's unmount/remount cycle
-// during install (issue #2876).
-function PluginActionPanel({
-  folders,
-  notices,
-  busyKey,
-  onRunAction,
-  onRequestOpenFile,
-  onRequestPluginFolderAgentAction,
-  activePluginActionPaths = new Set(),
-}: {
-  folders: PluginFolderCandidate[];
-  notices: Record<string, ActionNotice>;
-  busyKey: string | null;
-  onRunAction: (
-    folder: PluginFolderCandidate,
-    action: PluginFolderAgentAction,
-  ) => Promise<void> | void;
-  onRequestOpenFile?: (name: string) => void;
-  onRequestPluginFolderAgentAction?: (
-    relativePath: string,
-    action: PluginFolderAgentAction,
-  ) => Promise<{ message?: string; url?: string } | void> | { message?: string; url?: string } | void;
-  activePluginActionPaths?: Set<string>;
-}) {
-  const noticeByFolder = notices;
-  const runAction = onRunAction;
-
-  return (
-    <div className="plugin-action-panel" aria-label="Plugin next actions">
-      <div className="plugin-action-panel__head">
-        <span className="plugin-action-panel__icon" aria-hidden>
-          <Icon name="sparkles" size={15} />
-        </span>
-        <div>
-          <div className="plugin-action-panel__title">Plugin ready</div>
-          <div className="plugin-action-panel__subtitle">
-            Send the next step to the agent so it can run the od CLI.
-          </div>
-        </div>
-      </div>
-      <div className="plugin-action-panel__list">
-        {folders.map((folder) => {
-          const actionBusy = activePluginActionPaths.has(folder.path);
-          return (
-          <div
-            key={folder.path}
-            className="plugin-action-card"
-            data-testid={`assistant-plugin-actions-${folder.path}`}
-          >
-            <div className="plugin-action-card__main">
-              <span className="plugin-action-card__folder-icon" aria-hidden>
-                <Icon name="folder" size={14} />
-              </span>
-              <div className="plugin-action-card__copy">
-                <code className="plugin-action-card__path">{folder.path}</code>
-                <span>{folder.fileCount} files ready for My plugins</span>
-              </div>
-            </div>
-              <div className="plugin-action-card__actions">
-                <button
-                  type="button"
-                  className="plugin-action-button plugin-action-button--primary"
-                  data-testid={`assistant-plugin-install-${folder.path}`}
-                  disabled={actionBusy || busyKey !== null || !onRequestPluginFolderAgentAction}
-                  onClick={() => void runAction(folder, "install")}
-                >
-                  <Icon
-                    name={actionBusy && busyKey === `install:${folder.path}` ? "spinner" : "plus"}
-                    size={13}
-                  />
-                  <span>
-                    {actionBusy && busyKey === `install:${folder.path}` ? "Sending..." : "Add to My plugins"}
-                  </span>
-                </button>
-                {onRequestOpenFile ? (
-                  <button
-                    type="button"
-                    className="plugin-action-button"
-                    data-testid={`assistant-plugin-open-manifest-${folder.path}`}
-                    onClick={() => onRequestOpenFile(folder.manifestPath)}
-                  >
-                    <Icon name="file-code" size={13} />
-                    <span>Open manifest</span>
-                  </button>
-                ) : null}
-              </div>
-            {noticeByFolder[folder.path] ? (
-              <div className="plugin-action-card__notice" role="status">
-                <ActionNoticeView notice={noticeByFolder[folder.path] ?? null} />
-              </div>
-            ) : null}
-          </div>
-        )})}
-      </div>
-    </div>
-  );
-}
-
 function kindIconName(
   kind: ProjectFile["kind"]
 ): "file-code" | "image" | "pencil" | "file" {
@@ -2301,64 +1896,6 @@ function humanBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function pluginFoldersTouchedThisTurn(
-  projectFiles: ProjectFile[],
-  fileOps: FileOpEntry[],
-  produced: ProjectFile[],
-  messageContent: string,
-): PluginFolderCandidate[] {
-  const candidates = getPluginFolderCandidates(projectFiles);
-  if (candidates.length === 0) return [];
-  const directTouchedPaths = [
-    ...fileOps.flatMap((entry) => [entry.path, entry.fullPath]),
-    ...produced.flatMap((file) => [file.name, file.path]),
-  ].filter((path): path is string => typeof path === "string" && path.length > 0);
-  const touchedPaths = [...directTouchedPaths, messageContent].filter(
-    (path): path is string => typeof path === "string" && path.length > 0,
-  );
-  const explicitFolders = candidates.filter((folder) =>
-    touchedPaths.some((path) => pathTouchesFolder(path, folder.path)),
-  );
-  if (explicitFolders.length > 0) return explicitFolders;
-  if (candidates.length !== 1) return [];
-  const candidate = candidates[0];
-  if (!candidate) return [];
-  if (
-    directTouchedPaths.some((path) =>
-      pathMatchesFolderFileBasename(path, candidate, projectFiles),
-    )
-  ) {
-    return [candidate];
-  }
-  return hasPluginFinalActionHint(messageContent) ? [candidate] : [];
-}
-
-function pathTouchesFolder(path: string, folderPath: string): boolean {
-  const normalized = path.replace(/\\/g, "/").replace(/^\.\//, "");
-  if (normalized === folderPath || normalized.startsWith(`${folderPath}/`)) {
-    return true;
-  }
-  return normalized.includes(`/${folderPath}/`) || normalized.includes(`${folderPath}/`);
-}
-
-function pathMatchesFolderFileBasename(
-  path: string,
-  folder: PluginFolderCandidate,
-  projectFiles: ProjectFile[],
-): boolean {
-  const basename = path.replace(/\\/g, "/").split("/").filter(Boolean).pop();
-  if (!basename) return false;
-  return projectFiles.some((file) =>
-    file.name.startsWith(`${folder.path}/`) && file.name.endsWith(`/${basename}`),
-  );
-}
-
-function hasPluginFinalActionHint(content: string): boolean {
-  return /\b(Add to My plugins|Clean Design PR|Publish repo|plugin publish|ready to publish|ready to add)\b/i.test(
-    content,
-  );
 }
 
 /**
@@ -3636,14 +3173,6 @@ type Block =
   | { kind: "thinking"; text: string }
   | { kind: "tool-group"; items: ToolItem[] }
   | { kind: "live-tool"; id: string; name: string; raw: string }
-  | {
-      kind: "plugin-candidate";
-      candidateId: string;
-      title: string;
-      description?: string | undefined;
-      confidence?: number | undefined;
-      draftPath?: string | null | undefined;
-    }
   | { kind: "status"; label: string; detail?: string | undefined };
 
 /**
@@ -3748,17 +3277,6 @@ function buildBlocks(events: AgentEvent[]): Block[] {
       continue;
     }
     if (ev.kind === "tool_result") continue;
-    if (ev.kind === "plugin_candidate") {
-      out.push({
-        kind: "plugin-candidate",
-        candidateId: ev.candidateId,
-        title: ev.title,
-        description: ev.description,
-        confidence: ev.confidence,
-        draftPath: ev.draftPath,
-      });
-      continue;
-    }
     if (ev.kind === "status") {
       if (
         ev.label === "streaming" ||

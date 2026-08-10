@@ -61,22 +61,12 @@ describe('server route inventory', () => {
     const pluginLifecycleRouteKeys = [
       'GET /api/plugins',
       'GET /api/plugins/:id',
-      'POST /api/plugins/upload-zip',
-      'POST /api/plugins/upload-folder',
-      'POST /api/plugins/install',
-      'POST /api/plugins/:id/uninstall',
-      'POST /api/plugins/:id/upgrade',
       'POST /api/plugins/:id/apply',
       'POST /api/plugins/:id/duplicate-project',
-      'POST /api/plugins/:id/share-project',
-      'POST /api/plugins/:id/doctor',
-      'POST /api/plugins/:id/trust',
-      'GET /api/plugins/stats',
       'GET /api/applied-plugins/:snapshotId',
       'GET /api/applied-plugins/:snapshotId/canon',
       'GET /api/applied-plugins',
       'GET /api/projects/:projectId/applied-plugins',
-      'POST /api/applied-plugins/export',
       'POST /api/applied-plugins/prune',
     ];
     const pluginAssetRouteKeys = [
@@ -85,7 +75,17 @@ describe('server route inventory', () => {
       'GET /api/plugins/:id/asset/*splat',
       'GET /api/asset-cache',
     ];
-    const projectPluginRouteKeys = [
+    const disabledPluginRouteKeys = [
+      'POST /api/plugins/upload-zip',
+      'POST /api/plugins/upload-folder',
+      'POST /api/plugins/install',
+      'POST /api/plugins/:id/uninstall',
+      'POST /api/plugins/:id/upgrade',
+      'POST /api/plugins/:id/share-project',
+      'POST /api/plugins/:id/doctor',
+      'POST /api/plugins/:id/trust',
+      'GET /api/plugins/stats',
+      'POST /api/applied-plugins/export',
       'POST /api/projects/:id/plugins/install-folder',
       'POST /api/projects/:id/plugins/publish-github',
       'GET /api/projects/:id/plugin-candidates',
@@ -196,7 +196,7 @@ describe('server route inventory', () => {
     expect(routeKeys.filter((key) => runRouteKeys.includes(key))).toEqual(runRouteKeys);
     expect(routeKeys.filter((key) => pluginLifecycleRouteKeys.includes(key))).toEqual(pluginLifecycleRouteKeys);
     expect(routeKeys.filter((key) => pluginAssetRouteKeys.includes(key))).toEqual(pluginAssetRouteKeys);
-    expect(routeKeys.filter((key) => projectPluginRouteKeys.includes(key))).toEqual(projectPluginRouteKeys);
+    expect(routeKeys.filter((key) => disabledPluginRouteKeys.includes(key))).toEqual([]);
     expect(routeKeys.filter((key) => liveArtifactRouteKeys.includes(key))).toEqual(liveArtifactRouteKeys);
     expect(routeKeys.filter((key) => projectFileStringRouteKeys.includes(key))).toEqual(projectFileStringRouteKeys);
     expect(routeKeys.filter((key) => projectArchiveRouteKeys.includes(key))).toEqual(projectArchiveRouteKeys);
@@ -220,7 +220,6 @@ describe('server route inventory', () => {
     expect(routeKeys.filter((key) => key === 'POST /api/runs')).toHaveLength(1);
     expect(routeKeys.filter((key) => key === 'POST /api/chat')).toHaveLength(1);
     expect(routeKeys.filter((key) => key === 'POST /api/media/tasks/:id/wait')).toHaveLength(1);
-    expect(routeKeys.filter((key) => key === 'POST /api/projects/:id/plugins/share-tasks')).toHaveLength(1);
     for (const [index, key] of routeKeys.entries()) {
       if (key.includes(' /api/')) {
         expect(index, `${key} should register before SPA fallback`).toBeLessThan(fallbackIndex);

@@ -229,13 +229,6 @@ export interface RegisterRunRoutesDeps {
     isDaemonShuttingDown: () => boolean;
   };
   plugins: {
-    detectSkillPluginCandidateOnRunSuccess: (
-      db: SqliteDb,
-      runs: ChatRunService,
-      run: ChatRun,
-      input: JsonRecord,
-      projectRoot: string,
-    ) => void;
     firePipelineForRun: (args: {
       run: ChatRun;
       snapshot: AppliedPluginSnapshot;
@@ -415,7 +408,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
   const { detectAgents, getAgentDef } = ctx.agents;
   const { startChatRun } = ctx.chat;
   const {
-    detectSkillPluginCandidateOnRunSuccess,
     firePipelineForRun,
     loadPluginRegistryView,
     renderPluginBriefTemplate,
@@ -651,15 +643,6 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
       });
     }
     reconcileAssistantMessageOnRunEnd(db, design.runs, run);
-    if (run.projectId && run.conversationId) {
-      try {
-        const project = toProjectRecord(getProject(db, run.projectId));
-        const projectRoot = resolveProjectDir(PROJECTS_DIR, run.projectId, project?.metadata);
-        detectSkillPluginCandidateOnRunSuccess(db, design.runs, run, requestBody, projectRoot);
-      } catch (err) {
-        console.warn('[plugins] skill candidate hook setup failed', err);
-      }
-    }
     design.runs.start(run, () => startChatRun(meta, run));
 
     const reqBody = requestBody;

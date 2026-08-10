@@ -27,7 +27,6 @@ export function homeHeroChipLabel(chipId: string, t: Translate): string {
     case 'webgl': return t('homeHero.chip.webgl');
     case 'audio': return t('homeHero.chip.audio');
     case 'create-brand-kit': return t('homeHero.chip.createBrandKit');
-    case 'create-plugin': return t('homeHero.chip.createPlugin');
     case 'figma': return t('homeHero.chip.figma');
     case 'template': return t('homeHero.chip.template');
     default: return chipId;

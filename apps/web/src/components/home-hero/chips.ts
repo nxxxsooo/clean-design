@@ -5,7 +5,7 @@
 // plugin to apply, which lands them in the generic agent path and
 // stretches the convergence loop. This chip rail exposes high-signal
 // NewProjectModal categories plus a small set of lower-row shortcuts
-// (plugin authoring / Figma / template), so the same Enter
+// (Figma / template), so the same Enter
 // keystroke can hit a scenario-bound run. The generic "other" path stays
 // in the free-form prompt instead of becoming a redundant chip.
 //
@@ -56,14 +56,13 @@ export type ChipAction =
       inputs?: Record<string, unknown>;
       projectMetadata?: ProjectMetadata;
     }
-  | { kind: 'create-plugin' }
   | { kind: 'open-template-picker' }
   // Routes the user into the Brand Kit tab and opens its New Brand Kit modal,
   // reusing the same extraction flow as the tab's own "New Brand Kit" button.
   | { kind: 'create-brand-kit' };
 
 // Two intent groups: "create" = produce a design artifact, "migrate" =
-// lower-row starter shortcuts such as plugin authoring, imports, and
+// lower-row starter shortcuts such as imports and
 // templates. The grouping is structural only — HomeHero renders the two
 // groups in separate flex containers so they wrap onto separate rows on
 // narrow viewports without horizontal scrolling.
@@ -341,14 +340,6 @@ export const HOME_HERO_CHIPS: ReadonlyArray<HomeHeroChip> = [
         aspect: '16:9',
       },
     },
-  },
-  {
-    id: 'create-plugin',
-    label: 'Create plugin',
-    icon: 'edit',
-    group: 'migrate',
-    hint: 'Author a reusable Clean Design plugin and add it to My plugins.',
-    action: { kind: 'create-plugin' },
   },
   {
     id: 'figma',

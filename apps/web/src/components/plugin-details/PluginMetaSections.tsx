@@ -10,14 +10,10 @@
 //   - Example query    (the prompt body; optional, hidden by media
 //                       variants that already render it inline)
 //   - Inputs           (declared variables + types + defaults)
-//   - Context bundles  (skills, design system, craft, atoms, MCP,
-//                       claude plugins)
+//   - Context bundles  (skills, design system, craft, atoms, assets)
 //   - Workflow         (pipeline stages + atoms)
 //   - GenUI surfaces   (interactive prompts the plugin may surface)
-//   - Connectors       (required + optional)
 //   - Capabilities     (granted permissions)
-//   - Source           (origin, fs path, ref, marketplace id,
-//                       installed timestamp, contribute link)
 //
 // Variants that already show a field through their hero/header pass
 // it through `omit` so the body never duplicates information the
@@ -27,8 +23,6 @@ import { useMemo, useState, type ReactNode } from 'react';
 import type {
   InputField,
   InstalledPluginRecord,
-  McpServerSpec,
-  PluginConnectorRef,
   PluginManifest,
 } from '@open-design/contracts';
 import { Icon } from '../Icon';
@@ -78,8 +72,8 @@ interface Props {
   /**
    * 'minimal' keeps the designer-relevant blocks (author, example
    * query) inline and tucks the developer-oriented manifest detail
-   * (inputs, context bundles, workflow, GenUI, connectors,
-   * capabilities, source) behind a collapsed "Developer details"
+   * (inputs, context bundles, workflow, GenUI, capabilities) behind a
+   * collapsed "Developer details"
    * disclosure. Defaults to 'full' so the scenario / media / design
    * variants keep their existing flat inspector.
    */
@@ -91,7 +85,6 @@ export function PluginMetaSections({ record, omit, compact, heading, variant = '
   const [copied, setCopied] = useState(false);
 
   const manifest: PluginManifest = record.manifest ?? ({} as PluginManifest);
-  const specVersion = typeof manifest.specVersion === 'string' ? manifest.specVersion : '';
   const od = manifest.od ?? {};
   const description = localizePluginDescription(locale, record);
   const query = resolvePluginQueryFallback(od.useCase?.query);
@@ -99,8 +92,6 @@ export function PluginMetaSections({ record, omit, compact, heading, variant = '
   const ctx = od.context ?? {};
   const stages = od.pipeline?.stages ?? [];
   const surfaces = od.genui?.surfaces ?? [];
-  const required = (od.connectors?.required ?? []) as PluginConnectorRef[];
-  const optional = (od.connectors?.optional ?? []) as PluginConnectorRef[];
   const capabilities = od.capabilities ?? [];
 
   const hasContext = useMemo(() => {
@@ -110,7 +101,6 @@ export function PluginMetaSections({ record, omit, compact, heading, variant = '
         ctx.designSystem ||
         (ctx.craft && ctx.craft.length > 0) ||
         (ctx.assets && ctx.assets.length > 0) ||
-        (ctx.mcp && ctx.mcp.length > 0) ||
         (ctx.atoms && ctx.atoms.length > 0) ||
         (ctx.claudePlugins && ctx.claudePlugins.length > 0),
     );
@@ -128,19 +118,10 @@ export function PluginMetaSections({ record, omit, compact, heading, variant = '
     return r.ref ?? r.path ?? '';
   }
 
-  function formattedInstalledAt(): string {
-    try {
-      return new Date(record.installedAt).toLocaleString(locale);
-    } catch {
-      return String(record.installedAt);
-    }
-  }
-
   function label(key: Parameters<typeof localizePluginChrome>[1], vars?: Record<string, string | number>): string {
     return localizePluginChrome(locale, key, vars);
   }
 
-  const installedLabel = formattedInstalledAt();
   const links = useMemo(() => derivePluginSourceLinks(record), [record]);
   const hasAuthorBlock = Boolean(
     links.authorName || links.authorProfileUrl || links.homepageUrl,
@@ -368,15 +349,6 @@ export function PluginMetaSections({ record, omit, compact, heading, variant = '
                 ))}
               </ContextGroup>
             ) : null}
-            {ctx.mcp && ctx.mcp.length > 0 ? (
-              <ContextGroup label={label('mcpServers')} count={ctx.mcp.length}>
-                {(ctx.mcp as McpServerSpec[]).map((m) => (
-                  <span key={`mcp-${m.name}`} className="plugin-details-modal__chip">
-                    {m.name}
-                  </span>
-                ))}
-              </ContextGroup>
-            ) : null}
             {ctx.claudePlugins && ctx.claudePlugins.length > 0 ? (
               <ContextGroup
                 label={label('claudePlugins')}
@@ -470,16 +442,6 @@ export function PluginMetaSections({ record, omit, compact, heading, variant = '
         </Section>
       ) : null}
 
-      {required.length > 0 || optional.length > 0 ? (
-        <Section title={label('connectors')}>
-          {required.length > 0 ? (
-            <ConnectorList label={label('required')} items={required} variant="required" />
-          ) : null}
-          {optional.length > 0 ? (
-            <ConnectorList label={label('optional')} items={optional} variant="optional" />
-          ) : null}
-        </Section>
-      ) : null}
 
       {capabilities.length > 0 ? (
         <Section
@@ -497,109 +459,6 @@ export function PluginMetaSections({ record, omit, compact, heading, variant = '
         </Section>
       ) : null}
 
-      <Section
-        title={label('source')}
-        action={
-          links.contributeUrl ? (
-            <a
-              className="plugin-details-modal__chip-btn"
-              href={links.contributeUrl}
-              target="_blank"
-              rel="noreferrer"
-              data-testid="plugin-details-contribute"
-              title={
-                links.contributeOnGithub
-                  ? label('openIssueOnGithub')
-                  : label('openContributePage')
-              }
-            >
-              <Icon
-                name={links.contributeOnGithub ? 'github' : 'external-link'}
-                size={12}
-              />
-              {label('contribute')}
-            </a>
-          ) : undefined
-        }
-      >
-        <dl className="plugin-details-modal__source">
-          <div>
-            <dt>{label('origin')}</dt>
-            <dd>
-              <span className="plugin-details-modal__source-kind">
-                {links.sourceKindLabel}
-              </span>
-              {links.sourceUrl ? (
-                <ExternalLink
-                  href={links.sourceUrl}
-                  icon={
-                    record.sourceKind === 'github' ? 'github' : 'external-link'
-                  }
-                  testId="plugin-details-source-link"
-                >
-                  {links.sourceLabel}
-                </ExternalLink>
-              ) : (
-                <code>{links.sourceLabel}</code>
-              )}
-            </dd>
-          </div>
-          <div>
-            <dt>{label('path')}</dt>
-            <dd>
-              <code>{record.fsPath}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>{label('version')}</dt>
-            <dd>
-              <code>v{record.version}</code>
-            </dd>
-          </div>
-          {specVersion ? (
-            <div>
-              <dt>{label('spec')}</dt>
-              <dd>
-                <code>v{specVersion}</code>
-              </dd>
-            </div>
-          ) : null}
-          <div>
-            <dt>{label('trust')}</dt>
-            <dd>
-              <TrustBadge trust={record.trust} />
-            </dd>
-          </div>
-          {record.pinnedRef ? (
-            <div>
-              <dt>{label('pinnedRef')}</dt>
-              <dd>
-                <code>{record.pinnedRef}</code>
-              </dd>
-            </div>
-          ) : null}
-          {record.sourceMarketplaceId ? (
-            <div>
-              <dt>{label('marketplaceId')}</dt>
-              <dd>
-                <code>{record.sourceMarketplaceId}</code>
-              </dd>
-            </div>
-          ) : null}
-          {manifest.license ? (
-            <div>
-              <dt>{label('license')}</dt>
-              <dd>
-                <code>{manifest.license}</code>
-              </dd>
-            </div>
-          ) : null}
-          <div>
-            <dt>{label('installed')}</dt>
-            <dd>{installedLabel}</dd>
-          </div>
-        </dl>
-      </Section>
         </>,
       )}
     </div>
@@ -719,38 +578,4 @@ function githubProfileLabel(url: string): string {
   } catch {
     return url;
   }
-}
-
-interface ConnectorListProps {
-  label: string;
-  items: PluginConnectorRef[];
-  variant: 'required' | 'optional';
-}
-
-function ConnectorList({ label, items, variant }: ConnectorListProps) {
-  return (
-    <div className="plugin-details-modal__connector-group">
-      <h4 className="plugin-details-modal__sub-title">
-        {label}
-        <span className={`plugin-details-modal__badge is-${variant}`}>
-          {items.length}
-        </span>
-      </h4>
-      <ul className="plugin-details-modal__connectors">
-        {items.map((c) => (
-          <li
-            key={`${variant}-${c.id}`}
-            className="plugin-details-modal__connector"
-          >
-            <code>{c.id}</code>
-            {c.tools && c.tools.length > 0 ? (
-              <span className="plugin-details-modal__muted plugin-details-modal__small">
-                · {c.tools.join(', ')}
-              </span>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
 }

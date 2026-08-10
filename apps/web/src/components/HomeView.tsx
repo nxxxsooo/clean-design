@@ -88,18 +88,12 @@ import {
   normalizeHomeMediaInputs,
   type HomeComposerMediaSurface,
 } from './home-hero/media-surfaces';
-import {
-  buildPluginAuthoringInputs,
-  buildPluginAuthoringPromptForInputs,
-  PLUGIN_AUTHORING_PROMPT,
-  PLUGIN_AUTHORING_PROMPT_TEMPLATE,
-  type HomePromptHandoff,
-} from './home-hero/plugin-authoring';
+import type { HomePromptHandoff } from './home-hero/plugin-use-handoff';
 import { PluginDetailsModal } from './PluginDetailsModal';
 import { SkillDetailsModal } from './SkillDetailsModal';
 import { HomeTemplatesReveal } from './HomeTemplatesReveal';
 import { PluginsHomeSection } from './PluginsHomeSection';
-import type { PluginLoopSubmit } from './PluginLoopHome';
+import type { PluginLoopSubmit } from './plugin-loop-types';
 import { localizePluginTitle } from './plugins-home/localization';
 import type { PluginUseAction } from './plugins-home/useActions';
 import { examplePresetSeedPrompt } from './plugins-home/presetSeedPrompt';
@@ -191,13 +185,6 @@ interface PendingPluginUseHandoff {
   action: PluginUseAction;
   inputs?: Record<string, unknown>;
 }
-
-const AUTHORING_DEFAULT_SCENARIO_INPUTS = {
-  artifactKind: 'Clean Design plugin',
-  audience: 'Clean Design plugin authors',
-  topic: 'packaging a reusable workflow as an Clean Design plugin',
-};
-
 
 interface Props {
   isActive?: boolean;
@@ -329,11 +316,6 @@ export function HomeView({
   const [pendingApplyId, setPendingApplyId] = useState<string | null>(null);
   const [pendingDuplicatePluginId, setPendingDuplicatePluginId] = useState<string | null>(null);
   const [pendingChipId, setPendingChipId] = useState<string | null>(null);
-  const [pendingAuthoringChipId, setPendingAuthoringChipId] = useState<string | null>(null);
-  const [pendingAuthoringPrompt, setPendingAuthoringPrompt] = useState(PLUGIN_AUTHORING_PROMPT);
-  const [pendingAuthoringInputs, setPendingAuthoringInputs] = useState<Record<string, unknown>>(
-    () => buildPluginAuthoringInputs(undefined),
-  );
   const [pendingPluginUseHandoff, setPendingPluginUseHandoff] =
     useState<PendingPluginUseHandoff | null>(null);
   const [fallbackProjectKind, setFallbackProjectKind] = useState<ProjectKind | null>(null);
@@ -614,33 +596,14 @@ export function HomeView({
     if (!promptHandoff || consumedHandoffIdRef.current === promptHandoff.id) return;
     consumedHandoffIdRef.current = promptHandoff.id;
     setError(null);
-    if (promptHandoff.source === 'plugin-use') {
-      setPendingPluginUseHandoff({
-        pluginId: promptHandoff.pluginId,
-        action: promptHandoff.action ?? 'use',
-        ...(promptHandoff.inputs ? { inputs: promptHandoff.inputs } : {}),
-      });
-      if (promptHandoff.focus) {
-        focusPromptAtEnd();
-      }
-      scrollHomeToTop();
-      return;
-    }
-
-    setActive(null);
-    setActiveSkill(null);
-    setSelectedPluginContexts([]);
-    setFallbackProjectKind('other');
-    setFallbackProjectMetadata(null);
+    setPendingPluginUseHandoff({
+      pluginId: promptHandoff.pluginId,
+      action: promptHandoff.action ?? 'use',
+      ...(promptHandoff.inputs ? { inputs: promptHandoff.inputs } : {}),
+    });
     if (promptHandoff.focus) {
-      pendingPromptFocusEndRef.current = true;
+      focusPromptAtEnd();
     }
-    setPrompt(promptHandoff.prompt);
-    setPromptEditedByUser(false);
-    setPendingAuthoringPrompt(promptHandoff.prompt);
-    setPendingAuthoringInputs(promptHandoff.inputs);
-    setPendingAuthoringChipId('create-plugin');
-    setPendingChipId('create-plugin');
     scrollHomeToTop();
   }, [promptHandoff, scrollHomeToTop]);
 
@@ -1519,51 +1482,6 @@ export function HomeView({
     focusPromptAtEnd();
   }
 
-  function queuePluginAuthoring(chipId: string | null, goal?: string) {
-    const nextInputs = buildPluginAuthoringInputs(goal);
-    const nextPrompt = buildPluginAuthoringPromptForInputs(nextInputs);
-    runWithReplacementConfirmation('Plugin authoring', nextPrompt, async () => {
-      setActive(null);
-      setActiveSkill(null);
-      setFallbackProjectKind('other');
-      setFallbackProjectMetadata(null);
-      setError(null);
-      setPrompt(nextPrompt);
-      setPromptEditedByUser(false);
-      setPendingAuthoringPrompt(nextPrompt);
-      setPendingAuthoringInputs(nextInputs);
-      setPendingAuthoringChipId(chipId ?? 'create-plugin');
-      setPendingChipId(chipId ?? 'create-plugin');
-      focusPromptAtEnd();
-    }, {
-      before: active?.record.id ?? null,
-      after: 'od-plugin-authoring',
-    });
-  }
-
-  useEffect(() => {
-    if (!pendingAuthoringChipId || pluginsLoading) return;
-    const authoringRecord = plugins.find((plugin) => plugin.id === 'od-plugin-authoring');
-    const record = authoringRecord ?? plugins.find((plugin) => plugin.id === 'od-new-generation');
-    setPendingAuthoringChipId(null);
-    if (!record) {
-      setPendingChipId(null);
-      // The authoring scenario can be absent in a long-running dev
-      // daemon that started before the bundled plugin was added. If
-      // even the default scenario is missing, do not block the user:
-      // keep the prompt in place and submit as a naked `other`
-      // project so the server-side fallback can still attempt to bind.
-      return;
-    }
-    void usePlugin(record, pendingAuthoringPrompt, {
-      projectKind: 'other',
-      chipId: pendingAuthoringChipId,
-      inputs: authoringRecord ? pendingAuthoringInputs : AUTHORING_DEFAULT_SCENARIO_INPUTS,
-      ...(authoringRecord ? { queryTemplate: PLUGIN_AUTHORING_PROMPT_TEMPLATE } : {}),
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingAuthoringChipId, pendingAuthoringPrompt, pendingAuthoringInputs, pluginsLoading, plugins]);
-
   // Stage B of plugin-driven-flow-plan: the chip rail dispatcher.
   // Pure UI-state mapping — the heavy lifting is delegated back to
   // existing handlers. Migration chips that don't have a bound plugin
@@ -1573,7 +1491,7 @@ export function HomeView({
     // P0 ui_click area=chat_composer element=plugin_chip|action_chip. The
     // chip's `action.kind` discriminates: plugin-bound chips
     // (apply-scenario / apply-figma-migration) route to a plugin; the rest
-    // (create-plugin, open-template-picker) are action
+    // (open-template-picker) are action
     // shortcuts. Failure paths below still fire because the user did pick
     // the chip — error state belongs in the run lifecycle event.
     const chipElement: 'plugin_chip' | 'action_chip' =
@@ -1661,10 +1579,6 @@ export function HomeView({
         } else {
           requestActivePlugin(record, undefined, pluginOptions);
         }
-        return;
-      }
-      case 'create-plugin': {
-        queuePluginAuthoring(chip.id);
         return;
       }
       case 'create-brand-kit': {
@@ -2002,7 +1916,6 @@ export function HomeView({
         pendingChipId={pendingChipId}
         submitDisabled={
           Boolean(pendingApplyId) ||
-          Boolean(pendingAuthoringChipId) ||
           Boolean(active && !active.inputsValid)
         }
         onPickPlugin={(record, nextPrompt) => addPluginContext(record, nextPrompt)}

@@ -9,8 +9,6 @@
 // llm_wiki, gbrain, memU. Kept deliberately small so every read/write
 // stays a plain `cat` / `editor` round trip — no DB, no fancy schema.
 
-import type { MemoryTreeNode } from './automations.js';
-
 // `profile` — the singleton structured "who I am / how I work" entry (one
 //   well-known id `user_profile`) the intent gateway reads to rewrite a short
 //   query into a full brief; seeded at onboarding, edited in the Profile tab.
@@ -39,6 +37,30 @@ export const MEMORY_TYPES: readonly MemoryType[] = [
 
 /** The well-known singleton id for the structured user profile. */
 export const PROFILE_MEMORY_ID = 'user_profile';
+
+export type MemoryTreeNodeKind = 'folder' | 'entry';
+
+export type MemoryTreeNodeScope =
+  | 'global'
+  | 'project'
+  | 'connector'
+  | 'artifact'
+  | 'design-system'
+  | 'skill';
+
+export interface MemoryTreeNode {
+  id: string;
+  parentId: string | null;
+  path: string;
+  name: string;
+  description?: string;
+  kind: MemoryTreeNodeKind;
+  type?: MemoryType;
+  scope: MemoryTreeNodeScope;
+  createdAt: string;
+  updatedAt: string;
+  childrenCount?: number;
+}
 
 // Listing payload — frontmatter only, no body. The settings panel pulls
 // the full body lazily through `GET /api/memory/:id` when the user

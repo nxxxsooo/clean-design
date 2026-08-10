@@ -18,6 +18,13 @@ export const CLEAN_DESIGN_DISABLED_API_PREFIXES = Object.freeze([
   '/api/mcp',
   '/api/observability',
   '/api/orbit',
+  '/api/applied-plugins/export',
+  '/api/plugins/events',
+  '/api/plugins/install',
+  '/api/plugins/share-tasks',
+  '/api/plugins/stats',
+  '/api/plugins/upload-folder',
+  '/api/plugins/upload-zip',
   '/api/routines',
   '/api/social-share',
   '/api/tools/connectors',
@@ -36,8 +43,9 @@ export function isCleanDesignDisabledApiPath(pathname: string): boolean {
   return [
     /^\/api\/projects\/[^/]+\/deploy(?:ments)?(?:\/|$)/,
     /^\/api\/projects\/[^/]+\/handoff$/,
-    /^\/api\/projects\/[^/]+\/plugins\/(?:publish-github|contribute-open-design|share-tasks)(?:\/|$)/,
-    /^\/api\/plugins\/[^/]+\/share-project(?:\/|$)/,
+    /^\/api\/projects\/[^/]+\/plugin-candidates(?:\/|$)/,
+    /^\/api\/projects\/[^/]+\/plugins\/(?:install-folder|publish-github|contribute-open-design|share-tasks)(?:\/|$)/,
+    /^\/api\/plugins\/[^/]+\/(?:doctor|share-project|trust|uninstall|upgrade)(?:\/|$)/,
     /^\/api\/runs\/[^/]+\/feedback(?:\/|$)/,
   ].some((pattern) => pattern.test(normalized));
 }

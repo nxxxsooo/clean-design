@@ -9,12 +9,7 @@ vi.mock('../../src/components/home-hero/PlaceholderCarousel', () => ({
 }));
 
 import { HomeView } from '../../src/components/HomeView';
-import {
-  createPluginAuthoringHandoff,
-  createPluginUseHandoff,
-  PLUGIN_AUTHORING_DEFAULT_GOAL,
-  PLUGIN_AUTHORING_PROMPT,
-} from '../../src/components/home-hero/plugin-authoring';
+import { createPluginUseHandoff } from '../../src/components/home-hero/plugin-use-handoff';
 // HomeHero's `home-hero-input` is now the project composer's Lexical
 // contenteditable, not a <textarea>. These helpers drive/read it through the
 // live editor instead of synthetic `fireEvent.change` / `.value` (which are
@@ -24,54 +19,26 @@ import {
   setHomeHeroPrompt,
 } from '../helpers/home-hero-lexical';
 
-const AUTHORING_PLUGIN = {
-  id: 'od-plugin-authoring',
-  title: 'Plugin authoring',
+const DEFAULT_PLUGIN = {
+  id: 'od-new-generation',
+  title: 'New generation',
   version: '0.1.0',
   trust: 'bundled' as const,
   sourceKind: 'bundled' as const,
-  source: '/tmp/plugin-authoring',
+  source: '/tmp/new-generation',
   capabilitiesGranted: ['prompt:inject'],
-  fsPath: '/tmp/plugin-authoring',
+  fsPath: '/tmp/new-generation',
   installedAt: 0,
   updatedAt: 0,
   manifest: {
-    name: 'od-plugin-authoring',
-    title: 'Plugin authoring',
-    version: '0.1.0',
-    description: 'Create plugins',
-    od: {
-      kind: 'scenario',
-      taskKind: 'new-generation',
-      useCase: { query: 'Create an Clean Design plugin for {{pluginGoal}}.' },
-      inputs: [
-        {
-          name: 'pluginGoal',
-          type: 'string',
-          required: false,
-          default: PLUGIN_AUTHORING_DEFAULT_GOAL,
-          label: 'Plugin goal',
-        },
-      ],
-    },
-  },
-};
-
-const DEFAULT_PLUGIN = {
-  ...AUTHORING_PLUGIN,
-  id: 'od-new-generation',
-  title: 'New generation',
-  source: '/tmp/new-generation',
-  fsPath: '/tmp/new-generation',
-  manifest: {
-    ...AUTHORING_PLUGIN.manifest,
     name: 'od-new-generation',
     title: 'New generation',
+    version: '0.1.0',
     description: 'Create new design artifacts',
     od: {
       kind: 'scenario',
       taskKind: 'new-generation',
-      useCase: { query: 'Create a plugin.' },
+      useCase: { query: 'Create a design artifact.' },
     },
   },
 };
@@ -305,12 +272,6 @@ const LIVE_ARTIFACT_IMAGE_TEMPLATE_PLUGIN = {
   },
 };
 
-const AUTHORING_DEFAULT_SCENARIO_INPUTS = {
-  artifactKind: 'Clean Design plugin',
-  audience: 'Clean Design plugin authors',
-  topic: 'packaging a reusable workflow as an Clean Design plugin',
-};
-
 const REFLY_DESIGN_SYSTEM = {
   id: 'ds-refly',
   title: 'Refly Design System',
@@ -321,21 +282,21 @@ const REFLY_DESIGN_SYSTEM = {
   isEditable: true,
 };
 
-const AUTHORING_APPLY_RESULT = {
-  query: 'Create a plugin.',
+const DEFAULT_APPLY_RESULT = {
+  query: 'Create a design artifact.',
   contextItems: [],
-  inputs: AUTHORING_PLUGIN.manifest.od.inputs,
+  inputs: [],
   assets: [],
   mcpServers: [],
   trust: 'trusted',
   capabilitiesGranted: ['prompt:inject'],
   capabilitiesRequired: ['prompt:inject'],
   appliedPlugin: {
-    snapshotId: 'snap-authoring',
-    pluginId: 'od-plugin-authoring',
+    snapshotId: 'snap-default',
+    pluginId: 'od-new-generation',
     pluginVersion: '0.1.0',
     manifestSourceDigest: 'a'.repeat(64),
-    inputs: { pluginGoal: PLUGIN_AUTHORING_DEFAULT_GOAL },
+    inputs: {},
     resolvedContext: { items: [] },
     capabilitiesGranted: ['prompt:inject'],
     capabilitiesRequired: ['prompt:inject'],
@@ -350,23 +311,12 @@ const AUTHORING_APPLY_RESULT = {
   projectMetadata: {},
 };
 
-const DEFAULT_APPLY_RESULT = {
-  ...AUTHORING_APPLY_RESULT,
-  inputs: [],
-  appliedPlugin: {
-    ...AUTHORING_APPLY_RESULT.appliedPlugin,
-    snapshotId: 'snap-default',
-    pluginId: 'od-new-generation',
-    inputs: AUTHORING_DEFAULT_SCENARIO_INPUTS,
-  },
-};
-
 const DOCUMENT_NEW_GENERATION_APPLY_RESULT = {
-  ...AUTHORING_APPLY_RESULT,
+  ...DEFAULT_APPLY_RESULT,
   query: DOCUMENT_NEW_GENERATION_PLUGIN.manifest.od.useCase.query,
   inputs: DOCUMENT_NEW_GENERATION_PLUGIN.manifest.od.inputs,
   appliedPlugin: {
-    ...AUTHORING_APPLY_RESULT.appliedPlugin,
+    ...DEFAULT_APPLY_RESULT.appliedPlugin,
     snapshotId: 'snap-document-new-generation',
     pluginId: 'od-new-generation',
     inputs: {
@@ -378,11 +328,11 @@ const DOCUMENT_NEW_GENERATION_APPLY_RESULT = {
 };
 
 const WEB_PROTOTYPE_APPLY_RESULT = {
-  ...AUTHORING_APPLY_RESULT,
+  ...DEFAULT_APPLY_RESULT,
   query: WEB_PROTOTYPE_PLUGIN.manifest.od.useCase.query,
   inputs: WEB_PROTOTYPE_PLUGIN.manifest.od.inputs,
   appliedPlugin: {
-    ...AUTHORING_APPLY_RESULT.appliedPlugin,
+    ...DEFAULT_APPLY_RESULT.appliedPlugin,
     snapshotId: 'snap-web-prototype',
     pluginId: 'example-web-prototype',
     inputs: {
@@ -432,11 +382,11 @@ const META_INSTRUCTION_APPLY_RESULT = {
 };
 
 const SIMPLE_DECK_APPLY_RESULT = {
-  ...AUTHORING_APPLY_RESULT,
+  ...DEFAULT_APPLY_RESULT,
   query: SIMPLE_DECK_PLUGIN.manifest.od.useCase.query,
   inputs: SIMPLE_DECK_PLUGIN.manifest.od.inputs,
   appliedPlugin: {
-    ...AUTHORING_APPLY_RESULT.appliedPlugin,
+    ...DEFAULT_APPLY_RESULT.appliedPlugin,
     snapshotId: 'snap-simple-deck',
     pluginId: 'example-simple-deck',
     inputs: {
@@ -451,11 +401,11 @@ const SIMPLE_DECK_APPLY_RESULT = {
 };
 
 const LIVE_ARTIFACT_APPLY_RESULT = {
-  ...AUTHORING_APPLY_RESULT,
+  ...DEFAULT_APPLY_RESULT,
   query: LIVE_ARTIFACT_PLUGIN.manifest.od.useCase.query,
   inputs: [],
   appliedPlugin: {
-    ...AUTHORING_APPLY_RESULT.appliedPlugin,
+    ...DEFAULT_APPLY_RESULT.appliedPlugin,
     snapshotId: 'snap-live-artifact',
     pluginId: 'example-live-artifact',
     inputs: {},
@@ -481,157 +431,6 @@ describe('HomeView prompt handoff', () => {
     cleanup();
     window.localStorage.clear();
     window.sessionStorage.clear();
-  });
-
-  it('consumes a plugin authoring handoff once and focuses the textarea', async () => {
-    let resolveApply: (response: Response) => void = () => undefined;
-    const applyResponse = new Promise<Response>((resolve) => {
-      resolveApply = resolve;
-    });
-    const fetchMock = vi.fn<typeof fetch>(async (url) => {
-      if (typeof url === 'string' && url === '/api/plugins') {
-        return new Response(JSON.stringify({ plugins: [AUTHORING_PLUGIN, WEB_PROTOTYPE_PLUGIN] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url.includes('/api/plugins/od-plugin-authoring/apply')) {
-        return applyResponse;
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    stubAnimationFrame();
-
-    const { rerender } = render(
-      <HomeView
-        projects={[]}
-        onSubmit={() => undefined}
-        onOpenProject={() => undefined}
-        onViewAllProjects={() => undefined}
-        promptHandoff={createPluginAuthoringHandoff(1)}
-      />,
-    );
-
-    const input = await screen.findByTestId('home-hero-input');
-    await waitFor(() => {
-      expect(homeHeroPromptText()).toBe(PLUGIN_AUTHORING_PROMPT);
-      expect(document.activeElement).toBe(input);
-    });
-    const inputCard = input.closest('.home-hero__input-card') as HTMLElement | null;
-    expect(inputCard?.classList.contains('home-hero__input-card--compact-authoring')).toBe(true);
-    expect(inputCard?.style.getPropertyValue('--home-hero-prompt-max-height')).toBe('132px');
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      '/api/plugins/od-plugin-authoring/apply',
-      expect.anything(),
-    ));
-    resolveApply(new Response(JSON.stringify(AUTHORING_APPLY_RESULT), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    }));
-    await waitFor(() => {
-      expect((screen.getByTestId('home-hero-submit') as HTMLButtonElement).disabled).toBe(false);
-    });
-
-    await setPromptAndSettle('User edited prompt');
-
-    rerender(
-      <HomeView
-        projects={[]}
-        onSubmit={() => undefined}
-        onOpenProject={() => undefined}
-        onViewAllProjects={() => undefined}
-        promptHandoff={createPluginAuthoringHandoff(1)}
-      />,
-    );
-
-    expect(homeHeroPromptText()).toBe('User edited prompt');
-  });
-
-  it('uses the same authoring prompt from the Home rail chip', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url) => {
-      if (typeof url === 'string' && url === '/api/plugins') {
-        return new Response(JSON.stringify({ plugins: [AUTHORING_PLUGIN, WEB_PROTOTYPE_PLUGIN] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url.includes('/api/plugins/od-plugin-authoring/apply')) {
-        return new Response(JSON.stringify(AUTHORING_APPLY_RESULT), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    }));
-    stubAnimationFrame();
-
-    render(
-      <HomeView
-        projects={[]}
-        onSubmit={() => undefined}
-        onOpenProject={() => undefined}
-        onViewAllProjects={() => undefined}
-      />,
-    );
-
-    await clearActiveTypeChip();
-    await clickHomeShortcut('create-plugin');
-
-    const input = await screen.findByTestId('home-hero-input');
-    await waitFor(() => {
-      expect(homeHeroPromptText()).toBe(PLUGIN_AUTHORING_PROMPT);
-      expect(document.activeElement).toBe(input);
-    });
-    expect(screen.queryByRole('alert')).toBeNull();
-  });
-
-  it('asks before replacing an edited Home draft with the rail create-plugin prompt', async () => {
-    const fetchMock = vi.fn<typeof fetch>(async (url) => {
-      if (typeof url === 'string' && url === '/api/plugins') {
-        return new Response(JSON.stringify({ plugins: [AUTHORING_PLUGIN, WEB_PROTOTYPE_PLUGIN] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url.includes('/api/plugins/od-plugin-authoring/apply')) {
-        return new Response(JSON.stringify(AUTHORING_APPLY_RESULT), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    stubAnimationFrame();
-
-    render(
-      <HomeView
-        projects={[]}
-        onSubmit={() => undefined}
-        onOpenProject={() => undefined}
-        onViewAllProjects={() => undefined}
-      />,
-    );
-
-    await screen.findByTestId('home-hero-input');
-    await setPromptAndSettle('Keep my custom plugin brief');
-    await clickHomeShortcut('create-plugin');
-
-    const dialog = await screen.findByRole('dialog', { name: /replace current prompt/i });
-    expect(homeHeroPromptText()).toBe('Keep my custom plugin brief');
-    expect(fetchMock.mock.calls.some(([url]) => (
-      typeof url === 'string' && url.includes('/api/plugins/od-plugin-authoring/apply')
-    ))).toBe(false);
-
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Replace' }));
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      '/api/plugins/od-plugin-authoring/apply',
-      expect.anything(),
-    ));
-    await waitFor(() => expect(homeHeroPromptText()).toBe(PLUGIN_AUTHORING_PROMPT));
-    expect(screen.queryByRole('dialog', { name: /replace current prompt/i })).toBeNull();
   });
 
   it('routes a plugin-use handoff from the Plugins page as the active driver and submits it as the run driver', async () => {
@@ -726,70 +525,6 @@ describe('HomeView prompt handoff', () => {
       pluginId: 'od-default',
       appliedPluginSnapshotId: null,
       pluginInputs: { prompt: 'Make a launch page for a robotics studio' },
-      projectKind: 'other',
-    }));
-  });
-
-  it('falls back to od-new-generation when od-plugin-authoring is not registered yet', async () => {
-    const fetchMock = vi.fn<typeof fetch>(async (url) => {
-      if (typeof url === 'string' && url === '/api/plugins') {
-        return new Response(JSON.stringify({ plugins: [DEFAULT_PLUGIN] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url.includes('/apply')) {
-        return new Response(JSON.stringify(DEFAULT_APPLY_RESULT), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    stubAnimationFrame();
-    const onSubmit = vi.fn();
-
-    render(
-      <HomeView
-        projects={[]}
-        onSubmit={onSubmit}
-        onOpenProject={() => undefined}
-        onViewAllProjects={() => undefined}
-      />,
-    );
-
-    await clickHomeShortcut('create-plugin');
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      '/api/plugins/od-new-generation/apply',
-      expect.anything(),
-    ));
-    const applyCall = fetchMock.mock.calls.find(([url]) => (
-      typeof url === 'string' && url.includes('/api/plugins/od-new-generation/apply')
-    ));
-    expect(JSON.parse(String((applyCall?.[1] as RequestInit).body))).toMatchObject({
-      inputs: {
-        artifactKind: 'Clean Design plugin',
-        audience: 'Clean Design plugin authors',
-        topic: 'packaging a reusable workflow as an Clean Design plugin',
-      },
-    });
-    await waitFor(() => {
-      expect(homeHeroPromptText()).toBe(PLUGIN_AUTHORING_PROMPT);
-      expect((screen.getByTestId('home-hero-submit') as HTMLButtonElement).disabled).toBe(false);
-    });
-    fireEvent.click(screen.getByTestId('home-hero-submit'));
-
-    expect(screen.queryByRole('alert')).toBeNull();
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
-      prompt: PLUGIN_AUTHORING_PROMPT,
-      pluginId: 'od-new-generation',
-      appliedPluginSnapshotId: 'snap-default',
-      pluginInputs: {
-        artifactKind: 'Clean Design plugin',
-        audience: 'Clean Design plugin authors',
-        topic: 'packaging a reusable workflow as an Clean Design plugin',
-      },
       projectKind: 'other',
     }));
   });
@@ -1833,178 +1568,10 @@ describe('HomeView prompt handoff', () => {
       expect.anything(),
     ));
   });
-
-  it('binds od-plugin-authoring before submitting the rail create-plugin prompt', async () => {
-    const fetchMock = vi.fn<typeof fetch>(async (url) => {
-      if (typeof url === 'string' && url === '/api/plugins') {
-        return new Response(JSON.stringify({ plugins: [AUTHORING_PLUGIN, WEB_PROTOTYPE_PLUGIN] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url.includes('/apply')) {
-        return new Response(JSON.stringify(AUTHORING_APPLY_RESULT), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    stubAnimationFrame();
-    const onSubmit = vi.fn();
-
-    render(
-      <HomeView
-        projects={[]}
-        onSubmit={onSubmit}
-        onOpenProject={() => undefined}
-        onViewAllProjects={() => undefined}
-      />,
-    );
-
-    await clearActiveTypeChip();
-    await clickHomeShortcut('create-plugin');
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      '/api/plugins/od-plugin-authoring/apply',
-      expect.anything(),
-    ));
-    await waitFor(() => {
-      const badge = screen.getByTestId('home-hero-active-plugin');
-      expect(badge.textContent).toContain('Create plugin');
-      expect(badge.textContent).not.toContain('Plugin authoring');
-    });
-    const input = screen.getByTestId('home-hero-input');
-    const inputCard = input.closest('.home-hero__input-card') as HTMLElement | null;
-    expect(homeHeroPromptText()).toBe(PLUGIN_AUTHORING_PROMPT);
-    expect(inputCard?.classList.contains('home-hero__input-card--compact-authoring')).toBe(true);
-    expect(inputCard?.style.getPropertyValue('--home-hero-prompt-max-height')).toBe('132px');
-    fireEvent.click(await screen.findByTestId('home-hero-submit'));
-
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
-      prompt: PLUGIN_AUTHORING_PROMPT,
-      pluginId: 'od-plugin-authoring',
-      appliedPluginSnapshotId: 'snap-authoring',
-      pluginInputs: { pluginGoal: PLUGIN_AUTHORING_DEFAULT_GOAL },
-      projectKind: 'other',
-    }));
-  });
-
-  it('keeps the authoring goal input linked to the prompt and submit payload', async () => {
-    const fetchMock = vi.fn<typeof fetch>(async (url) => {
-      if (typeof url === 'string' && url === '/api/plugins') {
-        return new Response(JSON.stringify({ plugins: [AUTHORING_PLUGIN, WEB_PROTOTYPE_PLUGIN] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url.includes('/apply')) {
-        return new Response(JSON.stringify(AUTHORING_APPLY_RESULT), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    stubAnimationFrame();
-    const onSubmit = vi.fn();
-
-    render(
-      <HomeView
-        projects={[]}
-        onSubmit={onSubmit}
-        onOpenProject={() => undefined}
-        onViewAllProjects={() => undefined}
-      />,
-    );
-
-    await clearActiveTypeChip();
-    await clickHomeShortcut('create-plugin');
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      '/api/plugins/od-plugin-authoring/apply',
-      expect.anything(),
-    ));
-
-    const rewrittenGoal = 'catalog internal research notes into a reusable knowledge workflow';
-    screen.getByTestId('home-hero-input');
-    await setPromptAndSettle(
-      homeHeroPromptText().replace(PLUGIN_AUTHORING_DEFAULT_GOAL, rewrittenGoal),
-    );
-    await waitFor(() => {
-      expect(homeHeroPromptText()).toContain(rewrittenGoal);
-    });
-    fireEvent.click(screen.getByTestId('home-hero-submit'));
-
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
-      prompt: expect.stringContaining(rewrittenGoal),
-      pluginId: 'od-plugin-authoring',
-      pluginInputs: {
-        pluginGoal: rewrittenGoal,
-      },
-    })));
-  });
-
-  it('does not submit the create-plugin prompt before the authoring scenario is applied', async () => {
-    let resolveApply: (response: Response) => void = () => undefined;
-    const applyResponse = new Promise<Response>((resolve) => {
-      resolveApply = resolve;
-    });
-    const fetchMock = vi.fn<typeof fetch>(async (url) => {
-      if (typeof url === 'string' && url === '/api/plugins') {
-        return new Response(JSON.stringify({ plugins: [AUTHORING_PLUGIN, WEB_PROTOTYPE_PLUGIN] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      if (typeof url === 'string' && url.includes('/apply')) {
-        return applyResponse;
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    stubAnimationFrame();
-    const onSubmit = vi.fn();
-
-    render(
-      <HomeView
-        projects={[]}
-        onSubmit={onSubmit}
-        onOpenProject={() => undefined}
-        onViewAllProjects={() => undefined}
-      />,
-    );
-
-    await clearActiveTypeChip();
-    await clickHomeShortcut('create-plugin');
-    const input = screen.getByTestId('home-hero-input');
-    const inputCard = input.closest('.home-hero__input-card') as HTMLElement | null;
-    expect(homeHeroPromptText()).toBe(PLUGIN_AUTHORING_PROMPT);
-    expect(inputCard?.classList.contains('home-hero__input-card--compact-authoring')).toBe(true);
-    expect(inputCard?.style.getPropertyValue('--home-hero-prompt-max-height')).toBe('132px');
-    fireEvent.click(await screen.findByTestId('home-hero-submit'));
-    expect(onSubmit).not.toHaveBeenCalled();
-
-    resolveApply(new Response(JSON.stringify(AUTHORING_APPLY_RESULT), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    }));
-    await waitFor(() => {
-      expect((screen.getByTestId('home-hero-submit') as HTMLButtonElement).disabled).toBe(false);
-    });
-    fireEvent.click(screen.getByTestId('home-hero-submit'));
-
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
-      pluginId: 'od-plugin-authoring',
-      appliedPluginSnapshotId: 'snap-authoring',
-    }));
-  });
 });
 
-// An empty Lexical editor renders `<p><br></p>` (a placeholder break node), so
-// the DOM serializer in `homeHeroPromptText()` reads that lone `<br>` back as
-// `'\n'`. The editor's real text is empty — `.textContent` is `''` — so this
-// reads the empty case precisely without weakening the genuine-content path.
+// An empty Lexical editor renders a placeholder break node. Read that as an
+// empty value without weakening the genuine-content path.
 function homeHeroPromptValue(): string {
   const text = homeHeroPromptText();
   if (text === '\n' && (screen.getByTestId('home-hero-input').textContent ?? '') === '') {
@@ -2013,10 +1580,6 @@ function homeHeroPromptValue(): string {
   return text;
 }
 
-// Replace the Lexical editor's text the way a user edit would, then let the
-// editor's OnChange → host `onPromptChange` React state update flush a
-// microtask (mirrors lexical-composer's `typeAndSettle`) so flows that submit
-// right after editing read the latest draft.
 async function setPromptAndSettle(value: string): Promise<void> {
   setHomeHeroPrompt(value);
   await act(async () => {
@@ -2025,18 +1588,10 @@ async function setPromptAndSettle(value: string): Promise<void> {
 }
 
 async function clearActiveTypeChip() {
-  // Reset the Template selection back to "None" via the dropdown's Clear.
   const trigger = screen.queryByTestId('home-hero-template-trigger');
   if (!trigger) return;
   fireEvent.click(trigger);
   const clear = screen.queryByTestId('home-hero-template-clear');
   if (clear) fireEvent.click(clear);
   fireEvent.keyDown(document, { key: 'Escape' });
-}
-
-async function clickHomeShortcut(id: string) {
-  const trigger = await screen.findByTestId('home-hero-shortcuts-trigger');
-  await waitFor(() => expect((trigger as HTMLButtonElement).disabled).toBe(false));
-  fireEvent.click(trigger);
-  fireEvent.click(await screen.findByTestId(`home-hero-rail-${id}`));
 }

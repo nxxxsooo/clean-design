@@ -29,8 +29,5 @@ describe('local-only router', () => {
 
   it('never builds a removed route', () => {
     expect(buildPath({ kind: 'home', view: 'onboarding' })).toBe('/');
-    expect(buildPath({ kind: 'home', view: 'plugins' })).toBe('/');
-    expect(buildPath({ kind: 'marketplace' })).toBe('/');
-    expect(buildPath({ kind: 'marketplace-detail', pluginId: 'example' })).toBe('/');
   });
 });

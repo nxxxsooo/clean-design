@@ -568,21 +568,6 @@ describe('classifyRunFailure', () => {
     });
   });
 
-  it('maps missing generated plugin artifacts to artifact-write tool failures', () => {
-    expect(
-      classify(
-        'AGENT_EXECUTION_FAILED',
-        'Plugin authoring ended before generating the required generated-plugin artifacts.',
-      ),
-    ).toMatchObject({
-      failure_category: 'tool_error',
-      failure_detail: 'plugin_artifact_missing',
-      failure_stage: 'artifact_write',
-      retryable: false,
-      user_action: 'none',
-    });
-  });
-
   it('keeps process exits as an explicit fallback category', () => {
     expect(classify('AGENT_EXIT_1', 'process exited with code 1')).toMatchObject({
       failure_category: 'process_exit',
