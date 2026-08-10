@@ -7,7 +7,7 @@
 
 Clean Design will ship a manually installable, repository-owned Codex plugin named `clean-design`. The plugin combines a small set of Codex guidance skills with an MCP bridge. The bridge automatically connects every parent agent and subagent to one bounded, authenticated, local Clean Design service per data namespace.
 
-The service may run without the desktop application, but it is not a general agent host. In its MCP profile it performs deterministic project, file, design-system, preview, render, and export operations only. It cannot start Codex, invoke another model, or spawn another coding agent. This boundary prevents recursive agent creation while still letting the current Codex agent use Clean Design as a local visual-creation service.
+The service may run without the desktop application, but MCP is not a general agent-hosting surface. An MCP-authenticated session performs deterministic project, file, design-system, preview, render, and export operations only. No MCP-originated operation can start Codex, invoke another model, or spawn another coding agent. A separately authenticated desktop session may retain the product's existing generation runtime without making it reachable from MCP. This boundary prevents recursive agent creation while still letting the current Codex agent use Clean Design as a local visual-creation service.
 
 ## Goals
 
@@ -91,10 +91,10 @@ Each Codex session may instantiate its own lightweight stdio MCP bridge. The bri
 4. Authenticates and forwards MCP JSON-RPC messages.
 5. Maintains a client lease until stdio closes.
 
-The launcher resolves the service executable in this order:
+The launcher resolves a protocol-compatible service executable in this order:
 
-1. The installed Clean Design application bundle.
-2. The current source checkout's built development service.
+1. The current source checkout's built development service when the installed plugin belongs to that checkout.
+2. The installed Clean Design application bundle.
 
 It does not fall back to `od`, Open Design runtime paths, or an arbitrary executable from `PATH`.
 
@@ -127,7 +127,7 @@ Internal loopback HTTP ports remain dynamic transport details. The Unix socket a
 - Startup creates a random 256-bit secret in a mode-`0600` runtime file.
 - The bridge and service use that secret for a challenge-response handshake and derive an ephemeral session key.
 - A readable stale process stamp without the matching secret cannot authenticate.
-- The MCP profile cannot read provider credentials and does not invoke providers.
+- MCP-authenticated sessions cannot read provider credentials and do not invoke providers.
 - Desktop-managed provider credentials remain in Electron `safeStorage` and are not copied into the headless runtime.
 - Logs never include authorization values, decrypted secrets, prompts, file contents, or provider headers.
 
@@ -151,16 +151,24 @@ The surface excludes:
 
 Every file/export operation keeps existing realpath containment, traversal, symlink, size, secret-filename/content, hidden-state, temporary-sibling, and atomic-publication invariants.
 
+Client capabilities are fixed during the authenticated handshake:
+
+- MCP bridges receive the deterministic MCP allowlist and cannot elevate it.
+- The first-version headless CLI receives the same deterministic allowlist.
+- The desktop may establish a separately authenticated privileged session for the product's existing generation runtime and `safeStorage` credential handoff.
+- Authorization is checked at the service boundary on every operation; knowing a project identifier or local port does not grant a stronger role.
+
 ### 7. Recursion and OOM prevention
 
 Two amplification risks are handled independently.
 
 **Agent recursion:**
 
-- The MCP service profile does not register agent-spawn or provider-run capabilities.
+- The MCP tool registry does not register agent-spawn or provider-run capabilities.
 - Attempts to reach internal agent execution through MCP fail closed with `TOOL_NOT_AVAILABLE`.
-- The service child receives a recursion marker. If future code accidentally attempts to launch a coding agent from that process tree, the nested Clean Design plugin refuses activation.
-- A static/runtime capability assertion verifies that the MCP profile contains no agent-spawn dependency.
+- A service started without the desktop does not initialize agent/provider execution until a separately authenticated desktop session requests that product capability.
+- Any coding agent explicitly launched by the privileged desktop path inherits a service-origin recursion marker and has the `clean-design` plugin disabled. A nested bridge from that marked process refuses auto-start.
+- A static/runtime capability assertion verifies that no MCP tool handler has a dependency path to agent/provider execution.
 
 **Process fan-out:**
 
@@ -227,7 +235,7 @@ Stale locks and process stamps are recoverable only after PID, executable, names
 - Process-stamp PID, executable, namespace, data-root, and version validation.
 - Authentication handshake and session expiration.
 - Lease registration, heartbeat renewal, crash reclamation, and idle shutdown.
-- Capability allowlist and absence of agent-spawn dependencies.
+- Capability allowlist, immutable client roles, and absence of any MCP-to-agent/provider dependency path.
 - Queue, client, worker, memory high-water, and restart-budget enforcement.
 - Stable error-code mapping and log redaction.
 
