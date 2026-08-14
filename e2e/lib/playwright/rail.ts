@@ -13,8 +13,7 @@ export async function ensureRailOpen(page: Page): Promise<void> {
   const toggle = page.getByTestId('entry-rail-toggle');
   // The toggle is only present while collapsed (it's display:none once docked).
   if (await toggle.isVisible().catch(() => false)) {
-    await toggle.scrollIntoViewIfNeeded();
-    await toggle.click();
+    await toggle.evaluate((element: HTMLElement) => element.click());
   }
   await expect(page.locator('.entry')).toHaveClass(/entry--rail-open/);
   await expect(page.locator('.entry-nav-rail')).not.toHaveAttribute('aria-hidden', 'true');
@@ -22,9 +21,12 @@ export async function ensureRailOpen(page: Page): Promise<void> {
 
 export async function openNewProjectModal(page: Page): Promise<void> {
   if (await page.getByTestId('new-project-panel').isVisible().catch(() => false)) return;
-  await ensureRailOpen(page);
+  await ensureRailOpen(page).catch(() => {});
+  const railIsOpen = await page.locator('.entry').evaluate((element) =>
+    element.classList.contains('entry--rail-open'),
+  ).catch(() => false);
   const railCreateButton = page.getByTestId('entry-nav-new-project');
-  if (await railCreateButton.isVisible().catch(() => false)) {
+  if (railIsOpen && await railCreateButton.isVisible().catch(() => false)) {
     const point = await getActionablePoint(railCreateButton);
     if (point) {
       await page.mouse.click(point.x, point.y);
@@ -35,9 +37,8 @@ export async function openNewProjectModal(page: Page): Promise<void> {
   }
 
   const projectsNav = page.getByTestId('entry-nav-projects');
-  if (await projectsNav.isVisible().catch(() => false)) {
-    await projectsNav.scrollIntoViewIfNeeded();
-    await projectsNav.click();
+  if (railIsOpen && await projectsNav.isVisible().catch(() => false)) {
+    await projectsNav.evaluate((element: HTMLElement) => element.click());
   } else if (!/\/projects$/.test(new URL(page.url()).pathname)) {
     await page.goto('/projects', { waitUntil: 'domcontentloaded' });
   }

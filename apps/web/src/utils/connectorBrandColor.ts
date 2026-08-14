@@ -1,4 +1,5 @@
 const PALETTE = ['#1f6feb', '#b5360f', '#2e7d32', '#6a4fb6', '#b0337a', '#0f766e'];
+const DARK_PALETTE = ['#58a6ff', '#ff7b72', '#56d364', '#a371f7', '#db61a2', '#2dd4bf'];
 
 export type BrandTheme = 'light' | 'dark';
 
@@ -12,9 +13,10 @@ function hashIndex(seed: string): number {
 
 export function connectorBrandColor(
   connector: { id: string; name: string },
-  _theme: BrandTheme = 'light',
+  theme: BrandTheme = 'light',
 ): string {
-  return PALETTE[hashIndex(connector.id || connector.name)]!;
+  const palette = theme === 'dark' ? DARK_PALETTE : PALETTE;
+  return palette[hashIndex(connector.id || connector.name)]!;
 }
 
 export function resolveBrandTheme(): BrandTheme {

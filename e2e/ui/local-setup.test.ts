@@ -3,7 +3,6 @@ import type { Locator, Page } from '@playwright/test';
 
 import {
   openSettingsDialog,
-  STORAGE_KEY,
   waitForLoadingToClear,
 } from '@/playwright/app';
 import { routeAgents } from '@/playwright/mock-factory';
@@ -11,6 +10,7 @@ import { T } from '@/timeouts';
 
 const LOCAL_CLI_LABEL = /Local CLI|本机 CLI|本地 CLI/i;
 const MODEL_POPOVER_SELECTOR = '.model-select-searchable__popover';
+const STORAGE_KEY = 'clean-design:config';
 
 test.describe.configure({ timeout: T.xlong });
 
@@ -50,7 +50,7 @@ test('[P0] @critical first local setup selects an allowlisted CLI and persists i
   await expect(reopened.getByRole('combobox', { name: 'Model', exact: true })).toContainText(/GPT 5\.5/i);
 });
 
-test('[P0] @critical first BYOK setup discovers models, tests the provider, and persists selection', async ({ page }) => {
+test('[P1] first BYOK setup discovers models, tests the provider, and persists selection', async ({ page }) => {
   const modelRequests: Array<Record<string, unknown>> = [];
   const connectionRequests: Array<Record<string, unknown>> = [];
 

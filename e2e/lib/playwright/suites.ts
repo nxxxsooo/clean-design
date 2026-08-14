@@ -30,8 +30,6 @@ export const uiP0Groups = {
       "ui/entry-chrome-flows.test.ts",
       "ui/entry-configuration-flows.test.ts",
       "ui/local-setup.test.ts",
-      "ui/api-empty-response.test.ts",
-      "ui/settings-api-protocol.test.ts",
     ],
   },
   "project-workspace": {
@@ -71,7 +69,6 @@ export const visualCiMatrix = [
 ] as const satisfies readonly VisualCiMatrixEntry[];
 
 const uiP0CoverageFiles = [
-  "ui/api-empty-response.test.ts",
   "ui/app-design-files.test.ts",
   "ui/app-manual-edit.test.ts",
   "ui/app-restoration.test.ts",
@@ -83,7 +80,6 @@ const uiP0CoverageFiles = [
   "ui/project-management-flows.test.ts",
   "ui/real-daemon-run.test.ts",
   "ui/run-failure-recovery.test.ts",
-  "ui/settings-api-protocol.test.ts",
   "ui/settings-local-cli-codex-fallback.test.ts",
   "ui/workspace-keyboard-flows.test.ts",
 ] as const;

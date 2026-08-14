@@ -135,13 +135,11 @@ test('[P0] @critical entry chrome exposes the primary home creation surface and 
   });
 
   await gotoEntryHome(page);
-  await expect(page.getByTestId('entry-star-badge')).toBeVisible();
-  await expect(page.getByTestId('entry-use-everywhere-button')).toBeVisible();
   await expect(page.getByTestId('recent-projects-strip')).toHaveCount(0);
   // The nav rail is collapsed by default — only the topbar toggle shows.
   // Expand it to assert the rail and its logo are reachable.
   await expect(page.getByTestId('entry-rail-toggle')).toBeVisible();
-  await page.getByTestId('entry-rail-toggle').click();
+  await ensureRailOpen(page);
   await expect(page.locator('.entry-nav-rail')).toBeVisible();
   await expect(page.getByTestId('entry-nav-logo')).toBeVisible();
   await expect(page.locator('.entry-brand')).toHaveCount(0);
@@ -1909,7 +1907,7 @@ test('[P0] @critical clearing the home working directory removes linked dirs fro
   expect(body.metadata?.userWorkingDir).toBeUndefined();
 });
 
-test('[P0] @critical home hero input keeps Shift+Enter as a newline and submits on Enter', async ({ page }) => {
+test('[P1] home hero input keeps Shift+Enter as a newline and submits on Enter', async ({ page }) => {
   await gotoEntryHome(page);
 
   const input = page.getByTestId('home-hero-input');

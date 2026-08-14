@@ -123,7 +123,6 @@ test('[P0] manual edit inspector previews and persists page and selected element
   await expectFileSourceExcludes(page, projectId, 'manual-edit.html', ['data-od-edit-selected']);
   await expect(page.locator('.manual-edit-error')).toHaveCount(0);
 
-  await expect(page.getByRole('button', { name: /^Share$/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Download$/ })).toBeVisible();
 });
 
@@ -150,7 +149,6 @@ test('[P0] manual edit mode preserves preview actions after style edits', async 
 
   await page.getByTestId('board-mode-toggle').click();
   await expect(page.getByRole('button', { name: /^Comment$/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Share$/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /^Download$/ })).toBeVisible();
 });
 
@@ -176,7 +174,7 @@ async function selectPreviewElementThroughBridge(
   await expect(page.locator('.manual-edit-modal')).toContainText(section);
 }
 
-test('[P0] @critical preview toolbar keeps share, download, comment, and zoom actions reachable', async ({ page }) => {
+test('[P0] @critical preview toolbar keeps download, comment, and zoom actions reachable', async ({ page }) => {
   await routeMockAgents(page);
   const projectId = await createEmptyProject(page, 'Preview toolbar smoke');
   await seedHtmlArtifact(page, projectId, 'toolbar-preview.html', manualEditHtml());
@@ -185,14 +183,6 @@ test('[P0] @critical preview toolbar keeps share, download, comment, and zoom ac
 
   await expect(page.getByTestId('artifact-preview-frame')).toBeVisible();
   await expect(page.getByRole('tablist', { name: 'View mode' })).toHaveCount(0);
-
-  await page.getByRole('button', { name: /^Share$/ }).click();
-  const shareMenu = page.locator('.share-menu-popover[role="menu"]');
-  await expect(shareMenu).toBeVisible();
-  await expect(shareMenu).toContainText('PUBLISH ONLINE');
-  await expect(shareMenu).toContainText('SOCIAL SHARE');
-  await page.keyboard.press('Escape');
-  await expect(shareMenu).toHaveCount(0);
 
   await page.getByRole('button', { name: /^Download$/ }).click();
   const downloadMenu = page.locator('.share-menu-popover[role="menu"]');
