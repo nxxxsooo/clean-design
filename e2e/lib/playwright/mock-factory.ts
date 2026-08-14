@@ -1,6 +1,6 @@
 import type { Page, Route } from '@playwright/test';
 
-export const STORAGE_KEY = 'open-design:config';
+export const STORAGE_KEY = 'clean-design:config';
 
 const STANDARD_CONFIG = {
   mode: 'daemon',

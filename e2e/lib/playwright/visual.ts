@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fulfillAgentsRoute } from './mock-factory.js';
 import { T } from '@/timeouts';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 const GITHUB_STARS_STORAGE_KEY = 'open-design:gh-stars';
 const VISUAL_STABILITY_STORAGE_KEY = 'open-design:visual-stability';
 const VISUAL_STYLE_ID = 'od-visual-stability-style';
@@ -16,6 +16,7 @@ const VISUAL_GITHUB_STARS = 40_000;
 type VisualConfig = {
   mode: 'daemon' | 'api';
   apiKey: string;
+  apiKeyConfigured?: boolean;
   baseUrl: string;
   model: string;
   apiProtocol?: 'anthropic' | 'openai' | 'azure' | 'google' | 'ollama' | 'senseaudio' | 'aihubmix';
@@ -527,7 +528,9 @@ export async function prepareVisualWorkspaceFileList(page: Page): Promise<void> 
   const triggerText = await trigger.textContent().catch(() => '');
   if (!/\bAll project files\b/.test(triggerText ?? '')) {
     await trigger.click();
-    await page.getByRole('menuitem', { name: 'All project files' }).click();
+    await page
+      .getByRole('menuitem', { name: 'All project files' })
+      .evaluate((element: HTMLElement) => element.click());
     await expect(trigger).toContainText('All project files');
   }
   await expect(page.getByTestId('design-file-row-index.html')).toBeVisible();

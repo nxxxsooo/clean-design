@@ -102,9 +102,13 @@ async function rootReadmeFiles(): Promise<string[]> {
   for (const entry of rootEntries) {
     if (entry.isFile() && entry.name === "README.md") names.add(entry.name);
   }
-  const translationEntries = await readdir(path.join(repoRoot, translationsDir), { withFileTypes: true });
-  for (const entry of translationEntries) {
-    if (entry.isFile() && /^README\.[A-Za-z0-9-]+\.md$/.test(entry.name)) names.add(entry.name);
+  try {
+    const translationEntries = await readdir(path.join(repoRoot, translationsDir), { withFileTypes: true });
+    for (const entry of translationEntries) {
+      if (entry.isFile() && /^README\.[A-Za-z0-9-]+\.md$/.test(entry.name)) names.add(entry.name);
+    }
+  } catch (error) {
+    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
   }
   return Array.from(names).sort((left, right) =>
     left === "README.md" ? -1 : right === "README.md" ? 1 : left.localeCompare(right),

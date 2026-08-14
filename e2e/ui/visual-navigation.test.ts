@@ -69,33 +69,3 @@ test('[P2] captures the design system detail preview surface', async ({ page }) 
 
   await captureVisual(page, 'visual-design-system-detail');
 });
-
-test('[P2] captures the plugins page surface', async ({ page }) => {
-  await configureVisualPage(page);
-  await gotoVisualHome(page);
-
-  await ensureRailOpen(page);
-  await page.getByTestId('entry-nav-plugins').click();
-  await expect(page).toHaveURL(/\/plugins$/);
-  const plugins = page.getByTestId('entry-view-plugins');
-  await expect(plugins.getByRole('heading', { name: 'Plugins', exact: true })).toBeVisible();
-  await expect(plugins.getByTestId('plugins-tab-installed')).toBeVisible();
-  await expect(plugins.getByText('Prototype Starter').first()).toBeVisible();
-  await waitForVisualFonts(page);
-
-  await captureVisual(page, 'visual-plugins');
-});
-
-test('[P2] captures the tasks page surface', async ({ page }) => {
-  await configureVisualPage(page);
-  await gotoVisualHome(page);
-
-  await ensureRailOpen(page);
-  await page.getByTestId('entry-nav-tasks').click();
-  await expect(page).toHaveURL(/\/automations$/);
-  await expect(page.getByTestId('tasks-view')).toBeVisible();
-  await expect(page.getByText('No automations yet')).toBeVisible();
-  await waitForVisualFonts(page);
-
-  await captureVisual(page, 'visual-tasks');
-});

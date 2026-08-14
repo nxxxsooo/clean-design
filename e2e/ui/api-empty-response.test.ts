@@ -4,7 +4,7 @@ import { openNewProjectModal as openNewProjectModalFromProjects } from '@/playwr
 import type { Page } from '@playwright/test';
 import { T } from '@/timeouts';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 test.describe.configure({ timeout: T.xlong });
 

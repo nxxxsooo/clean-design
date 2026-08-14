@@ -4,7 +4,7 @@ import { routeAgents } from '@/playwright/mock-factory';
 import { T } from '@/timeouts';
 import type { Page } from '@playwright/test';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 test.describe.configure({ timeout: T.xlong });
 

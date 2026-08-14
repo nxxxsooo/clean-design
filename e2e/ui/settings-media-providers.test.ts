@@ -3,7 +3,7 @@ import { openNewProjectModal } from '@/playwright/rail';
 import type { Page, Route } from '@playwright/test';
 import { openSettingsDialog } from '../lib/playwright/app.js';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 function baseConfig(): Record<string, unknown> {
   return {

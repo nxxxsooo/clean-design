@@ -12,7 +12,7 @@ import { expect, test } from '@/playwright/suite';
 import type { Page } from '@playwright/test';
 import { routeAgents } from '@/playwright/mock-factory';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 const DESIGN_SYSTEMS = [
   {

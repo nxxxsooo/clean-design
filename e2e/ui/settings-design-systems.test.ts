@@ -2,7 +2,7 @@ import { expect, test } from '@/playwright/suite';
 import type { Page, Route } from '@playwright/test';
 import { openSettingsDialog } from '../lib/playwright/app.js';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 type DesignSystemFixture = {
   id: string;

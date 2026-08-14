@@ -24,7 +24,7 @@ import { createSmokeSuite } from '@/vitest/suite';
 
 const HELD_PROMPT = 'Hold the daemon run open until canceled for the send-now smoke';
 const QUEUED_PROMPT = 'Create a deterministic smoke artifact';
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 type ProjectResponse = {
   conversationId: string;

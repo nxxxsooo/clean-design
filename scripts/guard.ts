@@ -1228,6 +1228,8 @@ async function checkCiTopology(): Promise<boolean> {
     ...[
       "run: node --experimental-strip-types scripts/scopes.ts github-output",
       "pull-requests: read",
+      'OD_E2E_VITEST_MAX_WORKERS: "2"',
+      'OD_PLAYWRIGHT_WORKERS: "1"',
       "ci_mode: ${{ steps.detect.outputs.ci_mode }}",
       "ui_p0_validation_required: ${{ steps.detect.outputs.ui_p0_validation_required }}",
       "run_ui_p0: ${{ steps.detect.outputs.run_ui_p0 }}",

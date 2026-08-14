@@ -5,7 +5,7 @@ import { T } from '@/timeouts';
 
 test.describe.configure({ timeout: T.xlong });
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 const LOCALE_KEY = 'open-design:locale';
 const LOCALE_SOURCE_KEY = 'open-design:locale-source';
 const OPEN_SETTINGS_LABEL = /Open settings|打开设置|開啟設定/i;

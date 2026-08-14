@@ -95,7 +95,8 @@ test('[P2] captures the topbar BYOK execution switcher surface', async ({ page }
   await configureVisualPage(page, {
     config: {
       mode: 'api',
-      apiKey: 'sk-visual',
+      apiKey: 'credential://visualbyokcredential',
+      apiKeyConfigured: true,
       apiProtocol: 'openai',
       baseUrl: 'https://api.openai.com/v1',
       model: 'gpt-4o',
@@ -121,7 +122,8 @@ test('[P2] captures the topbar BYOK model dropdown surface', async ({ page }) =>
   await configureVisualPage(page, {
     config: {
       mode: 'api',
-      apiKey: 'sk-visual',
+      apiKey: 'credential://visualbyokcredential',
+      apiKeyConfigured: true,
       apiProtocol: 'openai',
       baseUrl: 'https://api.openai.com/v1',
       model: 'gpt-4o',

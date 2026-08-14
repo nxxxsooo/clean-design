@@ -13,7 +13,7 @@ import { routeAgents } from '../lib/playwright/mock-factory.js';
 // and cannot rise above later sibling sections. The fix lifts the OPEN
 // picker's stacking context above its siblings.
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 const AGENTS = [
   {
