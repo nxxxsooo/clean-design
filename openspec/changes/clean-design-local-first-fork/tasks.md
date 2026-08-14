@@ -41,5 +41,5 @@
 
 - [x] 6.1 Run guard, typecheck, and affected package test suites and repair all regressions
 - [x] 6.2 Build, install, launch, restart, quit, uninstall, and clean the Apple Silicon application; verify loopback sidecars terminate and product data stays namespace-scoped
-- [ ] 6.3 Complete one representative real generation through either an allowlisted local CLI or configured BYOK provider, then export and inspect one handoff packet
+- [x] 6.3 Complete one representative real generation through either an allowlisted local CLI or configured BYOK provider, then export and inspect one handoff packet
 - [x] 6.4 Run the final product-boundary audit for removed services, unsupported runtimes, unintended outbound destinations, visible identity, secrets, and required provenance; repair concrete findings

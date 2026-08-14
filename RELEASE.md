@@ -5,45 +5,45 @@ failed or unverified item blocks both public visibility and the release tag.
 
 ## Build and behavior
 
-- [ ] Repository guard, full typecheck, and affected package tests pass under
+- [x] Repository guard, full typecheck, and affected package tests pass under
       Node 24 and pinned pnpm.
-- [ ] Apple Silicon package builds, installs, launches, restarts, quits, and
+- [x] Apple Silicon package builds, installs, launches, restarts, quits, and
       uninstalls without leaving owned processes or runtime files.
-- [ ] Clean Design coexists with an Open Design installation and never reads or
+- [x] Clean Design coexists with an Open Design installation and never reads or
       writes its application data, IPC paths, bundle, or installation files.
 - [ ] Every retained artifact family passes a mocked generation/preview/export
       flow, plus one real local-CLI and one real BYOK flow.
-- [ ] A real immutable handoff packet is inspected and its prompt is pasted into
+- [x] A real immutable handoff packet is inspected and its prompt is pasted into
       a coding agent for an implementation attempt.
 
 ## Privacy and security
 
-- [ ] Git history and tracked content contain no secrets, credentials, internal
+- [x] Git history and tracked content contain no secrets, credentials, internal
       hosts, personal paths, owner mappings, or private operational references.
-- [ ] Credentials are encrypted with protected storage, renderer storage has no
+- [x] Credentials are encrypted with protected storage, renderer storage has no
       plaintext secret, vault mode is `0600`, and failure paths fail closed.
-- [ ] Local-only startup, editing, preview, and handoff tests observe zero
+- [x] Local-only startup, editing, preview, and handoff tests observe zero
       outbound requests.
-- [ ] Provider traffic reaches only the explicitly selected provider or resource.
-- [ ] Handoff traversal, secret detection, size limits, atomicity, collisions,
+- [x] Provider traffic reaches only the explicitly selected provider or resource.
+- [x] Handoff traversal, secret detection, size limits, atomicity, collisions,
       and unsafe-root rejection pass focused tests.
 
 ## Licensing and identity
 
-- [ ] `LICENSE`, `NOTICE`, and `UPSTREAM.md` accurately describe every retained
+- [x] `LICENSE`, `NOTICE`, and `UPSTREAM.md` accurately describe every retained
       third-party work and required attribution.
-- [ ] Upstream trade names, logos, domains, social links, donation/affiliate
+- [x] Upstream trade names, logos, domains, social links, donation/affiliate
       links, promotions, update feeds, and hosted-service endpoints are absent
       from installed/runtime surfaces.
-- [ ] Bundled named-brand catalogs and media have been reviewed for public
+- [x] Bundled named-brand catalogs and media have been reviewed for public
       redistribution, attribution, and trademark risk.
-- [ ] Public documentation clearly states that Clean Design is independent and
+- [x] Public documentation clearly states that Clean Design is independent and
       does not imply upstream endorsement.
 
 ## Publication
 
 - [ ] The final commit is pushed to the private `nxxxsooo/clean-design` remote.
-- [ ] A clean checkout reproduces the accepted build and tests.
+- [x] A clean checkout reproduces the accepted build and tests.
 - [ ] Repository visibility is changed to public only after this checklist is
       complete.
 - [ ] Tag `v0.1.0` is created and pushed only from the audited public commit.
