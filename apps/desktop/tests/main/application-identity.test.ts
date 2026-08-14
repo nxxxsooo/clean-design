@@ -66,8 +66,10 @@ describe("macOS application identity", () => {
 
   it("ships a transparent outer canvas instead of a white square", () => {
     const webIcon = join(workspaceRoot, "apps/web/public/app-icon.png");
+    const inAppLogo = join(workspaceRoot, "apps/web/public/logo.png");
     const packagedIcon = join(workspaceRoot, "tools/pack/resources/mac/icon.png");
     expect(pngCornerAlpha(webIcon)).toBe(0);
+    expect(pngCornerAlpha(inAppLogo)).toBe(0);
     expect(pngCornerAlpha(packagedIcon)).toBe(0);
     expect(readFileSync(packagedIcon)).toEqual(readFileSync(webIcon));
   });
