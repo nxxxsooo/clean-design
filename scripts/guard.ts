@@ -914,8 +914,6 @@ const toolsRootAllowlist = new Map<string, "directory" | "file">([
   ["AGENTS.md", "file"],
   ["dev", "directory"],
   ["pack", "directory"],
-  ["release", "directory"],
-  ["serve", "directory"],
 ]);
 
 async function checkToolsLayout(): Promise<boolean> {
@@ -929,7 +927,7 @@ async function checkToolsLayout(): Promise<boolean> {
     const repositoryPath = `tools/${entry.name}${entry.isDirectory() ? "/" : ""}`;
 
     if (expected == null) {
-      violations.push(`${repositoryPath} -> tools/ top-level entries are allowlisted; expected only AGENTS.md, dev/, pack/, release/, and serve/`);
+      violations.push(`${repositoryPath} -> tools/ top-level entries are allowlisted; expected only AGENTS.md, dev/, and pack/`);
       continue;
     }
 
