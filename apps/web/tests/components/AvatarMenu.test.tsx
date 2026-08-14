@@ -53,7 +53,7 @@ function mount(overrides: Partial<AppConfig> = {}, agents: AgentInfo[] = [codex]
       {...callbacks}
     />,
   );
-  fireEvent.click(screen.getByRole('button', { name: 'avatar.title' }));
+  fireEvent.click(screen.getByRole('button', { name: 'avatar.settings' }));
   return callbacks;
 }
 
@@ -61,9 +61,9 @@ afterEach(cleanup);
 
 describe('AvatarMenu local execution', () => {
   it('shows local CLI state and excludes removed hosted agents', () => {
-    mount({}, [codex, { ...codex, id: 'amr', name: 'Hosted account' }]);
+    mount({}, [codex, { ...codex, id: 'hosted-service', name: 'Hosted account' }]);
     expect(screen.getByTestId('avatar-agent-option-codex')).toBeTruthy();
-    expect(screen.queryByTestId('avatar-agent-option-amr')).toBeNull();
+    expect(screen.queryByTestId('avatar-agent-option-hosted-service')).toBeNull();
   });
 
   it('routes mode, agent, refresh, and settings commands', () => {
@@ -86,7 +86,7 @@ describe('AvatarMenu local execution', () => {
 
   it('uses the link glyph for BYOK mode', () => {
     mount({ mode: 'api', apiKeyConfigured: true });
-    expect(screen.getByRole('button', { name: 'avatar.title' }).querySelector('.ri-link')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'avatar.settings' }).querySelector('.ri-link')).toBeTruthy();
     expect(screen.getByText('api.anthropic.com')).toBeTruthy();
   });
 });

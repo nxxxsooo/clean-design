@@ -57,10 +57,6 @@
     "./critique": {
       "types": "./dist/critique.d.ts",
       "default": "./dist/critique.mjs"
-    },
-    "./analytics": {
-      "types": "./dist/analytics/index.d.ts",
-      "default": "./dist/analytics/index.mjs"
     }
   },
   "scripts": {
@@ -69,7 +65,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tests.json --noEmit"
   },
   "dependencies": {
-    "@open-design/release": "workspace:*",
     "zod": "3.25.76"
   },
   "devDependencies": {

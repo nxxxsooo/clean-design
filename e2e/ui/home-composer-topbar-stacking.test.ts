@@ -26,8 +26,6 @@ const HOME_CONFIG = {
   designSystemId: null,
   onboardingCompleted: true,
   agentModels: { codex: { model: 'default' } },
-  privacyDecisionAt: 1,
-  telemetry: { metrics: false, content: false, artifactManifest: false },
 };
 
 test.beforeEach(async ({ page }) => {

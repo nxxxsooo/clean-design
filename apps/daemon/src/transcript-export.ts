@@ -30,7 +30,7 @@
 //   * `kind: 'status'` with `label === 'thinking'` is the daemon's translated
 //     thinking_start marker; it flushes the prior accumulator so adjacent
 //     thinking segments preserve their original block boundaries. Other
-//     `status` labels and `kind: 'usage' | 'raw'` drop (telemetry).
+//     `status` labels and `kind: 'usage' | 'raw'` drop (non-content events).
 //   * Type-change between text ↔ thinking flushes the prior accumulator.
 //
 // Content fallback: user-typed messages persist as plain text in
@@ -421,7 +421,7 @@ function parseCommentAttachments(raw: string | null): CommentAttachmentRef[] {
 
 // Walk arrival-order. Maintain a single accumulator for the current run of
 // text or thinking events; flush on type change, on any tool block, on a
-// status thinking-start marker, and at end-of-stream. Pure telemetry events
+// status thinking-start marker, and at end-of-stream. Non-content events
 // (status with non-thinking label, usage, raw) drop without flushing — they
 // neither contribute content nor signal a content boundary.
 //
@@ -491,12 +491,12 @@ function coalesceBlocks(events: PersistedAgentEvent[]): Block[] {
         // It signals a new thinking segment, so flush the prior accumulator
         // — without this, two thinking segments separated only by the
         // marker would merge into one block and synthesis could not recover
-        // the original boundaries. Other status labels are pure telemetry
+        // the original boundaries. Other status labels are non-content
         // and drop without flushing.
         if (ev.label === 'thinking') flush();
         break;
       }
-      // Telemetry: usage, raw — intentional drop, neither contributes
+      // Usage and raw transport events are intentionally dropped; neither contributes
       // content nor signals a content boundary.
       default:
         break;

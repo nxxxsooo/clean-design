@@ -27,14 +27,12 @@ describe('Clean Design local-only daemon boundary', () => {
   });
 
   it.each([
-    ['GET', '/api/amr/models'],
     ['GET', '/api/analytics/config'],
     ['POST', '/api/attribution/bridge-url'],
     ['GET', '/api/community/discord'],
     ['GET', '/api/connectors'],
     ['GET', '/api/deploy/config'],
     ['GET', '/api/github/open-design'],
-    ['POST', '/api/integrations/vela/login'],
     ['GET', '/api/marketplaces'],
     ['GET', '/api/mcp/servers'],
     ['POST', '/api/observability/event'],

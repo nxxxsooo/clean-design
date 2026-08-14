@@ -32,7 +32,7 @@ import {
   runArtifactCountForRun,
   runSideEffectsForRun,
   sideEffectsFromLedger,
-} from '../src/runtimes/run-lifecycle-analytics.js';
+} from '../src/runtimes/run-state.js';
 
 const PROD_DEFAULT_MAX_EVENTS = 2_000;
 
@@ -128,14 +128,6 @@ type StartedServer = { url: string; server: Server; shutdown?: () => Promise<voi
 type RunStatus = { id: string; status: string; exitCode: number | null };
 
 describe('run event-buffer truncation vs artifact verdict (HTTP)', () => {
-  const originalEnv = {
-    POSTHOG_KEY: process.env.POSTHOG_KEY,
-    POSTHOG_HOST: process.env.POSTHOG_HOST,
-    LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY,
-    LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
-    LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL,
-    OPEN_DESIGN_TELEMETRY_RELAY_URL: process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL,
-  };
   let started: StartedServer | null = null;
   let binDir: string | null = null;
 
@@ -147,10 +139,6 @@ describe('run event-buffer truncation vs artifact verdict (HTTP)', () => {
     started = null;
     if (binDir) await rm(binDir, { recursive: true, force: true });
     binDir = null;
-    for (const [key, value] of Object.entries(originalEnv)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
   });
 
   it('a run that wrote an artifact then flooded past the ring buffer, then exited non-zero, is succeeded', async () => {
@@ -159,19 +147,11 @@ describe('run event-buffer truncation vs artifact verdict (HTTP)', () => {
     // is spliced out of the in-memory run.events buffer.
     const fakeClaude = await writeArtifactThenFloodClaude(binDir, 'claude-trunc', PROD_DEFAULT_MAX_EVENTS + 500);
 
-    delete process.env.POSTHOG_KEY;
-    delete process.env.POSTHOG_HOST;
-    delete process.env.LANGFUSE_PUBLIC_KEY;
-    delete process.env.LANGFUSE_SECRET_KEY;
-    delete process.env.LANGFUSE_BASE_URL;
-    delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
 
     started = await startServer({ port: 0, returnServer: true }) as StartedServer;
     await putConfig(started.url, {
       agentId: 'claude',
       agentCliEnv: { claude: { CLAUDE_BIN: fakeClaude } },
-      telemetry: { metrics: false, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
 
     const run = await createAndWaitForRun(started.url);
@@ -239,9 +219,6 @@ async function createAndWaitForRun(url: string): Promise<RunStatus> {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-od-analytics-device-id': 'trunc-test',
-      'x-od-analytics-session-id': 'trunc-session',
-      'x-od-analytics-client-type': 'web',
     },
     body: JSON.stringify({
       projectId,

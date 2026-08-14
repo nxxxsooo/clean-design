@@ -5,20 +5,14 @@ function promptArgvBudgetMessage(
   bytes: number,
   limit: number,
 ): string {
-  if (def.id === 'deepseek') {
-    return (
-      `${def.name} currently accepts prompts only as a command-line argument, and this run's composed prompt exceeds the safe size (${bytes} > ${limit} bytes). ` +
-      'Reduce the selected skills/design-system context or conversation length, or use DeepSeek through an API/provider model connection for large contexts. Pick a stdin-capable adapter when the prompt must include large local context.'
-    );
-  }
   return (
     `${def.name} requires the prompt as a command-line argument and this run's composed prompt exceeds the safe size (${bytes} > ${limit} bytes). ` +
     'Reduce the selected skills/design-system context, shorten the conversation, or pick an adapter with stdin support.'
   );
 }
 
-// `maxPromptArgBytes` is sized for Windows' ~32 KB CreateProcess
-// command-line limit (see deepseek.ts). On POSIX the per-arg ceiling is far
+// `maxPromptArgBytes` can be sized for Windows' ~32 KB CreateProcess
+// command-line limit. On POSIX the per-arg ceiling is far
 // higher — Linux's MAX_ARG_STRLEN is 128 KB and macOS's ARG_MAX is 256 KB
 // (total argv+env) — and the *real* Windows command-line cap is guarded
 // precisely post-buildArgs by checkWindowsCmdShim/DirectExeCommandLineBudget.
@@ -64,10 +58,9 @@ export function checkPromptArgvBudget(
 // Must stay byte-for-byte identical to the platform copy — the helper's
 // whole point is to compute the exact `cmd.exe /d /s /c "<inner>"` line
 // the spawn path will produce on Windows. The `%` → `"^%"` substitution
-// neutralizes cmd.exe's percent-expansion for prompts that ride argv
-// (DeepSeek TUI today): `%name%` pairs would otherwise be expanded from
-// the daemon environment before the child reads them, leaking secrets
-// like `%DEEPSEEK_API_KEY%` whenever the prompt mentions an env-var name.
+// neutralizes cmd.exe's percent-expansion for prompts that ride argv:
+// `%name%` pairs would otherwise be expanded from the daemon environment
+// before the child reads them.
 function quoteForWindowsCmdShim(value: unknown): string {
   const str = String(value ?? '');
   if (!/[\s"&<>|^%]/.test(str)) return str;
@@ -145,7 +138,7 @@ const WINDOWS_CREATE_PROCESS_HEADROOM = 256;
 //   - the assembled line fits comfortably under the kernel cap.
 //
 // Pure: takes `resolvedBin` explicitly so a test on macOS can pass a
-// fake `C:\\…\\deepseek.cmd` path and exercise the same math the daemon
+// fake `C:\\…\\agent.cmd` path and exercise the same math the daemon
 // would run on Windows.
 export function checkWindowsCmdShimCommandLineBudget(
   def: RuntimeAgentDef | null | undefined,
@@ -188,7 +181,7 @@ function looksLikeWindowsPath(p: unknown): boolean {
 
 // Companion to `checkWindowsCmdShimCommandLineBudget` for argv-bound
 // adapters whose binary resolves directly to a Windows executable
-// (a cargo-installed `deepseek.exe`, a hand-built release, or any other
+// (a native executable, a hand-built release, or any other
 // non-shim install path). `createCommandInvocation` does *not* wrap the
 // call in `cmd.exe /d /s /c "<inner>"` for those — but Node/libuv still
 // composes a CreateProcess `lpCommandLine` by walking each argv entry
@@ -211,7 +204,7 @@ function looksLikeWindowsPath(p: unknown): boolean {
 //   - the assembled command line fits under the safe limit.
 //
 // Pure: takes `resolvedBin` and `args` explicitly so a test on macOS can
-// pass a fake `C:\…\deepseek.exe` and exercise the same math the daemon
+// pass a fake `C:\…\agent.exe` and exercise the same math the daemon
 // would run on Windows. The libuv quoting math lives in
 // `quoteForWindowsDirectExe` above.
 export function checkWindowsDirectExeCommandLineBudget(

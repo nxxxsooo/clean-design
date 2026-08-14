@@ -17,33 +17,9 @@ export function defaultAgentModelId(agent: AgentModelSource): string | null {
   );
 }
 
-export function normalizeAgentModelChoice(
-  agent: AgentModelSource,
-  choice: AgentModelChoice | undefined,
-): AgentModelChoice | null {
-  const configuredModel =
-    typeof choice?.model === 'string' && choice.model ? choice.model : null;
-  if (agent?.id !== 'amr' || !configuredModel) return null;
-  if (configuredModel === 'default') return null;
-
-  const matchingModel = agent.models?.find((model) => model.id === configuredModel) ?? null;
-  if (!matchingModel && (agent.models?.length ?? 0) === 0) {
-    return null;
-  }
-  if (matchingModel && matchingModel.enabled !== false) return null;
-
-  const fallbackModel = defaultAgentModelId(agent);
-  if (!fallbackModel || fallbackModel === configuredModel) return null;
-
-  return {
-    ...choice,
-    model: fallbackModel,
-  };
-}
-
 export function effectiveAgentModelChoice(
-  agent: AgentModelSource,
+  _agent: AgentModelSource,
   choice: AgentModelChoice | undefined,
 ): AgentModelChoice | undefined {
-  return normalizeAgentModelChoice(agent, choice) ?? choice;
+  return choice;
 }

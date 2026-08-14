@@ -86,48 +86,6 @@ test('[P2] captures the plugins page surface', async ({ page }) => {
   await captureVisual(page, 'visual-plugins');
 });
 
-test('[P2] captures the integrations page surface', async ({ page }) => {
-  await configureVisualPage(page);
-  await gotoVisualHome(page);
-
-  await ensureRailOpen(page);
-  await page.getByTestId('entry-nav-integrations').click();
-  await expect(page).toHaveURL(/\/integrations$/);
-  await expect(page.getByRole('heading', { name: 'Integrations' })).toBeVisible();
-  await expect(page.getByTestId('integrations-tab-connectors')).toBeVisible();
-  await waitForVisualFonts(page);
-
-  await captureVisual(page, 'visual-integrations');
-});
-
-test('[P2] captures the integrations use everywhere surface', async ({ page }) => {
-  await configureVisualPage(page);
-  await gotoVisualHome(page);
-
-  await ensureRailOpen(page);
-  await page.getByTestId('entry-nav-integrations').click();
-  await page.getByTestId('integrations-tab-use-everywhere').click();
-  await expect(page.getByTestId('integrations-tab-use-everywhere')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByText('CLI, HTTP, MCP').first()).toBeVisible();
-  await waitForVisualFonts(page);
-
-  await captureVisual(page, 'visual-integrations-use-everywhere');
-});
-
-test('[P2] captures the integrations MCP surface', async ({ page }) => {
-  await configureVisualPage(page);
-  await gotoVisualHome(page);
-
-  await ensureRailOpen(page);
-  await page.getByTestId('entry-nav-integrations').click();
-  await page.getByTestId('integrations-tab-mcp').click();
-  await expect(page.getByTestId('integrations-tab-mcp')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByText(/MCP/i).first()).toBeVisible();
-  await waitForVisualFonts(page);
-
-  await captureVisual(page, 'visual-integrations-mcp');
-});
-
 test('[P2] captures the tasks page surface', async ({ page }) => {
   await configureVisualPage(page);
   await gotoVisualHome(page);

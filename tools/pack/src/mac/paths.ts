@@ -21,16 +21,12 @@ export function sanitizeNamespace(value: string): string {
   return value.replace(/[^A-Za-z0-9._-]+/g, "-");
 }
 
-export function macAppBundleName(namespace: string): string {
-  return `${PRODUCT_NAME}.${sanitizeNamespace(namespace)}.app`;
-}
-
 export function macAppExecutablePath(appPath: string, executableName = PRODUCT_NAME): string {
   return join(appPath, "Contents", "MacOS", executableName);
 }
 
 export function resolveMacAppOutputDirectoryName(): string {
-  return process.arch === "arm64" ? "mac-arm64" : "mac";
+  return "mac-arm64";
 }
 
 export function resolveMacPaths(config: ToolPackConfig): MacPaths {
@@ -63,13 +59,11 @@ export function resolveMacPaths(config: ToolPackConfig): MacPaths {
     dmgPath: join(namespaceRoot, "dmg", `${PRODUCT_NAME}-${namespaceToken}.dmg`),
     installApplicationsRoot,
     installedAppPath,
-    latestMacYmlPath: join(namespaceRoot, "zip", "latest-mac.yml"),
     mountPoint: join(namespaceRoot, "mount"),
     packagedMainPrebundleMetaPath: join(namespaceRoot, MAC_PREBUNDLE_META_DIR_NAME, "packaged-main.meta.json"),
     packagedMainPrebundlePath: join(namespaceRoot, "assembled", MAC_PREBUNDLED_PACKAGED_MAIN_RELATIVE_PATH),
     packagedConfigPath: join(namespaceRoot, "open-design-config.json"),
     resourceRoot: join(namespaceRoot, "resources", "open-design"),
-    payloadZipPath: join(namespaceRoot, "payload", `${PRODUCT_NAME}-${namespaceToken}-payload.zip`),
     systemApplicationsAppPath: join("/Applications", identity.systemAppBundleName),
     tarballsRoot: join(namespaceRoot, "tarballs"),
     userApplicationsAppPath: join(homedir(), "Applications", identity.systemAppBundleName),
@@ -79,6 +73,14 @@ export function resolveMacPaths(config: ToolPackConfig): MacPaths {
     webSidecarPrebundlePath: join(namespaceRoot, "assembled", MAC_PREBUNDLED_WEB_SIDECAR_RELATIVE_PATH),
     zipPath: join(namespaceRoot, "zip", `${PRODUCT_NAME}-${namespaceToken}.zip`),
   };
+}
+
+export function resolveMacProductUserDataRoot(config: ToolPackConfig): string {
+  return join(homedir(), "Library", "Application Support", resolveMacInstallIdentity(config).productName);
+}
+
+export function resolveMacProductNamespaceRoot(config: ToolPackConfig): string {
+  return join(resolveMacProductUserDataRoot(config), "namespaces", config.namespace);
 }
 
 

@@ -195,7 +195,7 @@ export function createMacElectronRebuildOptions(
   appRoot: string,
 ): RebuildOptions {
   return {
-    arch: process.arch,
+    arch: "arm64",
     buildFromSource: ELECTRON_BUILDER_BUILD_DEPENDENCIES_FROM_SOURCE,
     buildPath: appRoot,
     electronVersion: config.electronVersion,

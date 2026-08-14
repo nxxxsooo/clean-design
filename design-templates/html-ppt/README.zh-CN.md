@@ -9,10 +9,8 @@
 **协议：** MIT
 **English docs:** [README.md](README.md)
 
-![html-ppt 封面 · 实时预览](https://repo-assets.open-design.ai/resources/images/design-templates/html-ppt/hero.gif)
-
 > 一行命令装好 **36 主题 × 20 Canvas FX × 31 布局 × 15 完整 deck + 演讲者模式**。
-> 上图里的每一个预览都是真实的 iframe 加载真实模板文件 —— 不是截图，不是色卡。
+> 内置的每一个预览都是真实的 iframe 加载真实模板文件 —— 不是截图，不是色卡。
 
 ## 🎤 演讲者模式（全新）
 

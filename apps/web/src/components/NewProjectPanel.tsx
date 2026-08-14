@@ -1,22 +1,8 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Dialog, DialogDescription, DialogFooter, DialogTitle } from '@open-design/components';
-import { createTabToTracking } from '@open-design/contracts/analytics';
 import { isOpenDesignHostAvailable, pickHostWorkingDir } from '@open-design/host';
 import type { OpenDesignHostProjectImportSuccess } from '@open-design/host';
-import { useAnalytics } from '../analytics/provider';
-import {
-  trackDesignSystemApplyResult,
-  trackNewProjectModalElementClick,
-  trackNewProjectModalSurfaceView,
-  trackNewProjectModalTabClick,
-} from '../analytics/events';
-import type {
-  TrackingDesignSystemApplyTargetKind,
-  TrackingDesignSystemOrigin,
-  TrackingDesignSystemStatusValue,
-} from '@open-design/contracts/analytics';
-
 import { useI18n, useT } from '../i18n';
 import { localizeSkillDescription, localizeSkillName } from '../i18n/content';
 import type { Dict } from '../i18n/types';
@@ -174,66 +160,6 @@ const TAB_LABEL_KEYS: Record<CreateTab, keyof Dict> = {
   other: 'newproj.tabOther',
 };
 
-// Maps the New Project tab + media surface to the apply-result target
-// kind enum. `media` collapses to image/video/audio inside callers;
-// this helper covers the non-media tabs and the live-artifact special
-// case. Media surfaces map case-by-case at the call site.
-function newProjectTabToApplyKind(
-  tab: CreateTab,
-): TrackingDesignSystemApplyTargetKind {
-  switch (tab) {
-    case 'prototype':
-      return 'prototype';
-    case 'deck':
-      return 'slide_deck';
-    case 'live-artifact':
-      return 'live_artifact';
-    case 'media':
-      // Media tab has its own surface picker; the apply emission
-      // happens before the user selects image/video/audio, so we
-      // mark it `unknown` rather than guessing. The picker is also
-      // typically hidden under media but the helper stays total.
-      return 'unknown';
-    case 'template':
-    case 'other':
-      return 'unknown';
-  }
-}
-
-// Maps a `DesignSystemSummary.source` value to the DS origin enum used
-// by `design_system_apply_result.design_system_source`. The summary
-// shape only carries `'built-in' | 'installed' | 'user'`; we map them
-// onto the doc's enum: user → manual_create, built-in → official_preset,
-// installed → template.
-function deriveDesignSystemOrigin(
-  system: DesignSystemSummary | undefined,
-): TrackingDesignSystemOrigin | undefined {
-  if (!system) return undefined;
-  switch (system.source) {
-    case 'user':
-      return 'manual_create';
-    case 'built-in':
-      return 'official_preset';
-    case 'installed':
-      return 'template';
-    default:
-      return 'unknown';
-  }
-}
-
-function deriveDesignSystemStatusValue(
-  system: DesignSystemSummary | undefined,
-): TrackingDesignSystemStatusValue | undefined {
-  if (!system) return undefined;
-  switch (system.status) {
-    case 'draft':
-    case 'published':
-      return system.status;
-    default:
-      return 'unknown';
-  }
-}
-
 const MEDIA_SURFACE_LABEL_KEYS: Record<MediaSurface, keyof Dict> = {
   image: 'newproj.surfaceImage',
   video: 'newproj.surfaceVideo',
@@ -283,9 +209,7 @@ export function NewProjectPanel({
   initialTab = 'prototype',
 }: Props) {
   const t = useT();
-  const { locale } = useI18n();
-  const analytics = useAnalytics();
-  const importInputRef = useRef<HTMLInputElement | null>(null);
+  const { locale } = useI18n();  const importInputRef = useRef<HTMLInputElement | null>(null);
   const [importing, setImporting] = useState(false);
   const [importZipError, setImportZipError] = useState<
     { message: string; details?: string } | null
@@ -297,20 +221,12 @@ export function NewProjectPanel({
     { message: string; details?: string } | null
   >(null);
   const [tab, setTab] = useState<CreateTab>(initialTab);
-  // P0 analytics — fire surface_view once per (panel mount, tab) pair so the
-  // funnel sees both initial open and tab switches without double-counting on
-  // unrelated re-renders. Ref keys on a tab string because the panel is a
-  // long-lived component the modal mounts/unmounts as the user opens/closes it.
+  // Remember the visible tab without reacting to unrelated re-renders.
   const newProjectViewedTabRef = useRef<string | null>(null);
   useEffect(() => {
     if (newProjectViewedTabRef.current === tab) return;
     newProjectViewedTabRef.current = tab;
-    trackNewProjectModalSurfaceView(analytics.track, {
-      page_name: 'home',
-      area: 'new_project_modal',
-      tab_name: createTabToTracking(tab),
-    });
-  }, [tab, analytics.track]);
+  }, [tab]);
   // Media tab consolidates image / video / audio. The active surface picks
   // which set of options + skill resolution applies; submission still maps
   // back to the existing image/video/audio ProjectKind branches so the
@@ -440,25 +356,7 @@ export function NewProjectPanel({
     if (!primary) return;
     if (autoSelectFiredForRef.current === primary) return;
     autoSelectFiredForRef.current = primary;
-    const picked = selectableDesignSystems.find((d) => d.id === primary);
-    trackDesignSystemApplyResult(analytics.track, {
-      page_name: 'home',
-      area: 'design_system_picker',
-      action: 'auto_select',
-      result: 'success',
-      target_project_kind: newProjectTabToApplyKind(tab),
-      design_system_id: primary,
-      design_system_source: deriveDesignSystemOrigin(picked),
-      design_system_status: deriveDesignSystemStatusValue(picked),
-      design_system_applied: true,
-      design_system_selection_mode: 'default',
-      is_default: true,
-      is_auto_selected: true,
-      available_design_system_count: designSystems.length,
-      duration_ms: 0,
-    });
   }, [
-    analytics.track,
     dsSelectionTouched,
     initialDefaultDsSelection,
     selectableDesignSystems,
@@ -636,47 +534,11 @@ export function NewProjectPanel({
     // Only emit when the primary actually changed; secondary reorders
     // inside multi-select don't count as a fresh apply.
     if (previousPrimary === nextPrimary) return;
-    const targetKind = newProjectTabToApplyKind(tab);
-    if (ids.length === 0) {
-      trackDesignSystemApplyResult(analytics.track, {
-        page_name: 'home',
-        area: 'design_system_picker',
-        action: 'clear_selection',
-        result: 'success',
-        target_project_kind: targetKind,
-        design_system_applied: false,
-        design_system_selection_mode: 'none',
-        is_default: false,
-        is_auto_selected: false,
-        available_design_system_count: designSystems.length,
-        duration_ms: 0,
-      });
-      return;
+    if (ids.length === 0) {      return;
     }
     if (!nextPrimary) return;
     const picked = designSystems.find((d) => d.id === nextPrimary);
-    const isDefault = nextPrimary === defaultDesignSystemId;
-    trackDesignSystemApplyResult(analytics.track, {
-      page_name: 'home',
-      area: 'design_system_picker',
-      action: 'select_design_system',
-      result: 'success',
-      target_project_kind: targetKind,
-      design_system_id: nextPrimary,
-      design_system_source: deriveDesignSystemOrigin(picked),
-      design_system_status: deriveDesignSystemStatusValue(picked),
-      design_system_applied: true,
-      design_system_selection_mode: isDefault ? 'default' : 'manual',
-      is_default: isDefault,
-      // `is_auto_selected` reports whether this row was picked by the
-      // app (initial default selection from `initialDefaultDsSelection`)
-      // rather than by the user. Once `dsSelectionTouched` is set we
-      // know any subsequent change came from a click.
-      is_auto_selected: false,
-      available_design_system_count: designSystems.length,
-      duration_ms: 0,
-    });
-  }
+    const isDefault = nextPrimary === defaultDesignSystemId;  }
 
   useEffect(() => {
     const el = tabsRef.current;
@@ -741,21 +603,6 @@ export function NewProjectPanel({
     });
     // Generate the click→result correlation id here so the home_click and
     // the eventual project_create_result share request_id.
-    const requestId = analytics.newRequestId();
-    // v2 emits ui_click element=create on the New project modal; the
-    // project_create_result correlated through `requestId` carries the
-    // project_kind / fidelity payload, so we no longer duplicate them
-    // on the click event.
-    trackNewProjectModalElementClick(
-      analytics.track,
-      {
-        page_name: 'home',
-        area: 'new_project_modal',
-        element: 'create',
-        tab_name: createTabToTracking(tab),
-      },
-      { requestId },
-    );
     onCreate({
       name: trimmedName || autoName(tab, mediaSurface, t),
       skillId: startTemplateId ?? skillIdForTab,
@@ -766,7 +613,6 @@ export function NewProjectPanel({
         ...(workingDir ? { userWorkingDir: workingDir } : {}),
       },
       ...(workingDirToken ? { userWorkingDirToken: workingDirToken } : {}),
-      requestId,
     });
   }
 
@@ -855,14 +701,7 @@ export function NewProjectPanel({
               aria-selected={tab === entry}
               className={`newproj-tab ${tab === entry ? 'active' : ''}`}
               onClick={() => {
-                if (entry !== tab) {
-                  trackNewProjectModalTabClick(analytics.track, {
-                    page_name: 'home',
-                    area: 'new_project_modal',
-                    element: 'tab',
-                    tab_name: createTabToTracking(entry),
-                  });
-                }
+                if (entry !== tab) {                }
                 setTab(entry);
               }}
             >

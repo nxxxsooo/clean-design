@@ -43,6 +43,7 @@ describe('@open-design/contracts package runtime shape', () => {
     expect(pkg.exports?.['./api/handoff']?.types).toBe('./dist/api/handoff.d.ts');
     expect(pkg.exports?.['./critique']?.default).toBe('./dist/critique.mjs');
     expect(pkg.exports?.['./critique']?.types).toBe('./dist/critique.d.ts');
+    expect(pkg.exports).not.toHaveProperty('./analytics');
   });
 
   it('points every runtime export at generated files', async () => {

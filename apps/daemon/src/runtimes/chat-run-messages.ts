@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { PersistedAgentEvent } from '@open-design/contracts';
-import { scanRunEventsForUsageAnalytics } from '../run-analytics-observability.js';
+import { scanRunEventsForUsage } from '../run-usage.js';
 import {
   appendMessageAgentEvent,
   upsertMessage,
@@ -145,28 +145,10 @@ export function runSseEventToPersistedAgentEvent(
   return daemonAgentPayloadToPersistedAgentEvent(record);
 }
 
-/**
- * ACP status labels that are purely protocol-internal. They carry no
- * user-visible detail and must be suppressed at persistence time so that
- * history replay doesn't render empty expandable rows in the assistant
- * process panel.
- */
-const TRANSIENT_ACP_PERSISTED_STATUS_LABELS = new Set([
-  'waiting_for_first_output',
-  'tool_call',
-  'tool_call_update',
-  'session_update',
-]);
-
 export function daemonAgentPayloadToPersistedAgentEvent(data: unknown): PersistedAgentEvent | null {
   if (!isRecord(data)) return null;
   const type = data.type;
   if (type === 'status' && typeof data.label === 'string') {
-    // Filter out transient ACP status events that carry no user-visible content.
-    // The web-side translateAgentEvent already normalizes these for live display,
-    // but the daemon must also suppress them at persistence time so history replay
-    // doesn't show empty expandable rows labelled "tool_call" or "tool_call_update".
-    if (TRANSIENT_ACP_PERSISTED_STATUS_LABELS.has(data.label)) return null;
     const detail =
       typeof data.detail === 'string'
         ? data.detail
@@ -225,7 +207,7 @@ export function daemonAgentPayloadToPersistedAgentEvent(data: unknown): Persiste
   }
   if (type === 'usage') {
     const usage = isRecord(data.usage) ? data.usage : {};
-    const usageAnalytics = scanRunEventsForUsageAnalytics(
+    const usageAnalytics = scanRunEventsForUsage(
       [{ event: 'agent', data }],
       null,
       0,

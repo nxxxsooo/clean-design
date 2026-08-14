@@ -125,12 +125,13 @@ function optionsWithDefaultModel(
 function createLocalAgentDef(
   raw: unknown,
   baseDefs: RuntimeAgentDef[],
+  reservedIds: ReadonlySet<string>,
 ): RuntimeAgentDef | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const profile = raw as Record<string, unknown>;
   const id = typeof profile.id === 'string' ? profile.id.trim() : '';
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(id)) return null;
-  if (baseDefs.some((def) => def.id === id)) return null;
+  if (reservedIds.has(id)) return null;
 
   const hasExplicitBaseAgent =
     typeof profile.baseAgent === 'string' &&
@@ -172,6 +173,8 @@ function createLocalAgentDef(
     ...baseWithoutAuthProbe,
     id,
     name,
+    source: 'local-profile',
+    baseAgentId: base.id as 'claude' | 'codex' | 'antigravity' | 'opencode' | 'pi',
     bin,
     versionArgs: versionArgs.length > 0 ? versionArgs : base.versionArgs,
     ...(helpArgs.length > 0 ? { helpArgs } : {}),
@@ -197,6 +200,7 @@ function createLocalAgentDef(
 
 export function readLocalAgentProfileDefs(
   baseDefs: RuntimeAgentDef[],
+  reservedIds: ReadonlySet<string> = new Set(baseDefs.map((def) => def.id)),
 ): RuntimeAgentDef[] {
   const profilesFile = localAgentProfilesFile();
   if (profilesFile == null) return [];
@@ -214,9 +218,9 @@ export function readLocalAgentProfileDefs(
       ? (parsed as { agents: unknown[] }).agents
       : [];
   const defs: RuntimeAgentDef[] = [];
-  const seen = new Set(baseDefs.map((def) => def.id));
+  const seen = new Set(reservedIds);
   for (const profile of profiles) {
-    const def = createLocalAgentDef(profile, baseDefs);
+    const def = createLocalAgentDef(profile, baseDefs, reservedIds);
     if (!def || seen.has(def.id)) continue;
     seen.add(def.id);
     defs.push(def);

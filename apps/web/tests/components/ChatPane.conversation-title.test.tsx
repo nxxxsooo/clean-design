@@ -5,7 +5,6 @@ import { forwardRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatPane } from '../../src/components/ChatPane';
-import { trackRunFailedToastSurfaceView } from '../../src/analytics/events';
 import type { AppConfig, ChatMessage, Conversation } from '../../src/types';
 
 vi.mock('../../src/i18n', () => ({
@@ -26,15 +25,6 @@ vi.mock('../../src/components/AssistantMessage', () => ({
 vi.mock('../../src/components/ChatComposer', () => ({
   ChatComposer: forwardRef((_props, _ref) => <div data-testid="composer" />),
 }));
-
-vi.mock('../../src/analytics/events', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/analytics/events')>();
-  return {
-    ...actual,
-    trackChatPanelClick: vi.fn(),
-    trackRunFailedToastSurfaceView: vi.fn(),
-  };
-});
 
 afterEach(() => {
   cleanup();
@@ -173,7 +163,7 @@ function failedAssistantMessage({
       {
         kind: 'status',
         label: 'error',
-        detail: 'AMR balance empty',
+        detail: 'Provider unavailable',
         code,
       },
     ],

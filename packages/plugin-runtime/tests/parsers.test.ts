@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { parseManifest } from '../src/parsers/manifest';
-import { parseMarketplace } from '../src/parsers/marketplace';
 import { parseFrontmatter } from '../src/parsers/frontmatter';
 
 describe('parseManifest', () => {
@@ -51,40 +50,6 @@ describe('parseManifest', () => {
     }));
 
     expect(result.ok).toBe(true);
-  });
-});
-
-describe('parseMarketplace', () => {
-  it('accepts a tiny catalog', () => {
-    const result = parseMarketplace(JSON.stringify({
-      specVersion: '1.0.0',
-      name: 'open-design-official',
-      version: '1.0.0',
-      plugins: [{ name: 'make-a-deck', source: 'github:open-design/plugins/make-a-deck', version: '0.1.0' }],
-    }));
-    expect(result.ok).toBe(true);
-  });
-
-  it('rejects when catalog version is missing', () => {
-    const result = parseMarketplace(JSON.stringify({
-      name: 'no-version',
-      plugins: [{ name: 'make-a-deck', source: 'github:open-design/plugins/make-a-deck', version: '0.1.0' }],
-    }));
-    expect(result.ok).toBe(false);
-  });
-
-  it('rejects when plugin entry version is missing', () => {
-    const result = parseMarketplace(JSON.stringify({
-      name: 'missing-plugin-version',
-      version: '1.0.0',
-      plugins: [{ name: 'make-a-deck', source: 'github:open-design/plugins/make-a-deck' }],
-    }));
-    expect(result.ok).toBe(false);
-  });
-
-  it('rejects when plugins is missing', () => {
-    const result = parseMarketplace(JSON.stringify({ name: 'no-plugins', version: '1.0.0' }));
-    expect(result.ok).toBe(false);
   });
 });
 

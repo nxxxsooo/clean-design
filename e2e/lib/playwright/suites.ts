@@ -29,11 +29,9 @@ export const uiP0Groups = {
     files: [
       "ui/entry-chrome-flows.test.ts",
       "ui/entry-configuration-flows.test.ts",
-      "ui/amr-onboarding.test.ts",
+      "ui/local-setup.test.ts",
       "ui/api-empty-response.test.ts",
       "ui/settings-api-protocol.test.ts",
-      "ui/settings-connectors-auth-happy-path.test.ts",
-      "ui/settings-connectors-auth-recovery.test.ts",
     ],
   },
   "project-workspace": {
@@ -52,8 +50,7 @@ export const uiP0Groups = {
     workers: 1,
     files: [
       "ui/real-daemon-run.test.ts",
-      "ui/amr-run-failure-recovery.test.ts",
-      "ui/amr-logout-requires-relogin.test.ts",
+      "ui/run-failure-recovery.test.ts",
       "ui/settings-local-cli-codex-fallback.test.ts",
     ],
   },
@@ -74,9 +71,6 @@ export const visualCiMatrix = [
 ] as const satisfies readonly VisualCiMatrixEntry[];
 
 const uiP0CoverageFiles = [
-  "ui/amr-logout-requires-relogin.test.ts",
-  "ui/amr-onboarding.test.ts",
-  "ui/amr-run-failure-recovery.test.ts",
   "ui/api-empty-response.test.ts",
   "ui/app-design-files.test.ts",
   "ui/app-manual-edit.test.ts",
@@ -85,11 +79,11 @@ const uiP0CoverageFiles = [
   "ui/critical-smoke.test.ts",
   "ui/entry-chrome-flows.test.ts",
   "ui/entry-configuration-flows.test.ts",
+  "ui/local-setup.test.ts",
   "ui/project-management-flows.test.ts",
   "ui/real-daemon-run.test.ts",
+  "ui/run-failure-recovery.test.ts",
   "ui/settings-api-protocol.test.ts",
-  "ui/settings-connectors-auth-happy-path.test.ts",
-  "ui/settings-connectors-auth-recovery.test.ts",
   "ui/settings-local-cli-codex-fallback.test.ts",
   "ui/workspace-keyboard-flows.test.ts",
 ] as const;

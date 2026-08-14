@@ -12,14 +12,21 @@ The macOS application SHALL present the name Clean Design, use bundle identifier
 - **THEN** launching, using, and uninstalling Clean Design does not alter Open Design application data, IPC endpoints, or installation files
 
 ### Requirement: The complete 0.16.1 creation surface remains available
-The product SHALL preserve Home, Studio, system/light/dark themes, projects, previews, canvas editing, assets, `DESIGN.md`, exports, local CLI generation, BYOK generation, catalogs, and the prototype, deck, template, brand, image, video, audio, and other project kinds.
+The product SHALL preserve Home, Studio, system/light/dark themes, projects, previews, canvas editing, assets, `DESIGN.md`, exports, allowlisted local CLI generation, BYOK generation, catalogs, and the prototype, deck, template, brand, image, video, audio, and other project kinds.
 
 #### Scenario: User creates each supported artifact kind
 - **WHEN** a user creates and opens each supported project kind using a valid local CLI or BYOK provider
 - **THEN** the project can be generated, previewed, manually refined, and exported through the native product flow
 
+### Requirement: Local coding CLIs are allowlisted
+The product SHALL expose and execute only Codex, Claude Code, Antigravity (`agy`), OpenCode, and Pi as local coding CLIs. The internal `byok-opencode` adapter SHALL remain available only to the BYOK provider flow. Local profiles SHALL inherit only one of the five allowlisted CLI definitions. All other inherited coding-agent adapters and unused transports MUST be absent from active source, configuration, UI, documentation, fixtures, and tests.
+
+#### Scenario: Runtime discovery completes
+- **WHEN** Clean Design discovers installed coding-agent runtimes and loads valid local profiles
+- **THEN** every returned local CLI is one of the five allowlisted runtimes or a profile derived from one of them, and removed runtime IDs cannot be selected or executed
+
 ### Requirement: Removed platform services are unavailable
-The product MUST NOT expose or invoke accounts, hosted Open Design Cloud, AMR, teams, billing, promotions, news, deployment, auto-update, telemetry, Langfuse, PostHog, external MCP installation, or downstream-agent plugin-host integration.
+The product MUST NOT expose or invoke accounts, hosted cloud services, login or wallet flows, teams, billing, promotions, news, deployment, auto-update, telemetry, external observability services, external MCP installation, or downstream-agent plugin-host integration.
 
 #### Scenario: Product runs with network denial
 - **WHEN** Clean Design starts and the user performs local-only project and editing workflows without selecting an external provider or resource
@@ -38,4 +45,3 @@ The Apple Silicon macOS application SHALL bind local services to loopback, start
 #### Scenario: Application quits
 - **WHEN** the user quits Clean Design
 - **THEN** no Clean Design-owned daemon, web, desktop, or helper process remains running
-

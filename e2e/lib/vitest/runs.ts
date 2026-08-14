@@ -13,9 +13,7 @@ export type ChatRunCreateBody = {
   projectId: string;
   reasoning?: string | null;
   skillId?: string | null;
-  toolBundle?: {
-    mcpServers?: Array<Record<string, unknown>>;
-  };
+  designSystemEnrichment?: boolean;
 };
 
 export type ChatRunStatusBody = {

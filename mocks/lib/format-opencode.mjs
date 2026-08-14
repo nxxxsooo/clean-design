@@ -1,4 +1,4 @@
-// OD-faithful opencode renderer. Emits the JSONL shape OD's
+// Clean Design OpenCode renderer. Emits the JSONL shape the daemon's
 // `json-event-stream.ts:handleOpenCodeEvent` parser accepts.
 
 import { writeFile } from 'node:fs/promises';
@@ -8,7 +8,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 export async function renderAsOpencode(events, opts = {}) {
   const emit = opts.emit ?? (s => process.stdout.write(s));
   const maxSleep = opts.maxSleepMs ?? 3000;
-  const sessionId = opts.sessionId ?? `mock-${Date.now()}`;
+  const sessionId = opts.sessionId ?? 'mock-opencode-session';
   const meta = events.find(e => e.type === 'meta');
 
   const results = new Map();

@@ -1,7 +1,6 @@
 import type { DesktopEvalResult, DesktopScreenshotResult, DesktopStatusSnapshot, SidecarStamp } from "@open-design/sidecar-proto";
 import type { CacheReport } from "../cache.js";
 import type { ToolPackBuildOutput, ToolPackConfig } from "../config.js";
-import type { ToolPackLauncherRuntimeSnapshot } from "../launcher-runtime-snapshot.js";
 import type { INTERNAL_PACKAGES } from "./constants.js";
 
 export type PackedTarballInfo = {
@@ -26,12 +25,10 @@ export type MacPaths = {
   dmgPath: string;
   installApplicationsRoot: string;
   installedAppPath: string;
-  latestMacYmlPath: string;
   mountPoint: string;
   packagedMainPrebundleMetaPath: string;
   packagedMainPrebundlePath: string;
   packagedConfigPath: string;
-  payloadZipPath: string;
   resourceRoot: string;
   systemApplicationsAppPath: string;
   tarballsRoot: string;
@@ -52,9 +49,7 @@ export type MacPackResult = {
   appPath: string;
   cacheReport: CacheReport;
   dmgPath: string | null;
-  latestMacYmlPath: string | null;
   outputRoot: string;
-  payloadPath: string | null;
   resourceRoot: string;
   runtimeNamespaceRoot: string;
   sizeReport: MacSizeReport;
@@ -82,7 +77,6 @@ export type MacStartResult = {
 
 export type MacInspectResult = {
   eval?: DesktopEvalResult;
-  launcher: ToolPackLauncherRuntimeSnapshot;
   screenshot?: DesktopScreenshotResult;
   status: DesktopStatusSnapshot | null;
 };
@@ -128,6 +122,7 @@ export type MacUninstallResult = {
   installedAppPath: string;
   namespace: string;
   removed: boolean;
+  removalPlan: MacRemovalTarget[];
   stop: MacStopResult;
 };
 
@@ -137,8 +132,16 @@ export type MacCleanupResult = {
   outputRoot: string;
   removedOutputRoot: boolean;
   removedRuntimeNamespaceRoot: boolean;
+  removalPlan: MacRemovalTarget[];
   runtimeNamespaceRoot: string;
   stop: MacStopResult;
+};
+
+export type MacRemovalTarget = {
+  exists: boolean;
+  path: string;
+  scope: "data" | "logs" | "product-user-data" | "sidecars";
+  willRemove: boolean;
 };
 
 export type ElectronBuilderTarget = "dir" | "dmg" | "zip";

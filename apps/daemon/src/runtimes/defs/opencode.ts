@@ -16,8 +16,7 @@ export const opencodeAgentDef = {
     // `opencode models` calls can take >8s (network round-trip to the
     // provider registry), so the previous 8s budget timed out and fell back
     // to the hardcoded `fallbackModels`, hiding the user's actual catalog.
-    // 15s matches the listModels budget the rest of the agent defs use
-    // (devin, hermes, kiro, kilo, kimi, trae-cli, vibe, reasonix).
+    // 15s leaves enough room for a remote provider registry round trip.
     listModels: {
       args: ['models'],
       parse: parseLineSeparatedModels,

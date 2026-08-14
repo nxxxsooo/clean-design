@@ -1,4 +1,9 @@
-import { isCredentialReference, type AppConfigPrefs } from '@open-design/contracts';
+import {
+  isCleanDesignInternalAgent,
+  isCleanDesignPublicCliAgent,
+  isCredentialReference,
+  type AppConfigPrefs,
+} from '@open-design/contracts';
 import { MEDIA_PROVIDERS } from '../media/models';
 import { isOpenAICompatible } from '../providers/openai-compatible';
 import type {
@@ -23,6 +28,22 @@ import { stripPlaintextConfigCredentials } from './credentials';
 
 const STORAGE_KEY = 'clean-design:config';
 const CONFIG_MIGRATION_VERSION = 2;
+
+function isPersistablePublicAgentId(agentId: string | null | undefined): boolean {
+  if (agentId == null) return true;
+  if (isCleanDesignPublicCliAgent(agentId)) return true;
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(agentId)
+    && !isCleanDesignInternalAgent(agentId);
+}
+
+function keepPublicAgentRecords<T>(
+  records: Record<string, T> | undefined,
+): Record<string, T> {
+  return Object.fromEntries(
+    Object.entries(records ?? {}).filter(([agentId]) =>
+      isPersistablePublicAgentId(agentId)),
+  );
+}
 
 // Hatched out of the box, but tucked away — the user has to go through
 // either the entry-view "adopt a pet" callout or Settings → Pets to
@@ -624,18 +645,15 @@ export function loadConfig(): AppConfig {
       ...parsed,
       apiProtocolConfigs: { ...(parsed.apiProtocolConfigs ?? {}) },
       mediaProviders: { ...(parsed.mediaProviders ?? {}) },
-      agentModels: { ...(parsed.agentModels ?? {}) },
-      agentCliEnv: { ...(parsed.agentCliEnv ?? {}) },
-      agentCliEnvIntent: { ...(parsed.agentCliEnvIntent ?? {}) },
+      agentModels: keepPublicAgentRecords(parsed.agentModels),
+      agentCliEnv: keepPublicAgentRecords(parsed.agentCliEnv),
+      agentCliEnvIntent: keepPublicAgentRecords(parsed.agentCliEnvIntent),
       accentColor: normalizeAccentColor(parsed.accentColor) ?? DEFAULT_CONFIG.accentColor,
       pet: normalizePet(parsed.pet),
       notifications: normalizeNotifications(parsed.notifications),
     };
     merged.onboardingCompleted = true;
-    if (merged.agentId === 'amr') merged.agentId = null;
-    delete merged.agentModels?.amr;
-    delete merged.agentCliEnv?.amr;
-    delete merged.agentCliEnvIntent?.amr;
+    if (!isPersistablePublicAgentId(merged.agentId)) merged.agentId = null;
 
     let migratedConfig = false;
     const parsedMigrationVersion =
@@ -913,7 +931,9 @@ export function mergeDaemonConfig(
 
   next.onboardingCompleted = true;
   if (daemonConfig.agentId !== undefined) {
-    next.agentId = daemonConfig.agentId === 'amr' ? null : daemonConfig.agentId;
+    next.agentId = isPersistablePublicAgentId(daemonConfig.agentId)
+      ? daemonConfig.agentId
+      : null;
   }
   if (daemonConfig.skillId !== undefined) {
     next.skillId = daemonConfig.skillId;
@@ -922,16 +942,13 @@ export function mergeDaemonConfig(
     next.designSystemId = daemonConfig.designSystemId;
   }
   if (daemonConfig.agentModels) {
-    next.agentModels = {
+    next.agentModels = keepPublicAgentRecords({
       ...(next.agentModels ?? {}),
       ...daemonConfig.agentModels,
-    };
+    });
   }
-  next.agentCliEnv = { ...(daemonConfig.agentCliEnv ?? {}) };
-  next.agentCliEnvIntent = { ...(daemonConfig.agentCliEnvIntent ?? {}) };
-  delete next.agentModels?.amr;
-  delete next.agentCliEnv.amr;
-  delete next.agentCliEnvIntent.amr;
+  next.agentCliEnv = keepPublicAgentRecords(daemonConfig.agentCliEnv);
+  next.agentCliEnvIntent = keepPublicAgentRecords(daemonConfig.agentCliEnvIntent);
   if (daemonConfig.disabledSkills !== undefined) {
     next.disabledSkills = daemonConfig.disabledSkills;
   }

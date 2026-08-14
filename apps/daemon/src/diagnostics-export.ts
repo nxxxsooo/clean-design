@@ -30,7 +30,6 @@ import { spawnEnvForAgent } from './agents.js';
 import { collectBrowserUseDiscoveryFacts } from './browser/index.js';
 
 interface ResolvedAgentHomes {
-  amrOpenCodeHome: string | null;
   claudeConfigDir: string | null;
   codexHome: string | null;
   openCodeXdgDataHome: string | null;
@@ -44,7 +43,6 @@ interface ResolvedAgentHomes {
 // path. Returns nulls on any failure; the collector then falls back to defaults.
 async function resolveAgentHomes(dataDir: string | null | undefined): Promise<ResolvedAgentHomes> {
   const empty: ResolvedAgentHomes = {
-    amrOpenCodeHome: null,
     claudeConfigDir: null,
     codexHome: null,
     openCodeXdgDataHome: null,
@@ -63,7 +61,6 @@ async function resolveAgentHomes(dataDir: string | null | undefined): Promise<Re
       return trimmed && trimmed.length > 0 ? trimmed : null;
     };
     return {
-      amrOpenCodeHome: clean(envFor('amr').OPENCODE_TEST_HOME),
       claudeConfigDir: clean(envFor('claude').CLAUDE_CONFIG_DIR),
       codexHome: clean(envFor('codex').CODEX_HOME),
       // OpenCode resolves its data/log dir from XDG_DATA_HOME; sandbox mode
@@ -84,7 +81,7 @@ export interface DiagnosticsHandlerOptions {
   projectRoot: string;
   /** Directory containing per-run event logs at <runsDir>/<runId>/events.jsonl. */
   runsDir?: string | null;
-  /** Open Design data dir (OD_DATA_DIR), used to locate the AMR OpenCode home. */
+  /** Open Design data dir (OD_DATA_DIR), used to resolve configured CLI homes. */
   dataDir?: string | null;
 }
 
@@ -185,8 +182,6 @@ export function createDiagnosticsExportHandler(options: DiagnosticsHandlerOption
         ...runEventSources,
         ...(await buildAgentCliLogSources({
           homeDir: home,
-          dataDir: options.dataDir ?? null,
-          amrOpenCodeHome: agentHomes.amrOpenCodeHome,
           claudeConfigDir: agentHomes.claudeConfigDir,
           codexHome: agentHomes.codexHome,
           xdgDataHome: agentHomes.openCodeXdgDataHome ?? process.env.XDG_DATA_HOME ?? null,

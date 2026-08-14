@@ -46,8 +46,6 @@ test.beforeEach(async ({ page }) => {
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: {},
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
@@ -65,8 +63,6 @@ test.beforeEach(async ({ page }) => {
           skillId: null,
           designSystemId: null,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
         },
       },
     });
@@ -2568,8 +2564,6 @@ test('[P1] completed background run sends the configured desktop notification', 
           designSystemId: null,
           onboardingCompleted: true,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
           notifications: notificationsConfig,
         }),
       );
@@ -2723,8 +2717,6 @@ test('[P1] failed foreground run still sends the configured desktop notification
           designSystemId: null,
           onboardingCompleted: true,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
           notifications: notificationsConfig,
         }),
       );
@@ -3436,8 +3428,6 @@ async function routeAppConfig(page: Page, override: Record<string, unknown>) {
           skillId: null,
           designSystemId: null,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
           ...override,
         },
       },

@@ -29,8 +29,6 @@ async function seedAppConfig(page: Page) {
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: {},
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
@@ -48,8 +46,6 @@ async function seedAppConfig(page: Page) {
           skillId: null,
           designSystemId: null,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
         },
       },
     });

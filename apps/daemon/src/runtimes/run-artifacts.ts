@@ -29,17 +29,17 @@
 //     on PR #2590).
 //
 // Earlier `server.ts` hard-coded `artifact_count: 0`, which produced
-// uniform zero on PostHog and made the same funnel useless from the
-// other direction.
+// a uniform zero and made the same local summary useless from the other
+// direction.
 
-import type { TrackingRunResult } from '@open-design/contracts/analytics';
+import type { RunResult } from '@open-design/contracts';
 import { emittedRenderableQuestionForm } from '../question-form-detect.js';
 
-// Tool names cover Claude-style, Codex-style, and the ACP/MCP shapes
+// Tool names cover the structured tool-event shapes emitted by retained CLIs
 // the daemon proxies. Keep aligned with the web-side `WRITE_NAMES` /
 // `EDIT_NAMES` sets in `apps/web/src/runtime/file-ops.ts`.
 // Exported so the incremental side-effect ledger
-// (`run-lifecycle-analytics.ts`) pairs write/edit tool calls by the same
+// run-lifecycle ledger pairs write/edit tool calls by the same
 // tool-name set the batch counter uses, keeping the two in lock-step.
 export const WRITE_OR_EDIT_TOOL_NAMES: ReadonlySet<string> = new Set([
   'Write',
@@ -121,10 +121,9 @@ export interface RunEventLike {
 }
 
 // Join key the daemon-stream uses for tool_use → tool_result pairing.
-// Claude / Codex / ACP all stamp the same `id` onto the `tool_use`
+// Retained structured CLIs stamp the same `id` onto the `tool_use`
 // event and reference it via `toolUseId` on the subsequent
-// `tool_result`; see `apps/daemon/src/langfuse-bridge.ts#collectToolCalls`
-// for the canonical implementation.
+// `tool_result`; other run consumers use the same join convention.
 export function readToolUseId(data: unknown): string | null {
   if (!data || typeof data !== 'object') return null;
   const obj = data as { id?: unknown };
@@ -269,20 +268,17 @@ export function reconstructAssistantText(
   return text;
 }
 
-// First-touch activation milestones, written to the PostHog person record via
-// `$set_once` on `run_finished` (the authoritative daemon-side run-outcome
-// event that already carries `artifact_count` and `design_system_created`).
-// Two milestones the growth funnel needs to segment a user without replaying
-// their whole event history:
+// First-touch activation milestones derived from the authoritative daemon-side
+// run outcome. Two milestones let local consumers summarize a project without
+// replaying its whole event history:
 //
 //   - `first_artifact_at`        — first run, observed since this stamp shipped,
 //                                  in which the user produced an artifact
 //   - `first_design_system_at`   — first run, observed since this stamp shipped,
 //                                  in which the user generated a design system
 //
-// IMPORTANT — "first observed since rollout", NOT "first ever". `$set_once`
-// only writes a key that does not already exist on the person, and this is the
-// only writer, so the timestamp is pinned to the user's first qualifying run
+// IMPORTANT — "first observed since rollout", NOT "first ever". The timestamp
+// is pinned to the first qualifying run visible to this local installation
 // AFTER this code ships. For users who onboard after rollout that equals their
 // true first-ever milestone (and a faithful time-to-first-value signal). For
 // the pre-existing installed base it does NOT: a user who already produced an
@@ -314,7 +310,7 @@ export function reconstructAssistantText(
 // Returns undefined when the run crossed no milestone so the caller omits the
 // `$set_once` key entirely rather than shipping an empty object.
 export function deriveActivationMilestones(args: {
-  result: TrackingRunResult;
+  result: RunResult;
   artifactCount: number;
   designSystemCreated: boolean;
   // Whether this run is a design-system generation run. The DS milestone is

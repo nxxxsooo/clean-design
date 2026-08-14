@@ -133,7 +133,7 @@ export const HOME_HERO_CHIPS: ReadonlyArray<HomeHeroChip> = [
     // the bundled `example-web-clone` skill instead of the blank prototype
     // seed. The project still stores `kind: 'prototype'` for preview
     // behavior; `intent: 'web-clone'` routes the scenario plugin and splits
-    // the analytics `project_kind` (see contracts scenario-defaults/events).
+    // the persisted project kind.
     action: {
       kind: 'apply-scenario',
       pluginId: 'example-web-clone',
@@ -228,9 +228,7 @@ export const HOME_HERO_CHIPS: ReadonlyArray<HomeHeroChip> = [
       },
       projectMetadata: {
         kind: 'other',
-        // Analytics-only tag: splits this card's projects out of generic
-        // `other` so `project_kind` reports `document` (matches the task_chip).
-        // No product behavior keys off `intent: 'document'`.
+        // Distinguish document projects from generic `other` artifacts.
         intent: 'document',
       },
     },

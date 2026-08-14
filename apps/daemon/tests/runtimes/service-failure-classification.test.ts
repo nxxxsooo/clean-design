@@ -13,12 +13,12 @@ describe('classifyAgentServiceFailure', () => {
     }
   });
 
-  it('classifies quota / rate-limit / balance failures', () => {
+  it('classifies quota and rate-limit failures', () => {
     for (const text of [
       'Error: 429 Too Many Requests',
       'rate_limit_error: rate limit exceeded',
-      'You exceeded your current quota, please check your plan and billing details.',
-      'Your credit balance is too low to access the Anthropic API.',
+      'You exceeded your current quota.',
+      'The current usage limit has been reached.',
       'insufficient_quota',
     ]) {
       expect(classifyAgentServiceFailure(text)).toBe('RATE_LIMITED');

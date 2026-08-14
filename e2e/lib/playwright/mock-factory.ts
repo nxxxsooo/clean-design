@@ -12,8 +12,6 @@ const STANDARD_CONFIG = {
   designSystemId: null,
   onboardingCompleted: true,
   agentModels: {},
-  privacyDecisionAt: 1,
-  telemetry: { metrics: false, content: false, artifactManifest: false },
 };
 
 const STANDARD_APP_CONFIG = {
@@ -22,8 +20,6 @@ const STANDARD_APP_CONFIG = {
   skillId: null,
   designSystemId: null,
   agentModels: {},
-  privacyDecisionAt: 1,
-  telemetry: { metrics: false, content: false, artifactManifest: false },
 };
 
 const STANDARD_MOCK_AGENT = {
@@ -47,18 +43,6 @@ export async function applyStandardMocks(page: Page): Promise<void> {
   await applyStorageConfig(page);
   await routeMockAgents(page);
   await routeAppConfig(page);
-  await suppressWhatsNew(page);
-}
-
-/** Keep unrelated release announcements from covering the surface under test. */
-export async function suppressWhatsNew(page: Page): Promise<void> {
-  await page.route('**/api/whats-new', async (route) => {
-    if (route.request().method() !== 'GET') {
-      await route.continue();
-      return;
-    }
-    await route.fulfill({ json: { version: 'e2e', id: null, content: null } });
-  });
 }
 
 /** Seed localStorage with the standard config only (no route interception). */

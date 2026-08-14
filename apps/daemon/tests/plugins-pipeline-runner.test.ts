@@ -28,7 +28,7 @@ import { runPipelineForRun } from '../src/plugins/pipeline-runner.js';
 import { listIterationsForRun } from '../src/plugins/pipeline.js';
 import { respondSurface } from '../src/genui/registry.js';
 import { findPendingByRunAndSurfaceId } from '../src/genui/store.js';
-import type { RunEventForAnalyticsObservability } from '../src/run-analytics-observability.js';
+import type { RunEventRecord } from '../src/run-usage.js';
 import {
   clearAtomWorkers,
   registerAtomWorker,
@@ -264,7 +264,7 @@ describe('pipeline-runner: Stage D registry runner integration', () => {
         stages: [{ id: 'compose', atoms: ['unknown-atom'] }],
       },
     });
-    const usageEvents: RunEventForAnalyticsObservability[] = [{
+    const usageEvents: RunEventRecord[] = [{
       id:        1,
       event:     'agent',
       data:      {

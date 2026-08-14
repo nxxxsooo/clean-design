@@ -1,0 +1,135 @@
+import { expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+
+import { T } from '@/timeouts';
+
+export const STORAGE_KEY = 'open-design:config';
+export const OPEN_SETTINGS_LABEL = /Open settings|打开设置|開啟設定|Settings/i;
+export const SETTINGS_MENU_LABEL = /Settings|设置|設定/i;
+
+export async function waitForLoadingToClear(page: Page): Promise<void> {
+  await page
+    .getByText(/Loading Clean Design(?:…|\.\.\.)/)
+    .waitFor({ state: 'hidden', timeout: T.long })
+    .catch(() => {});
+}
+
+export async function gotoEntryHome(page: Page): Promise<void> {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForLoadingToClear(page);
+}
+
+export async function expectWorkspaceReady(page: Page): Promise<void> {
+  await waitForLoadingToClear(page);
+  await expect(page).toHaveURL(/\/projects\//);
+  await expect(page.getByTestId('chat-composer')).toBeVisible();
+  await expect(page.getByTestId('chat-composer-input')).toBeVisible();
+}
+
+export async function openSettingsDialog(page: Page) {
+  await waitForLoadingToClear(page);
+  const dialog = page.getByRole('dialog');
+  const menu = page
+    .getByTestId('entry-settings-menu')
+    .or(page.getByRole('menu', { name: SETTINGS_MENU_LABEL }))
+    .first();
+  const settingsTrigger = page.getByTestId('entry-settings-menu-trigger');
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (await dialog.isVisible().catch(() => false)) return dialog;
+
+    if (await settingsTrigger.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await settingsTrigger.click();
+    } else {
+      await page.getByRole('button', { name: OPEN_SETTINGS_LABEL }).first().click();
+    }
+
+    await expect
+      .poll(
+        async () => {
+          if (await dialog.isVisible().catch(() => false)) return 'dialog';
+          if (await menu.isVisible().catch(() => false)) return 'menu';
+          return 'pending';
+        },
+        { timeout: T.medium },
+      )
+      .not.toBe('pending')
+      .catch(() => {});
+
+    if (await dialog.isVisible().catch(() => false)) return dialog;
+    if (!(await menu.isVisible().catch(() => false))) continue;
+
+    const settingsItem = menu
+      .getByRole('menuitem', { name: SETTINGS_MENU_LABEL })
+      .or(menu.getByRole('button', { name: SETTINGS_MENU_LABEL }))
+      .first();
+    if (!(await settingsItem.isVisible({ timeout: 1_000 }).catch(() => false))) continue;
+    await settingsItem.click();
+    if (await dialog.isVisible({ timeout: T.medium }).catch(() => false)) return dialog;
+  }
+
+  await expect(dialog).toBeVisible({ timeout: T.medium });
+  return dialog;
+}
+
+export async function sendPrompt(page: Page, prompt: string): Promise<void> {
+  const input = page.getByTestId('chat-composer-input');
+  await expect(input).toBeVisible({ timeout: T.medium });
+  await input.click();
+  await input.fill(prompt);
+  await expect(page.getByTestId('chat-send')).toBeEnabled();
+  await input.press('Enter');
+}
+
+export async function createProjectViaApi(page: Page, projectId: string, name: string) {
+  const response = await page.request.post('/api/projects', {
+    data: {
+      id: projectId,
+      name,
+      skillId: null,
+      designSystemId: null,
+      pendingPrompt: null,
+      metadata: { kind: 'prototype' },
+    },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+  return (await response.json()) as { conversationId: string };
+}
+
+export async function gotoProject(page: Page, projectId: string): Promise<void> {
+  try {
+    await page.goto(`/projects/${projectId}`, { waitUntil: 'domcontentloaded' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/ERR_ABORTED|frame was detached/i.test(message)) throw error;
+  }
+  await expectWorkspaceReady(page);
+}
+
+export async function putAppConfig(page: Page, config: Record<string, unknown>): Promise<void> {
+  const response = await page.request.put('/api/app-config', { data: config });
+  expect(response.ok(), await response.text()).toBeTruthy();
+}
+
+export async function readAppConfig(page: Page): Promise<{ config?: Record<string, unknown> }> {
+  const response = await page.request.get('/api/app-config');
+  expect(response.ok(), await response.text()).toBeTruthy();
+  return (await response.json()) as { config?: Record<string, unknown> };
+}
+
+export async function seedBrowserConfig(page: Page, value: Record<string, unknown>): Promise<void> {
+  const payload = { key: STORAGE_KEY, config: value };
+  await page.addInitScript(
+    ({ key, config }) => {
+      window.localStorage.setItem(key, JSON.stringify(config));
+    },
+    payload,
+  );
+  await page
+    .evaluate(({ key, config }) => {
+      window.localStorage.setItem(key, JSON.stringify(config));
+    }, payload)
+    .catch(() => {
+      // Some pre-navigation pages do not expose localStorage yet; the init script covers the next load.
+    });
+}

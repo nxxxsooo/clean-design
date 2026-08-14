@@ -48,7 +48,7 @@ const conversations: Conversation[] = [
 function renderPane(extra: Partial<React.ComponentProps<typeof ChatPane>>) {
   return render(
     <ChatPane
-      projectKindForTracking="prototype"
+      projectKind="prototype"
       messages={[]}
       streaming={false}
       error={null}

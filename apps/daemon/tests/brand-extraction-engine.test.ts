@@ -658,7 +658,7 @@ describe('agent-driven brand extraction engine', () => {
   });
 
   // Regression for the "Spotify" P1: a blocked / give-up origin used to leave the
-  // synthetic "AMR · Working" row counting up forever while the brand stayed
+  // synthetic working row counting up forever while the brand stayed
   // `extracting`. The give-up now retires the row into the actionable terminal so
   // the user sees a next step instead of an infinite clock.
   it('retires the synthetic row into an actionable terminal when the programmatic pass gives up', async () => {

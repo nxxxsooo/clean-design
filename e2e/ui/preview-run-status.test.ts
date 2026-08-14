@@ -6,7 +6,7 @@ import {
   gotoProject,
   putAppConfig,
   seedBrowserConfig,
-} from '@/playwright/amr';
+} from '@/playwright/app';
 import { T } from '@/timeouts';
 
 let codexEnv: Record<string, string>;

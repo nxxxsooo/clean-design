@@ -54,6 +54,7 @@ const residualSkippedDirectories = new Set([
   ".task",
   ".tmp",
   ".vite",
+  ".worktrees",
   "dist",
   "node_modules",
   "out",
@@ -65,9 +66,7 @@ const residualAllowedExactPaths = new Set([
   "packages/agui-adapter/esbuild.config.mjs",
   "packages/contracts/esbuild.config.mjs",
   "packages/diagnostics/esbuild.config.mjs",
-  "packages/download/esbuild.config.mjs",
   "packages/host/esbuild.config.mjs",
-  "packages/launcher-proto/esbuild.config.mjs",
   "packages/metatool/esbuild.config.mjs",
   "packages/platform/esbuild.config.mjs",
   "packages/plugin-runtime/esbuild.config.mjs",
@@ -129,9 +128,8 @@ const residualAllowedPathPrefixes = [
   // (Jane-xiaoer/claude-skill-web-clone). Global skill assets staged into the
   // project cwd for direct `node scripts/...` execution by the agent.
   "skills/web-clone/scripts/",
-  // Replay-based mock CLIs that impersonate local agent CLIs
-  // (opencode/claude/codex/gemini/cursor-agent + ACP family). Need to
-  // be directly executable via Node so `child_process.spawn` from test
+  // Replay-based mock CLIs that impersonate retained local agent CLIs. They
+  // need to be directly executable via Node so `child_process.spawn` from test
   // harnesses and PATH-overlay shells work without any transform step.
   // `mocks/scripts/` holds the maintainer-facing helpers (manifest math,
   // fetch from R2) which are also pure-node single-file modules — same
@@ -139,16 +137,6 @@ const residualAllowedPathPrefixes = [
   "mocks/lib/",
   "mocks/mock-agent.mjs",
   "mocks/scripts/",
-  // OD Clipper - a standalone Chrome MV3 extension subproject (not a pnpm
-  // workspace package, no build step). It ships hand-written browser-loadable
-  // JavaScript (service worker, content script, popup) the same way as the
-  // web notifications service worker; it must not be retypecast to TypeScript.
-  "clipper/",
-  // OD Figma Import - a standalone Figma plugin subproject (no build step,
-  // not a pnpm workspace package). Figma plugins load hand-written
-  // browser-loadable JavaScript (`code.js` sandbox + `ui.html`); same
-  // precedent as the clipper, and it must not be retypecast to TypeScript.
-  "figma-plugin/",
   "test-results/",
   "vendor/",
 ];

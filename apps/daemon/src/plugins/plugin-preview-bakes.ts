@@ -8,19 +8,13 @@
 // (MediaSurface) instead of a live iframe. Plugins without a bake are left
 // untouched and keep the live-iframe path as the fallback.
 //
-// Files + a `manifest.json` live under `<dir>` (OD_PLUGIN_PREVIEWS_DIR, default
-// `<project>/.od/plugin-previews`). CI bakes them and uploads to R2; the daemon
-// serves whatever is present locally at `/api/plugin-previews/<file>`.
+// Files + a `manifest.json` live under `<dir>` (OD_PLUGIN_PREVIEWS_DIR). The
+// daemon serves only clips that are present locally.
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 export const PLUGIN_PREVIEWS_ROUTE = '/api/plugin-previews';
-
-// Public R2 (Cloudflare CDN) origin the baked clips are published to. Used as
-// the default so the packaged desktop app and the web deployment both serve
-// previews with zero configuration; OD_PLUGIN_PREVIEWS_BASE_URL overrides it.
-const DEFAULT_PUBLIC_BASE = 'https://repo-assets.open-design.ai/plugin-previews';
 
 interface BakeEntry {
   video: string;
@@ -38,9 +32,7 @@ export interface BakedPreviewBlock {
 export function resolvePluginPreviewsDir(projectRoot: string): string {
   const env = process.env.OD_PLUGIN_PREVIEWS_DIR;
   if (env) return path.isAbsolute(env) ? env : path.resolve(projectRoot, env);
-  // Default to the checked-in manifest dir (CI commits manifest.json here; the
-  // clips themselves live on R2). Local dev overrides OD_PLUGIN_PREVIEWS_DIR to
-  // a freshly-baked dir that also holds the mp4/poster files for local serving.
+  // Default to the checked-in local preview directory.
   return path.join(projectRoot, 'data', 'plugin-previews');
 }
 
@@ -69,17 +61,10 @@ function loadManifest(dir: string): Record<string, BakeEntry> {
 export function bakedPreviewBlock(id: string, dir: string): BakedPreviewBlock | null {
   const entry = loadManifest(dir)[id];
   if (!entry || !entry.video || !entry.poster) return null;
-  // Resolve where the clip is fetchable from, in priority order:
-  //   1. an explicit OD_PLUGIN_PREVIEWS_BASE_URL override;
-  //   2. the daemon's own /api/plugin-previews route when the clips are on disk
-  //      (local dev / a freshly-baked dir);
-  //   3. the public R2 origin — the default for the packaged desktop app and the
-  //      web deployment, so neither needs any config: the checked-in manifest
-  //      names the clips and they're served from R2's CDN.
-  const envBase = process.env.OD_PLUGIN_PREVIEWS_BASE_URL?.replace(/\/+$/, '');
   const onDisk =
     existsSync(path.join(dir, entry.video)) && existsSync(path.join(dir, entry.poster));
-  const base = envBase || (onDisk ? PLUGIN_PREVIEWS_ROUTE : DEFAULT_PUBLIC_BASE);
+  if (!onDisk) return null;
+  const base = PLUGIN_PREVIEWS_ROUTE;
   return {
     poster: `${base}/${entry.poster}`,
     video: `${base}/${entry.video}`,

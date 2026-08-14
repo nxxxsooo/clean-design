@@ -10,13 +10,12 @@ import { Icon } from './Icon';
 
 // Stable, human-readable provider name used by the source filter and the
 // thumbnail badge. Anchored on `source.repo` (a small enumerated set) rather
-// than `source.author` (dozens of curators). Known upstream repos get a
-// brand-aware label; everything else falls back to the repo's last segment.
+// than `source.author` (dozens of curators). Known catalog families get a
+// readable label; everything else falls back to the repo's last segment.
 const PROVIDER_LABELS: Record<string, string> = {
   'heygen-com/hyperframes': 'HyperFrames',
   'YouMind-OpenLab/awesome-seedance-2-prompts': 'Seedance 2',
   'YouMind-OpenLab/awesome-gpt-image-2': 'GPT Image 2',
-  'nexu-io/open-design': 'Clean Design',
 };
 function providerLabel(source: PromptTemplateSource): string {
   const known = PROVIDER_LABELS[source.repo];
@@ -33,8 +32,8 @@ interface Props {
 
 // Curated prompt-template gallery — one tab per surface (image / video).
 // Layout mirrors the Examples tab: a category filter row + a responsive
-// card grid that lazy-loads remote thumbnails (the upstream README hosts
-// images on CMS / Cloudflare Stream, both public). Each card opens a
+// card grid that lazy-loads the preview URLs supplied by the local catalog.
+// Each card opens a
 // preview modal with the full prompt body and attribution.
 export function PromptTemplatesTab({ surface, templates, onPreview }: Props) {
   const { locale, t } = useI18n();

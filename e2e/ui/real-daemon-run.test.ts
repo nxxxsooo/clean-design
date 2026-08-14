@@ -17,8 +17,6 @@ const GENERATED_HEADING = 'Real Daemon Smoke';
 const EDITED_GENERATED_HEADING = 'Real Daemon Smoke Edited';
 const CHUNKED_FILE = 'chunked-daemon-smoke.html';
 const CHUNKED_HEADING = 'Chunked Daemon Smoke';
-const PLAIN_STREAM_FILE = 'fake-agent-runtime-qwen.html';
-const PLAIN_STREAM_HEADING = 'Fake Agent Runtime qwen';
 const DELAYED_FILE = 'delayed-daemon-smoke.html';
 const DELAYED_HEADING = 'Delayed Daemon Smoke';
 const SLOW_RELOAD_FILE = 'slow-reload-daemon-smoke.html';
@@ -118,20 +116,6 @@ test('[P0] real daemon run persists an artifact streamed across multiple chunks'
   await expect(frame.getByRole('heading', { name: CHUNKED_HEADING })).toBeVisible();
 
   await expectProjectFileToContain(page, projectId, CHUNKED_FILE, CHUNKED_HEADING);
-});
-
-test('[P1] plain stdout daemon runtime persists artifact tags into project files and preview', async ({ page }) => {
-  await page.goto('/');
-  await createProject(page, 'Plain stream artifact smoke', 'qwen');
-  await expectWorkspaceReady(page);
-
-  await sendPrompt(page, 'Fake runtime smoke for qwen');
-
-  const { projectId } = await currentProjectContext(page);
-  await expectProjectFilesToContain(page, projectId, [PLAIN_STREAM_FILE]);
-  await expect(artifactPreview(page)).toBeVisible();
-  await expect(artifactPreviewFrame(page).getByRole('heading', { name: PLAIN_STREAM_HEADING })).toBeVisible();
-  await expectProjectFileToContain(page, projectId, PLAIN_STREAM_FILE, PLAIN_STREAM_HEADING);
 });
 
 test('[P0] real daemon run surfaces process/parser errors in chat', async ({ page }) => {
@@ -517,29 +501,6 @@ test('[P0] empty daemon output fails cleanly, persists after reload, and does no
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expectWorkspaceReady(page);
   await expect(page.getByText(expectedError, { exact: false }).first()).toBeVisible();
-  await expect(runErrorCard(page)).toContainText(expectedError);
-  expect(await listProjectFiles(page, projectId)).toEqual([]);
-});
-
-test('[P1] plain stdout daemon runtime surfaces stderr-only failures without ghost files', async ({ page }) => {
-  await page.goto('/');
-  await createProject(page, 'Plain stderr failure smoke', 'qwen');
-  await expectWorkspaceReady(page);
-
-  await sendPrompt(page, 'Return a stderr-only daemon smoke failure');
-
-  const expectedError = 'stderr-only daemon smoke failure from fake qwen';
-  await expect(runErrorCard(page)).toContainText(expectedError, { timeout: 15_000 });
-
-  const { projectId, conversationId } = await currentProjectContext(page);
-  await expect.poll(async () => {
-    const messages = await listConversationMessages(page, projectId, conversationId);
-    return messages.find((message) => message.role === 'assistant')?.runStatus ?? 'missing';
-  }, { timeout: 15_000 }).toBe('failed');
-  expect(await listProjectFiles(page, projectId)).toEqual([]);
-
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await expectWorkspaceReady(page);
   await expect(runErrorCard(page)).toContainText(expectedError);
   expect(await listProjectFiles(page, projectId)).toEqual([]);
 });
@@ -968,7 +929,7 @@ async function resetDaemonAppConfig(page: Page) {
   const response = await page.request.put('/api/app-config', {
     data: {
       onboardingCompleted: true,
-      agentId: 'mock',
+      agentId: null,
       agentModels: {},
       agentCliEnv: {},
       skillId: null,

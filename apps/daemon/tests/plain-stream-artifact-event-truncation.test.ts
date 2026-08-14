@@ -23,8 +23,8 @@
 //
 // Harness mirrors run-event-truncation-artifact-verdict.test.ts (#5351):
 // drive a real daemon (startServer) over the production HTTP API with a fake
-// `deepseek` CLI (streamFormat: 'plain') injected via
-// agentCliEnv.deepseek.DEEPSEEK_BIN. The fake prints a complete
+// Antigravity CLI (the retained plain-stream runtime) injected via
+// agentCliEnv.antigravity.ANTIGRAVITY_BIN. The fake prints a complete
 // <artifact>...</artifact> block FIRST, then floods >2000 separate stdout
 // chunks (one run event per pipe read), then exits 0.
 //
@@ -50,14 +50,6 @@ type StartedServer = { url: string; server: Server; shutdown?: () => Promise<voi
 type RunStatus = { id: string; status: string; exitCode: number | null };
 
 describe('plain-stream artifact persistence vs run.events ring-buffer truncation (HTTP)', () => {
-  const originalEnv = {
-    POSTHOG_KEY: process.env.POSTHOG_KEY,
-    POSTHOG_HOST: process.env.POSTHOG_HOST,
-    LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY,
-    LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
-    LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL,
-    OPEN_DESIGN_TELEMETRY_RELAY_URL: process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL,
-  };
   let started: StartedServer | null = null;
   let binDir: string | null = null;
 
@@ -69,10 +61,6 @@ describe('plain-stream artifact persistence vs run.events ring-buffer truncation
     started = null;
     if (binDir) await rm(binDir, { recursive: true, force: true });
     binDir = null;
-    for (const [key, value] of Object.entries(originalEnv)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
   });
 
   it('persists an artifact the agent streamed early, even after >2000 later stdout events truncate the ring buffer', async () => {
@@ -80,25 +68,17 @@ describe('plain-stream artifact persistence vs run.events ring-buffer truncation
     // 2x maxEvents with a full event-loop turn per chunk (setTimeout) so the
     // daemon reads each chunk as its own pipe 'data' event => one run event
     // per chunk, truncating the early artifact tag out of the ring buffer.
-    const fakeDeepseek = await writeArtifactThenFloodDeepseek(
+    const fakeAntigravity = await writeArtifactThenFloodAntigravity(
       binDir,
-      'deepseek-trunc',
+      'agy-trunc',
       PROD_DEFAULT_MAX_EVENTS * 2,
     );
 
-    delete process.env.POSTHOG_KEY;
-    delete process.env.POSTHOG_HOST;
-    delete process.env.LANGFUSE_PUBLIC_KEY;
-    delete process.env.LANGFUSE_SECRET_KEY;
-    delete process.env.LANGFUSE_BASE_URL;
-    delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
 
     started = await startServer({ port: 0, returnServer: true }) as StartedServer;
     await putConfig(started.url, {
-      agentId: 'deepseek',
-      agentCliEnv: { deepseek: { DEEPSEEK_BIN: fakeDeepseek } },
-      telemetry: { metrics: false, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
+      agentId: 'antigravity',
+      agentCliEnv: { antigravity: { ANTIGRAVITY_BIN: fakeAntigravity } },
     });
 
     const { run, projectId } = await createAndWaitForRun(started.url);
@@ -154,21 +134,13 @@ describe('plain-stream artifact persistence vs run.events ring-buffer truncation
   // the artifact tag survives in the ring — the fallback must find it.
   it('persists an artifact that first appears after a >8 MiB prefix (accumulator cap must fall back to the ring)', async () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-plain-cap-bin-'));
-    const fakeDeepseek = await writeBigPrefixThenArtifactDeepseek(binDir, 'deepseek-cap');
+    const fakeAntigravity = await writeBigPrefixThenArtifactAntigravity(binDir, 'agy-cap');
 
-    delete process.env.POSTHOG_KEY;
-    delete process.env.POSTHOG_HOST;
-    delete process.env.LANGFUSE_PUBLIC_KEY;
-    delete process.env.LANGFUSE_SECRET_KEY;
-    delete process.env.LANGFUSE_BASE_URL;
-    delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
 
     started = await startServer({ port: 0, returnServer: true }) as StartedServer;
     await putConfig(started.url, {
-      agentId: 'deepseek',
-      agentCliEnv: { deepseek: { DEEPSEEK_BIN: fakeDeepseek } },
-      telemetry: { metrics: false, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
+      agentId: 'antigravity',
+      agentCliEnv: { antigravity: { ANTIGRAVITY_BIN: fakeAntigravity } },
     });
 
     const { run, projectId } = await createAndWaitForRun(started.url);
@@ -211,21 +183,13 @@ describe('plain-stream artifact persistence vs run.events ring-buffer truncation
   // head and tail artifact sets.
   it('persists BOTH artifacts when they straddle the cap boundary (A -> >8 MiB -> B)', async () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-plain-split-bin-'));
-    const fakeDeepseek = await writeArtifactBigPrefixArtifactDeepseek(binDir, 'deepseek-split');
+    const fakeAntigravity = await writeArtifactBigPrefixArtifactAntigravity(binDir, 'agy-split');
 
-    delete process.env.POSTHOG_KEY;
-    delete process.env.POSTHOG_HOST;
-    delete process.env.LANGFUSE_PUBLIC_KEY;
-    delete process.env.LANGFUSE_SECRET_KEY;
-    delete process.env.LANGFUSE_BASE_URL;
-    delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
 
     started = await startServer({ port: 0, returnServer: true }) as StartedServer;
     await putConfig(started.url, {
-      agentId: 'deepseek',
-      agentCliEnv: { deepseek: { DEEPSEEK_BIN: fakeDeepseek } },
-      telemetry: { metrics: false, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
+      agentId: 'antigravity',
+      agentCliEnv: { antigravity: { ANTIGRAVITY_BIN: fakeAntigravity } },
     });
 
     const { run, projectId } = await createAndWaitForRun(started.url);
@@ -259,21 +223,13 @@ describe('plain-stream artifact persistence vs run.events ring-buffer truncation
   // treats them as two separate occurrences and keeps both.
   it('keeps both artifacts when a distinct pair shares the same identifier and body across the cap boundary', async () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-plain-dup-bin-'));
-    const fakeDeepseek = await writeSameBodyArtifactsAcrossCapDeepseek(binDir, 'deepseek-dup');
+    const fakeAntigravity = await writeSameBodyArtifactsAcrossCapAntigravity(binDir, 'agy-dup');
 
-    delete process.env.POSTHOG_KEY;
-    delete process.env.POSTHOG_HOST;
-    delete process.env.LANGFUSE_PUBLIC_KEY;
-    delete process.env.LANGFUSE_SECRET_KEY;
-    delete process.env.LANGFUSE_BASE_URL;
-    delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
 
     started = await startServer({ port: 0, returnServer: true }) as StartedServer;
     await putConfig(started.url, {
-      agentId: 'deepseek',
-      agentCliEnv: { deepseek: { DEEPSEEK_BIN: fakeDeepseek } },
-      telemetry: { metrics: false, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
+      agentId: 'antigravity',
+      agentCliEnv: { antigravity: { ANTIGRAVITY_BIN: fakeAntigravity } },
     });
 
     const { run, projectId } = await createAndWaitForRun(started.url);
@@ -306,25 +262,17 @@ describe('plain-stream artifact persistence vs run.events ring-buffer truncation
   // behavioral assertion above red.
   it('control: persists the same artifact when the run stays under the ring-buffer cap', async () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-plain-trunc-bin-'));
-    const fakeDeepseek = await writeArtifactThenFloodDeepseek(
+    const fakeAntigravity = await writeArtifactThenFloodAntigravity(
       binDir,
-      'deepseek-control',
+      'agy-control',
       0,
     );
 
-    delete process.env.POSTHOG_KEY;
-    delete process.env.POSTHOG_HOST;
-    delete process.env.LANGFUSE_PUBLIC_KEY;
-    delete process.env.LANGFUSE_SECRET_KEY;
-    delete process.env.LANGFUSE_BASE_URL;
-    delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
 
     started = await startServer({ port: 0, returnServer: true }) as StartedServer;
     await putConfig(started.url, {
-      agentId: 'deepseek',
-      agentCliEnv: { deepseek: { DEEPSEEK_BIN: fakeDeepseek } },
-      telemetry: { metrics: false, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
+      agentId: 'antigravity',
+      agentCliEnv: { antigravity: { ANTIGRAVITY_BIN: fakeAntigravity } },
     });
 
     const { run, projectId } = await createAndWaitForRun(started.url);
@@ -347,7 +295,7 @@ describe('plain-stream artifact persistence vs run.events ring-buffer truncation
   });
 });
 
-async function writeArtifactThenFloodDeepseek(
+async function writeArtifactThenFloodAntigravity(
   dir: string,
   name: string,
   flood: number,
@@ -355,8 +303,7 @@ async function writeArtifactThenFloodDeepseek(
   const bin = path.join(dir, name);
   await writeFile(bin, `#!/usr/bin/env node
 const fs = require('node:fs');
-if (process.argv.includes('--version')) { console.log('deepseek 4.0.0-trunc'); process.exit(0); }
-if (process.argv.includes('--help')) { console.log('Usage: deepseek exec [--auto] <prompt>'); process.exit(0); }
+if (process.argv.includes('--version')) { console.log('agy 4.0.0-trunc'); process.exit(0); }
 // Synchronous writes so every chunk is delivered before the process exits.
 const W = (s) => fs.writeSync(1, s);
 // The artifact comes FIRST — a complete, well-formed block.
@@ -382,13 +329,12 @@ W('</artifact>\\n');
 // as a handful of run events — the ring buffer is NOT truncated), THEN a
 // complete artifact block, then exits. This overruns the head-biased stdout
 // accumulator's cap while leaving the artifact tag inside run.events.
-async function writeBigPrefixThenArtifactDeepseek(dir: string, name: string): Promise<string> {
+async function writeBigPrefixThenArtifactAntigravity(dir: string, name: string): Promise<string> {
   const bin = path.join(dir, name);
   // 9 chunks of 1 MiB = 9 MiB prose prefix, comfortably above the 8 MiB cap.
   await writeFile(bin, `#!/usr/bin/env node
 const fs = require('node:fs');
-if (process.argv.includes('--version')) { console.log('deepseek 4.0.0-cap'); process.exit(0); }
-if (process.argv.includes('--help')) { console.log('Usage: deepseek exec [--auto] <prompt>'); process.exit(0); }
+if (process.argv.includes('--version')) { console.log('agy 4.0.0-cap'); process.exit(0); }
 const W = (s) => fs.writeSync(1, s);
 const CHUNK = 'x'.repeat(1024 * 1024);
 for (let i = 0; i < 9; i++) W('prefix-' + i + '-' + CHUNK + '\\n');
@@ -406,12 +352,11 @@ process.exit(0);
 // not truncated), THEN artifact B, then exits. A lands in the capped head
 // accumulator; B is past the cap and survives only in the tail-biased ring —
 // the finalizer must union both.
-async function writeArtifactBigPrefixArtifactDeepseek(dir: string, name: string): Promise<string> {
+async function writeArtifactBigPrefixArtifactAntigravity(dir: string, name: string): Promise<string> {
   const bin = path.join(dir, name);
   await writeFile(bin, `#!/usr/bin/env node
 const fs = require('node:fs');
-if (process.argv.includes('--version')) { console.log('deepseek 4.0.0-split'); process.exit(0); }
-if (process.argv.includes('--help')) { console.log('Usage: deepseek exec [--auto] <prompt>'); process.exit(0); }
+if (process.argv.includes('--version')) { console.log('agy 4.0.0-split'); process.exit(0); }
 const W = (s) => fs.writeSync(1, s);
 W('<artifact identifier="split-a" title="Split A" type="text/html">\\n');
 W('<!doctype html><html><body>artifact A before the cap</body></html>\\n');
@@ -431,12 +376,11 @@ process.exit(0);
 // by a >8 MiB prose block (few large chunks so the ring is not truncated). One
 // lands in the capped head, one past it; both survive in the tail ring. They
 // are genuinely distinct deliverables and both must persist.
-async function writeSameBodyArtifactsAcrossCapDeepseek(dir: string, name: string): Promise<string> {
+async function writeSameBodyArtifactsAcrossCapAntigravity(dir: string, name: string): Promise<string> {
   const bin = path.join(dir, name);
   await writeFile(bin, `#!/usr/bin/env node
 const fs = require('node:fs');
-if (process.argv.includes('--version')) { console.log('deepseek 4.0.0-dup'); process.exit(0); }
-if (process.argv.includes('--help')) { console.log('Usage: deepseek exec [--auto] <prompt>'); process.exit(0); }
+if (process.argv.includes('--version')) { console.log('agy 4.0.0-dup'); process.exit(0); }
 const W = (s) => fs.writeSync(1, s);
 const BLOCK =
   '<artifact identifier="dup" title="Dup" type="text/html">\\n' +
@@ -479,16 +423,13 @@ async function createAndWaitForRun(url: string): Promise<{ run: RunStatus; proje
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-od-analytics-device-id': 'plain-trunc-test',
-      'x-od-analytics-session-id': 'plain-trunc-session',
-      'x-od-analytics-client-type': 'web',
     },
     body: JSON.stringify({
       projectId,
       conversationId: projectBody.conversationId,
       assistantMessageId: `assistant_plain_trunc_${randomUUID()}`,
       clientRequestId: `client_plain_trunc_${randomUUID()}`,
-      agentId: 'deepseek',
+      agentId: 'antigravity',
       message: 'reproduce plain-stream artifact truncation',
       currentPrompt: 'reproduce plain-stream artifact truncation',
     }),

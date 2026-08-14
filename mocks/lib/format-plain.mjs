@@ -1,6 +1,4 @@
-// Plain (raw stdout) renderer. OD's `plain` streamFormat (deepseek /
-// qwen / grok / grok-build) treats stdout as the final assistant
-// response. We emit ONLY the report content.
+// Plain stdout renderer used by the Antigravity (`agy`) mock.
 
 import { writeFile } from 'node:fs/promises';
 

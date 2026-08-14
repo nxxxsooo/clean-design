@@ -24,7 +24,6 @@ import {
   GENERIC_DAEMON_DISCONNECT_MESSAGE,
   listActiveChatRuns,
   listProjectRuns,
-  publishDaemonRunFinishedEvent,
   reattachDaemonRun,
   streamViaDaemon,
 } from '../providers/daemon';
@@ -43,7 +42,6 @@ import {
   writeProjectTextFile,
 } from '../providers/registry';
 import { useProjectFileEvents, type ProjectEvent } from '../providers/project-events';
-import { claimProjectTurnIndex, claimRunTurnIndex } from '../analytics/identity';
 import { useCoalescedCallback } from '../hooks/useCoalescedCallback';
 import {
   type ByokMediaDefaults,
@@ -51,37 +49,6 @@ import {
   type ByokChatProtocol,
   type ResearchOptions,
 } from '@open-design/contracts';
-import {
-  anonymizeArtifactId,
-  artifactKindToTracking,
-  byokProtocolToTracking,
-  executionModeToTracking,
-  projectKindFromMetadataToTracking,
-  projectKindToTracking,
-} from '@open-design/contracts/analytics';
-import type {
-  TrackingArtifactKind,
-  TrackingDesignSystemApplyTargetKind,
-  TrackingDesignSystemOrigin,
-  TrackingDesignSystemStatusValue,
-} from '@open-design/contracts/analytics';
-import { useAnalytics } from '../analytics/provider';
-import {
-  trackArtifactHeaderClick,
-  trackByokPreflightBlocked,
-  trackComposerBarClick,
-  trackDesignSystemApplyResult,
-  trackDesignSystemEnrichClick,
-  trackPageView,
-  trackOnboardingPromptPrefilled,
-  trackOnboardingFirstPromptSent,
-  trackOnboardingFirstGenerationCompleted,
-} from '../analytics/events';
-import { byokPreflightBlockReason } from './byok/preflight';
-import {
-  clearOnboardingSessionId,
-  peekOnboardingSessionId,
-} from '../analytics/onboarding-session';
 import { navigate } from '../router';
 import { agentDisplayName, agentModelDisplayName } from '../utils/agentLabels';
 import { isMacPlatform } from '../utils/platform';
@@ -164,7 +131,6 @@ import {
 import type {
   AppliedPluginSnapshot,
   BrandStatus,
-  ChatAnalyticsEntryFrom,
   ChatSessionMode,
   InstalledPluginRecord,
   RunContextSelection,
@@ -230,18 +196,6 @@ import { DESIGN_SYSTEM_TAB, FileWorkspace, type BrowserOpenRequest } from './Fil
 import { CenteredLoader } from './Loading';
 import type { SettingsSection } from './SettingsDialog';
 import { Toast } from './Toast';
-import { FirstArtifactHint } from './FirstArtifactHint';
-import {
-  consumeOnboardingEntryForProject,
-  hasSentFirstOnboardingPrompt,
-  markFirstOnboardingPromptSent,
-  hasCompletedFirstOnboardingGeneration,
-  markFirstOnboardingGenerationCompleted,
-  type OnboardingEntry,
-} from '../onboarding/onboarding-entry';
-import { producedPreviewableArtifact } from '../onboarding/first-generation';
-import { sentPrefilledPrompt } from '../onboarding/first-prompt';
-import { beginFirstLoop, recordFirstLoopStep } from '../onboarding/first-loop';
 import { BrandReadyPrompt } from './BrandReadyPrompt';
 import { useDesignMdState } from '../hooks/useDesignMdState';
 import { useFinalizeProject } from '../hooks/useFinalizeProject';
@@ -278,14 +232,8 @@ type ProjectChatSendMeta = ChatSendMeta & {
   queueOnly?: boolean;
   retryOfAssistantId?: string;
   sessionMode?: ChatSessionMode;
-  /** Overrides the run_created / run_finished `entry_from` analytics prop for
-   *  this send (e.g. 'resume_continue' from the resumable-failure Continue
-   *  action). Behavior never depends on it; it only shapes PostHog props. */
-  entryFrom?: ChatAnalyticsEntryFrom;
-  /** Marks this send as the AI-optimize (deep enrichment) run so the daemon
-   *  can emit design_system_enrich_result + flag the DS as ai_refined on
-   *  success (tracking spec C14/C15). Daemon mode only. */
-  dsEnrichment?: boolean;
+  /** Marks this send as the AI refinement pass persisted by the daemon. */
+  designSystemEnrichment?: boolean;
   /** Marks a send replayed from the queued-sends drain. */
   queueDrain?: boolean;
 };
@@ -394,6 +342,8 @@ interface Props {
   designTemplates: SkillSummary[];
   designSystems: DesignSystemSummary[];
   daemonLive: boolean;
+  /** Readiness for the private OpenCode adapter used only by BYOK runs. */
+  byokRuntimeAvailable?: boolean;
   onModeChange: (mode: AppConfig['mode']) => void;
   onAgentChange: (id: string) => void;
   onAgentModelChange: (
@@ -460,7 +410,7 @@ const COMMENT_INSPECTOR_PANEL_WIDTH = 320;
 const MIN_WORKSPACE_PANEL_WIDTH = 400;
 const SPLIT_RESIZE_HANDLE_WIDTH = 8;
 const BYOK_OPENCODE_UNAVAILABLE_MESSAGE =
-  'BYOK API runs require OpenCode. Install OpenCode, then rescan local agents in Settings before retrying.';
+  'The bundled BYOK runtime is unavailable. Restart Clean Design, then retry.';
 const BYOK_PROVIDER_REQUIRED_MESSAGE =
   'BYOK OpenCode requires a provider, API key, and model. Complete BYOK settings before starting a run.';
 const BEDROCK_BYOK_UNSUPPORTED_MESSAGE =
@@ -797,8 +747,6 @@ function autoSendContextKey(projectId: string): string {
   return `od:auto-send-context:${projectId}`;
 }
 
-/** Set by the home create flow when its submit already ran the Clean Design
- * Cloud balance gate — the first auto-send must not re-prompt the user. */
 function designSystemAuditAutoRepairKey(projectId: string): string {
   return `od:design-system-audit-auto-repair:${projectId}`;
 }
@@ -1305,6 +1253,7 @@ export function ProjectView({
   designTemplates,
   designSystems,
   daemonLive,
+  byokRuntimeAvailable = false,
   onModeChange,
   onAgentChange,
   onAgentModelChange,
@@ -1329,38 +1278,6 @@ export function ProjectView({
   onDuplicateProject,
 }: Props) {
   const { locale, t } = useI18n();
-  const analytics = useAnalytics();
-  // Onboarding first-generation funnel (spec §11.1). Consume the pending entry
-  // (set by the Home recommendation) exactly once on mount; the refs guard the
-  // two lifecycle events so each fires only for the genuine first send / first
-  // successful generation of a recommendation-started project.
-  const onboardingEntryInitRef = useRef(false);
-  const onboardingEntryRef = useRef<OnboardingEntry | null>(null);
-  // The prompt the recommendation prefilled into the composer. Prefer the seed
-  // cached WITH the onboarding entry (it survives a reopen-before-send, whereas
-  // `project.pendingPrompt` is wiped by `onClearPendingPrompt` on the first
-  // mount); fall back to `pendingPrompt` for the very first mount / any project
-  // without a cached seed. The first-prompt-sent funnel event compares the
-  // actually-sent prompt against this seed so `has_prefilled_prompt` reflects
-  // real behavior — the user is free to edit, clear, or replace the suggestion
-  // before sending (spec §7.4 / §8.2).
-  const onboardingSeedPromptRef = useRef('');
-  if (!onboardingEntryInitRef.current) {
-    onboardingEntryInitRef.current = true;
-    onboardingEntryRef.current = consumeOnboardingEntryForProject(project.id);
-    onboardingSeedPromptRef.current =
-      onboardingEntryRef.current?.seedPrompt ?? (project.pendingPrompt ?? '').trim();
-    // Pin the first-loop ledger for THIS project so later delivery taps (the
-    // FileViewer share/export path) can close the loop by project id without
-    // prop plumbing. Project-scoped, so an unrelated project's delivery never
-    // closes this loop.
-    if (onboardingEntryRef.current) beginFirstLoop(project.id, onboardingEntryRef.current);
-  }
-  // The once-per-project funnel guards live in the onboarding-entry module
-  // (project-keyed), not mount-local refs: ProjectView remounts on every
-  // leave/reopen, and the entry now survives those remounts via its cache, so a
-  // mount-local guard would let the funnel events re-fire on a later
-  // conversation/run of the same project.
   const iframeKeepAlivePool = useIframeKeepAlivePool();
   const handleThemeChange = onThemeChange ?? (() => {});
   const projectDetail = useProjectDetail(project.id);
@@ -1380,14 +1297,6 @@ export function ProjectView({
     : null;
   const projectIsProgrammaticBrandExtraction =
     isProgrammaticBrandExtractionProject(currentProject.metadata);
-  // P0 page_view page_name=chat_panel — fire once per project mount.
-  // ProjectView outlives conversation switches (ChatPane is keyed by
-  // activeConversationId so it remounts when the user switches chats,
-  // but this component does not), so page_view stays a "chat-panel
-  // entry" metric instead of becoming a "conversation switch" count.
-  // Reviewer #2285 (mrcfps, 2026-05-20 04:08) flagged the previous
-  // ChatComposer-level emit for skewing the funnel.
-  const chatPanelPageViewFiredRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const trackedTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
@@ -1417,32 +1326,6 @@ export function ProjectView({
     trackedTimeoutsRef.current.delete(timer);
   }, []);
 
-  useEffect(() => {
-    if (chatPanelPageViewFiredRef.current === project.id) return;
-    chatPanelPageViewFiredRef.current = project.id;
-    trackPageView(analytics.track, { page_name: 'chat_panel' });
-    // Onboarding's 4th step ("生成进度页") fires here, not in
-    // `DesignSystemDetailView`: the Generate path navigates
-    // straight to the project's chat_panel, not to the design
-    // system detail surface. If an onboarding session id is still
-    // in sessionStorage we stamp the funnel's last row here and
-    // clear so any later DS visit doesn't inherit the attribution.
-    // E2E (2026-05-21) confirmed this is the only path users
-    // actually take — observed: page_view chat_panel fires, but
-    // page_view design_system_project never did because that
-    // route isn't visited from the embedded onboarding generate.
-    const onboardingSessionId = peekOnboardingSessionId();
-    if (onboardingSessionId) {
-      trackPageView(analytics.track, {
-        page_name: 'onboarding',
-        area: 'generation_progress',
-        step_index: 'progress',
-        step_name: 'generation',
-        onboarding_session_id: onboardingSessionId,
-      });
-      clearOnboardingSessionId();
-    }
-  }, [analytics.track, project.id]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const conversationsRef = useRef<Conversation[]>([]);
   useEffect(() => {
@@ -1641,25 +1524,6 @@ export function ProjectView({
     tabs: [],
     active: null,
   });
-  // Artifact context for the header actions (settings gear, handoff) that live
-  // in this workspace's header alongside FileViewer's present/share/download.
-  // Mirrors the artifact_id / artifact_kind that FileViewer attaches, derived
-  // from the currently-active file tab, so all artifact_header analytics carry
-  // the same dimensions. Undefined on non-file tabs (e.g. the file list).
-  const headerArtifact = useMemo<{
-    artifact_id?: string;
-    artifact_kind?: TrackingArtifactKind;
-  }>(() => {
-    const activeName = openTabsState.active;
-    const file = activeName
-      ? projectFiles.find((entry) => entry.name === activeName) ?? null
-      : null;
-    if (!file) return {};
-    return {
-      artifact_id: anonymizeArtifactId({ projectId: project.id, fileName: file.name }),
-      artifact_kind: artifactKindToTracking({ fileKind: file.kind ?? null }),
-    };
-  }, [openTabsState.active, projectFiles, project.id]);
   const routeFileNameRef = useRef(routeFileName);
   routeFileNameRef.current = routeFileName;
   const [activeWorkspaceContext, setActiveWorkspaceContext] =
@@ -2485,25 +2349,6 @@ export function ProjectView({
     () => new Set(projectFiles.map((f) => f.name)),
     [projectFiles],
   );
-  // A previewable artifact exists once any HTML file has been produced. Gates
-  // the one-time first-generation hint (spec §8.3); the hint component owns its
-  // own once-ever "seen" budget.
-  const hasPreviewableArtifact = useMemo(() => {
-    for (const name of projectFileNames) {
-      if (name.toLowerCase().endsWith('.html')) return true;
-    }
-    return false;
-  }, [projectFileNames]);
-  // First-loop ledger: the artifact reaching the preview is the 查看 step of the
-  // loop (spec §8.3). Recorded once per project; a no-op for any project not
-  // started from a recommendation.
-  const firstLoopViewedRef = useRef(false);
-  useEffect(() => {
-    if (!hasPreviewableArtifact || firstLoopViewedRef.current) return;
-    if (!onboardingEntryRef.current) return;
-    firstLoopViewedRef.current = true;
-    recordFirstLoopStep(analytics.track, 'artifact_viewed', project.id);
-  }, [hasPreviewableArtifact, analytics.track, project.id]);
   const activeProjectFileName = useMemo(
     () => (
       openTabsState.active && projectFileNames.has(openTabsState.active)
@@ -3213,7 +3058,6 @@ export function ProjectView({
                 ],
               }),
               true,
-              { telemetryFinalized: true },
             );
           } else {
             updateMessageById(
@@ -3230,7 +3074,6 @@ export function ProjectView({
                 ],
               }),
               true,
-              { telemetryFinalized: true },
             );
           }
         }
@@ -3244,7 +3087,6 @@ export function ProjectView({
             events: [...(prev.events ?? []), { kind: 'status', label: 'audit', detail: auditSummary }],
           }),
           true,
-          { telemetryFinalized: true },
         );
         const repairPrompt = buildDesignSystemPackageAuditRepairPrompt(audit);
         if (repairPrompt) {
@@ -3268,7 +3110,6 @@ export function ProjectView({
             ],
           }),
           true,
-          { telemetryFinalized: true },
         );
       }
     },
@@ -3642,7 +3483,6 @@ export function ProjectView({
                 endedAt: prev.endedAt ?? legacyReplayEndedAt,
               }),
               true,
-              { telemetryFinalized: true },
             );
 
             let nextFiles = await refreshProjectFiles();
@@ -3736,7 +3576,6 @@ export function ProjectView({
                   artifactPersistenceError,
                 ),
               true,
-              { telemetryFinalized: true },
             );
             if (deliveryOutcome === 'no_result' || deliveryOutcome === 'delivery_failed') {
               setError(artifactPersistenceError ?? DESIGN_RESULT_MISSING_DETAIL);
@@ -3866,10 +3705,6 @@ export function ProjectView({
           reattachTextBuffersRef.current.delete(textBuffer);
         };
 
-        const shouldPublishRunFinishedEvent =
-          isActiveRunStatus(message.runStatus)
-          || spuriouslyFailedPending
-          || recoverableGenericDisconnectFailed;
         void reattachDaemonRun({
           runId,
           projectId: project.id,
@@ -3877,7 +3712,6 @@ export function ProjectView({
           signal: controller.signal,
           cancelSignal: cancelController.signal,
           initialLastEventId: needsFullReplay ? null : message.lastRunEventId ?? null,
-          publishRunFinishedEvent: shouldPublishRunFinishedEvent,
           handlers: {
             onDelta: (delta) => {
               // First payload from the resumed stream is real recovery — the daemon is
@@ -3959,9 +3793,6 @@ export function ProjectView({
                   endedAt,
                 }),
                 true,
-                latestReattachRunStatus === 'canceled'
-                  ? { telemetryFinalized: true }
-                  : undefined,
               );
               if (latestReattachRunStatus === 'canceled') return;
               void (async () => {
@@ -4061,9 +3892,8 @@ export function ProjectView({
                       },
                       deliveryOutcome,
                       artifactPersistenceError,
-                    ),
+                  ),
                   true,
-                  { telemetryFinalized: true },
                 );
                 if (deliveryOutcome === 'no_result' || deliveryOutcome === 'delivery_failed') {
                   setError(artifactPersistenceError ?? DESIGN_RESULT_MISSING_DETAIL);
@@ -4152,26 +3982,13 @@ export function ProjectView({
                     const producedArtifactToOpen = selectAutoOpenProducedArtifact(produced, autoOpenArtifactOptions);
                     if (producedArtifactToOpen) requestOpenFile(producedArtifactToOpen);
                     if (latestRunStatus?.status === 'succeeded') setError(null);
-                    if (
-                      shouldPublishRunFinishedEvent
-                      && latestRunStatus?.status === 'succeeded'
-                      && typeof latestRunStatus.artifactCount === 'number'
-                    ) {
-                      publishDaemonRunFinishedEvent({
-                        runId,
-                        projectId: project.id,
-                        conversationId: reattachConversationId,
-                        result: 'success',
-                        artifactCount: latestRunStatus.artifactCount,
-                      });
-                    }
                     // Unlike the recoverArtifacts sibling below, this row's
                     // endedAt was already stamped synchronously above (~4041)
                     // at disconnect time — `prev.endedAt` is never null here,
                     // so a `prev.endedAt ?? ...` fallback would never fire.
                     // Overwrite it, but ONLY when the daemon just confirmed
                     // succeeded (the same condition gating the runStatus
-                    // upgrade below) — `latestRunStatus` is already the fresh,
+                    // status transition below) — `latestRunStatus` is already the fresh,
                     // confirmed-terminal probe from above, so its `updatedAt`
                     // is authoritative directly, with no extra re-probe.
                     // Otherwise this row is still not terminal and must keep
@@ -4191,7 +4008,6 @@ export function ProjectView({
                             : prev.endedAt,
                       }),
                       true,
-                      { telemetryFinalized: true },
                     );
                     await auditDesignSystemWorkspaceAfterRun(message.id);
                     onProjectsRefresh();
@@ -4238,18 +4054,6 @@ export function ProjectView({
                   const latestRunStatus = await fetchChatRunStatus(runId).catch(() => null);
                   if (!latestRunStatus || isActiveRunStatus(latestRunStatus.status)) {
                   } else if (latestRunStatus.status === 'succeeded') {
-                    if (
-                      shouldPublishRunFinishedEvent
-                      && typeof latestRunStatus.artifactCount === 'number'
-                    ) {
-                      publishDaemonRunFinishedEvent({
-                        runId,
-                        projectId: project.id,
-                        conversationId: reattachConversationId,
-                        result: 'success',
-                        artifactCount: latestRunStatus.artifactCount,
-                      });
-                    }
                     clearProjectTimeout(backoffTimer);
                     setError(null);
                     // If the resumed stream already replayed some content/events
@@ -4278,7 +4082,6 @@ export function ProjectView({
                             : {}),
                         }),
                         true,
-                        { telemetryFinalized: true },
                       );
                       retryFullReplayAfterCleanup = true;
                     } else {
@@ -4293,7 +4096,6 @@ export function ProjectView({
                             : {}),
                         }),
                         true,
-                        { telemetryFinalized: true },
                       );
                     }
                     skipFinalPersistNow = true;
@@ -4313,7 +4115,6 @@ export function ProjectView({
                           : {}),
                       }),
                       true,
-                      { telemetryFinalized: true },
                     );
                     skipFinalPersistNow = true;
                     completedReattachRunsRef.current.add(runId);
@@ -4332,7 +4133,7 @@ export function ProjectView({
               reattachControllersRef.current.delete(runId);
               reattachCancelControllersRef.current.delete(runId);
               clearCurrentRunStreamingMarker(reattachConversationId, controller, cancelController);
-              if (!skipFinalPersistNow) persistNow({ telemetryFinalized: true });
+              if (!skipFinalPersistNow) persistNow();
               if (retryFullReplayAfterCleanup) setRecoveryTick((t) => t + 1);
               scheduleConversationMessageRefresh(reattachConversationId);
             },
@@ -4385,7 +4186,6 @@ export function ProjectView({
                 message.id,
                 (prev) => ({ ...prev, runStatus: 'failed', endedAt: prev.endedAt ?? Date.now() }),
                 true,
-                { telemetryFinalized: true },
               );
             }
           })
@@ -4560,7 +4360,6 @@ export function ProjectView({
               endedAt: prev.endedAt ?? recoveredArtifactEndedAt,
             }),
             true,
-            { telemetryFinalized: true },
           );
           await auditDesignSystemWorkspaceAfterRun(message.id);
           scheduleConversationMessageRefresh(activeConversationId);
@@ -4735,15 +4534,8 @@ export function ProjectView({
       );
       const byokOpenCodeProvider = byokOpenCodeProviderFromConfig(config);
       const requiresByokPreflight =
-        (config.mode === 'api' && config.apiProtocol !== 'bedrock') ||
-        (config.mode === 'daemon' && config.agentId === 'byok-opencode');
+        config.mode === 'api' && config.apiProtocol !== 'bedrock';
       if (requiresByokPreflight && !byokOpenCodeProvider) {
-        trackByokPreflightBlocked(analytics.track, {
-          source: 'run',
-          reason: byokPreflightBlockReason(config) ?? 'config_invalid',
-          provider_id: byokProtocolToTracking(config.apiProtocol) ?? 'unknown',
-          active_execution_mode: executionModeToTracking(config.mode),
-        });
         setError(BYOK_PROVIDER_REQUIRED_MESSAGE);
         onOpenSettings('execution');
         return false;
@@ -4767,34 +4559,6 @@ export function ProjectView({
           meta: { ...(meta ?? {}), sessionMode: runSessionMode },
         });
         return false;
-      }
-      // First genuine send in a recommendation-started project — the
-      // send-through half of the onboarding funnel. Fires once per project (the
-      // guard is project-scoped so it survives ProjectView remounts), on the
-      // first message of the conversation (not retries). Placed AFTER the
-      // queue-only and busy checks above can abort the send
-      // without creating a run, so emitting earlier would over-count blocked
-      // attempts and then suppress the real retry via the once-only guard. By
-      // here the send is committed to creating a run.
-      if (
-        onboardingEntryRef.current &&
-        !hasSentFirstOnboardingPrompt(project.id) &&
-        !retryTarget &&
-        historyBase.length === 0
-      ) {
-        markFirstOnboardingPromptSent(project.id);
-        const entry = onboardingEntryRef.current;
-        trackOnboardingFirstPromptSent(analytics.track, {
-          entry_source: entry.source,
-          product_type: entry.productType,
-          recommendation_id: entry.recommendationId,
-          // True only when the user sent the prefilled suggestion unmodified;
-          // an edited, cleared, replaced, or starter-swapped prompt (or an
-          // attachments-only send) reports false so the send-through split
-          // stays honest.
-          has_prefilled_prompt: sentPrefilledPrompt(onboardingSeedPromptRef.current, prompt),
-        });
-        recordFirstLoopStep(analytics.track, 'prompt_sent', project.id);
       }
       setChatSeed(null);
       const runConversationId = activeConversationId;
@@ -5273,7 +5037,6 @@ export function ProjectView({
                 ],
               }),
               true,
-              { telemetryFinalized: true },
             );
             if (runCommentAttachments.length > 0) {
               void patchAttachedStatuses(runCommentAttachments, 'failed');
@@ -5355,28 +5118,6 @@ export function ProjectView({
                 }
               }
               const produced = computeProducedFiles(beforeFileNames, nextFiles) ?? [];
-              // Completion half of the onboarding funnel: the first generation
-              // in a recommendation-started project that actually produced a
-              // previewable artifact. Gated on the same artifact-producing
-              // condition as the first-artifact hint (a produced `.html`), so a
-              // `succeeded` run that returned only text or a clarifying question
-              // does NOT count. Fires once.
-              if (
-                ownsCurrentRun &&
-                onboardingEntryRef.current &&
-                !hasCompletedFirstOnboardingGeneration(project.id) &&
-                finalRunStatus === 'succeeded' &&
-                producedPreviewableArtifact(produced)
-              ) {
-                markFirstOnboardingGenerationCompleted(project.id);
-                const entry = onboardingEntryRef.current;
-                trackOnboardingFirstGenerationCompleted(analytics.track, {
-                  entry_source: entry.source,
-                  product_type: entry.productType,
-                  recommendation_id: entry.recommendationId,
-                });
-                recordFirstLoopStep(analytics.track, 'generated', project.id);
-              }
               const traceObjectFiles = computeTraceObjectFiles(
                 beforeFileNames,
                 nextFiles,
@@ -5426,7 +5167,7 @@ export function ProjectView({
                     ? finalized
                     : m,
                 );
-                persistMessage(finalized, { telemetryFinalized: true });
+                persistMessage(finalized);
                 return updated;
               });
               if (deliveryOutcome === 'no_result' || deliveryOutcome === 'delivery_failed') {
@@ -5531,15 +5272,6 @@ export function ProjectView({
                 const latestRunStatus = await fetchChatRunStatus(runIdForGenericDisconnect).catch(() => null);
                 if (!latestRunStatus || isActiveRunStatus(latestRunStatus.status)) {
                 } else if (latestRunStatus.status === 'succeeded') {
-                  if (typeof latestRunStatus.artifactCount === 'number') {
-                    publishDaemonRunFinishedEvent({
-                      runId: runIdForGenericDisconnect,
-                      projectId: project.id,
-                      conversationId: runConversationId,
-                      result: 'success',
-                      artifactCount: latestRunStatus.artifactCount,
-                    });
-                  }
                   clearProjectTimeout(backoffTimer);
                   // Advance the outer endedAt so updateConversationLatestRun()
                   // below adopts this same authoritative terminal timestamp,
@@ -5629,7 +5361,7 @@ export function ProjectView({
           }
           setMessages((curr) => {
             const finalized = curr.find((m) => m.id === assistantId);
-            if (finalized) persistMessage(finalized, { telemetryFinalized: true });
+            if (finalized) persistMessage(finalized);
             return curr;
           });
           if (refreshConversationAfterError) {
@@ -5646,70 +5378,6 @@ export function ProjectView({
           return true;
         }
         const choice = effectiveSelectedAgentChoice;
-        const daemonByokOpenCode = config.agentId === 'byok-opencode';
-        if (daemonByokOpenCode && !agentsById.get('byok-opencode')?.available) {
-          handlers.onError(new Error(BYOK_OPENCODE_UNAVAILABLE_MESSAGE));
-          return true;
-        }
-        // v2 analytics: when the active project is a DS workspace
-        // (created by `prepareCreatedDesignSystemProject`, identifiable
-        // by `metadata.importedFrom === 'design-system'`), every run
-        // started from this composer is a DS-variant run. Pass
-        // analyticsHints so the daemon emits run_created /
-        // run_finished under `page_name=design_system_project`,
-        // `area=design_system_generation`, `project_kind=design_system`.
-        // The first-ever message into a DS workspace is the auto-sent
-        // generation kickoff (entry_from=`onboarding_design_system` is
-        // the doc's name for "DS create flow handed off to the agent");
-        // subsequent messages are review-driven regenerations
-        // (`regenerate_from_review`). Use `messages.length === 0` —
-        // truer than autoSendFirstMessageRef which races StrictMode
-        // remounts + sessionStorage clears.
-        const isDesignSystemWorkspaceProject =
-          project.metadata?.importedFrom === 'design-system';
-        const dsEntryFrom: 'onboarding_design_system' | 'regenerate_from_review' =
-          messages.length === 0
-            ? 'onboarding_design_system'
-            : 'regenerate_from_review';
-        const dsAnalyticsHints = isDesignSystemWorkspaceProject
-          ? {
-              entryFrom: dsEntryFrom,
-              projectKind: 'design_system' as const,
-              designSystemRunContext: {
-                origin: 'manual_create' as const,
-              },
-            }
-          : undefined;
-        // A caller-supplied entry_from (e.g. 'resume_continue' from the
-        // resumable-failure Continue action) overrides the DS default so the
-        // run is attributed to the affordance that started it.
-        //
-        // Session-dimension hints are stamped on every real run creation (this
-        // path only runs for non-queued sends): claim the next 0-based turn
-        // index for this browser session, and flag whether the project already
-        // had a generated artifact (project-scoped) so the run reads as an edit
-        // rather than a first creation.
-        const sessionTurn = claimRunTurnIndex();
-        // Per-project run turn index (project-lifetime, localStorage-backed):
-        // "within THIS project, which prompt / follow-up is this?". Sibling to
-        // the session-wide `sessionTurn` above — claimed together per real run
-        // so run_created / run_finished carry both the session-global and the
-        // project-scoped sequence.
-        const projectTurn = claimProjectTurnIndex(project.id);
-        const hasExistingArtifact = projectFilesRef.current.some(
-          (file) => Boolean(file.artifactManifest),
-        );
-        const runAnalyticsHints = {
-          ...(dsAnalyticsHints ?? {}),
-          ...(meta?.entryFrom ? { entryFrom: meta.entryFrom } : {}),
-          ...(sessionTurn
-            ? { turnIndex: sessionTurn.turnIndex, isFirstRun: sessionTurn.isFirstRun }
-            : {}),
-          ...(projectTurn ? { projectTurnIndex: projectTurn.projectTurnIndex } : {}),
-          ...(meta?.dsEnrichment ? { dsEnrichment: true } : {}),
-          hasExistingArtifact,
-          runtimeType: daemonByokOpenCode ? ('byok' as const) : ('local_cli' as const),
-        };
         void streamViaDaemon({
           agentId: config.agentId,
           history: nextHistory,
@@ -5731,28 +5399,11 @@ export function ProjectView({
             meta?.appliedPluginSnapshotId ?? meta?.appliedPluginSnapshot?.snapshotId ?? null,
           research: meta?.research,
           mediaExecution: mediaExecutionPolicyForProjectMetadata(project.metadata),
-          model: daemonByokOpenCode ? config.model : choice?.model ?? null,
-          reasoning: daemonByokOpenCode ? null : choice?.reasoning ?? null,
-          ...(daemonByokOpenCode && byokOpenCodeProvider
-            ? { byokProvider: byokOpenCodeProvider }
-            : {}),
-          ...(daemonByokOpenCode
-            ? {
-                byokMediaDefaults: byokMediaDefaultsForRun({
-                  imageModelOverride: byokImageModelOverride,
-                  videoModelOverride: byokVideoModelOverride,
-                  speechModelOverride: byokSpeechModelOverride,
-                  speechVoiceOverride: byokSpeechVoiceOverride,
-                  config,
-                  imageModelOptions: byokImageModelOptionsPV,
-                  videoModelOptions: byokVideoModelOptionsPV,
-                  speechModelOptions: byokSpeechModelOptionsPV,
-                }),
-              }
-            : {}),
+          model: choice?.model ?? null,
+          reasoning: choice?.reasoning ?? null,
           titleGeneration: isFirstTurn ? { enabled: true } : undefined,
           locale,
-          ...(runAnalyticsHints ? { analyticsHints: runAnalyticsHints } : {}),
+          designSystemEnrichment: meta?.designSystemEnrichment === true,
           onRunCreated: (runId) => {
             const pinnedAssistant = {
               ...latestAssistantMsg,
@@ -5778,7 +5429,6 @@ export function ProjectView({
                 endedAt: endedAt === undefined ? prev.endedAt : prev.endedAt ?? endedAt,
               }),
               true,
-              runStatus === 'canceled' ? { telemetryFinalized: true } : undefined,
             );
             if (!runMayFinalize) return;
             updateConversationLatestRun(runStatus, endedAt);
@@ -5799,7 +5449,7 @@ export function ProjectView({
           handlers.onError(new Error(BEDROCK_BYOK_UNSUPPORTED_MESSAGE));
           return true;
         }
-        if (!agentsById.get('byok-opencode')?.available) {
+        if (!byokRuntimeAvailable) {
           handlers.onError(new Error(BYOK_OPENCODE_UNAVAILABLE_MESSAGE));
           return true;
         }
@@ -5862,14 +5512,6 @@ export function ProjectView({
           projectFiles,
           { omitNativeImageAttachments: usesAnthropicProxy(config) },
         );
-        // Session-dimension hints on the BYOK-OpenCode path too, so
-        // run_created / run_finished carry the same session-global and
-        // project-scoped run sequence on every retained runtime.
-        const byokSessionTurn = claimRunTurnIndex();
-        const byokProjectTurn = claimProjectTurnIndex(project.id);
-        const byokHasExistingArtifact = projectFilesRef.current.some(
-          (file) => Boolean(file.artifactManifest),
-        );
         void streamViaDaemon({
           agentId: 'byok-opencode',
           history: byokOpenCodeHistory,
@@ -5906,15 +5548,7 @@ export function ProjectView({
           }),
           titleGeneration: isFirstTurn ? { enabled: true } : undefined,
           locale,
-          analyticsHints: {
-            ...(meta?.entryFrom ? { entryFrom: meta.entryFrom } : {}),
-            ...(byokSessionTurn
-              ? { turnIndex: byokSessionTurn.turnIndex, isFirstRun: byokSessionTurn.isFirstRun }
-              : {}),
-            ...(byokProjectTurn ? { projectTurnIndex: byokProjectTurn.projectTurnIndex } : {}),
-            hasExistingArtifact: byokHasExistingArtifact,
-            runtimeType: 'byok',
-          },
+          designSystemEnrichment: meta?.designSystemEnrichment === true,
           onRunCreated: (runId) => {
             const pinnedAssistant = {
               ...latestAssistantMsg,
@@ -5936,7 +5570,6 @@ export function ProjectView({
                 endedAt: endedAt === undefined ? prev.endedAt : prev.endedAt ?? endedAt,
               }),
               true,
-              runStatus === 'canceled' ? { telemetryFinalized: true } : undefined,
             );
             if (!runMayFinalize) return;
             updateConversationLatestRun(runStatus, endedAt);
@@ -5963,6 +5596,7 @@ export function ProjectView({
       config,
       locale,
       agentsById,
+      byokRuntimeAvailable,
       onTouchProject,
       project.id,
       projectDesignSystemId,
@@ -6060,7 +5694,7 @@ export function ProjectView({
     setStreamingConversationId(null);
     setMessages((curr) => {
       const { messages: next, finalized } = finalizeActiveAssistantMessagesOnStop(curr, stoppedAt);
-      for (const message of finalized) persistMessage(message, { telemetryFinalized: true });
+      for (const message of finalized) persistMessage(message);
       return next;
     });
   }, [
@@ -6203,18 +5837,13 @@ export function ProjectView({
     [currentConversationActionDisabled, handleSend],
   );
 
-  // "Continue" on a resumable failed run: send a fresh turn in the same
-  // conversation. For a session-resuming runtime (Claude) the daemon persisted
-  // the failed run's CLI session, so this turn resumes it (`--resume`) and the
-  // agent continues from its committed work instead of restarting. Mirrors the
-  // "Continue remaining tasks" affordance; unlike Retry it does not replay the
-  // prior turn from scratch. Tagged `entryFrom: 'resume_continue'` so
-  // run_created / run_finished can quantify how often resume fires and whether
-  // it recovers (the whole point is to show the mechanism lowers failure rate).
+  // "Continue" on a resumable failed run sends a fresh turn in the same
+  // conversation. Session-resuming runtimes can continue from committed work
+  // instead of replaying the failed turn from scratch.
   const handleResumeRun = useCallback(
     (_assistantMessage: ChatMessage) => {
       if (currentConversationActionDisabled) return;
-      void handleSend(RESUME_CONTINUE_PROMPT, [], [], { entryFrom: 'resume_continue' });
+      void handleSend(RESUME_CONTINUE_PROMPT, [], []);
     },
     [currentConversationActionDisabled, handleSend],
   );
@@ -6274,20 +5903,18 @@ export function ProjectView({
         uploaded = result.uploaded;
       }
       if (commentAttachments.length === 0) {
-        if (uploaded.length > 0) await handleSend('', uploaded, [], { queueOnly: true, entryFrom: 'comment' });
+        if (uploaded.length > 0) await handleSend('', uploaded, [], { queueOnly: true });
         return true;
       }
       for (let i = 0; i < commentAttachments.length; i++) {
         const commentAttachment = commentAttachments[i]!;
         const savedImages = chatAttachmentsFromPreviewCommentImages(commentAttachment.imageAttachments);
         const prompt = commentTaskQuery(commentAttachment);
-        // Comment/board pin → run: tag entry_from='comment' so the dashboard
-        // separates annotation-driven runs from plain composer sends.
         await handleSend(
           prompt,
           mergeChatAttachments(i === 0 ? uploaded : [], savedImages),
           [commentTaskContextAttachment(commentAttachment)],
-          { queueOnly: true, entryFrom: 'comment' },
+          { queueOnly: true },
         );
       }
       return true;
@@ -6738,70 +6365,6 @@ export function ProjectView({
   const handleChangeDesignSystemId = useCallback(
     (nextId: string | null) => {
       if ((projectDesignSystemId ?? null) === nextId) return;
-      // `design_system_apply_result` studio variant. The existing
-      // NewProjectPanel picker fires the same event under
-      // `page_name=home`; this in-project header picker fires under
-      // `page_name=studio` so the funnel sees applies from both
-      // surfaces. `target_project_kind` derives from
-      // `project.metadata.kind`.
-      const target =
-        // NOTE: `target_project_kind` uses the narrower
-        // `TrackingDesignSystemApplyTargetKind` enum, which intentionally does
-        // NOT carry the prototype subtypes (wireframe/mobile) or `document`.
-        // Derive the coarse kind here (subtypes collapse back to `prototype`)
-        // so a Home-created Wireframe/Mobile/Document project never emits a
-        // value outside this field's schema. The fine-grained split only
-        // belongs on `project_kind` (create/run events).
-        (projectKindToTracking(project.metadata?.kind ?? null, project.metadata?.videoModel) ?? 'unknown') as TrackingDesignSystemApplyTargetKind;
-      const picked = nextId
-        ? designSystems.find((d) => d.id === nextId)
-        : null;
-      const origin: TrackingDesignSystemOrigin | undefined = picked
-        ? picked.source === 'user'
-          ? 'manual_create'
-          : picked.source === 'built-in'
-            ? 'official_preset'
-            : picked.source === 'installed'
-              ? 'template'
-              : 'unknown'
-        : undefined;
-      const status: TrackingDesignSystemStatusValue | undefined = picked
-        ? picked.status === 'draft' || picked.status === 'published'
-          ? picked.status
-          : 'unknown'
-        : undefined;
-      if (nextId === null) {
-        trackDesignSystemApplyResult(analytics.track, {
-          page_name: 'studio',
-          area: 'design_system_picker',
-          action: 'clear_selection',
-          result: 'success',
-          target_project_kind: target,
-          design_system_applied: false,
-          design_system_selection_mode: 'none',
-          is_default: false,
-          is_auto_selected: false,
-          available_design_system_count: designSystems.length,
-          duration_ms: 0,
-        });
-      } else {
-        trackDesignSystemApplyResult(analytics.track, {
-          page_name: 'studio',
-          area: 'design_system_picker',
-          action: 'select_design_system',
-          result: 'success',
-          target_project_kind: target,
-          design_system_id: nextId,
-          design_system_source: origin,
-          design_system_status: status,
-          design_system_applied: true,
-          design_system_selection_mode: 'manual',
-          is_default: false,
-          is_auto_selected: false,
-          available_design_system_count: designSystems.length,
-          duration_ms: 0,
-        });
-      }
       const updated: Project = {
         ...project,
         designSystemId: nextId,
@@ -6810,7 +6373,7 @@ export function ProjectView({
       onProjectChange(updated);
       void patchProject(project.id, { designSystemId: nextId });
     },
-    [project, projectDesignSystemId, onProjectChange, designSystems, analytics.track],
+    [project, projectDesignSystemId, onProjectChange],
   );
 
   // Canonical project-type chip shown next to the editable title. We label
@@ -7237,23 +6800,6 @@ export function ProjectView({
         ? undefined
         : (initialDraft?.projectId === project.id ? initialDraft.value : undefined)
     );
-  // Home → Studio handoff confirmation (spec §11.1 onboarding_prompt_prefilled):
-  // the recommendation's first request actually reached this composer. Fires
-  // once, only for recommendation-started projects that arrived with a seed.
-  const onboardingPrefilledFiredRef = useRef(false);
-  useEffect(() => {
-    const entry = onboardingEntryRef.current;
-    if (!entry || onboardingPrefilledFiredRef.current) return;
-    if (typeof chatInitialDraft !== 'string' || chatInitialDraft.trim().length === 0) return;
-    onboardingPrefilledFiredRef.current = true;
-    trackOnboardingPromptPrefilled(analytics.track, {
-      entry_source: entry.source,
-      product_type: entry.productType,
-      recommendation_id: entry.recommendationId,
-      ...(entry.role ? { role: entry.role } : {}),
-      ...(entry.useCases && entry.useCases.length > 0 ? { use_cases: entry.useCases } : {}),
-    });
-  }, [chatInitialDraft, analytics.track]);
   const brandEnrichmentPromptSeed =
     project.pendingPrompt?.trim() ||
     (initialDraft?.projectId === project.id ? initialDraft.value.trim() : '');
@@ -7519,13 +7065,6 @@ export function ProjectView({
     if (brandEnrichmentStarting || config.mode !== 'daemon') return;
     const system = designSystemProject ?? activeDesignSystemSummary;
     const skillIds = installedBrandEnrichmentSkillIds(skills);
-    trackDesignSystemEnrichClick(analytics.track, {
-      page_name: 'design_system_project',
-      area: 'design_system_enrich',
-      element: 'ai_optimize',
-      design_system_id: projectDesignSystemId ?? undefined,
-      project_kind: 'design_system',
-    });
     setBrandEnrichmentStarting(true);
     void handleSend(
       buildBrandEnrichmentPrompt(brandEnrichmentPromptSeed || brandEnrichmentPromptSeedCache, {
@@ -7536,11 +7075,13 @@ export function ProjectView({
       }),
       [],
       [],
-      { ...(skillIds.length > 0 ? { skillIds } : {}), dsEnrichment: true },
+      {
+        ...(skillIds.length > 0 ? { skillIds } : {}),
+        designSystemEnrichment: true,
+      },
     ).finally(() => setBrandEnrichmentStarting(false));
   }, [
     activeDesignSystemSummary,
-    analytics,
     brandEnrichmentPromptSeed,
     brandEnrichmentPromptSeedCache,
     brandEnrichmentStarting,
@@ -7891,45 +7432,9 @@ export function ProjectView({
         agents={agents}
         daemonLive={daemonLive}
         onModeChange={onModeChange}
-        onOpen={() => {
-          trackComposerBarClick(analytics.track, {
-            page_name: 'chat_panel',
-            area: 'chat_composer',
-            element: 'agent_selector_open',
-            ...(project?.id ? { project_id: project.id } : {}),
-          });
-        }}
-        onAgentChange={(id) => {
-          trackComposerBarClick(analytics.track, {
-            page_name: 'chat_panel',
-            area: 'chat_composer',
-            element: 'agent_select',
-            agent_id: id,
-            ...(project?.id ? { project_id: project.id } : {}),
-          });
-          onAgentChange(id);
-        }}
-        onAgentModelChange={(agentId, choice) => {
-          trackComposerBarClick(analytics.track, {
-            page_name: 'chat_panel',
-            area: 'chat_composer',
-            element: 'agent_model_select',
-            agent_id: agentId,
-            ...(choice?.model ? { model_id: choice.model } : {}),
-            ...(project?.id ? { project_id: project.id } : {}),
-          });
-          onAgentModelChange(agentId, choice);
-        }}
-        onApiModelChange={(model) => {
-          trackComposerBarClick(analytics.track, {
-            page_name: 'chat_panel',
-            area: 'chat_composer',
-            element: 'agent_model_select',
-            model_id: model,
-            ...(project?.id ? { project_id: project.id } : {}),
-          });
-          onApiModelChange?.(model);
-        }}
+        onAgentChange={onAgentChange}
+        onAgentModelChange={onAgentModelChange}
+        onApiModelChange={onApiModelChange}
         onOpenSettings={onOpenSettings}
         onRefreshAgents={onRefreshAgents}
         placement="up"
@@ -7977,7 +7482,6 @@ export function ProjectView({
               projectId={project.id}
               sessionMode={activeSessionMode}
               onSessionModeChange={handleActiveConversationSessionModeChange}
-              projectKindForTracking={projectKindFromMetadataToTracking(currentProject.metadata)}
               projectFiles={projectFiles}
               activeProjectFileName={activeProjectFileName}
               hasActiveDesignSystem={!!projectDesignSystemId}
@@ -8003,12 +7507,10 @@ export function ProjectView({
               onRequestPluginDetails={handleOpenContextPluginDetails}
               onRequestDesignSystemDetails={handleOpenContextDesignSystemDetails}
               initialDraft={chatInitialDraft}
-              onboardingStarterPath={onboardingEntryRef.current?.productType ?? null}
               questionFormSubmitDisabled={currentConversationActionDisabled}
               onSubmitQuestionForm={(text, attachments = [], context) => {
                 if (currentConversationActionDisabled) return false;
                 return handleSend(text, attachments, [], {
-                  entryFrom: 'question_answer',
                   ...(context ? { context } : {}),
                 });
               }}
@@ -8162,7 +7664,7 @@ export function ProjectView({
         ) : null}
         <FileWorkspace
           projectId={project.id}
-          projectKind={projectKindFromMetadataToTracking(currentProject.metadata) ?? 'prototype'}
+          projectKind={currentProject.metadata?.kind ?? 'prototype'}
           rootDirName={(() => {
             const baseDir = currentProject.metadata?.baseDir;
             return typeof baseDir === 'string'
@@ -8250,18 +7752,6 @@ export function ProjectView({
                 config={config}
                 onThemeChange={handleThemeChange}
                 onOpenSettings={onOpenSettings}
-                trackingPageName="artifact"
-                onTrackTriggerClick={() => {
-                  // Spec row 52: the settings gear in the artifact header.
-                  // Carry the active artifact so settings slices line up with
-                  // the rest of the artifact_header funnel.
-                  trackArtifactHeaderClick(analytics.track, {
-                    page_name: 'artifact',
-                    area: 'artifact_header',
-                    element: 'settings',
-                    ...headerArtifact,
-                  });
-                }}
               />
             </>
           )}
@@ -8283,14 +7773,6 @@ export function ProjectView({
           initialViewId="kit"
           onClose={() => setContextDesignSystemDetails(null)}
         />
-      ) : null}
-      {/* One-time first-generation hint (spec §8.3) is scoped to the new-user
-          onboarding handoff: only projects started from the Home recommendation
-          carry a consumed `onboardingEntryRef`. Without this gate the hint
-          would surface for any returning user opening an existing HTML project
-          and burn its once-ever localStorage budget outside the intended flow. */}
-      {onboardingEntryRef.current && hasPreviewableArtifact && !currentConversationStreaming ? (
-        <FirstArtifactHint />
       ) : null}
       <AnimatePresence>
         {projectActionsToast && !projectActionsToastInChatPane ? projectActionsToastNode : null}

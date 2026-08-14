@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { installMockOpenDesignHost } from '@open-design/host/testing';
 
 import {
+  fetchAgents,
   fetchAgentsStream,
   fetchAppVersionInfo,
+  fetchByokRuntimeReadiness,
   fetchPluginExampleHtml,
   fetchPluginPreviewHtml,
   fetchProjectDesignSystemPackageAudit,
@@ -56,6 +58,43 @@ describe('fetchAgentsStream', () => {
     expect(onAgent).toHaveBeenCalledWith(agent);
   });
 
+  it('keeps validated public profiles while rejecting internal and retired streamed agents', async () => {
+    const agents = [
+      { id: 'codex', name: 'Codex CLI', bin: 'codex', available: true },
+      {
+        id: 'my-claude-wrapper',
+        name: 'My Claude',
+        bin: 'my-claude',
+        available: true,
+        source: 'local-profile',
+        baseAgentId: 'claude',
+      },
+      { id: 'byok-opencode', name: 'Internal BYOK', bin: 'opencode', available: true },
+      {
+        id: 'internal-wrapper',
+        name: 'Invalid internal wrapper',
+        bin: 'internal-wrapper',
+        available: true,
+        source: 'local-profile',
+        baseAgentId: 'byok-opencode',
+      },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => agentStreamResponse(
+        agents.map((agent) => `event: agent\ndata: ${JSON.stringify(agent)}\n\n`).join('') +
+          'event: done\ndata: {}\n\n',
+      )),
+    );
+    const onAgent = vi.fn();
+
+    await expect(fetchAgentsStream({ onAgent })).resolves.toEqual(agents.slice(0, 2));
+    expect(onAgent.mock.calls.map(([agent]) => agent.id)).toEqual([
+      'codex',
+      'my-claude-wrapper',
+    ]);
+  });
+
   it('throws when the stream emits an error event', async () => {
     vi.stubGlobal(
       'fetch',
@@ -84,6 +123,67 @@ describe('fetchAgentsStream', () => {
 
     await expect(fetchAgentsStream({ onAgent: vi.fn() }))
       .rejects.toThrow('agents stream ended before done');
+  });
+});
+
+describe('agent discovery boundaries', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('filters internal, retired, and unvalidated batch-discovery entries', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({
+        agents: [
+          { id: 'pi', name: 'Pi', bin: 'pi', available: true },
+          {
+            id: 'work-codex',
+            name: 'Work Codex',
+            bin: 'work-codex',
+            available: true,
+            source: 'local-profile',
+            baseAgentId: 'codex',
+          },
+          { id: 'byok-opencode', name: 'Internal BYOK', bin: 'opencode', available: true },
+          { id: 'qwen', name: 'Qwen', bin: 'qwen', available: true },
+          { id: 'unmarked-wrapper', name: 'Unknown', bin: 'unknown', available: true },
+        ],
+      }), { status: 200 })),
+    );
+
+    await expect(fetchAgents()).resolves.toEqual([
+      expect.objectContaining({ id: 'pi' }),
+      expect.objectContaining({ id: 'work-codex' }),
+    ]);
+  });
+
+  it('reads internal BYOK readiness without exposing an agent entry', async () => {
+    const readiness = {
+      available: true,
+      version: '1.2.3',
+      diagnostics: [],
+    };
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify(readiness),
+      { status: 200 },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchByokRuntimeReadiness()).resolves.toEqual(readiness);
+    expect(fetchMock).toHaveBeenCalledWith('/api/byok/runtime-readiness', {
+      cache: 'no-store',
+    });
+  });
+
+  it('fails closed when internal BYOK readiness cannot be read', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}', { status: 503 })),
+    );
+
+    await expect(fetchByokRuntimeReadiness()).resolves.toEqual({ available: false });
   });
 });
 

@@ -160,8 +160,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: WORKSPACE_ROOT,
   reactStrictMode: true,
   // Emit browser sourcemaps so packaged-runtime exceptions can be symbolicated
-  // by PostHog. `tools/pack/src/web-sourcemaps.ts` runs after `next build`
-  // to inject chunk IDs, upload to PostHog, and ALWAYS delete the .map files
+  // by packaged error pages. `tools/pack/src/web-sourcemaps.ts` runs after
+  // `next build` and ALWAYS deletes the .map files
   // before packaging so source never ships inside an installer.
   productionBrowserSourceMaps: true,
   transpilePackages: ['@open-design/components'],

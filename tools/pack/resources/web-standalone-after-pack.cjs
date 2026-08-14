@@ -5,7 +5,7 @@ const path = require("node:path");
 const { promisify } = require("node:util");
 
 const CONFIG_ENV = "OD_TOOLS_PACK_WEB_STANDALONE_HOOK_CONFIG";
-const STANDALONE_RESOURCE_NAME = "open-design-web-standalone";
+const STANDALONE_RESOURCE_NAME = "clean-design-web-standalone";
 const REQUIRED_MODULES = ["next/package.json", "react/package.json", "react-dom/package.json", "styled-jsx/package.json"];
 const execFileAsync = promisify(execFile);
 

@@ -16,7 +16,6 @@ export type RunFailureMessageKey =
   | 'chat.runError.outputInvalidMessage'
   | 'chat.runError.runtimeConfigMessage'
   | 'chat.runError.quotaExhaustedMessage'
-  | 'chat.runError.workspaceCreditsMessage'
   | 'chat.runError.timedOutMessage'
   | 'chat.runError.inactivityTimeoutMessage'
   | 'chat.runError.emptyOutputMessage'
@@ -84,13 +83,6 @@ const DETAIL_GUIDANCE: Record<string, RunFailureUi> = {
     primaryAction: 'none',
     titleKey: 'chat.runError.title.quotaExhausted',
     messageKey: 'chat.runError.quotaExhaustedMessage',
-    secondaryRetry: false,
-    showSwitchCard: false,
-  },
-  workspace_credits_exhausted: {
-    primaryAction: 'none',
-    titleKey: 'chat.runError.title.quotaExhausted',
-    messageKey: 'chat.runError.workspaceCreditsMessage',
     secondaryRetry: false,
     showSwitchCard: false,
   },

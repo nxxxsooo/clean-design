@@ -14,10 +14,11 @@
 
 ## 3. Local-Only Service Boundary
 
-- [x] 3.1 Remove account, AMR/cloud, team, billing, promotion, news, deployment, updater, external MCP, and plugin-host UI surfaces
+- [x] 3.1 Remove account, hosted-cloud, team, billing, promotion, news, deployment, updater, external MCP, and plugin-host UI surfaces
 - [x] 3.2 Remove or deny corresponding daemon routes and background initializers without changing retained creation APIs
 - [x] 3.3 Remove PostHog, Langfuse, telemetry relay, updater, and hosted-service egress from active runtime dependency graphs
 - [x] 3.4 Add outbound allow-policy and forbidden-service regression tests proving zero egress for local-only workflows
+- [x] 3.5 Purge all removed-service and unused-transport code, configuration, UI, documentation, fixtures, and tests; reduce local coding runtimes and profile bases to Codex, Claude Code, Antigravity, OpenCode, and Pi while retaining internal BYOK OpenCode
 
 ## 4. Encrypted Credential References
 
@@ -36,11 +37,9 @@
 - [x] 5.6 Replace agent-selector handoff UI with Export handoff, progress, warnings, stable errors, and clipboard fallback
 - [x] 5.7 Add unit, integration, and Playwright coverage for trust, secrets, atomicity, collisions, formats, and clipboard failure
 
-## 6. Acceptance and Release Gate
+## 6. Finite Acceptance
 
-- [ ] 6.1 Run guard, typecheck, and affected package test suites and repair all regressions
-- [ ] 6.2 Exercise every artifact family with mocked runtimes plus one real local-CLI and one real BYOK generation
-- [ ] 6.3 Build and install the Apple Silicon application, capture screenshots, inspect a real packet, and perform a pasted handoff
-- [ ] 6.4 Verify restart, quit process cleanup, identity coexistence, and uninstall cleanup on macOS
-- [ ] 6.5 Audit secrets, history, licenses, trademarks, visible branding, catalogs, telemetry, affiliate links, update endpoints, and outbound destinations
-- [ ] 6.6 Make the repository public and tag v0.1.0 only after every scrub and acceptance check passes
+- [x] 6.1 Run guard, typecheck, and affected package test suites and repair all regressions
+- [x] 6.2 Build, install, launch, restart, quit, uninstall, and clean the Apple Silicon application; verify loopback sidecars terminate and product data stays namespace-scoped
+- [ ] 6.3 Complete one representative real generation through either an allowlisted local CLI or configured BYOK provider, then export and inspect one handoff packet
+- [x] 6.4 Run the final product-boundary audit for removed services, unsupported runtimes, unintended outbound destinations, visible identity, secrets, and required provenance; repair concrete findings

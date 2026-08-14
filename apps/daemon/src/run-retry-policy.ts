@@ -1,18 +1,18 @@
 import type {
-  TrackingRunFailureCategory,
-  TrackingRunFailureDetail,
-  TrackingRunFailureStage,
-  TrackingRunRetryStrategy,
-  TrackingRunRetrySuppressedReason,
-  TrackingRunResult,
-} from '@open-design/contracts/analytics';
+  RunFailureCategory,
+  RunFailureDetail,
+  RunFailureStage,
+  RunRetryStrategy,
+  RunRetrySuppressedReason,
+  RunResult,
+} from '@open-design/contracts';
 
 // Counts automatic same-run retry attempts, not the initial run. Issue #3543
 // scopes the first implementation to at most one automatic same-run retry, so
 // the default caps retries at a single attempt (attemptCount >= 1 suppresses
 // with attempt_limit_reached).
 export const DEFAULT_SAFE_RUN_RETRY_MAX_ATTEMPTS = 1;
-export const SAFE_RUN_RETRY_STRATEGY: TrackingRunRetryStrategy = 'same_run_transient';
+export const SAFE_RUN_RETRY_STRATEGY: RunRetryStrategy = 'same_run_transient';
 
 // Backoff before a same-run retry restart. An immediate retry of a transient
 // failure — especially a 429 — tends to re-hit the same limit, so the policy
@@ -26,7 +26,7 @@ export const TRANSIENT_RETRY_BASE_DELAY_MS = 500;
 export const RETRY_BACKOFF_MULTIPLIER = 2;
 export const MAX_RETRY_BACKOFF_DELAY_MS = 8_000;
 
-function backoffBaseDelayMs(category: TrackingRunFailureCategory | undefined): number {
+function backoffBaseDelayMs(category: RunFailureCategory | undefined): number {
   return category === 'rate_limit'
     ? RATE_LIMIT_RETRY_BASE_DELAY_MS
     : TRANSIENT_RETRY_BASE_DELAY_MS;
@@ -38,7 +38,7 @@ function backoffBaseDelayMs(category: TrackingRunFailureCategory | undefined): n
 // returns a value in [delay/2, delay].
 export function computeRetryBackoffMs(
   attemptIndex: number,
-  category: TrackingRunFailureCategory | undefined,
+  category: RunFailureCategory | undefined,
   random: () => number = Math.random,
 ): number {
   const exponent = Math.max(0, Math.floor(attemptIndex) - 1);
@@ -51,9 +51,9 @@ export function computeRetryBackoffMs(
 }
 
 export interface RunRetryFailureSignal {
-  failure_category?: TrackingRunFailureCategory;
-  failure_detail?: TrackingRunFailureDetail;
-  failure_stage?: TrackingRunFailureStage;
+  failure_category?: RunFailureCategory;
+  failure_detail?: RunFailureDetail;
+  failure_stage?: RunFailureStage;
   retryable?: boolean;
 }
 
@@ -66,7 +66,7 @@ export interface RunRetrySideEffectState {
 }
 
 export interface RunRetryPolicyInput {
-  result: TrackingRunResult;
+  result: RunResult;
   failure?: RunRetryFailureSignal;
   attemptCount: number;
   maxAttempts?: number;
@@ -80,7 +80,7 @@ export type RunRetryPolicyDecision =
       shouldRetry: true;
       retryAttemptIndex: number;
       retryMaxAttempts: number;
-      retryStrategy: TrackingRunRetryStrategy;
+      retryStrategy: RunRetryStrategy;
       retryReason: 'transient_failure';
       retryDelayMs: number;
     }
@@ -88,8 +88,8 @@ export type RunRetryPolicyDecision =
       shouldRetry: false;
       retryAttemptIndex: number;
       retryMaxAttempts: number;
-      retryStrategy: TrackingRunRetryStrategy;
-      retrySuppressedReason: TrackingRunRetrySuppressedReason;
+      retryStrategy: RunRetryStrategy;
+      retrySuppressedReason: RunRetrySuppressedReason;
     };
 
 function normalizeAttemptCount(attemptCount: number): number {
@@ -104,10 +104,10 @@ function normalizeMaxAttempts(maxAttempts: number | undefined): number {
 }
 
 function transientSuppressedReason(
-  category: TrackingRunFailureCategory | undefined,
-  detail: TrackingRunFailureDetail | undefined,
-  stage: TrackingRunFailureStage | undefined,
-): TrackingRunRetrySuppressedReason | null {
+  category: RunFailureCategory | undefined,
+  detail: RunFailureDetail | undefined,
+  stage: RunFailureStage | undefined,
+): RunRetrySuppressedReason | null {
   if (category === undefined) return 'missing_failure_signal';
   if (category === 'rate_limit') {
     return detail === 'rate_limit_429' ? null : 'non_retryable_category';
@@ -132,9 +132,7 @@ function transientSuppressedReason(
       : 'unsafe_failure_stage';
   }
   if (category === 'process_exit') {
-    return detail === 'agent_protocol_error' ||
-      detail === 'qoder_stop_sequence' ||
-      detail === 'session_resume_expired' ||
+    return detail === 'session_resume_expired' ||
       detail === 'stream_error' ||
       detail === 'fatal_rpc_error'
       ? null
@@ -155,7 +153,7 @@ export function decideSafeRunRetry(
     retryStrategy: SAFE_RUN_RETRY_STRATEGY,
   };
   const suppress = (
-    retrySuppressedReason: TrackingRunRetrySuppressedReason,
+    retrySuppressedReason: RunRetrySuppressedReason,
   ): RunRetryPolicyDecision => ({
     ...base,
     shouldRetry: false,

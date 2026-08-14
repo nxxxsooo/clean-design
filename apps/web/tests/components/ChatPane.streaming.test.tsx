@@ -223,7 +223,7 @@ describe('ChatPane streaming state', () => {
 
   it('balances finished transcripts near the composer without affecting active turns', () => {
     const baseProps = {
-      projectKindForTracking: 'prototype' as const,
+      projectKind: 'prototype' as const,
       streaming: false,
       error: null,
       projectId: 'project-1',
@@ -327,7 +327,7 @@ describe('ChatPane streaming state', () => {
         id: 'assistant-1',
         role: 'assistant',
         content: 'Generation failed',
-        agentId: 'amr',
+        agentId: 'opencode',
         createdAt: 1,
         runId: 'run-trace-123',
         runStatus: 'failed',
@@ -344,7 +344,7 @@ describe('ChatPane streaming state', () => {
 
     render(
       <ChatPane
-        projectKindForTracking="prototype"
+        projectKind="prototype"
         messages={messages}
         streaming={false}
         error={null}
@@ -384,7 +384,7 @@ describe('ChatPane streaming state', () => {
       projectId: 'project-1',
       conversationId: 'conv-1',
       assistantMessageId: 'assistant-1',
-      agentId: 'amr',
+      agentId: 'opencode',
     });
 
     expect(text).toMatch(/^json-rpc id 4: Connection reset by server\n\nClean Design run error diagnostics/);
@@ -402,7 +402,7 @@ describe('ChatPane streaming state', () => {
       projectId: 'project-1',
       conversationId: 'conv-1',
       assistantMessageId: 'assistant-1',
-      agentId: 'amr',
+      agentId: 'opencode',
     });
 
     expect(text).toMatch(/^Connection dropped\. Try again\.\n\nClean Design run error diagnostics/);
@@ -423,7 +423,7 @@ describe('ChatPane streaming state', () => {
 
     render(
       <ChatPane
-        projectKindForTracking="prototype"
+        projectKind="prototype"
         messages={messages}
         streaming={false}
         error={null}
@@ -557,7 +557,7 @@ describe('ChatPane streaming state', () => {
 
     render(
       <ChatPane
-        projectKindForTracking="prototype"
+        projectKind="prototype"
         messages={messages}
         streaming={false}
         error={null}
@@ -622,7 +622,7 @@ describe('ChatPane streaming state', () => {
 
     render(
       <ChatPane
-        projectKindForTracking="prototype"
+        projectKind="prototype"
         messages={messages}
         streaming={false}
         error={null}
@@ -694,7 +694,7 @@ Expected output:
 
     render(
       <ChatPane
-        projectKindForTracking="prototype"
+        projectKind="prototype"
         messages={messages}
         streaming={false}
         error={null}
@@ -719,7 +719,7 @@ Expected output:
     const onSend = vi.fn();
     const { container } = render(
       <ChatPane
-        projectKindForTracking="prototype"
+        projectKind="prototype"
         messages={[
           { id: 'user-1', role: 'user', content: 'Make the landing page', createdAt: 1 },
           { id: 'assistant-1', role: 'assistant', content: 'Done', createdAt: 2 },

@@ -1,12 +1,12 @@
 import type {
-  TrackingRunFailureCategory,
-  TrackingRunFailureDetail,
-  TrackingRunFailureStage,
-  TrackingRunFailureUserAction,
-} from '@open-design/contracts/analytics';
+  RunFailureCategory,
+  RunFailureDetail,
+  RunFailureStage,
+  RunFailureUserAction,
+} from '@open-design/contracts';
 
 import { classifyAgentServiceFailure } from './runtimes/auth.js';
-import type { RunResult, RunStatusForAnalytics } from './run-result.js';
+import type { RunResult, RunStatusSummary } from './run-result.js';
 
 export interface RunEventForFailureClassification {
   event: string;
@@ -15,7 +15,7 @@ export interface RunEventForFailureClassification {
 
 export interface RunFailureClassificationInput {
   result: RunResult;
-  status: RunStatusForAnalytics & {
+  status: RunStatusSummary & {
     error?: string | null;
   };
   errorCode?: string;
@@ -24,11 +24,11 @@ export interface RunFailureClassificationInput {
 }
 
 export interface RunFailureClassification {
-  failure_category: TrackingRunFailureCategory;
-  failure_detail: TrackingRunFailureDetail;
-  failure_stage: TrackingRunFailureStage;
+  failure_category: RunFailureCategory;
+  failure_detail: RunFailureDetail;
+  failure_stage: RunFailureStage;
   retryable: boolean;
-  user_action: TrackingRunFailureUserAction;
+  user_action: RunFailureUserAction;
 }
 
 function normalizeCode(value: string | undefined | null): string {
@@ -99,8 +99,8 @@ function latestRetryable(
 
 function inferFailureStageFromEvents(
   events: RunEventForFailureClassification[] | undefined,
-  fallback: TrackingRunFailureStage,
-): TrackingRunFailureStage {
+  fallback: RunFailureStage,
+): RunFailureStage {
   let sawFirstToken = false;
   let sawToolUse = false;
   let sawOpenTool = false;
@@ -154,7 +154,7 @@ function collectFailureText(input: RunFailureClassificationInput): string {
 }
 
 function isHardQuotaText(text: string): boolean {
-  return /\b(session limit|usage limit|limit reached|quota|billing (?:hard )?limit|insufficient[ _-]?(?:quota|credit|credits|funds)|exceeded your current quota|out of credits|no payment method|requires more credits|can only afford)\b|DAILY_LIMIT_EXCEEDED|用户额度不足|额度不足|预扣费额度失败/i
+  return /\b(session limit|usage limit|limit reached|quota|billing (?:hard )?limit|insufficient[ _-]?(?:quota|credit|credits|funds)|exceeded your current quota)\b|DAILY_LIMIT_EXCEEDED/i
     .test(text);
 }
 
@@ -163,11 +163,6 @@ function isHardQuotaText(text: string): boolean {
 // quota check above misses, so it currently leaks into execution_failed.
 function isRateLimitText(text: string): boolean {
   return /(速率限制|控制请求频率|请求(?:过于)?频繁|rate[ _-]?limit|too many requests)/i
-    .test(text);
-}
-
-function isWorkspaceCreditsText(text: string): boolean {
-  return /\b(?:your )?workspace is out of credits\b|\badd credits to continue\b|\bask your workspace owner to refill\b|\bno payment method\b|\brequires more credits\b/i
     .test(text);
 }
 
@@ -216,21 +211,14 @@ function isSpawnFailureText(text: string): boolean {
   return /\bspawn failed: spawn\b/i.test(text);
 }
 
-function isAgentProtocolErrorText(text: string): boolean {
+function isRpcProtocolErrorText(text: string): boolean {
   return /\bjson-rpc id \d+: Internal error\b/i.test(text) ||
-    /\bACP session exited before completion\b/i.test(text) ||
-    /\bQoder run failed: (?:stop_sequence|end_turn)\b/i.test(text) ||
     /\bthread\/start failed\b/i.test(text) ||
     /\bfailed to parse request\b/i.test(text);
 }
 
 function isFabricatedRoleMarkerText(text: string): boolean {
   return /\bmodel emitted fabricated role marker\b/i.test(text);
-}
-
-function isPermissionRequestNotFoundText(text: string): boolean {
-  return /\b(PermissionNotFoundError|Permission request not found|permissions\/per_[A-Za-z0-9_-]+\s+returned\s+HTTP\s+404)\b/i
-    .test(text);
 }
 
 function isAuthDetailText(text: string): boolean {
@@ -250,7 +238,7 @@ function isSessionResumeExpiredText(text: string): boolean {
     /\bsession [\w-]+ not found\b/i.test(text);
 }
 
-function promptTooLargeDetail(text: string): TrackingRunFailureDetail | null {
+function promptTooLargeDetail(text: string): RunFailureDetail | null {
   if (
     /\b(?:Payload Too Large|Request Entity Too Large|request entity too large|request body exceeds configured limit)\b/i.test(text) ||
     /\[code=request_too_large\]/i.test(text)
@@ -267,7 +255,7 @@ function promptTooLargeDetail(text: string): TrackingRunFailureDetail | null {
   return null;
 }
 
-function clientRequestFailureDetail(text: string): TrackingRunFailureDetail | null {
+function clientRequestFailureDetail(text: string): RunFailureDetail | null {
   if (
     /\bsource\.media_type\b[\s\S]*\bInvalid enum value\b[\s\S]*\bapplication\/pdf\b/i.test(text) ||
     /\bapplication\/pdf\b[\s\S]*\bexpected\b[\s\S]*\bimage\/(?:jpeg|png|gif|webp)\b/i.test(text)
@@ -293,7 +281,7 @@ function clientRequestFailureDetail(text: string): TrackingRunFailureDetail | nu
 
 function isUpstreamDetailText(text: string): boolean {
   return isUpstreamClientErrorText(text) ||
-    /\b(stream disconnected before completion|(?:stream|upstream) idle timeout|response\.completed|Transport error: network error|Upstream request failed|websocket closed|socket connection was closed unexpectedly|tls handshake eof|Connection reset by (?:peer|server)|TLS close_notify|Broken pipe|remote host|远程主机强迫关闭|No route to host|Connection refused|ConnectionRefused|error sending request|Provider returned error|high demand|model is at capacity|selected model is at capacity|temporarily unavailable|upstream_error|http2: response body closed|peer closed connection|incomplete chunked read|Client network socket disconnected before secure TLS connection|Connection failed repeatedly|lost its connection to (?:the Anthropic API|the configured custom Anthropic endpoint)|Server error mid-response|empty or malformed response|Unexpected server error|Streaming response failed|Failed to process error response|AMR model catalog is (?:temporarily )?unavailable)\b/i
+    /\b(stream disconnected before completion|(?:stream|upstream) idle timeout|response\.completed|Transport error: network error|Upstream request failed|websocket closed|socket connection was closed unexpectedly|tls handshake eof|Connection reset by (?:peer|server)|TLS close_notify|Broken pipe|remote host|远程主机强迫关闭|No route to host|Connection refused|ConnectionRefused|error sending request|Provider returned error|high demand|model is at capacity|selected model is at capacity|temporarily unavailable|upstream_error|http2: response body closed|peer closed connection|incomplete chunked read|Client network socket disconnected before secure TLS connection|Connection failed repeatedly|lost its connection to (?:the Anthropic API|the configured custom Anthropic endpoint)|Server error mid-response|empty or malformed response|Unexpected server error|Streaming response failed|Failed to process error response|model catalog is (?:temporarily )?unavailable)\b/i
       .test(text);
 }
 
@@ -323,7 +311,7 @@ function isByokOpenCodeProviderNotFoundText(
     /\bstatusCode[\"']?\s*:\s*404\b/i.test(text);
 }
 
-function modelUnavailableDetail(text: string): TrackingRunFailureDetail | null {
+function modelUnavailableDetail(text: string): RunFailureDetail | null {
   if (/\brequires a newer version of codex\b|\bunknown option [`'"]?--[\w-]+[`'"]?\b/i.test(text)) {
     return 'cli_version_incompatible';
   }
@@ -346,7 +334,7 @@ function modelUnavailableDetail(text: string): TrackingRunFailureDetail | null {
   return null;
 }
 
-function authDetail(text: string): TrackingRunFailureDetail {
+function authDetail(text: string): RunFailureDetail {
   if (/\brefresh token (?:was )?(?:already used|expired|invalid)|access token could not be refreshed\b/i
     .test(text)) {
     return 'refresh_token_reused';
@@ -368,8 +356,8 @@ function authDetail(text: string): TrackingRunFailureDetail {
   return 'auth_required';
 }
 
-function upstreamDetail(text: string): TrackingRunFailureDetail {
-  if (/\b(AMR model catalog is (?:temporarily )?unavailable|no endpoints found that support tool use|provider routing)\b/i.test(text)) {
+function upstreamDetail(text: string): RunFailureDetail {
+  if (/\b(model catalog is (?:temporarily )?unavailable|no endpoints found that support tool use|provider routing)\b/i.test(text)) {
     return 'provider_routing_error';
   }
   if (/\bhigh demand|temporary errors|model is at capacity|selected model is at capacity\b/i.test(text)) return 'provider_high_demand';
@@ -446,14 +434,14 @@ function signalInterruptClassification(
   return classification('process_exit', 'terminated_unknown', 'child_close', false, 'none');
 }
 
-function toolErrorDetail(text: string): TrackingRunFailureDetail {
+function toolErrorDetail(text: string): RunFailureDetail {
   return 'tool_error';
 }
 
 function processExitDetail(
   errorCode: string,
   text: string,
-): TrackingRunFailureDetail {
+): RunFailureDetail {
   if (isCliNotInstalledText(text) || errorCode === 'AGENT_UNAVAILABLE') {
     return 'cli_not_installed';
   }
@@ -468,11 +456,8 @@ function processExitDetail(
   if (isProcessCrashText(text)) return 'process_crashed';
   if (isAgentConfigInvalidText(text)) return 'agent_config_invalid';
   if (isFabricatedRoleMarkerText(text)) return 'fabricated_role_marker';
-  if (/\bQoder run failed: stop_sequence\b/i.test(text)) {
-    return 'qoder_stop_sequence';
-  }
-  if (isAgentProtocolErrorText(text)) {
-    return 'agent_protocol_error';
+  if (isRpcProtocolErrorText(text)) {
+    return 'fatal_rpc_error';
   }
   if (errorCode.startsWith('AGENT_EXIT_')) return 'exit_code';
   if (errorCode === 'AGENT_TERMINATED_UNKNOWN') return 'terminated_unknown';
@@ -495,11 +480,11 @@ function isProcessCrashText(text: string): boolean {
 // - `no_avx2`: the CPU-feature line Bun's crash banner prints on such
 //   machines. Unconditional — the feature line itself is the proof.
 // - Windows STATUS_ILLEGAL_INSTRUCTION (hex 0xC000001D or Go/Node's decimal
-//   exit-status rendering 3221225501), but ONLY inside vela's bundled-opencode
-//   startup wrapper text ("start opencode server" / "opencode exited before
+//   exit-status rendering 3221225501), but only inside the OpenCode startup
+//   wrapper text ("start opencode server" / "opencode exited before
 //   readiness"). The raw status code is a generic Windows SIGILL that any
 //   agent binary could die with for unrelated reasons; every bannerless
-//   production trace carries the vela wrapper, so the gate costs no recall.
+//   supported startup trace carries this wrapper, so the gate costs no recall.
 // A bare "Illegal instruction" line is deliberately NOT matched: any
 // unrelated SIGILL (a runtime bug on an AVX2-capable machine) would then be
 // mislabeled as a processor limitation and lose its retry. The same binary on
@@ -518,7 +503,7 @@ function isCpuUnsupportedCrashText(text: string): boolean {
 // that ended the child as `rpc_close_reason`. When the agent-level error code is
 // the generic `AGENT_EXECUTION_FAILED` and no text pattern matched, this close
 // reason is the only remaining signal that distinguishes a mid-stream agent
-// error from a bare non-zero exit from an ACP fatal — so we surface it instead
+// error from a bare non-zero exit or fatal RPC close — so we surface it instead
 // of collapsing all three into one opaque `execution_failed` bucket.
 function readRuntimeCloseReason(
   events: RunEventForFailureClassification[] = [],
@@ -542,7 +527,7 @@ function readRuntimeCloseReason(
 // absorbs a reason we haven't reasoned about.
 function executionFailedDetail(
   events: RunEventForFailureClassification[] | undefined,
-): TrackingRunFailureDetail {
+): RunFailureDetail {
   switch (readRuntimeCloseReason(events)) {
     case 'stream_error':
       return 'stream_error';
@@ -561,7 +546,7 @@ function executionFailedDetail(
  * scratch. True only for transient mid-stream interruptions — an upstream drop
  * or an inactivity timeout — where any work already committed to the session is
  * worth continuing. Deliberately excludes process crashes, OOM kills,
- * auth/balance/prompt-size and any other non-transient cause: resuming those
+ * auth/quota/prompt-size and any other non-transient cause: resuming those
  * would just reproduce the failure. The caller additionally gates on the
  * runtime actually supporting CLI session resume and on holding a session id.
  */
@@ -591,11 +576,11 @@ export function isResumableFailure(
 }
 
 function classification(
-  failure_category: TrackingRunFailureCategory,
-  failure_detail: TrackingRunFailureDetail,
-  failure_stage: TrackingRunFailureStage,
+  failure_category: RunFailureCategory,
+  failure_detail: RunFailureDetail,
+  failure_stage: RunFailureStage,
   retryable: boolean,
-  user_action: TrackingRunFailureUserAction,
+  user_action: RunFailureUserAction,
 ): RunFailureClassification {
   return {
     failure_category,
@@ -740,7 +725,7 @@ export function classifyRunFailure(
     );
   }
 
-  if (isAgentProtocolErrorText(text)) {
+  if (isRpcProtocolErrorText(text)) {
     return classification(
       'process_exit',
       processExitDetail(errorCode, text),
@@ -763,18 +748,13 @@ export function classifyRunFailure(
 
   if (errorCode === 'RATE_LIMITED' || serviceFailure === 'RATE_LIMITED' || isHardQuotaText(text) || isRateLimitText(text)) {
     const hardQuota = isHardQuotaText(text);
-    const workspaceCredits = isWorkspaceCreditsText(text);
     const retryable = hardQuota ? false : (retryableHint ?? true);
     return classification(
       'rate_limit',
-      workspaceCredits
-        ? 'workspace_credits_exhausted'
-        : hardQuota
-          ? 'hard_quota'
-          : 'rate_limit_429',
+      hardQuota ? 'hard_quota' : 'rate_limit_429',
       'session_init',
       retryable,
-      retryable ? 'retry' : workspaceCredits ? 'recharge' : 'none',
+      retryable ? 'retry' : 'none',
     );
   }
 
@@ -845,22 +825,8 @@ export function classifyRunFailure(
     );
   }
 
-  if (isPermissionRequestNotFoundText(text)) {
-    const retryable = retryableHint ?? true;
-    return classification(
-      'process_exit',
-      'permission_request_not_found',
-      'child_close',
-      retryable,
-      retryable ? 'retry' : 'none',
-    );
-  }
-
-  // Must be checked BEFORE the fatal_rpc_error close-reason promotion below:
-  // when the bundled agent binary dies of an illegal instruction before
-  // readiness, vela surfaces an ACP fatal and the close reason alone would
-  // classify this as a retryable fatal_rpc_error — but the retry re-runs the
-  // same binary on the same CPU and deterministically fails again.
+  // Must be checked before fatal_rpc_error close-reason promotion: retrying
+  // the same binary on the same unsupported CPU fails deterministically.
   if (isCpuUnsupportedCrashText(text)) {
     return classification(
       'process_exit',
@@ -871,8 +837,8 @@ export function classifyRunFailure(
     );
   }
 
-  // ACP fatal paths ask the host to terminate the child after the protocol
-  // failure. The resulting exit/signal is therefore cleanup, not the cause.
+  // RPC fatal paths can terminate the child after the protocol failure. The
+  // resulting exit/signal is cleanup, not the cause.
   // Prefer the runtime_close reason once specific text classifiers above have
   // had a chance to claim auth, quota, upstream, prompt-size, and other known
   // failures. Unlike stream_error, fatal_rpc_error may have no structured SSE

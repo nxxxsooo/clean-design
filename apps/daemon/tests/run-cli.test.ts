@@ -128,7 +128,6 @@ describe('od run CLI', () => {
       projectId: 'project-1',
       conversationId: 'conversation-1',
       agentId: 'claude',
-      analyticsHints: { entryFrom: 'resume_continue' },
     });
     expect(JSON.parse(stub.requests[1]!.body).message).toContain(
       'The previous turn was interrupted by a transient failure.',

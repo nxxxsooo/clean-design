@@ -28,9 +28,9 @@ import type {
 } from '@open-design/contracts';
 import type { UntilSignals } from '../until.js';
 import {
-  scanRunEventsForUsageAnalytics,
-  type RunEventForAnalyticsObservability,
-} from '../../run-analytics-observability.js';
+  scanRunEventsForUsage,
+  type RunEventRecord,
+} from '../../run-usage.js';
 
 type SqliteDb = Database.Database;
 
@@ -42,7 +42,7 @@ export interface AtomWorkerContext {
   stage:          PipelineStage;
   iteration:      number;
   snapshot:       AppliedPluginSnapshot;
-  runEvents?:     RunEventForAnalyticsObservability[];
+  runEvents?:     RunEventRecord[];
 }
 
 export interface AtomOutcome {
@@ -142,10 +142,10 @@ export async function runStageWithRegistry(
 }
 
 function tokensUsedFromRunEvents(
-  events: RunEventForAnalyticsObservability[] | undefined,
+  events: RunEventRecord[] | undefined,
 ): number | null {
   if (!events?.length) return null;
-  const usage = scanRunEventsForUsageAnalytics(events, null, 0);
+  const usage = scanRunEventsForUsage(events, null, 0);
   return usage.total_tokens ?? null;
 }
 

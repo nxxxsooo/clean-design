@@ -4,7 +4,11 @@ export {
   getAgentDef,
   readLocalAgentProfileDefs,
 } from './runtimes/registry.js';
-export { detectAgents, detectAgentsStream } from './runtimes/detection.js';
+export {
+  detectAgents,
+  detectAgentsStream,
+  detectByokRuntimeReadiness,
+} from './runtimes/detection.js';
 export {
   resolveOnPath,
   inspectAgentExecutableResolution,
@@ -13,7 +17,6 @@ export {
 export { applyAgentLaunchEnv, resolveAgentLaunch } from './runtimes/launch.js';
 export { resolveAgentBin } from './runtimes/resolution.js';
 export { spawnEnvForAgent } from './runtimes/env.js';
-export { buildLiveArtifactsMcpServersForAgent } from './runtimes/mcp.js';
 export {
   checkPromptArgvBudget,
   checkWindowsCmdShimCommandLineBudget,

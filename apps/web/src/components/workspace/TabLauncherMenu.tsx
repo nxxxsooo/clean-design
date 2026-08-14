@@ -5,18 +5,10 @@ import type { Dict } from '../../i18n/types';
 import { Icon, type IconName } from '../Icon';
 import type { ProjectFile, ProjectFileKind } from '../../types';
 import type { WorkspaceContextItem } from '@open-design/contracts';
-import type { TabLauncherClickProps } from '@open-design/contracts/analytics';
 import type { LauncherAction, LauncherContext } from './tab-launcher';
 import styles from './TabLauncherMenu.module.css';
 
 type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
-
-// Page/area/project_id are filled by the host (FileWorkspace); the menu only
-// supplies the event-specific fields.
-export type TabLauncherTrackInput = Omit<
-  TabLauncherClickProps,
-  'page_name' | 'area' | 'project_id'
->;
 
 interface Props {
   /** The "+" button the menu is anchored to (for fixed positioning). */
@@ -34,8 +26,6 @@ interface Props {
   /** Open the chosen file in a new tab (wired to FileWorkspace.openFile). */
   onOpenFile: (name: string) => void;
   onOpenTab?: (tabId: string) => void;
-  /** Fire a tab-launcher ui_click (host fills page/area/project_id). */
-  onTrack?: (input: TabLauncherTrackInput) => void;
   onClose: () => void;
 }
 
@@ -53,7 +43,6 @@ export function TabLauncherMenu({
   launcherContext,
   onOpenFile,
   onOpenTab,
-  onTrack,
   onClose,
 }: Props) {
   const t = useT();
@@ -145,26 +134,17 @@ export function TabLauncherMenu({
 
   const openSet = useMemo(() => new Set(openTabNames), [openTabNames]);
 
-  // Fire once when the launcher opens (the menu mounts only while open).
-  useEffect(() => {
-    onTrack?.({ element: 'open' });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   function chooseFile(file: ProjectFile) {
-    onTrack?.({ element: 'open_file', file_kind: file.kind });
     onOpenFile(file.name);
     onClose();
   }
 
   function chooseTab(item: WorkspaceContextItem) {
-    onTrack?.({ element: 'open_tab', tab_kind: item.kind });
     if (item.tabId) onOpenTab?.(item.tabId);
     onClose();
   }
 
   function runLauncherAction(action: LauncherAction) {
-    onTrack?.({ element: 'create', action_id: action.id });
     action.run(launcherContext);
     onClose();
   }
@@ -229,7 +209,6 @@ export function TabLauncherMenu({
             type="button"
             className={`${styles.chip} ${kindFilter === 'all' ? styles.chipActive : ''}`}
             onClick={() => {
-              onTrack?.({ element: 'filter', kind_filter: 'all' });
               setKindFilter('all');
             }}
           >
@@ -241,7 +220,6 @@ export function TabLauncherMenu({
               type="button"
               className={`${styles.chip} ${kindFilter === kind ? styles.chipActive : ''}`}
               onClick={() => {
-                onTrack?.({ element: 'filter', kind_filter: kind });
                 setKindFilter(kind);
               }}
             >

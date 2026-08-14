@@ -35,7 +35,7 @@ interface Props {
   onDuplicate?: (record: InstalledPluginRecord) => void;
   isApplying?: boolean;
   hideUseAction?: boolean;
-  // Analytics forwarded to PreviewModal's local export popover.
+  // Forwarded to PreviewModal's local export popover.
   onSharePopoverItemClick?: (item: PreviewSharePopoverItem) => void;
 }
 

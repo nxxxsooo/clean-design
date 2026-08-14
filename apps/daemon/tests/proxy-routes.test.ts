@@ -287,41 +287,6 @@ describe('API proxy routes', () => {
     }
   });
 
-  it('reports malformed proxy env before sending the start event on Anthropic streams', async () => {
-    const originalHttpProxy = process.env.HTTP_PROXY;
-    const originalHttpsProxy = process.env.HTTPS_PROXY;
-    const originalAllProxy = process.env.ALL_PROXY;
-    process.env.HTTP_PROXY = 'not a valid proxy url';
-    delete process.env.HTTPS_PROXY;
-    delete process.env.ALL_PROXY;
-
-    try {
-      const res = await realFetch(`${baseUrl}/api/proxy/anthropic/stream`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          baseUrl: 'https://api.anthropic.com',
-          apiKey: 'sk-ant',
-          model: 'claude-test',
-          messages: [{ role: 'user', content: 'hello' }],
-        }),
-      });
-
-      expect(res.status).toBe(200);
-      const text = await res.text();
-      expect(text).toContain('event: error');
-      expect(text).toContain('INTERNAL_ERROR');
-      expect(text).not.toContain('event: start');
-    } finally {
-      if (originalHttpProxy === undefined) delete process.env.HTTP_PROXY;
-      else process.env.HTTP_PROXY = originalHttpProxy;
-      if (originalHttpsProxy === undefined) delete process.env.HTTPS_PROXY;
-      else process.env.HTTPS_PROXY = originalHttpsProxy;
-      if (originalAllProxy === undefined) delete process.env.ALL_PROXY;
-      else process.env.ALL_PROXY = originalAllProxy;
-    }
-  });
-
   // Regression: appendVersionedApiPath needs to thread three shapes:
   //   * bare host                  → inject /v1 (api.openai.com)
   //   * sub-path containing /vN    → no inject (api.deepinfra.com/v1/openai)

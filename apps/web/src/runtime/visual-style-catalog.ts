@@ -21,7 +21,7 @@ export interface VisualStyleCard {
   description: string;
   variant: VisualStyleVariant;
   category: VisualStyleCategory;
-  preview: VisualStylePreviewAsset;
+  preview?: VisualStylePreviewAsset;
   recommended?: boolean;
 }
 
@@ -33,8 +33,6 @@ interface VisualStyleCatalogEntry {
   category: VisualStyleCategory;
   recommended?: boolean;
 }
-
-const STYLE_CATALOG_ASSET_BASE_URL = 'https://repo-assets.open-design.ai/style-catalog/v1';
 
 const DECK_STYLE_CATALOG: VisualStyleCatalogEntry[] = [
   {
@@ -744,10 +742,6 @@ export function visualStyleCardsForContext(context: VisualStyleContext): VisualS
     description: style.description,
     variant: style.variant,
     category: style.category,
-    preview: {
-      src: `${STYLE_CATALOG_ASSET_BASE_URL}/${context}-${style.slug}-v1.webp`,
-      alt: `${style.title} ${context} style preview.`,
-    },
     recommended: style.recommended,
   }));
 }

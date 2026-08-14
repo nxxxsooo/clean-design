@@ -10,7 +10,7 @@ describe('tools-dev startup conflict detection', () => {
     expect(
       isToolsDevPortConflict(
         new Error(
-          'daemon is already running in namespace e2e-orbit-run-123 at http://127.0.0.1:36695; stop it or choose another namespace',
+          'daemon is already running in namespace e2e-live-artifact-run-123 at http://127.0.0.1:36695; stop it or choose another namespace',
         ),
       ),
     ).toBe(true);

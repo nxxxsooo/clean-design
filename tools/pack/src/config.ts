@@ -14,36 +14,26 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const WORKSPACE_ROOT = resolve(__dirname, "../../..");
 
-export type ToolPackPlatform = "mac" | "win" | "linux";
-export type ToolPackBuildOutput = "all" | "app" | "appimage" | "dir" | "dmg" | "nsis" | "zip";
+export type ToolPackBuildOutput = "all" | "app" | "dmg" | "zip";
 export type ToolPackMacCompression = "store" | "normal" | "maximum";
 export type ToolPackWebOutputMode = "server" | "standalone";
 
 export type ToolPackCliOptions = {
   appVersion?: string;
   cacheDir?: string;
-  containerized?: boolean;
   dir?: string;
-  diagnoseAttempts?: string | number;
-  expectedVersion?: string;
   expr?: string;
-  headless?: boolean;
   json?: boolean;
   macCompression?: string;
   notarize?: boolean;
   namespace?: string;
   path?: string;
-  payloadPath?: string;
   portable?: boolean;
-  removeCache?: boolean;
   removeData?: boolean;
   removeLogs?: boolean;
   removeProductUserData?: boolean;
   removeSidecars?: boolean;
   signed?: boolean;
-  silent?: boolean;
-  statusPollCount?: string | number;
-  statusPollIntervalMs?: string | number;
   to?: string;
 };
 
@@ -64,34 +54,29 @@ export type ToolPackRoots = {
 
 export type ToolPackConfig = {
   appVersion?: string;
-  containerized: boolean;
   electronBuilderCliPath: string;
   electronDistPath: string;
   electronVersion: string;
   macCompression: ToolPackMacCompression;
   macNotarize?: boolean;
   namespace: string;
-  platform: ToolPackPlatform;
+  platform: "mac";
   portable: boolean;
-  removeCache?: boolean;
   removeData: boolean;
   removeLogs: boolean;
   removeProductUserData: boolean;
   removeSidecars: boolean;
   roots: ToolPackRoots;
-  silent: boolean;
   signed: boolean;
   to: ToolPackBuildOutput;
   webOutputMode: ToolPackWebOutputMode;
   workspaceRoot: string;
 };
 
-function resolveToolPackBuildOutput(platform: ToolPackPlatform, value: string | undefined): ToolPackBuildOutput {
-  if (value == null || value.length === 0) return platform === "win" ? "nsis" : "all";
-  if (platform === "mac" && (value === "all" || value === "app" || value === "dmg" || value === "zip")) return value;
-  if (platform === "win" && (value === "all" || value === "dir" || value === "nsis" || value === "zip")) return value;
-  if (platform === "linux" && (value === "all" || value === "appimage" || value === "dir")) return value;
-  throw new Error(`unsupported ${platform} --to target: ${value}`);
+function resolveToolPackBuildOutput(value: string | undefined): ToolPackBuildOutput {
+  if (value == null || value.length === 0) return "all";
+  if (value === "all" || value === "app" || value === "dmg" || value === "zip") return value;
+  throw new Error(`unsupported mac --to target: ${value}`);
 }
 
 function resolveToolPackMacCompression(value: string | undefined): ToolPackMacCompression {
@@ -108,17 +93,14 @@ function resolveToolPackAppVersion(value: string | undefined): string | undefine
   return normalized;
 }
 
-function defaultNamespaceForAppVersion(platform: ToolPackPlatform, appVersion: string | undefined): string {
+function defaultNamespaceForAppVersion(appVersion: string | undefined): string {
   const channel = releaseChannelFromVersion(appVersion);
   if (channel == null) return SIDECAR_DEFAULTS.namespace;
 
-  return releaseNamespace(channel, platform);
+  return releaseNamespace(channel, "mac");
 }
 
-function resolveToolPackWebOutputMode(platform: ToolPackPlatform, value: string | undefined): ToolPackWebOutputMode {
-  // Standalone web output is wired for desktop packaged platforms; Linux stays on
-  // the existing server output until its AppImage resource path is optimized.
-  if (platform === "linux") return "server";
+function resolveToolPackWebOutputMode(value: string | undefined): ToolPackWebOutputMode {
   if (value == null || value.length === 0) return "standalone";
   if (value === "server" || value === "standalone") return value;
   throw new Error(`unsupported OD_WEB_OUTPUT_MODE value: ${value}`);
@@ -148,14 +130,14 @@ function resolveElectronBuilderCliPath(): string {
 }
 
 export function resolveToolPackConfig(
-  platform: ToolPackPlatform,
   options: ToolPackCliOptions = {},
 ): ToolPackConfig {
+  const platform = "mac" as const;
   const appVersion = resolveToolPackAppVersion(options.appVersion);
   const namespace = resolveNamespace({
     contract: OPEN_DESIGN_SIDECAR_CONTRACT,
     env: process.env,
-    namespace: options.namespace ?? defaultNamespaceForAppVersion(platform, appVersion),
+    namespace: options.namespace ?? defaultNamespaceForAppVersion(appVersion),
   });
   const defaultToolPackRoot = join(WORKSPACE_ROOT, ".tmp", "tools-pack");
   const toolPackRoot = resolve(options.dir ?? defaultToolPackRoot);
@@ -167,7 +149,6 @@ export function resolveToolPackConfig(
 
   return {
     appVersion,
-    containerized: options.containerized === true,
     electronBuilderCliPath: resolveElectronBuilderCliPath(),
     electronDistPath: resolveElectronDistPath(WORKSPACE_ROOT),
     electronVersion: resolveElectronVersion(WORKSPACE_ROOT),
@@ -190,15 +171,13 @@ export function resolveToolPackConfig(
       cacheRoot,
       toolPackRoot,
     },
-    removeCache: options.removeCache === true,
     removeData: options.removeData === true,
     removeLogs: options.removeLogs === true,
     removeProductUserData: options.removeProductUserData === true,
     removeSidecars: options.removeSidecars === true,
-    silent: options.silent !== false,
     signed: options.signed === true,
-    to: resolveToolPackBuildOutput(platform, options.to),
-    webOutputMode: resolveToolPackWebOutputMode(platform, process.env.OD_WEB_OUTPUT_MODE),
+    to: resolveToolPackBuildOutput(options.to),
+    webOutputMode: resolveToolPackWebOutputMode(process.env.OD_WEB_OUTPUT_MODE),
     workspaceRoot: WORKSPACE_ROOT,
   };
 }

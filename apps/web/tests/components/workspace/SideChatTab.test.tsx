@@ -41,7 +41,6 @@ describe('SideChatTab', () => {
     const config = {
       mode: 'daemon',
       agentCliEnv: {
-        amr: { OPEN_DESIGN_AMR_PROFILE: 'test' },
       },
     } as unknown as AppConfig;
     const conversations = [

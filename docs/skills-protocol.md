@@ -1,12 +1,16 @@
 # Skills Protocol
 
-**Parent:** [`spec.md`](spec.md) · **Siblings:** [`skills-contributing.md`](skills-contributing.md) · [`architecture.md`](architecture.md) · [`agent-adapters.md`](agent-adapters.md) · [`modes.md`](modes.md)
+**Sibling:** [`architecture.md`](architecture.md)
 
-> Want to ship a skill upstream rather than read the protocol spec? See [`skills-contributing.md`](skills-contributing.md) — quick start, merge bar, PR template, common rejections. This file is the **what** (frontmatter grammar, discovery rules, mode semantics); that file is the **how** (clone to merged PR).
+A **Skill** is an atomic functional capability in Clean Design. A **design
+template** is a rendering-catalogue entry. Both use the portable `SKILL.md`
+convention and may retain `od:` compatibility metadata, but they have different
+ownership and APIs: functional skills live in `skills/` and `/api/skills`;
+rendering templates live in `design-templates/` and `/api/design-templates`.
 
-A **Skill** is an atomic functional capability in OD. A **design template** is a rendering-catalogue entry. Both use Claude Code's `SKILL.md` convention as their portable instruction format and may add `od:` metadata, but they have different ownership and APIs: functional skills live in `skills/` and `/api/skills`; rendering templates live in `design-templates/` and `/api/design-templates`.
-
-> **Compatibility promise:** A bundle that contains `SKILL.md` remains readable by agents that support the Agent Skills format. Installation and catalogue placement are separate concerns: the bundled guizang integration is maintained under `design-templates/guizang-ppt/`, while external distribution normally uses the plugin system.
+> **Compatibility promise:** A bundle that contains `SKILL.md` remains readable
+> by agents that support the Agent Skills format. The bundled guizang
+> integration is maintained under `design-templates/guizang-ppt/`.
 
 ---
 
@@ -48,11 +52,12 @@ triggers:
 
 Body is free-form Markdown that describes the workflow the agent should follow — typically a numbered step list plus principles. This is what [guizang-ppt-skill](https://github.com/op7418/guizang-ppt-skill) does.
 
-**OD reads all of this as-is.** No changes required.
+**Clean Design reads all of this as-is.** No changes required.
 
-## 2. OD extensions (optional)
+## 2. Compatibility extensions (optional)
 
-Skills can declare additional front-matter fields to unlock OD-specific UI. All fields are optional; absent fields fall back to sensible defaults.
+Skills can declare additional front-matter fields to unlock Clean Design UI.
+All fields are optional; absent fields fall back to sensible defaults.
 
 ```yaml
 ---
@@ -60,7 +65,7 @@ name: magazine-web-ppt
 description: …
 triggers: […]
 
-# --- OD extensions below this line ---
+# --- Clean Design compatibility extensions below this line ---
 
 od:
   mode: deck                        # prototype | deck | template | design-system | image | video | audio
@@ -81,7 +86,7 @@ od:
 ---
 ```
 
-### 2.1 What OD uses each field for
+### 2.1 What Clean Design uses each field for
 
 | Field | Used by |
 |---|---|
@@ -103,9 +108,7 @@ od:
 Older bundles may also carry fields such as `od.inputs`, `od.parameters`,
 `od.outputs`, or `od.capabilities_required`. The skill registry preserves the
 portable `SKILL.md` body but does not use those fields to render forms, sliders,
-choose output files, or gate an agent. The Agent-Skill-to-plugin adapter can
-translate or retain some of that metadata; plugin behavior is specified in
-[`plugins-spec.md`](plugins-spec.md), not by this registry protocol.
+choose output files, or gate an agent.
 
 ### 2.2 If a skill omits `od:` entirely
 
@@ -139,7 +142,7 @@ against a design-template id continue to compose its instructions.
 
 ### Runtime resource staging
 
-Open Design does not distribute an active bundle by symlinking it into every
+Clean Design does not distribute an active bundle by symlinking it into every
 agent's global configuration. Before a project run, the daemon makes a real
 copy of every active skill/template with side files under the project's
 `.od-skills/` alias. The prompt preamble advertises that CWD-relative copy and
@@ -150,7 +153,8 @@ link, but that storage detail is separate from per-run staging.
 
 ## 4. Registry modes
 
-The daemon normalizes `od.mode` to one of seven values. These values classify both functional skills and design-template bundles; they are not the same thing as the six New Project tabs described in [`modes.md`](modes.md).
+The daemon normalizes `od.mode` to one of seven values. These values classify
+both functional skills and design-template bundles.
 
 ### 4.1 `prototype`
 
@@ -182,7 +186,7 @@ The daemon normalizes `od.mode` to one of seven values. These values classify bo
 - **Purpose:** classify a functional workflow that creates, extracts, audits,
   or transforms design-system material.
 - **Output:** defined by the skill. A portable workflow may emit only
-  `DESIGN.md`; current Open Design import/create flows build a package with
+  `DESIGN.md`; current Clean Design import/create flows build a package with
   `manifest.json`, `DESIGN.md`, `tokens.css`, and optional rich resources.
 - **Schema:** no fixed nine headings. Repository packages require substantive
   coverage and keep prose synchronized with the token contract; see
@@ -215,16 +219,14 @@ the system prompt, in this order:
 Design systems are not copied into the run CWD, section-pruned through
 `od.design_system.sections`, or substituted through a
 `{{ design_system }}` variable. Missing rich files preserve compatibility with
-legacy `DESIGN.md`-only folders. The historical nine-heading upstream sample
-remains useful as an interoperability example at
-[`docs/examples/DESIGN.sample.md`](examples/DESIGN.sample.md), but it is not
-the current repository package schema.
+legacy `DESIGN.md`-only folders, but those folders are not the current
+repository package schema.
 
 ## 5.5 Craft references (`craft/`)
 
 Some craft knowledge is **universal** — true regardless of brand. ALL CAPS always needs ≥0.06em letter-spacing; `var(--accent)` should appear at most 2 times per screen; `#6366f1` is always the AI-default tell. These rules don't belong in any one `DESIGN.md` because they apply across every brand.
 
-OD ships these as a separate packaged resource tree:
+Clean Design ships these as a separate packaged resource tree:
 
 ```
 craft/
@@ -266,32 +268,23 @@ The split keeps DESIGN.md authors free of universal-craft duplication and keeps 
 
 ## 6. Skill inspection and distribution
 
-```sh
-od skills list
-# → id and display label for entries returned by /api/skills
-
-od skills show <id>
-# → the daemon's JSON representation of one skill
-```
-
-The current `od skills` surface is read-only; it does not ship `add` or
-`remove` subcommands. Installable marketplace bundles use `od plugin`, while
-repository-owned functional skills and rendering templates live under
-`skills/` and `design-templates/` respectively. Do not document a concrete
-daemon-managed install path here; the root `AGENTS.md` **Daemon data directory
-contract** is the only path authority.
+Repository-owned functional skills and rendering templates live under
+`skills/` and `design-templates/` respectively. Clean Design does not expose a
+global install command, remote marketplace, or external plugin host. Do not
+document a concrete daemon-managed install path here; the root `AGENTS.md`
+data-directory rules are the only path authority.
 
 ## 7. Worked example — running the bundled guizang deck template
 
 The upstream-inspired bundle ships at
 [`design-templates/guizang-ppt/`](../design-templates/guizang-ppt/) with its
-license preserved and Open Design metadata applied:
+license preserved and Clean Design compatibility metadata applied:
 
 1. The daemon lists it through `/api/design-templates`, independently of the
    functional `/api/skills` registry.
 2. The user opens the Deck creation tab and selects the guizang template from
    the rendering catalogue.
-3. Open Design stores the selected template id as the project's primary
+3. Clean Design stores the selected template id as the project's primary
    `skillId`. The daemon's combined skill-like resolver loads that template's
    `SKILL.md` and resources; it does not also inject the Deck tab's default
    functional skill.
@@ -345,21 +338,8 @@ od:
 
 ## 9. Testing skills
 
-There is no `od skills test` command and no runtime contract for a
+There is no supported global skill-management CLI or runtime contract for a
 `tests/basic.prompt` tree. Repository-owned entries are checked by the root
 guard, localized-content coverage, registry tests, and any focused tests for
-their assets or prompt behavior. Run at least `pnpm guard` and
-`pnpm typecheck`, plus the package-scoped checks appropriate to the files
-changed. Plugin bundles have their own validation and doctor surfaces.
-
-## 10. Open questions
-
-- **Skill provenance.** Functional skills do not currently have a standalone
-  install command. External distribution should use the plugin trust and
-  provenance model rather than inventing an unverified `od skills add` flow.
-- **Skill composition.** Can a prototype-mode instruction bundle invoke a
-  deck-mode bundle for a sub-artifact? The current registries treat them as
-  leaf-level inputs; composition requires an explicit orchestration contract.
-- **Richer skill inputs.** Typed apply-time inputs and deferred parameters now
-  belong to the plugin manifest contract. A future skill-native form should
-  reuse that contract rather than reviving a second slider schema.
+their assets or prompt behavior. Run at least `pnpm guard` and `pnpm typecheck`,
+plus the package-scoped checks appropriate to the files changed.

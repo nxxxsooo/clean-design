@@ -16,9 +16,9 @@ describe('userFacingAgentLabel', () => {
     expect(
       userFacingAgentLabel(
         null,
-        '/Applications/Open Design Beta.app/Contents/Resources/open-design/bin/vela',
+        '/Applications/Clean Design.app/Contents/Resources/clean-design/bin/custom-agent',
       ),
-    ).toBe('vela');
+    ).toBe('custom-agent');
   });
 
   it('strips Windows executable extensions from basename fallbacks', () => {

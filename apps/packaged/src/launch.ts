@@ -109,8 +109,7 @@ export function stabilizePackagedWorkingDirectory(
   paths: Pick<PackagedNamespacePaths, "runtimeRoot">,
   chdir: (directory: string) => void = (directory) => process.chdir(directory),
 ): void {
-  // Payload launches can inherit a cwd inside an older version directory. Move
-  // to the namespace-scoped root before release cleanup makes that cwd invalid.
+  // Keep the packaged process rooted in its namespace-scoped runtime directory.
   chdir(paths.runtimeRoot);
 }
 

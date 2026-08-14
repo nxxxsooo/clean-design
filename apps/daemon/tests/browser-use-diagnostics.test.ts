@@ -91,7 +91,7 @@ describe('browser use diagnostics', () => {
   it('leaves non-Codex browser requests outside this Codex-specific state', () => {
     expect(buildBrowserUseRunState({
       requested: true,
-      agentId: 'amr',
+      agentId: 'claude',
       diagnostics: collectBrowserUseDiscoveryFacts({
         registryPath: join(tempDir, 'missing'),
       }),

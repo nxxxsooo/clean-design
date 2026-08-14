@@ -161,7 +161,6 @@
 }
 
 .plugins-view__section-head h2,
-.plugins-view__team h2,
 .plugins-view__marketplace h3,
 .plugins-view__future-card h3 {
   margin: 0;
@@ -173,7 +172,6 @@
 }
 
 .plugins-view__section-head p,
-.plugins-view__team p,
 .plugins-view__future-card p {
   margin: 5px 0 0;
   color: var(--text-muted);
@@ -305,8 +303,7 @@
 .plugins-view__marketplace,
 .plugins-view__available-card,
 .plugins-view__install-card,
-.plugins-view__source-manager,
-.plugins-view__team {
+.plugins-view__source-manager {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-panel);
@@ -573,12 +570,6 @@
   border-radius: 50%;
   color: var(--text-muted);
   background: var(--bg-subtle);
-}
-
-.plugins-view__team {
-  display: flex;
-  gap: 12px;
-  padding: 18px;
 }
 
 .plugins-view__empty {

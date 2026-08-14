@@ -281,26 +281,7 @@ function chatProtocolFromAgentId(agentId) {
   if (!agentId || typeof agentId !== 'string') return null;
   const id = agentId.trim().toLowerCase();
   if (id === 'claude') return 'anthropic';
-  if (id === 'gemini') return 'google';
-  // Codex, OpenCode, Qwen, DeepSeek, Kimi, Copilot, Pi, Kiro, Kilo,
-  // Vibe, Devin, Hermes, Cursor-Agent, Qoder all use the OpenAI chat-
-  // completions wire format.
-  if (
-    id === 'codex'
-    || id === 'opencode'
-    || id === 'qwen'
-    || id === 'deepseek'
-    || id === 'kimi'
-    || id === 'copilot'
-    || id === 'pi'
-    || id === 'kiro'
-    || id === 'kilo'
-    || id === 'vibe'
-    || id === 'devin'
-    || id === 'hermes'
-    || id === 'cursor-agent'
-    || id === 'qoder'
-  ) {
+  if (id === 'codex' || id === 'opencode' || id === 'pi') {
     return 'openai';
   }
   return null;

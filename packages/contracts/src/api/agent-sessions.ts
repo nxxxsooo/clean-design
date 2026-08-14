@@ -1,7 +1,6 @@
 export const AGENT_SESSION_HANDLE_KINDS = [
   'opaque-id',
   'cli-thread-id',
-  'acp-session-handle',
   'session-file-path',
   'continue-latest',
   'none',
@@ -13,7 +12,6 @@ export type AgentSessionHandleKind = (typeof AGENT_SESSION_HANDLE_KINDS)[number]
 export const AGENT_SESSION_HANDLE_ACQUISITION_MODES = [
   'daemon-specified',
   'stream-captured',
-  'acp-session-load',
   'session-file-discovered',
   'continue-latest',
   'none',
@@ -26,7 +24,6 @@ export type AgentSessionHandleAcquisitionMode =
 export const AGENT_SESSION_CONTINUATION_MODES = [
   'native-resume-by-id',
   'native-continue-latest',
-  'acp-session-load',
   'session-file-resume',
   'none',
 ] as const;
@@ -96,7 +93,6 @@ export interface AgentSessionBindingRecord {
 export interface AgentSessionCapabilityFlags {
   resumeById: boolean;
   continueLatest: boolean;
-  acpSessionLoad: boolean;
   streamCapturedHandle: boolean;
   daemonSpecifiedHandle: boolean;
   sessionFileHandle: boolean;

@@ -29,7 +29,6 @@ import {
   updateProject,
   upsertMessage,
 } from '../db.js';
-import { getDetectedRuntimeVersions } from '../runtimes/detection.js';
 import { parseMediaExecutionPolicyInput } from '../media/policy.js';
 import { getInstalledPlugin, resolvePluginSnapshot } from '../plugins/index.js';
 import {
@@ -42,7 +41,7 @@ import type { RunEventForDiagnostics } from '../run-diagnostics.js';
 import type { RunEventForFailureClassification } from '../run-failure-classification.js';
 import { classifyRunFailure } from '../run-failure-classification.js';
 import { runResultFromStatus } from '../run-result.js';
-import type { RunStatusForAnalytics } from '../run-result.js';
+import type { RunStatusSummary } from '../run-result.js';
 import type { DetectedAgent, RuntimeAgentDef } from '../runtimes/types.js';
 import {
   buildOpenCodeByokProviderConfig,
@@ -107,21 +106,10 @@ interface ChatRun {
   context?: Record<string, unknown> | null;
   events: RunEventRecord[];
   clients: Set<SseClient>;
-  // E-lite root-cause telemetry read at run_finished. `stdinBackpressure`: the
-  // prompt write to child stdin was queued (pipe buffer full). `lastAgentActivityAt`:
-  // the inactivity-watchdog clock, used to derive `last_progress_age_ms`.
+  // Runtime diagnostics used by the failure classifier and retry policy.
   stdinBackpressure?: boolean;
   lastAgentActivityAt?: number;
   retryAttemptCount?: number;
-  retryFinalResult?: string;
-  retrySuppressedReason?: string;
-  retryOriginalFailure?: {
-    failure_category?: string;
-    failure_detail?: string;
-    failure_stage?: string;
-    retryable?: boolean;
-    user_action?: string;
-  };
   contextBudget?: {
     action: 'unmeasured' | 'within_budget' | 'blocked' | 'rollover';
     source: 'model_metadata' | 'known_model_family' | 'unknown';
@@ -248,7 +236,7 @@ export interface RegisterRunRoutesDeps {
   };
 }
 
-type TerminalRunStatus = RunStatusForAnalytics & {
+type TerminalRunStatus = RunStatusSummary & {
   status: string;
   error?: string | null;
   errorCode?: string | null;
@@ -646,14 +634,9 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
     design.runs.start(run, () => startChatRun(meta, run));
 
     const reqBody = requestBody;
-    const analyticsHints =
-      (reqBody as { analyticsHints?: Record<string, unknown> | null }).analyticsHints
-        && typeof (reqBody as { analyticsHints?: unknown }).analyticsHints === 'object'
-        ? ((reqBody as { analyticsHints?: Record<string, unknown> }).analyticsHints ?? {})
-        : {};
-    // Marks the AI-optimize (deep enrichment) run so completion can flag the DS
-    // ai_refined even when analytics is unavailable or disabled.
-    const hintDsEnrichment = analyticsHints.dsEnrichment === true;
+    // Marks the AI-optimize (deep enrichment) run so completion can flag the
+    // design system as refined independently of any observability layer.
+    const hintDsEnrichment = reqBody.designSystemEnrichment === true;
     const requestProjectId = typeof reqBody.projectId === 'string' ? reqBody.projectId : null;
     if (hintDsEnrichment && requestProjectId) {
       design.runs.wait(run).then((status: TerminalRunStatus) => {
@@ -892,6 +875,11 @@ export function registerRunRoutes(app: Express, ctx: RegisterRunRoutesDeps) {
       );
     }
     const run = design.runs.create(meta);
+    try {
+      pinAssistantMessageOnRunCreate(db, run);
+    } catch (err) {
+      console.warn('[runs] message create pin failed', err);
+    }
     design.runs.stream(run, req, res);
     reconcileAssistantMessageOnRunEnd(db, design.runs, run);
     design.runs.start(run, () => startChatRun(meta, run));

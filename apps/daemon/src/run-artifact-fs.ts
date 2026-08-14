@@ -1,7 +1,7 @@
 // Agent-agnostic artifact counter. Instead of reconstructing file writes from
 // each agent's tool-call stream (which only `claude_code` reports in a shape
 // `run-artifacts.ts#countNewArtifacts` recognizes — see the audit that found
-// codex / opencode / gemini / cursor / amr / … all report artifact_count: 0),
+// some runtimes report artifact writes in incompatible shapes),
 // this snapshots the project's artifact files before the run and diffs against
 // a snapshot taken at run end. Whatever runtime the agent used, a real file
 // write or edit shows up as a created or modified path.
@@ -196,7 +196,7 @@ export interface RunArtifactBaseline {
 // Registry of per-run baselines that flags same-cwd overlap. `remember` marks
 // both the incoming run and every still-open run sharing its cwd as contended;
 // `peek` lets pre-finish hooks inspect without consuming the baseline, and
-// `take` removes and returns it for the final analytics pass.
+// `take` removes and returns it for final run bookkeeping.
 export function createRunArtifactBaselines(cap = 2000) {
   const baselines = new Map<string, RunArtifactBaseline>();
   return {

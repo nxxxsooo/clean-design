@@ -3,6 +3,7 @@ export { PACKAGED_CONFIG_PATH_ENV, resolveSeededAppConfigPaths, seedPackagedAppC
 export { resolveMacInstallIdentity } from "./identity.js";
 export {
   cleanupPackedMacNamespace,
+  createMacRemovalPlan,
   installPackedMacDmg,
   inspectPackedMacApp,
   readPackedMacLogs,
@@ -17,6 +18,7 @@ export type {
   MacInstallResult,
   MacPackResult,
   MacPackTiming,
+  MacRemovalTarget,
   MacSizeReport,
   MacStartResult,
   MacStopResult,

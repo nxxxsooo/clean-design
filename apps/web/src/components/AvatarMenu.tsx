@@ -207,9 +207,9 @@ export function AvatarMenu({
         onClick={toggleOpen}
         aria-haspopup="menu"
         aria-expanded={open}
-        data-tooltip={t('avatar.title')}
-        title={t('avatar.title')}
-        aria-label={t('avatar.title')}
+        data-tooltip={t('avatar.settings')}
+        title={t('avatar.settings')}
+        aria-label={t('avatar.settings')}
       >
         {config.mode === 'daemon' && currentAgent ? (
           <AgentIcon id={currentAgent.id} size={20} />
@@ -224,7 +224,7 @@ export function AvatarMenu({
           ref={popoverRef}
           className="avatar-popover"
           role="dialog"
-          aria-label={t('avatar.title')}
+          aria-label={t('avatar.settings')}
           style={popoverStyle}
         >
           <div className="avatar-popover-head">

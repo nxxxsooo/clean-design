@@ -42,9 +42,9 @@ const claude: AgentInfo = {
 };
 
 const removedCloudAgent: AgentInfo = {
-  id: 'amr',
+  id: 'hosted-service',
   name: 'Hosted account',
-  bin: 'amr',
+  bin: 'hosted-service',
   available: true,
   models: [{ id: 'default', label: 'Default' }],
 };
@@ -86,7 +86,7 @@ describe('InlineModelSwitcher local execution', () => {
     fireEvent.click(screen.getByTestId('inline-model-switcher-chip'));
     expect(screen.getByTestId('inline-model-switcher-agent-codex')).toBeTruthy();
     expect(screen.getByTestId('inline-model-switcher-agent-claude')).toBeTruthy();
-    expect(screen.queryByTestId('inline-model-switcher-agent-amr')).toBeNull();
+    expect(screen.queryByTestId('inline-model-switcher-agent-hosted-service')).toBeNull();
   });
 
   it('switches local agents and execution modes through explicit controls', () => {

@@ -238,7 +238,6 @@ describe('classifyChatRunCloseStatus (#1451 close-handler classification)', () =
     cancelRequested: false,
     code: 0 as number | null,
     signal: null as string | null,
-    acpCleanCompletion: false,
     artifactQuietShutdownRequested: false,
     turnCompletedCleanly: false,
     artifactProducedThisRun: false,
@@ -261,28 +260,6 @@ describe('classifyChatRunCloseStatus (#1451 close-handler classification)', () =
 
   it('returns succeeded on clean exit code 0', () => {
     expect(classifyChatRunCloseStatus({ ...base, code: 0 })).toBe('succeeded');
-  });
-
-  it('returns succeeded on ACP forced shutdown (SIGTERM + clean ACP completion)', () => {
-    expect(
-      classifyChatRunCloseStatus({
-        ...base,
-        code: null,
-        signal: 'SIGTERM',
-        acpCleanCompletion: true,
-      }),
-    ).toBe('succeeded');
-  });
-
-  it('returns failed when ACP shutdown was via SIGKILL (not the narrow override)', () => {
-    expect(
-      classifyChatRunCloseStatus({
-        ...base,
-        code: null,
-        signal: 'SIGKILL',
-        acpCleanCompletion: true,
-      }),
-    ).toBe('failed');
   });
 
   it('returns succeeded when the watchdog-initiated quiet-period SIGTERM fires', () => {
@@ -582,7 +559,6 @@ describe('applyClaudeStreamJsonRunBookkeeping', () => {
       cancelRequested: false,
       code: 1,
       signal: null,
-      acpCleanCompletion: false,
       artifactQuietShutdownRequested: false,
       turnCompletedCleanly: run.turnCompletedCleanly,
       artifactProducedThisRun: false,

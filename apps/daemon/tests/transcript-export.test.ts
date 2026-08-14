@@ -239,7 +239,7 @@ describe('exportProjectTranscript', () => {
     ]);
   });
 
-  it('drops status / usage / raw telemetry events without breaking content', () => {
+  it('drops status, usage, and raw transport events without breaking content', () => {
     const { db, projectsRoot } = setup();
     seedConversation(db, { id: 'c1', createdAt: 100 });
     seedMessage(db, 'c1', {

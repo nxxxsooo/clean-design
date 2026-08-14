@@ -3,11 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   collectStderrTailSummary,
   collectStdoutTailSummary,
-  summarizeRunDiagnosticsForAnalytics,
+  summarizeRunDiagnostics,
 } from '../src/run-diagnostics.js';
 
 describe('run diagnostics', () => {
-  it('summarizes stderr into redacted bounded tails for Langfuse', () => {
+  it('summarizes stderr into redacted bounded tails', () => {
     const events = Array.from({ length: 25 }, (_, i) => ({
       event: 'stderr',
       data: {
@@ -26,9 +26,9 @@ describe('run diagnostics', () => {
   });
 
   it('flags resume_auto_reseeded when an agent_resume_auto_reseed event is present', () => {
-    const result = summarizeRunDiagnosticsForAnalytics({
+    const result = summarizeRunDiagnostics({
       events: [
-        { event: 'diagnostic', data: { type: 'agent_resume_auto_reseed', agent_id: 'amr', reason: 'resume_failed' } },
+        { event: 'diagnostic', data: { type: 'agent_resume_auto_reseed', agent_id: 'claude', reason: 'resume_failed' } },
         { event: 'diagnostic', data: { type: 'runtime_close', rpc_close_reason: 'exit_0' } },
       ],
       exitCode: 0,
@@ -40,7 +40,7 @@ describe('run diagnostics', () => {
   });
 
   it('flags resume_auto_reseeded from native session recovery diagnostics', () => {
-    const result = summarizeRunDiagnosticsForAnalytics({
+    const result = summarizeRunDiagnostics({
       events: [
         {
           event: 'diagnostic',
@@ -57,8 +57,8 @@ describe('run diagnostics', () => {
     expect(result.resume_auto_reseeded).toBe(true);
   });
 
-  it('returns only low-cardinality stderr fields for PostHog analytics', () => {
-    const result = summarizeRunDiagnosticsForAnalytics({
+  it('returns bounded stderr fields for local diagnostics', () => {
+    const result = summarizeRunDiagnostics({
       events: [
         { event: 'stderr', data: { chunk: 'warning 1\nwarning 2\n' } },
       ],
@@ -88,7 +88,7 @@ describe('run diagnostics', () => {
     // The merged stream is exactly 5 non-empty lines ('1_5' bucket), but the
     // final line is split across two chunks. Summing per-chunk counts would
     // double-count the split line as 6 lines and drift into the '6_20' bucket.
-    const result = summarizeRunDiagnosticsForAnalytics({
+    const result = summarizeRunDiagnostics({
       events: [
         { event: 'stderr', data: { chunk: 'line1\nline2\nline3\nline4\nli' } },
         { event: 'stderr', data: { chunk: 'ne5' } },
@@ -116,7 +116,7 @@ describe('run diagnostics', () => {
   });
 
   it('prefers structured error events over stderr as diagnostic source', () => {
-    const result = summarizeRunDiagnosticsForAnalytics({
+    const result = summarizeRunDiagnostics({
       events: [
         { event: 'stderr', data: { chunk: 'raw provider warning\n' } },
         { event: 'error', data: { message: 'typed failure' } },
@@ -143,7 +143,7 @@ describe('run diagnostics', () => {
     });
   });
 
-  it('summarizes stdout into redacted bounded tails for Langfuse', () => {
+  it('summarizes stdout into redacted bounded tails', () => {
     const summary = collectStdoutTailSummary([
       { event: 'stdout', data: { chunk: 'visible line\nOPENAI_API_KEY=sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n' } },
     ]);
@@ -156,7 +156,7 @@ describe('run diagnostics', () => {
   });
 
   it('captures close reason and side-effect flags for aggregation', () => {
-    const result = summarizeRunDiagnosticsForAnalytics({
+    const result = summarizeRunDiagnostics({
       events: [
         { event: 'stdout', data: { chunk: 'hello\n' } },
         { event: 'agent', data: { type: 'tool_use', name: 'Read', id: 'tool-1' } },
@@ -184,9 +184,9 @@ describe('run diagnostics', () => {
     });
   });
 
-  it('flags tool_result_sent / approval_requested (E-lite root-cause discriminators)', () => {
+  it('tracks whether every committed tool call received a result', () => {
     // Every committed tool_use resolved (paired by id) → delivered.
-    const resolved = summarizeRunDiagnosticsForAnalytics({
+    const resolved = summarizeRunDiagnostics({
       events: [
         { event: 'agent', data: { type: 'tool_use', name: 'Read', id: 't1' } },
         { event: 'agent', data: { type: 'tool_result', toolUseId: 't1' } },
@@ -198,7 +198,7 @@ describe('run diagnostics', () => {
     expect(resolved.tool_result_sent).toBe(true);
 
     // Two parallel tool_uses both resolve (interleaved) → delivered.
-    const parallelResolved = summarizeRunDiagnosticsForAnalytics({
+    const parallelResolved = summarizeRunDiagnostics({
       events: [
         { event: 'agent', data: { type: 'tool_use', name: 'Read', id: 'a' } },
         { event: 'agent', data: { type: 'tool_use', name: 'Grep', id: 'b' } },
@@ -212,7 +212,7 @@ describe('run diagnostics', () => {
 
     // The reviewer's regression case: tool_use(A), tool_use(B), tool_result(A).
     // B is still outstanding, so a result arriving for A must NOT mark delivered.
-    const parallelHung = summarizeRunDiagnosticsForAnalytics({
+    const parallelHung = summarizeRunDiagnostics({
       events: [
         { event: 'agent', data: { type: 'tool_use', name: 'Read', id: 'a' } },
         { event: 'agent', data: { type: 'tool_use', name: 'Bash', id: 'b' } },
@@ -225,7 +225,7 @@ describe('run diagnostics', () => {
     expect(parallelHung.tool_result_sent).toBe(false);
 
     // The last tool_use of a sequential turn has no result → not delivered.
-    const hung = summarizeRunDiagnosticsForAnalytics({
+    const hung = summarizeRunDiagnostics({
       events: [
         { event: 'agent', data: { type: 'tool_use', name: 'Read', id: 'a' } },
         { event: 'agent', data: { type: 'tool_result', toolUseId: 'a' } },
@@ -237,10 +237,10 @@ describe('run diagnostics', () => {
     expect(hung.tool_call_seen).toBe(true);
     expect(hung.tool_result_sent).toBe(false);
 
-    // Degraded provider events carry a null id on BOTH sides (pi-rpc,
-    // copilot-stream emit `toolCallId ?? null`). An unpaired id-less tool call
+    // Degraded provider events can carry a null id on both sides. An unpaired
+    // id-less tool call
     // must NOT fall through to "delivered".
-    const idlessHung = summarizeRunDiagnosticsForAnalytics({
+    const idlessHung = summarizeRunDiagnostics({
       events: [
         { event: 'agent', data: { type: 'tool_use', name: 'Read', id: null } },
       ],
@@ -251,7 +251,7 @@ describe('run diagnostics', () => {
     expect(idlessHung.tool_result_sent).toBe(false);
 
     // ...but an id-less tool call that DID get its (also id-less) result counts.
-    const idlessResolved = summarizeRunDiagnosticsForAnalytics({
+    const idlessResolved = summarizeRunDiagnostics({
       events: [
         { event: 'agent', data: { type: 'tool_use', name: 'Read', id: null } },
         { event: 'agent', data: { type: 'tool_result', toolUseId: null } },
@@ -261,17 +261,5 @@ describe('run diagnostics', () => {
     });
     expect(idlessResolved.tool_result_sent).toBe(true);
 
-    // An ACP approval diagnostic flips approval_requested.
-    const approved = summarizeRunDiagnosticsForAnalytics({
-      events: [
-        {
-          event: 'agent',
-          data: { type: 'diagnostic', name: 'acp_approval_request', optionId: 'allow_once' },
-        },
-      ],
-      exitCode: 0,
-      signal: null,
-    });
-    expect(approved.approval_requested).toBe(true);
   });
 });

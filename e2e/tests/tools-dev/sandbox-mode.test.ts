@@ -85,22 +85,6 @@ describe('tools-dev sandbox mode smoke', () => {
             designSystemId: null,
             onboardingCompleted: true,
             skillId: null,
-            telemetry: { artifactManifest: true, content: false, metrics: false },
-          },
-          method: 'PUT',
-        });
-        await requestJson(webUrl, '/api/mcp/servers', {
-          body: {
-            servers: [
-              {
-                args: ['persisted.js'],
-                command: 'node',
-                enabled: true,
-                id: 'persisted-mcp',
-                label: 'Persisted MCP',
-                transport: 'stdio',
-              },
-            ],
           },
           method: 'PUT',
         });
@@ -126,19 +110,6 @@ describe('tools-dev sandbox mode smoke', () => {
           projectId: project.project.id,
           reasoning: 'default',
           skillId: null,
-          toolBundle: {
-            mcpServers: [
-              {
-                args: ['run-scoped.js'],
-                command: 'node',
-                enabled: true,
-                env: { RUN_SCOPED: '1' },
-                id: 'run-scoped-mcp',
-                label: 'Run-scoped MCP',
-                transport: 'stdio',
-              },
-            ],
-          },
         });
 
         await waitForRunStatus(webUrl, run.runId, 'succeeded', {
@@ -169,17 +140,10 @@ describe('tools-dev sandbox mode smoke', () => {
         expectPathUnder(capture.env.XDG_DATA_HOME, roots.configDir, 'XDG_DATA_HOME');
         expectPathUnder(capture.env.XDG_STATE_HOME, roots.configDir, 'XDG_STATE_HOME');
 
-        const opencodeConfig = JSON.parse(
-          capture.env.OPENCODE_CONFIG_CONTENT ?? '{}',
-        ) as { mcp?: Record<string, unknown> };
-        expect(opencodeConfig.mcp).toHaveProperty('run-scoped-mcp');
-        expect(opencodeConfig.mcp).not.toHaveProperty('persisted-mcp');
-
         await suite.report.json('summary.json', {
           capture,
           dataDir: daemonStatus.dataDir,
           namespace: suite.namespace,
-          opencodeMcpServerIds: Object.keys(opencodeConfig.mcp ?? {}),
           sandbox: daemonStatus.sandbox,
           sandboxMode: daemonStatus.sandboxMode,
         });

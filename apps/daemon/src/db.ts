@@ -126,7 +126,6 @@ function migrate(db: SqliteDb): void {
       session_mode TEXT,
       run_context_json TEXT,
       applied_plugin_snapshot_json TEXT,
-      telemetry_finalized_at INTEGER,
       started_at INTEGER,
       ended_at INTEGER,
       position INTEGER NOT NULL,
@@ -244,9 +243,6 @@ function migrate(db: SqliteDb): void {
   }
   if (!messageCols.some((c: DbRow) => c.name === 'applied_plugin_snapshot_json')) {
     db.exec(`ALTER TABLE messages ADD COLUMN applied_plugin_snapshot_json TEXT`);
-  }
-  if (!messageCols.some((c: DbRow) => c.name === 'telemetry_finalized_at')) {
-    db.exec(`ALTER TABLE messages ADD COLUMN telemetry_finalized_at INTEGER`);
   }
   const previewCommentCols = db.prepare(`PRAGMA table_info(preview_comments)`).all() as DbRow[];
   if (!previewCommentCols.some((c: DbRow) => c.name === 'selection_kind')) {
@@ -1304,10 +1300,6 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
               produced_files_json = ?, trace_object_files_json = ?, feedback_json = ?,
               pre_turn_file_names_json = ?,
               session_mode = ?, run_context_json = ?, applied_plugin_snapshot_json = ?,
-              telemetry_finalized_at = CASE
-                WHEN ? THEN COALESCE(telemetry_finalized_at, ?)
-                ELSE telemetry_finalized_at
-              END,
               started_at = ?, ended_at = ?
         WHERE id = ?`,
     ).run(
@@ -1329,8 +1321,6 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
       normalizeMessageSessionModeForStorage(m.sessionMode),
       m.runContext ? JSON.stringify(m.runContext) : null,
       m.appliedPluginSnapshot ? JSON.stringify(m.appliedPluginSnapshot) : null,
-      m.telemetryFinalized === true ? 1 : 0,
-      now,
       m.startedAt ?? null,
       m.endedAt ?? null,
       m.id,
@@ -1345,12 +1335,11 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
     const createdAt = typeof m.createdAt === 'number' && Number.isFinite(m.createdAt)
       ? m.createdAt
       : now;
-    // 25 values: id, conversation_id, role, content, agent_id, agent_name,
+    // 24 values: id, conversation_id, role, content, agent_id, agent_name,
     // run_id, run_status, result_delivery_state, last_run_event_id, events_json, attachments_json,
     // comment_attachments_json, produced_files_json, trace_object_files_json,
     // feedback_json, pre_turn_file_names_json, session_mode, run_context_json,
-    // applied_plugin_snapshot_json, telemetry_finalized_at, started_at,
-    // ended_at, position, created_at.
+    // applied_plugin_snapshot_json, started_at, ended_at, position, created_at.
     db.prepare(
       `INSERT INTO messages
          (id, conversation_id, role, content, agent_id, agent_name,
@@ -1358,8 +1347,8 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
           attachments_json, comment_attachments_json, produced_files_json,
           trace_object_files_json, feedback_json, pre_turn_file_names_json,
           session_mode, run_context_json, applied_plugin_snapshot_json,
-          telemetry_finalized_at, started_at, ended_at, position, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          started_at, ended_at, position, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       m.id,
       conversationId,
@@ -1381,7 +1370,6 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
       normalizeMessageSessionModeForStorage(m.sessionMode),
       m.runContext ? JSON.stringify(m.runContext) : null,
       m.appliedPluginSnapshot ? JSON.stringify(m.appliedPluginSnapshot) : null,
-      m.telemetryFinalized === true ? now : null,
       m.startedAt ?? null,
       m.endedAt ?? null,
       position,
@@ -1415,27 +1403,6 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
     )
     .get(m.id) as DbRow | undefined;
   return row ? normalizeMessage(row) : null;
-}
-
-export function getMessageTelemetryFinalizationState(db: SqliteDb, messageId: string) {
-  const row = db
-    .prepare(
-      `SELECT telemetry_finalized_at AS telemetryFinalizedAt
-         FROM messages
-        WHERE id = ?`,
-    )
-    .get(messageId) as DbRow | undefined;
-  if (!row) {
-    return {
-      exists: false,
-      finalizedAt: null,
-    };
-  }
-  return {
-    exists: true,
-    finalizedAt:
-      typeof row.telemetryFinalizedAt === 'number' ? row.telemetryFinalizedAt : null,
-  };
 }
 
 export function appendMessageStatusEvent(db: SqliteDb, messageId: string, event: DbRow) {

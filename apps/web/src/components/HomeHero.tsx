@@ -34,15 +34,6 @@ import type {
 import { DesignSystemPicker } from './DesignSystemPicker';
 import type { SkillSummary } from '../types';
 import { Icon, type IconName } from './Icon';
-import { useAnalytics } from '../analytics/provider';
-import {
-  trackComposerSessionModeClick,
-  trackContextLinkResult,
-  trackFigmaHelpModalSurfaceView,
-  trackHomeChatComposerClick,
-  trackProjectReferenceModalSurfaceView,
-} from '../analytics/events';
-import { sessionModeToTracking } from '@open-design/contracts/analytics';
 import {
   chipsForGroup,
   orderedCreateChips,
@@ -346,9 +337,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
   },
   ref,
 ) {
-  const { locale, t } = useI18n();
-  const analytics = useAnalytics();
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  const { locale, t } = useI18n();  const [selectedIndex, setSelectedIndex] = useState(0);
   const [mentionTab, setMentionTab] = useState<HomeMentionTab>('all');
   const [hoveredPlugin, setHoveredPlugin] = useState<InstalledPluginRecord | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -875,26 +864,11 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
         }
       );
     }
-    setProjectReferenceOpen(false);
-    trackContextLinkResult(analytics.track, {
-      page_name: 'home',
-      area: 'chat_composer',
-      context_kind: 'project',
-      result: 'success',
-      count: selections.length,
-    });
-  }
+    setProjectReferenceOpen(false);  }
 
   async function handleLinkLocalCodeContext() {
     const selected = await onPickLocalCodeDir?.();
-    if (!selected) {
-      trackContextLinkResult(analytics.track, {
-        page_name: 'home',
-        area: 'chat_composer',
-        context_kind: 'local_code',
-        result: 'cancelled',
-      });
-      return;
+    if (!selected) {      return;
     }
     const label = selected.split(/[/\\]/).filter(Boolean).pop() || selected;
     appendWorkspacePrompt(
@@ -906,15 +880,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
         path: selected,
         absolutePath: selected,
       }
-    );
-    trackContextLinkResult(analytics.track, {
-      page_name: 'home',
-      area: 'chat_composer',
-      context_kind: 'local_code',
-      result: 'success',
-      count: 1,
-    });
-  }
+    );  }
 
   function openDesignSystemPicker() {
     const trigger = homeHeroRef.current?.querySelector<HTMLButtonElement>(
@@ -1019,14 +985,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
     onRemoveFile(index);
   }
 
-  function usePromptExample(example: string) {
-    trackHomeChatComposerClick(analytics.track, {
-      page_name: 'home',
-      area: 'chat_composer',
-      element: 'example_prompt',
-      chip_id: activeChipId ?? 'prototype',
-    });
-    setSelectedPromptExample({
+  function usePromptExample(example: string) {    setSelectedPromptExample({
       label: promptExampleChipLabel(example),
       promptText: example,
     });
@@ -1042,16 +1001,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
     triggerSendAttention();
   }
 
-  function pickExamplePluginPreset(record: InstalledPluginRecord, chipId: string, promptText: string) {
-    trackHomeChatComposerClick(analytics.track, {
-      page_name: 'home',
-      area: 'chat_composer',
-      element: 'example_prompt',
-      chip_id: chipId,
-      plugin_id: record.sourceMarketplaceEntryName ?? record.id,
-      plugin_type: record.marketplaceTrust ?? 'official',
-    });
-    setSelectedPromptExample({
+  function pickExamplePluginPreset(record: InstalledPluginRecord, chipId: string, promptText: string) {    setSelectedPromptExample({
       label: record.title,
       promptText,
     });
@@ -1065,14 +1015,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
 
   // The task-type rail (原型 / 幻灯片 / HyperFrames / 视频 / …). Records which
   // task type the user picked before delegating to the host's chip handler.
-  function handlePickTaskChip(chip: HomeHeroChip) {
-    trackHomeChatComposerClick(analytics.track, {
-      page_name: 'home',
-      area: 'chat_composer',
-      element: 'task_chip',
-      chip_id: chip.id,
-    });
-    // First chip pick completes the guide's first beat; the preset-card
+  function handlePickTaskChip(chip: HomeHeroChip) {    // First chip pick completes the guide's first beat; the preset-card
     // pulse arms once the example cards for this chip render.
     if (readHomeGuideStage() === 'chip') {
       writeHomeGuideStage('card');
@@ -1247,14 +1190,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
                   <button
                     type="button"
                     className="home-hero__active-clear od-tooltip"
-                    onClick={() => {
-                      trackHomeChatComposerClick(analytics.track, {
-                        page_name: 'home',
-                        area: 'chat_composer',
-                        element: 'plugin_chip_clear',
-                        chip_id: activePluginRecord?.id,
-                      });
-                      onClearActivePlugin();
+                    onClick={() => {                      onClearActivePlugin();
                     }}
                     aria-label={t('homeHero.clearActivePlugin')}
                     title={t('homeHero.clearActivePlugin')}
@@ -1317,15 +1253,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
                 <button
                   type="button"
                   className="home-hero__active-clear od-tooltip"
-                  onClick={() => {
-                    trackHomeChatComposerClick(analytics.track, {
-                      page_name: 'home',
-                      area: 'chat_composer',
-                      element: 'context_remove',
-                      resource_kind: 'plugin',
-                      resource_id: plugin.id,
-                    });
-                    onRemovePluginContext(plugin.id);
+                  onClick={() => {                    onRemovePluginContext(plugin.id);
                   }}
                   aria-label={t('chat.removeAria', { name: plugin.title })}
                   title={t('common.close')}
@@ -1351,15 +1279,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
                 <button
                   type="button"
                   className="home-hero__active-clear od-tooltip"
-                  onClick={() => {
-                    trackHomeChatComposerClick(analytics.track, {
-                      page_name: 'home',
-                      area: 'chat_composer',
-                      element: 'context_remove',
-                      resource_kind: 'workspace',
-                      resource_id: item.id,
-                    });
-                    const nextPrompt = stripHomeMentionToken(prompt, item.label);
+                  onClick={() => {                    const nextPrompt = stripHomeMentionToken(prompt, item.label);
                     if (nextPrompt !== prompt) onPromptChange(nextPrompt);
                     onRemoveWorkspaceContext(item.id);
                   }}
@@ -1551,128 +1471,29 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
             <ComposerPlusMenu
               triggerTestId="home-hero-plus-trigger"
               placementPreference="down"
-              onOpen={() =>
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_menu_open',
-                })
-              }
+              onOpen={() => {}}
               onSubmenuOpen={(submenu) => {
-                if (submenu === 'toolbox') return;
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_submenu_open',
-                  resource_kind: PLUS_SUBMENU_RESOURCE_KIND[submenu],
-                });
-              }}
-              onSearchUsed={(submenu) => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_search',
-                  resource_kind: PLUS_SUBMENU_RESOURCE_KIND[submenu],
-                });
-              }}
+                if (submenu === 'toolbox') return;              }}
+              onSearchUsed={(submenu) => {              }}
               plugins={pluginOptions}
-              onPickPlugin={(record) => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_pick',
-                  resource_kind: 'plugin',
-                  resource_id: record.id,
-                });
-                pickPlugin(record);
+              onPickPlugin={(record) => {                pickPlugin(record);
               }}
-              onAddPlugin={() => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_add',
-                  resource_kind: 'plugin',
-                });
-                onAddPlugin();
+              onAddPlugin={() => {                onAddPlugin();
               }}
               skills={skillOptions}
-              onPickSkill={(skill) => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_pick',
-                  resource_kind: 'skill',
-                  resource_id: skill.id,
-                });
-                pickSkill(skill);
+              onPickSkill={(skill) => {                pickSkill(skill);
               }}
-              onAttachFiles={() => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'attachment',
-                });
-                fileInputRef.current?.click();
+              onAttachFiles={() => {                fileInputRef.current?.click();
               }}
-              onReferenceProject={() => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_pick',
-                  resource_kind: 'workspace',
-                  resource_id: 'reference-project',
-                });
-                trackProjectReferenceModalSurfaceView(analytics.track, {
-                  page_name: 'home',
-                  area: 'project_reference_modal',
-                });
-                setProjectReferenceOpen(true);
-              }}
-              onLinkLocalCode={onPickLocalCodeDir ? () => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'plus_pick',
-                  resource_kind: 'workspace',
-                  resource_id: 'local-code',
-                });
-                void handleLinkLocalCodeContext();
+              onReferenceProject={() => setProjectReferenceOpen(true)}
+              onLinkLocalCode={onPickLocalCodeDir ? () => {                void handleLinkLocalCodeContext();
               } : undefined}
-              onSelectFromLibrary={() => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'library',
-                });
-                setLibraryPickerOpen(true);
+              onSelectFromLibrary={() => {                setLibraryPickerOpen(true);
               }}
-              onImportFigma={onImportFigma ? () => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'figma_import',
-                });
-                onImportFigma();
+              onImportFigma={onImportFigma ? () => {                onImportFigma();
               } : undefined}
-              onShowFigmaHelp={() => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'figma_help',
-                });
-                trackFigmaHelpModalSurfaceView(analytics.track, {
-                  page_name: 'home',
-                  area: 'figma_help_modal',
-                });
-                setFigmaHelpOpen(true);
-              }}
-              onOpenDesignSystems={onDesignSystemChange ? () => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'design_system_open',
-                });
-                openDesignSystemPicker();
+              onShowFigmaHelp={() => setFigmaHelpOpen(true)}
+              onOpenDesignSystems={onDesignSystemChange ? () => {                openDesignSystemPicker();
               } : undefined}
             />
             {libraryPickerOpen ? (
@@ -1683,17 +1504,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
             ) : null}
             {projectReferenceOpen ? (
               <ProjectReferenceModal
-                onClose={() => {
-                  // Only the dismiss paths (X / backdrop / Escape / Cancel)
-                  // land here — a confirmed pick closes via
-                  // handleReferenceProjects, which reports 'success'.
-                  trackContextLinkResult(analytics.track, {
-                    page_name: 'home',
-                    area: 'chat_composer',
-                    context_kind: 'project',
-                    result: 'cancelled',
-                  });
-                  setProjectReferenceOpen(false);
+                onClose={() => {                  setProjectReferenceOpen(false);
                 }}
                 onSelect={handleReferenceProjects}
               />
@@ -1743,15 +1554,7 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
               <SessionModeToggle
                 mode={sessionMode}
                 onChange={(next) => {
-                  if (next !== sessionMode) {
-                    trackComposerSessionModeClick(analytics.track, {
-                      page_name: 'home',
-                      area: 'chat_composer',
-                      element: 'session_mode_toggle',
-                      mode_before: sessionModeToTracking(sessionMode),
-                      mode_after: sessionModeToTracking(next),
-                    });
-                  }
+                  if (next !== sessionMode) {                  }
                   onSessionModeChange?.(next);
                 }}
               />
@@ -1797,29 +1600,11 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
             <WorkingDirPicker
               workingDir={workingDir}
               recentDirs={recentDirs}
-              onPickDirectory={() => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'working_dir',
-                });
-                void onPickWorkingDir();
+              onPickDirectory={() => {                void onPickWorkingDir();
               }}
-              onSelectRecent={(dir) => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'working_dir_recent',
-                });
-                onSelectRecentWorkingDir?.(dir);
+              onSelectRecent={(dir) => {                onSelectRecentWorkingDir?.(dir);
               }}
-              onClear={() => {
-                trackHomeChatComposerClick(analytics.track, {
-                  page_name: 'home',
-                  area: 'chat_composer',
-                  element: 'working_dir_clear',
-                });
-                onClearWorkingDir?.();
+              onClear={() => {                onClearWorkingDir?.();
               }}
             />
           ) : null}
@@ -1866,25 +1651,9 @@ export const HomeHero = forwardRef<HomeHeroHandle, Props>(function HomeHero(
           subChips={activeSubChips}
           selectedSlug={selectedSubcategory}
           pluginsLoading={pluginsLoading}
-          onPickSubChip={(sub) => {
-            trackHomeChatComposerClick(analytics.track, {
-              page_name: 'home',
-              area: 'chat_composer',
-              element: 'subcategory_chip',
-              chip_id: activeChipId ?? undefined,
-              subcategory: sub.slug,
-            });
-            setSelectedSubcategory((current) => (current === sub.slug ? null : sub.slug));
+          onPickSubChip={(sub) => {            setSelectedSubcategory((current) => (current === sub.slug ? null : sub.slug));
           }}
-          onSelectAll={() => {
-            trackHomeChatComposerClick(analytics.track, {
-              page_name: 'home',
-              area: 'chat_composer',
-              element: 'subcategory_chip',
-              chip_id: activeChipId ?? undefined,
-              subcategory: 'all',
-            });
-            setSelectedSubcategory(null);
+          onSelectAll={() => {            setSelectedSubcategory(null);
           }}
         />
       ) : null}
@@ -2043,19 +1812,13 @@ function PluginPromptPresets({
   );
 }
 
-const FIRST_PARTY_WEB_CLONE_SITE_ICONS: Record<string, string> = {
-  'open-design.ai': '/logo.png',
-};
-
 function webCloneFaviconUrl(domain: string): string {
   return `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(domain)}`;
 }
 
-// A Website-clone text example ("Website URL to clone: https://open-design.ai") —
-// pull the site out so the card can show the site's own mark + bare domain
-// instead of the raw prompt line. First-party bundled examples use local assets
-// so the first screen is stable without waiting on a remote favicon service.
-// Returns null for non-URL examples so the generic text card renders unchanged.
+// Pull the site out of a Website-clone example so the card can show the site's
+// mark + bare domain instead of the raw prompt line. Returns null for non-URL
+// examples so the generic text card renders unchanged.
 function webCloneExampleSite(example: string): { domain: string; iconUrl: string; fallbackIconUrl?: string } | null {
   const match = example.match(/https?:\/\/[^\s"'<>]+/i);
   if (!match) return null;
@@ -2066,11 +1829,9 @@ function webCloneExampleSite(example: string): { domain: string; iconUrl: string
     return null;
   }
   if (!hostname || !hostname.includes('.')) return null;
-  const firstPartyIcon = FIRST_PARTY_WEB_CLONE_SITE_ICONS[hostname];
   return {
     domain: hostname,
-    iconUrl: firstPartyIcon ?? webCloneFaviconUrl(hostname),
-    ...(firstPartyIcon ? { fallbackIconUrl: webCloneFaviconUrl(hostname) } : {}),
+    iconUrl: webCloneFaviconUrl(hostname),
   };
 }
 
@@ -3930,7 +3691,7 @@ function fallbackPluginPresetPrompt(
 const HOME_PROMPT_EXAMPLES: Record<Locale, Record<string, string[]>> = {
   "en": {
     "web-clone": [
-      "Website URL to clone: https://open-design.ai",
+      "Website URL to clone: https://www.apple.com",
     ],
     prototype: [
       "Design a high-converting website for an AI CRM with a clear hero, feature story, proof points, and trial CTA",
@@ -4065,7 +3826,7 @@ const HOME_PROMPT_EXAMPLES: Record<Locale, Record<string, string[]>> = {
   },
   "zh-CN": {
     "web-clone": [
-      "想要复刻的网站链接：https://open-design.ai",
+      "想要复刻的网站链接：https://www.apple.com",
     ],
     prototype: [
       "为 AI CRM 设计一个高转化官网，包含首屏、功能卖点、客户案例和清晰的试用入口",

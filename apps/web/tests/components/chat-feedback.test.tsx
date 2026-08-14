@@ -113,7 +113,7 @@ function renderChatPane({
     onAssistantFeedback,
     ...render(
       <ChatPane
-        projectKindForTracking="prototype"
+        projectKind="prototype"
         messages={messages}
         streaming={streaming}
         error={null}
@@ -273,11 +273,6 @@ describe('chat assistant feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Helpful' }));
     expect(screen.getByText('Tell us why')).toBeTruthy();
     expect(screen.getByText('😊')).toBeTruthy();
-    expect(
-      screen.getByTestId('assistant-feedback-discord-positive').getAttribute('href'),
-    ).toBe('https://discord.gg/mHAjSMV6gz');
-    expect(screen.getByText(/Share what you made with the/i)).toBeTruthy();
-
     fireEvent.click(screen.getByLabelText('Understood my request'));
     fireEvent.click(screen.getByLabelText('Other'));
     fireEvent.change(screen.getByPlaceholderText('Add a short note...'), {
@@ -363,12 +358,6 @@ describe('chat assistant feedback', () => {
 
     expect(screen.getByText('Tell us why')).toBeTruthy();
     expect(screen.getByText('😔')).toBeTruthy();
-    expect(
-      screen.getByTestId('assistant-feedback-discord-negative').getAttribute('href'),
-    ).toBe('https://discord.gg/mHAjSMV6gz');
-    expect(
-      screen.getByText(/so the team can understand what went wrong/i),
-    ).toBeTruthy();
   });
 
   it('scrolls the feedback reasons panel into view after selecting a rating', () => {

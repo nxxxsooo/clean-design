@@ -45,7 +45,6 @@ interface StartedServer {
 const realFetch = globalThis.fetch;
 let baseUrl: string;
 let server: http.Server;
-const FAKE_VELA_FIXTURE = path.resolve(process.cwd(), 'tests', 'fixtures', 'fake-vela.mjs');
 
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify(body), {
@@ -147,18 +146,6 @@ async function withOnlyFakeOpenClaude<T>(script: string, run: () => Promise<T>):
 
 async function withFakeOpenCode<T>(script: string, run: () => Promise<T>): Promise<T> {
   return withFakeAgent('opencode', script, run);
-}
-
-async function withFakeCursorAgent<T>(script: string, run: () => Promise<T>): Promise<T> {
-  return withFakeAgent('cursor-agent', script, run);
-}
-
-async function withFakeDeepSeek<T>(script: string, run: () => Promise<T>): Promise<T> {
-  return withFakeAgent('deepseek', script, run);
-}
-
-async function withFakeKimi<T>(script: string, run: () => Promise<T>): Promise<T> {
-  return withFakeAgent('kimi', script, run);
 }
 
 async function withFakeAntigravity<T>(script: string, run: () => Promise<T>): Promise<T> {
@@ -2166,20 +2153,6 @@ describe('POST /api/test/connection provider mode', () => {
     }
   });
 
-  it('resolves system proxy env for each HTTP proxy dispatcher request', async () => {
-    const proxySpy = vi.spyOn(platform, 'resolveSystemProxyEnv').mockReturnValue({});
-
-    try {
-      const { close, requestInit } = proxyDispatcherRequestInit();
-
-      expect(proxySpy).toHaveBeenCalledWith();
-      expect(requestInit).toEqual({});
-      await expect(close()).resolves.toBeUndefined();
-    } finally {
-      proxySpy.mockRestore();
-    }
-  });
-
   it('reports malformed proxy env without leaking the connection-test timer', async () => {
     const originalHttpProxy = process.env.HTTP_PROXY;
     const originalHttpsProxy = process.env.HTTPS_PROXY;
@@ -3516,67 +3489,6 @@ setInterval(() => {}, 1000);
     },
   );
 
-  it('launches Kimi connection tests without the legacy acp positional arg', async () => {
-    const markerDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'od-kimi-argv-'));
-    const argvFile = path.join(markerDir, 'argv.json');
-    try {
-      await withFakeKimi(
-        `
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-fs.writeFileSync(${JSON.stringify(argvFile)}, JSON.stringify(args));
-if (args.includes('acp')) {
-  console.error('error: too many arguments. Expected 0 arguments but got 1.');
-  process.exit(1);
-}
-const promptIndex = args.indexOf('-p');
-if (promptIndex === -1 || args[promptIndex + 1] !== 'Reply with only: ok') {
-  console.error('missing connection-test prompt');
-  process.exit(1);
-}
-const outputFormatIndex = args.indexOf('--output-format');
-if (outputFormatIndex === -1 || args[outputFormatIndex + 1] !== 'stream-json') {
-  console.error('missing --output-format stream-json');
-  process.exit(1);
-}
-console.log(JSON.stringify({ role: 'assistant', content: 'ok' }));
-`,
-        async () => {
-          const res = await realFetch(`${baseUrl}/api/test/connection`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({
-              mode: 'agent',
-              agentId: 'kimi',
-              model: 'moonshot-v1-32k',
-            }),
-          });
-          expect(res.status).toBe(200);
-          await expect(res.json()).resolves.toMatchObject({
-            ok: true,
-            kind: 'success',
-            agentName: 'Kimi CLI',
-            model: 'moonshot-v1-32k',
-            sample: 'ok',
-          });
-
-          await expect(fsp.readFile(argvFile, 'utf8')).resolves.toBe(
-            JSON.stringify([
-              '-p',
-              'Reply with only: ok',
-              '--output-format',
-              'stream-json',
-              '--model',
-              'moonshot-v1-32k',
-            ]),
-          );
-        },
-      );
-    } finally {
-      await fsp.rm(markerDir, { recursive: true, force: true });
-    }
-  });
-
   // Regression for #4281: agy print mode is silent on stdout/stderr for
   // BOTH missing-auth and quota-exhausted failures — it exits 0 without
   // echoing the upstream error, so the only place the failure shape
@@ -3701,165 +3613,6 @@ console.log(JSON.stringify({ type: 'text', part: { text: 'ok' } }));
       process.env.PATH = oldPath;
       await fsp.rm(gitDir, { recursive: true, force: true });
     }
-  });
-
-  it('reports Cursor Agent status auth failures before running the smoke prompt', async () => {
-    await withFakeCursorAgent(
-      `
-const args = process.argv.slice(2);
-if (args[0] === '--version') {
-  console.log('2026.05.07-test');
-  process.exit(0);
-}
-if (args[0] === 'models') {
-  console.log('No models available for this account.');
-  process.exit(0);
-}
-if (args[0] === 'status') {
-  console.error("Authentication required. Please run 'agent login' first, or set CURSOR_API_KEY environment variable.");
-  process.exit(1);
-}
-console.error('smoke prompt should not run when status reports missing auth');
-process.exit(1);
-`,
-      async () => {
-        const res = await realFetch(`${baseUrl}/api/test/connection`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ mode: 'agent', agentId: 'cursor-agent' }),
-        });
-        expect(res.status).toBe(200);
-        await expect(res.json()).resolves.toMatchObject({
-          ok: false,
-          kind: 'agent_auth_required',
-          agentName: 'Cursor Agent',
-          detail: expect.stringContaining('cursor-agent login'),
-        });
-      },
-    );
-  });
-
-  it('reports Cursor Agent Not logged in status before running the smoke prompt', async () => {
-    await withFakeCursorAgent(
-      `
-const args = process.argv.slice(2);
-if (args[0] === '--version') {
-  console.log('2026.05.07-test');
-  process.exit(0);
-}
-if (args[0] === 'models') {
-  console.log('No models available for this account.');
-  process.exit(0);
-}
-if (args[0] === 'status') {
-  console.error('Not logged in');
-  process.exit(1);
-}
-console.error('smoke prompt should not run when status reports missing auth');
-process.exit(1);
-`,
-      async () => {
-        const res = await realFetch(`${baseUrl}/api/test/connection`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ mode: 'agent', agentId: 'cursor-agent' }),
-        });
-        expect(res.status).toBe(200);
-        await expect(res.json()).resolves.toMatchObject({
-          ok: false,
-          kind: 'agent_auth_required',
-          agentName: 'Cursor Agent',
-          detail: expect.stringContaining('cursor-agent login'),
-        });
-      },
-    );
-  });
-
-  it('classifies Cursor Agent runtime auth failures from stderr', async () => {
-    await withFakeCursorAgent(
-      `
-const args = process.argv.slice(2);
-if (args[0] === '--version') {
-  console.log('2026.05.07-test');
-  process.exit(0);
-}
-if (args[0] === 'models') {
-  console.log('auto');
-  process.exit(0);
-}
-if (args[0] === 'status') {
-  console.log('Authenticated');
-  process.exit(0);
-}
-console.error("Authentication required. Please run 'agent login' first, or set CURSOR_API_KEY environment variable.");
-process.exit(1);
-`,
-      async () => {
-        const result = await testAgentConnection({ agentId: 'cursor-agent' });
-        expect(result).toMatchObject({
-          ok: false,
-          kind: 'agent_auth_required',
-          agentName: 'Cursor Agent',
-          detail: expect.stringContaining('cursor-agent status'),
-        });
-      },
-    );
-  });
-
-  it('classifies DeepSeek TUI config guidance from stderr as missing auth', async () => {
-    await withFakeDeepSeek(
-      `
-const args = process.argv.slice(2);
-if (args[0] === '--version') {
-  console.log('deepseek 0.3.0-test');
-  process.exit(0);
-}
-console.error('KEY=<your-key> deepseek --api-key <your-key>');
-console.error('api_key = "<your-key>" in ~/.deepseek/config.toml');
-process.exit(0);
-`,
-      async () => {
-        const result = await testAgentConnection({ agentId: 'deepseek' });
-        expect(result).toMatchObject({
-          ok: false,
-          kind: 'agent_auth_required',
-          agentName: 'DeepSeek TUI',
-          detail: expect.stringContaining('~/.deepseek/config.toml'),
-        });
-        expect(result.detail).toContain('DEEPSEEK_API_KEY');
-      },
-    );
-  });
-
-  it('keeps non-auth Cursor Agent runtime failures on the generic spawn path', async () => {
-    await withFakeCursorAgent(
-      `
-const args = process.argv.slice(2);
-if (args[0] === '--version') {
-  console.log('2026.05.07-test');
-  process.exit(0);
-}
-if (args[0] === 'models') {
-  console.log('auto');
-  process.exit(0);
-}
-if (args[0] === 'status') {
-  console.log('Authenticated');
-  process.exit(0);
-}
-console.error('workspace path does not exist');
-process.exit(1);
-`,
-      async () => {
-        const result = await testAgentConnection({ agentId: 'cursor-agent' });
-        expect(result).toMatchObject({
-          ok: false,
-          kind: 'agent_spawn_failed',
-          agentName: 'Cursor Agent',
-        });
-        expect(result.detail).toContain('workspace path does not exist');
-      },
-    );
   });
 
   it('rejects invalid custom model ids before spawning an agent', async () => {
@@ -4029,6 +3782,17 @@ setInterval(() => {}, 1000);
     expect(body.model).toBe('default');
   });
 
+  it('does not expose the internal BYOK runtime through local CLI connection tests', async () => {
+    const result = await testAgentConnection({ agentId: 'byok-opencode' });
+
+    expect(result).toMatchObject({
+      ok: false,
+      kind: 'agent_not_installed',
+      agentName: 'byok-opencode',
+      model: 'default',
+    });
+  });
+
   it('rejects requests missing agentId with HTTP 400', async () => {
     const res = await realFetch(`${baseUrl}/api/test/connection`, {
       method: 'POST',
@@ -4132,53 +3896,6 @@ process.stdin.on('end', () => {
     }
   });
 
-  it('attaches diagnostics when the preflight auth probe reports missing auth (#2248)', async () => {
-    // Cursor Agent's preflight `cursor-agent status` check rejects the
-    // smoke run before the daemon ever spawns the smoke prompt. The
-    // initial #2248 pass forgot to stamp diagnostics on that return
-    // path, which contradicted the "Always set on local agent test
-    // responses" contract in packages/contracts. Lock the contract,
-    // and additionally lock the probe's own stderr/exit metadata —
-    // without those, the diagnostics block would drop the only context
-    // a caller has on a missing-auth failure (no smoke spawn ever ran,
-    // so the smoke sink is empty).
-    await withFakeCursorAgent(
-      `
-const args = process.argv.slice(2);
-if (args[0] === '--version') {
-  console.log('2026.05.07-test');
-  process.exit(0);
-}
-if (args[0] === 'models') {
-  console.log('auto');
-  process.exit(0);
-}
-if (args[0] === 'status') {
-  console.error('Not logged in');
-  process.exit(1);
-}
-console.error('smoke prompt should not run when status reports missing auth');
-process.exit(1);
-`,
-      async () => {
-        const result = await testAgentConnection({ agentId: 'cursor-agent' });
-        expect(result).toMatchObject({
-          ok: false,
-          kind: 'agent_auth_required',
-        });
-        expect(result.diagnostics).toBeDefined();
-        // Preflight runs after binary resolution but before the smoke
-        // spawn, so phase should still be 'binary_resolution'.
-        expect(result.diagnostics?.phase).toBe('binary_resolution');
-        expect(result.diagnostics?.binaryPath ?? '').toMatch(/cursor-agent/);
-        // The probe child wrote "Not logged in" on stderr and exited
-        // 1; both must propagate into diagnostics so Settings/CLI can
-        // render the structured auth-failure context.
-        expect(result.diagnostics?.stderrTail ?? '').toContain('Not logged in');
-        expect(result.diagnostics?.exitCode).toBe(1);
-      },
-    );
-  });
 });
 
 describe('connection test helpers', () => {

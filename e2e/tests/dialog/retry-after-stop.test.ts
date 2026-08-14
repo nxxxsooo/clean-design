@@ -37,7 +37,6 @@ describe('dialog retry after stop', () => {
           designSystemId: null,
           onboardingCompleted: true,
           skillId: null,
-          telemetry: { artifactManifest: true, content: false, metrics: false },
         },
         method: 'PUT',
       });

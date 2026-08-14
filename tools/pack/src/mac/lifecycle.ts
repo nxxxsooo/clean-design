@@ -26,13 +26,12 @@ import {
   stopProcesses,
 } from "@open-design/platform";
 import type { ToolPackConfig } from "../config.js";
-import { readToolPackLauncherRuntimeSnapshot } from "../launcher-runtime-snapshot.js";
 import { PACKAGED_CONFIG_PATH_ENV, writeLaunchPackagedConfig } from "./app-config.js";
 import { DESKTOP_LOG_ECHO_ENV } from "./constants.js";
 import { pathExists, scrubMacExtendedAttributes } from "./fs.js";
 import { resolveMacInstallIdentity } from "./identity.js";
-import { desktopIdentityPath, desktopLogPath, macAppExecutablePath, resolveMacPaths } from "./paths.js";
-import type { DesktopRootIdentityFallback, DesktopRootIdentityMarker, MacCleanupResult, MacInspectResult, MacInstallResult, MacStartResult, MacStartSource, MacStopResult, MacUninstallResult } from "./types.js";
+import { desktopIdentityPath, desktopLogPath, macAppExecutablePath, resolveMacPaths, resolveMacProductNamespaceRoot } from "./paths.js";
+import type { DesktopRootIdentityFallback, DesktopRootIdentityMarker, MacCleanupResult, MacInspectResult, MacInstallResult, MacRemovalTarget, MacStartResult, MacStartSource, MacStopResult, MacUninstallResult } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -93,10 +92,10 @@ async function readDesktopRootIdentityMarker(config: ToolPackConfig): Promise<{
   marker: DesktopRootIdentityMarker | null;
 }> {
   const markerPath = desktopIdentityPath(config);
-  let payload: unknown;
+  let markerValue: unknown;
 
   try {
-    payload = JSON.parse(await readFile(markerPath, "utf8"));
+    markerValue = JSON.parse(await readFile(markerPath, "utf8"));
   } catch (error) {
     const code = typeof error === "object" && error != null && "code" in error
       ? String((error as { code?: unknown }).code)
@@ -110,7 +109,7 @@ async function readDesktopRootIdentityMarker(config: ToolPackConfig): Promise<{
     };
   }
 
-  if (!isDesktopRootIdentityMarker(payload)) {
+  if (!isDesktopRootIdentityMarker(markerValue)) {
     return {
       fallback: {
         markerPath,
@@ -122,11 +121,11 @@ async function readDesktopRootIdentityMarker(config: ToolPackConfig): Promise<{
 
   return {
     fallback: {
-      marker: summarizeDesktopMarker(payload),
+      marker: summarizeDesktopMarker(markerValue),
       markerPath,
       reason: "marker-present",
     },
-    marker: payload,
+    marker: markerValue,
   };
 }
 
@@ -555,8 +554,8 @@ export async function startPackedMacApp(config: ToolPackConfig): Promise<MacStar
   const exit = watchProcessExit(child);
   const earlyExit = await exit.wait(1500);
   child.unref();
-  const cleanLauncherExit = earlyExit?.code === 0 && earlyExit.signal == null;
-  if (earlyExit != null && !cleanLauncherExit) {
+  const cleanBootstrapExit = earlyExit?.code === 0 && earlyExit.signal == null;
+  if (earlyExit != null && !cleanBootstrapExit) {
     throw new Error(await createLaunchFailureMessage(config, target, {
       pid,
       reason: `process exited early ${formatExit(earlyExit)}`,
@@ -567,7 +566,7 @@ export async function startPackedMacApp(config: ToolPackConfig): Promise<MacStar
   if (status == null && earlyExit != null) {
     throw new Error(await createLaunchFailureMessage(config, target, {
       pid,
-      reason: `launcher exited cleanly before desktop IPC was available ${formatExit(earlyExit)}`,
+      reason: `bootstrap process exited cleanly before desktop IPC was available ${formatExit(earlyExit)}`,
     }));
   }
   const delayedExit = exit.current();
@@ -704,7 +703,6 @@ export async function inspectPackedMacApp(config: ToolPackConfig, options: { exp
         { timeoutMs: 5000 },
       ),
     }),
-    launcher: await readToolPackLauncherRuntimeSnapshot(config),
     ...(options.path == null ? {} : {
       screenshot: await requestJsonIpc<DesktopScreenshotResult>(
         stamp.ipc,
@@ -716,16 +714,52 @@ export async function inspectPackedMacApp(config: ToolPackConfig, options: { exp
   };
 }
 
+export async function createMacRemovalPlan(config: ToolPackConfig): Promise<MacRemovalTarget[]> {
+  const productNamespaceRoot = resolveMacProductNamespaceRoot(config);
+  const runtimeNamespaceRoot = config.roots.runtime.namespaceRoot;
+  const targets: Array<Omit<MacRemovalTarget, "exists">> = [
+    { path: join(runtimeNamespaceRoot, "data"), scope: "data", willRemove: config.removeData },
+    { path: join(productNamespaceRoot, "data"), scope: "data", willRemove: config.removeData },
+    { path: join(runtimeNamespaceRoot, "logs"), scope: "logs", willRemove: config.removeLogs },
+    { path: join(productNamespaceRoot, "logs"), scope: "logs", willRemove: config.removeLogs },
+    { path: join(runtimeNamespaceRoot, "runtime"), scope: "sidecars", willRemove: config.removeSidecars },
+    { path: join(productNamespaceRoot, "runtime"), scope: "sidecars", willRemove: config.removeSidecars },
+    {
+      path: join(runtimeNamespaceRoot, "user-data"),
+      scope: "product-user-data",
+      willRemove: config.removeProductUserData,
+    },
+    {
+      path: join(productNamespaceRoot, "user-data"),
+      scope: "product-user-data",
+      willRemove: config.removeProductUserData,
+    },
+  ];
+
+  return await Promise.all(
+    targets.map(async (target) => ({ ...target, exists: await pathExists(target.path) })),
+  );
+}
+
+async function applyMacRemovalPlan(removalPlan: MacRemovalTarget[]): Promise<void> {
+  for (const target of removalPlan) {
+    if (target.willRemove) await rm(target.path, { force: true, recursive: true });
+  }
+}
+
 export async function uninstallPackedMacApp(config: ToolPackConfig): Promise<MacUninstallResult> {
   const paths = resolveMacPaths(config);
   const stop = await stopPackedMacApp(config);
+  const removalPlan = await createMacRemovalPlan(config);
   const removed = await pathExists(paths.installedAppPath);
   await rm(paths.installedAppPath, { force: true, recursive: true });
+  await applyMacRemovalPlan(removalPlan);
 
   return {
     installedAppPath: paths.installedAppPath,
     namespace: config.namespace,
     removed,
+    removalPlan,
     stop,
   };
 }
@@ -734,9 +768,11 @@ export async function cleanupPackedMacNamespace(config: ToolPackConfig): Promise
   const paths = resolveMacPaths(config);
   const stop = await stopPackedMacApp(config);
   const detachedMount = await detachMount(paths.mountPoint);
+  const removalPlan = await createMacRemovalPlan(config);
   const removedOutputRoot = await pathExists(config.roots.output.namespaceRoot);
   const removedRuntimeNamespaceRoot = await pathExists(config.roots.runtime.namespaceRoot);
 
+  await applyMacRemovalPlan(removalPlan);
   await rm(config.roots.output.namespaceRoot, { force: true, recursive: true });
   await rm(config.roots.runtime.namespaceRoot, { force: true, recursive: true });
 
@@ -746,6 +782,7 @@ export async function cleanupPackedMacNamespace(config: ToolPackConfig): Promise
     outputRoot: config.roots.output.namespaceRoot,
     removedOutputRoot,
     removedRuntimeNamespaceRoot,
+    removalPlan,
     runtimeNamespaceRoot: config.roots.runtime.namespaceRoot,
     stop,
   };

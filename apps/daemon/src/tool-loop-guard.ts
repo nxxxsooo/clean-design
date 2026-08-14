@@ -14,8 +14,8 @@
  * MAX_BYOK_TOOL_LOOPS; the autonomous chat agents had no equivalent.)
  *
  * This guard observes the normalized `tool_use` / `tool_result` events that
- * EVERY agent stream emits (Claude stream-json, Codex/OpenCode json-event,
- * Copilot, ACP, …), so a single run-scoped instance covers all of them. It is
+ * every retained agent stream emits, so a single run-scoped instance covers
+ * all of them. It is
  * pure and synchronous: feed it events, it returns a verdict the moment a loop
  * signature crosses a threshold. Two independent triggers:
  *

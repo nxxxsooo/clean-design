@@ -97,13 +97,9 @@ export interface ProjectMetadata {
   // live-artifact skill/system-prompt path). `web-clone`: website reproduction
   // projects from the Home `Website clone` card — stored as prototypes so they
   // keep prototype preview behavior, but the intent routes the `example-web-clone`
-  // scenario plugin and splits them into their own `web_clone` analytics kind.
-  // `document`: resume/report/PDF projects from the Home `document` card — an
-  // analytics-only discriminator (no product behavior keys off it) so a created
-  // `other`-kind project reports `project_kind: 'document'` instead of generic
-  // `other`. `webgl-experience` and `worker-visualizer`: the powered-preview
-  // GPU / off-main-thread scenario cards — analytics-only discriminators for the
-  // powered-artifact chips.
+  // scenario plugin. `document`: resume/report/PDF projects from the Home
+  // `document` card. `webgl-experience` and `worker-visualizer`: powered-preview
+  // GPU / off-main-thread scenario cards.
   intent?: 'live-artifact' | 'web-clone' | 'document' | 'webgl-experience' | 'worker-visualizer';
   fidelity?: 'wireframe' | 'high-fidelity';
   speakerNotes?: boolean;
@@ -201,8 +197,7 @@ export interface ProjectMetadata {
   sourceProjectName?: string;
   // AI-optimize (deep enrichment) state for a programmatically-extracted DS.
   // `programmatic` (or unset) = fast pass only; `ai_refined` = a user-triggered
-  // enrichment run completed successfully. Lets analytics compare the two
-  // cohorts' retention/usage (tracking spec C15 / §6).
+  // enrichment run completed successfully.
   enrichmentStatus?: 'programmatic' | 'ai_refined';
   enrichmentCompletedAt?: number;
 }

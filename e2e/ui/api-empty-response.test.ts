@@ -23,8 +23,6 @@ test.beforeEach(async ({ page }) => {
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: {},
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
@@ -42,8 +40,6 @@ test.beforeEach(async ({ page }) => {
           skillId: null,
           designSystemId: null,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
         },
       },
     });

@@ -35,11 +35,7 @@ describe("desktop package runtime shape", () => {
     const packagedSource = readFileSync(packagedSourcePath, "utf8");
     expect(packagedSource).toContain('preloadPath: join(app.getAppPath(), "preload.cjs")');
 
-    for (const relativePath of [
-      "tools/pack/src/mac/app.ts",
-      "tools/pack/src/win/app.ts",
-      "tools/pack/src/linux.ts",
-    ]) {
+    for (const relativePath of ["tools/pack/src/mac/app.ts"]) {
       const source = readFileSync(join(repoRoot, relativePath), "utf8");
       expect(source).toContain('"apps", "desktop", "dist", "main", "preload.cjs"');
       expect(source).toContain('join(paths.assembledAppRoot, "preload.cjs")');

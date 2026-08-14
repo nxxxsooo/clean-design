@@ -77,22 +77,6 @@ export function spawnEnvForAgent(
     }
     return finalizeRuntimeEnv(env, sandboxRuntime);
   }
-  if (agentId === 'mimo') {
-    stripKeysCaseInsensitive(env, [
-      'MIMOCODE',
-      'MIMOCODE_PID',
-      'MIMOCODE_RUN_ID',
-      'MIMOCODE_SERVER_PASSWORD',
-    ]);
-    // MiMo builds on the same toolchain as OpenCode and has the same
-    // workspace-corruption risk when project-config discovery walks up from
-    // cwd to a pnpm workspace root and runs its own install. Disable it so
-    // MiMo only honors the config injected through MIMOCODE_CONFIG_CONTENT.
-    if (!env.MIMOCODE_DISABLE_PROJECT_CONFIG?.trim()) {
-      env.MIMOCODE_DISABLE_PROJECT_CONFIG = 'true';
-    }
-    return finalizeRuntimeEnv(env, sandboxRuntime);
-  }
   return finalizeRuntimeEnv(env, sandboxRuntime);
 }
 

@@ -35,9 +35,7 @@ interface Props {
   onDuplicate?: (record: InstalledPluginRecord) => void;
   isApplying?: boolean;
   hideUseAction?: boolean;
-  // Analytics — fires when the user picks an item inside the PreviewModal
-  // share popover (media / html / design variants only; the scenario
-  // fallback has no share popover).
+  // Fires when the user picks an item inside the PreviewModal share popover.
   onSharePopoverItemClick?: (item: PreviewSharePopoverItem) => void;
 }
 

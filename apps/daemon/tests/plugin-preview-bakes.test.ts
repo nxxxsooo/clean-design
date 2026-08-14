@@ -11,8 +11,6 @@ import {
   PLUGIN_PREVIEWS_ROUTE,
 } from '../src/plugins/plugin-preview-bakes.js';
 
-const PUBLIC_BASE = 'https://repo-assets.open-design.ai/plugin-previews';
-
 interface ManifestEntry {
   video: string;
   poster: string;
@@ -101,7 +99,7 @@ describe('plugin preview bake manifest', () => {
 });
 
 describe('bakedPreviewBlock', () => {
-  it('uses the public preview origin when the manifest points to remote-only nested assets', async () => {
+  it('ignores a manifest entry when its preview assets are not present locally', async () => {
     tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-baked-preview-'));
     await writeManifest(tmpDir, {
       'html-plugin': {
@@ -113,11 +111,7 @@ describe('bakedPreviewBlock', () => {
       },
     });
 
-    expect(bakedPreviewBlock('html-plugin', tmpDir)).toEqual({
-      video: `${PUBLIC_BASE}/html-plugin/abc123abc123abcd/preview.mp4`,
-      poster: `${PUBLIC_BASE}/html-plugin/abc123abc123abcd/poster.jpg`,
-      holdMs: 2500,
-    });
+    expect(bakedPreviewBlock('html-plugin', tmpDir)).toBeNull();
   });
 
   it('uses the daemon static route when nested preview assets exist on disk', async () => {
@@ -143,7 +137,7 @@ describe('bakedPreviewBlock', () => {
     });
   });
 
-  it('lets an explicit preview base override both local and public origins', async () => {
+  it('ignores a remote base override when the local assets are absent', async () => {
     tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-baked-preview-'));
     previousBaseUrl = process.env.OD_PLUGIN_PREVIEWS_BASE_URL;
     process.env.OD_PLUGIN_PREVIEWS_BASE_URL = 'https://cdn.example.test/previews/';
@@ -156,16 +150,17 @@ describe('bakedPreviewBlock', () => {
       },
     });
 
-    expect(bakedPreviewBlock('html-plugin', tmpDir)).toEqual({
-      video: 'https://cdn.example.test/previews/html-plugin/fed987fed987abcd/preview.mp4',
-      poster: 'https://cdn.example.test/previews/html-plugin/fed987fed987abcd/poster.jpg',
-    });
+    expect(bakedPreviewBlock('html-plugin', tmpDir)).toBeNull();
   });
 });
 
 describe('applyBakedPreviews', () => {
   it('attaches baked previews without overwriting authored preview blocks', async () => {
     tmpDir = await mkdtemp(path.join(os.tmpdir(), 'od-baked-preview-'));
+    const nested = path.join(tmpDir, 'html-plugin', 'aaaabbbbccccdddd');
+    await mkdir(nested, { recursive: true });
+    await writeFile(path.join(nested, 'preview.mp4'), 'clip');
+    await writeFile(path.join(nested, 'poster.jpg'), 'poster');
     await writeManifest(tmpDir, {
       'html-plugin': {
         video: 'html-plugin/aaaabbbbccccdddd/preview.mp4',
@@ -196,8 +191,8 @@ describe('applyBakedPreviews', () => {
     expect(bakedRecord).not.toBe(records[0]);
     expect(bakedRecord?.manifest.od.preview).toEqual({ type: 'html', entry: './index.html' });
     expect(bakedRecord?.manifest.od.bakedPreview).toEqual({
-      video: `${PUBLIC_BASE}/html-plugin/aaaabbbbccccdddd/preview.mp4`,
-      poster: `${PUBLIC_BASE}/html-plugin/aaaabbbbccccdddd/poster.jpg`,
+      video: `${PLUGIN_PREVIEWS_ROUTE}/html-plugin/aaaabbbbccccdddd/preview.mp4`,
+      poster: `${PLUGIN_PREVIEWS_ROUTE}/html-plugin/aaaabbbbccccdddd/poster.jpg`,
       holdMs: 2500,
     });
     expect(out[1]).toBe(records[1]);

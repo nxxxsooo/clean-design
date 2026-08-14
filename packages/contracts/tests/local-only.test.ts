@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CLEAN_DESIGN_INTERNAL_AGENT_IDS,
+  CLEAN_DESIGN_PUBLIC_CLI_AGENT_IDS,
   CLEAN_DESIGN_DISABLED_API_PREFIXES,
-  isCleanDesignDisabledAgent,
   isCleanDesignDisabledApiPath,
+  isCleanDesignInternalAgent,
+  isCleanDesignPublicAgent,
+  isCleanDesignPublicCliAgent,
 } from '../src/local-only.js';
 
 describe('Clean Design local-only policy', () => {
@@ -51,10 +55,50 @@ describe('Clean Design local-only policy', () => {
     }
   });
 
-  it('removes AMR while retaining local CLI agents', () => {
-    expect(isCleanDesignDisabledAgent('amr')).toBe(true);
-    expect(isCleanDesignDisabledAgent('claude')).toBe(false);
-    expect(isCleanDesignDisabledAgent('codex')).toBe(false);
-    expect(isCleanDesignDisabledAgent('opencode')).toBe(false);
+  it('exposes exactly the five supported public CLI ids', () => {
+    expect(CLEAN_DESIGN_PUBLIC_CLI_AGENT_IDS).toEqual([
+      'claude',
+      'codex',
+      'antigravity',
+      'opencode',
+      'pi',
+    ]);
+    for (const agentId of CLEAN_DESIGN_PUBLIC_CLI_AGENT_IDS) {
+      expect(isCleanDesignPublicCliAgent(agentId)).toBe(true);
+      expect(isCleanDesignPublicAgent({ id: agentId })).toBe(true);
+    }
+    for (const agentId of ['custom-one', 'custom-two', 'unknown']) {
+      expect(isCleanDesignPublicCliAgent(agentId)).toBe(false);
+      expect(isCleanDesignPublicAgent({ id: agentId })).toBe(false);
+    }
+  });
+
+  it('keeps the BYOK adapter internal and out of public discovery', () => {
+    expect(CLEAN_DESIGN_INTERNAL_AGENT_IDS).toEqual(['byok-opencode']);
+    expect(isCleanDesignInternalAgent('byok-opencode')).toBe(true);
+    expect(isCleanDesignPublicCliAgent('byok-opencode')).toBe(false);
+    expect(isCleanDesignPublicAgent({ id: 'byok-opencode' })).toBe(false);
+  });
+
+  it('accepts only explicitly marked profiles based on a public CLI', () => {
+    expect(isCleanDesignPublicAgent({
+      id: 'my-claude-wrapper',
+      source: 'local-profile',
+      baseAgentId: 'claude',
+    })).toBe(true);
+    expect(isCleanDesignPublicAgent({
+      id: 'unmarked-wrapper',
+      baseAgentId: 'claude',
+    })).toBe(false);
+    expect(isCleanDesignPublicAgent({
+      id: 'internal-wrapper',
+      source: 'local-profile',
+      baseAgentId: 'byok-opencode',
+    })).toBe(false);
+    expect(isCleanDesignPublicAgent({
+      id: 'custom-claude',
+      source: 'local-profile',
+      baseAgentId: 'claude',
+    })).toBe(true);
   });
 });

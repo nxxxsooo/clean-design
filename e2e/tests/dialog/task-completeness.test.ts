@@ -51,7 +51,6 @@ describe('dialog task completeness (#1247)', () => {
           designSystemId: null,
           onboardingCompleted: true,
           skillId: null,
-          telemetry: { artifactManifest: true, content: false, metrics: false },
         },
         method: 'PUT',
       });

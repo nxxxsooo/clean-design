@@ -13,7 +13,6 @@ export type E2eChatMessage = {
   runId?: string;
   runStatus?: 'queued' | 'running' | 'succeeded' | 'failed' | 'canceled';
   startedAt?: number;
-  telemetryFinalized?: boolean;
 };
 
 export async function saveMessage(

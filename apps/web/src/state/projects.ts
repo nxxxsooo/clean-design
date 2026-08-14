@@ -489,7 +489,6 @@ export async function listMessages(
 }
 
 export interface SaveMessageOptions {
-  telemetryFinalized?: boolean;
   // Set during page-unload paths (pagehide / visibilitychange→hidden) so
   // the in-flight PUT survives even if the document tears down before the
   // response arrives. Without keepalive the browser cancels the fetch
@@ -504,15 +503,12 @@ export async function saveMessage(
   options: SaveMessageOptions = {},
 ): Promise<void> {
   try {
-    const body = options.telemetryFinalized
-      ? { ...message, telemetryFinalized: true }
-      : message;
     await fetch(
       `/api/projects/${encodeURIComponent(projectId)}/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(message.id)}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(message),
         ...(options.keepalive ? { keepalive: true } : {}),
       },
     );

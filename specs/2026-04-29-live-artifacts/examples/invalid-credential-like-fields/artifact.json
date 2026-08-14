@@ -14,17 +14,12 @@
       "account": "fixture-service"
     },
     "sourceJson": {
-      "type": "connector_tool",
-      "toolName": "fixture.read",
+      "type": "local_file",
+      "toolName": "project_files.read_json",
       "input": {
+        "path": "data.json",
         "token": "REDACTED_FIXTURE_TOKEN",
         "password": "REDACTED_FIXTURE_PASSWORD"
-      },
-      "connector": {
-        "connectorId": "fixture",
-        "accountLabel": "fixture-service",
-        "toolName": "fixture.read",
-        "approvalPolicy": "read_only_auto"
       },
       "refreshPermission": "none"
     }

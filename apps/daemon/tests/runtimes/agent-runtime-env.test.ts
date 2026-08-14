@@ -106,7 +106,7 @@ describe('agent runtime tool environment', () => {
 
     const env = {
       ...spawnEnvForAgent(
-        'amr',
+        'byok-opencode',
         base,
         configuredAgentEnv,
       ),
@@ -118,9 +118,6 @@ describe('agent runtime tool environment', () => {
     };
 
     expect(env.OD_DATA_DIR).toBe(process.env.OD_DATA_DIR);
-    expect(env.OPENCODE_TEST_HOME).toBe(
-      path.join(process.env.OD_DATA_DIR ?? '', 'amr', 'opencode-home'),
-    );
     expect(env.OD_PROJECT_ID).toBe('project-1');
     expect(env.OD_PROJECT_DIR).toBe('/tmp/project');
   });

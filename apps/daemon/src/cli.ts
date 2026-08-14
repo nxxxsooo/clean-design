@@ -588,7 +588,7 @@ Options:
   --no-open        Do not open the browser after start.
 
 What the daemon does:
-  * scans PATH for installed code-agent CLIs (claude, codex, devin, opencode, cursor-agent, ...)
+  * scans PATH for supported code-agent CLIs (claude, codex, opencode, pi, antigravity)
   * serves the chat UI at http://<host>:<port>
   * proxies messages (text + images) to the selected agent via child-process spawn
   * exposes /api/projects/:id/media/generate — the unified image/video/audio
@@ -665,7 +665,7 @@ function printResearchHelp() {
   console.log(`Usage:
   od research search --query <text> [--max-sources 5] [--daemon-url <url>]
 
-Runs Tavily-backed shallow research through the local Open Design daemon.
+Runs Tavily-backed shallow research through the local Clean Design daemon.
 Output is JSON only on stdout:
   { "query": "...", "summary": "...", "sources": [...], "provider": "tavily", "depth": "shallow", "fetchedAt": 0 }
 
@@ -938,7 +938,7 @@ function surfaceFetchError(err, daemonUrl) {
     console.error(
       'hint: outbound connect was denied by a sandbox. If you launched ' +
         'this command from a code agent, check the agent\'s sandbox / ' +
-        'network policy. The Open Design daemon itself is unaffected - it can be ' +
+        'network policy. The Clean Design daemon itself is unaffected - it can be ' +
         'reached from a regular shell.',
     );
   }
@@ -1429,75 +1429,6 @@ Exit codes:
   } catch (err) {
     console.error(`[pack] failed: ${err?.message ?? err}`);
     process.exit(2);
-  }
-}
-
-async function execFileBuffered(command, args, opts = {}) {
-  const { execFile } = await import('node:child_process');
-  return new Promise((resolve) => {
-    execFile(command, args, {
-      timeout: 30_000,
-      maxBuffer: 1024 * 1024,
-      ...opts,
-    }, (error, stdout, stderr) => {
-      resolve({
-        ok: !error,
-        code: error?.code,
-        stdout: String(stdout ?? '').trim(),
-        stderr: String(stderr ?? '').trim(),
-        error,
-      });
-    });
-  });
-}
-
-function quotePosixShellArg(value) {
-  const text = String(value ?? '');
-  return `'${text.replace(/'/g, `'\\''`)}'`;
-}
-
-function buildGhShellCommand(args) {
-  return ['gh', ...args].map(quotePosixShellArg).join(' ');
-}
-
-function buildLoginShellCommand(innerCommand) {
-  return `export PATH=${quotePosixShellArg(process.env.PATH ?? '')}; ${innerCommand}`;
-}
-
-async function execGhBuffered(args, opts = {}) {
-  if (process.platform === 'win32') return execFileBuffered('gh', args, opts);
-  const shell = process.env.SHELL && process.env.SHELL.trim() ? process.env.SHELL.trim() : '/bin/zsh';
-  return execFileBuffered(shell, ['-c', buildLoginShellCommand(buildGhShellCommand(args))], {
-    env: process.env,
-    ...opts,
-  });
-}
-
-async function spawnPassthrough(command, args, opts = {}) {
-  const { spawn } = await import('node:child_process');
-  return await new Promise((resolve) => {
-    const child = spawn(command, args, { stdio: 'inherit', ...opts });
-    child.on('error', (error) => resolve({ code: 1, error }));
-    child.on('close', (code) => resolve({ code }));
-  });
-}
-
-async function spawnGhPassthrough(args) {
-  if (process.platform === 'win32') return spawnPassthrough('gh', args);
-  const shell = process.env.SHELL && process.env.SHELL.trim() ? process.env.SHELL.trim() : '/bin/zsh';
-  return spawnPassthrough(shell, ['-c', buildLoginShellCommand(buildGhShellCommand(args))], {
-    env: process.env,
-  });
-}
-
-function inferGithubHost(target) {
-  if (!target || target === 'github.com') return 'github.com';
-  try {
-    const parsed = new URL(target);
-    return parsed.hostname || 'github.com';
-  } catch {
-    // Marketplace ids are not URLs; v1 GitHub-backed auth defaults to github.com.
-    return 'github.com';
   }
 }
 
@@ -2456,241 +2387,6 @@ function coerceCliValue(raw) {
   return raw;
 }
 
-async function publishToMarketplaceJson({ catalogPath, meta }) {
-  const [{ dirname, resolve }, { mkdir, readFile, writeFile }, { PublishError, upsertMarketplaceJsonEntry }] = await Promise.all([
-    import('node:path'),
-    import('node:fs/promises'),
-    import('./plugins/publish.js'),
-  ]);
-  const resolvedPath = resolve(process.cwd(), catalogPath);
-  let existing = null;
-  try {
-    existing = JSON.parse(await readFile(resolvedPath, 'utf8'));
-  } catch (err) {
-    if (err?.code !== 'ENOENT') {
-      throw err;
-    }
-  }
-  let outcome;
-  try {
-    outcome = upsertMarketplaceJsonEntry({ manifest: existing, meta });
-  } catch (err) {
-    if (err instanceof PublishError) {
-      console.error(`[publish] ${err.message}`);
-      process.exit(2);
-    }
-    throw err;
-  }
-  await mkdir(dirname(resolvedPath), { recursive: true });
-  await writeFile(resolvedPath, `${JSON.stringify(outcome.manifest, null, 2)}\n`, 'utf8');
-  return {
-    catalogPath: resolvedPath,
-    inserted: outcome.inserted,
-    entry: outcome.entry,
-    manifest: {
-      name: outcome.manifest.name,
-      version: outcome.manifest.version,
-      plugins: outcome.manifest.plugins.length,
-    },
-  };
-}
-
-async function resolvePluginGithubTarget({ host = 'github.com', owner, manifest, purpose }) {
-  const version = await execGhBuffered(['--version'], { timeout: 10_000 });
-  if (!version.ok) {
-    console.error('[plugin github] GitHub CLI is required. Install gh from https://cli.github.com/ and retry.');
-    process.exit(1);
-  }
-  let status = await execGhBuffered(['auth', 'status', '--hostname', host, '--active'], { timeout: 10_000 });
-  if (!status.ok && /unknown flag: --active/i.test(`${status.stdout}\n${status.stderr}`)) {
-    status = await execGhBuffered(['auth', 'status', '--hostname', host], { timeout: 10_000 });
-  }
-  if (!status.ok) {
-    console.error(`[plugin github] gh is not authenticated for ${host}.`);
-    if (status.stderr || status.stdout) console.error(status.stderr || status.stdout);
-    console.error('Run: gh auth login -h github.com -s repo,workflow');
-    process.exit(1);
-  }
-  const manifestRepo = parseGithubRepoUrl(typeof manifest?.plugin?.repo === 'string' ? manifest.plugin.repo.trim() : '');
-  const trustedManifestOwner = purpose === 'publish-repo' && manifestRepo && !isPlaceholderRepoOwner(manifestRepo.owner) ? manifestRepo.owner : '';
-  const explicitOwner = typeof owner === 'string' ? owner.trim() : '';
-  if (explicitOwner && isPlaceholderRepoOwner(explicitOwner)) {
-    console.error(`[plugin github] refusing placeholder owner "${explicitOwner}". Pass a real GitHub login or org.`);
-    process.exit(2);
-  }
-  const statusLogin = parseGhAuthStatusLogin(status.stderr || status.stdout);
-  let login = statusLogin;
-  let resolvedOwner = explicitOwner || trustedManifestOwner || statusLogin;
-  let source = explicitOwner ? '--owner' : trustedManifestOwner ? 'plugin.repo' : statusLogin ? 'gh auth status' : '';
-  let apiError = null;
-  if (!resolvedOwner || !login) {
-    const user = await execGhBuffered(['api', 'user', '--hostname', host, '--jq', '.login'], { timeout: 20_000 });
-    if (user.ok && user.stdout.trim()) {
-      login = user.stdout.trim();
-      if (!resolvedOwner) {
-        resolvedOwner = login;
-        source = 'gh api user';
-      }
-    } else {
-      apiError = user;
-    }
-  }
-  if (!resolvedOwner) {
-    console.error(`[plugin github] could not resolve the GitHub owner for ${purpose}.`);
-    if (apiError?.stderr || apiError?.stdout) console.error(apiError.stderr || apiError.stdout);
-    if (apiError && isGhApiRateLimit(apiError)) {
-      const ownerHint = purpose === 'open-design-pr' ? '<github-login-or-fork-owner>' : '<github-login-or-org>';
-      console.error(`GitHub API is rate limited. Re-run with --owner ${ownerHint}, or authenticate/refresh gh and retry.`);
-    } else {
-      console.error('Run: gh auth refresh -h github.com -s repo,workflow');
-      console.error('Or:  gh auth login -h github.com -s repo,workflow');
-      console.error(purpose === 'open-design-pr'
-        ? 'If the fork owner differs from your auth login, pass --owner <github-login-or-fork-owner>.'
-        : 'If this is an org-owned plugin, pass --owner <github-org>.');
-    }
-    process.exit(1);
-  }
-  if (apiError && isGhApiRateLimit(apiError)) {
-    console.warn('[plugin github] GitHub API is rate limited; continuing with the owner resolved locally.');
-  }
-  if (isPlaceholderRepoOwner(resolvedOwner)) {
-    console.error(`[plugin github] refusing placeholder owner "${resolvedOwner}". Pass --owner <github-login-or-org>.`);
-    process.exit(2);
-  }
-  return {
-    host,
-    login: login || resolvedOwner,
-    owner: resolvedOwner,
-    ownerSource: source,
-    apiRateLimited: Boolean(apiError && isGhApiRateLimit(apiError)),
-    version: version.stdout,
-    status: status.stderr || status.stdout,
-  };
-}
-
-function parseGhAuthStatusLogin(output) {
-  const text = String(output ?? '');
-  const activeAccount = /Logged in to [^\s]+ account ([^\s()]+)/i.exec(text);
-  if (activeAccount?.[1]) return activeAccount[1].trim();
-  const tokenAccount = /Token account:\s*([^\s()]+)/i.exec(text);
-  if (tokenAccount?.[1]) return tokenAccount[1].trim();
-  return '';
-}
-
-function isGhApiRateLimit(result) {
-  const text = `${result?.stdout ?? ''}\n${result?.stderr ?? ''}`;
-  return /rate limit exceeded|authenticated requests get a higher rate limit/i.test(text);
-}
-
-function normalizeManifestRepoForOwner(manifest, owner) {
-  const name = String(manifest?.name ?? '').trim();
-  if (!name) {
-    console.error('[plugin repo] manifest.name is required');
-    process.exit(2);
-  }
-  const rawRepo = typeof manifest?.plugin?.repo === 'string' ? manifest.plugin.repo.trim() : '';
-  const parsed = parseGithubRepoUrl(rawRepo);
-  const placeholder = parsed ? isPlaceholderRepoOwner(parsed.owner) : false;
-  const shouldRewrite = !parsed || placeholder || parsed.name.toLowerCase() !== name.toLowerCase() || parsed.owner.toLowerCase() !== owner.toLowerCase();
-  const repoUrl = shouldRewrite ? `https://github.com/${owner}/${name}` : parsed.url;
-  if (shouldRewrite) {
-    if (!manifest.plugin || typeof manifest.plugin !== 'object') manifest.plugin = {};
-    manifest.plugin.repo = repoUrl;
-    manifest.homepage = repoUrl;
-    if (!manifest.author || typeof manifest.author !== 'object') manifest.author = {};
-    manifest.author.url = `https://github.com/${owner}`;
-  }
-  return {
-    changed: shouldRewrite,
-    repoUrl,
-    previousRepoUrl: rawRepo || null,
-  };
-}
-
-function parseGithubRepoUrl(raw) {
-  if (!raw || typeof raw !== 'string') return null;
-  const trimmed = raw.trim().replace(/\.git$/i, '');
-  let owner = '';
-  let name = '';
-  try {
-    const url = new URL(trimmed);
-    if (!/^github\.com$/i.test(url.hostname)) return null;
-    const parts = url.pathname.split('/').filter(Boolean);
-    owner = parts[0] ?? '';
-    name = parts[1] ?? '';
-  } catch {
-    const match = /^([^/\s]+)\/([^/\s]+)$/.exec(trimmed);
-    if (!match) return null;
-    owner = match[1];
-    name = match[2];
-  }
-  if (!owner || !name) return null;
-  return {
-    owner,
-    name,
-    fullName: `${owner}/${name}`,
-    url: `https://github.com/${owner}/${name}`,
-  };
-}
-
-function isPlaceholderRepoOwner(owner) {
-  return /^(open-design-user|<vendor>|vendor|example-user|your-org|your-username|owner|user|username)$/i.test(String(owner ?? '').trim());
-}
-
-function isRepoNotFound(result) {
-  const text = `${result?.stdout ?? ''}\n${result?.stderr ?? ''}`;
-  return /could not resolve to a repository|not found|repository not found/i.test(text);
-}
-
-async function pluginCliValidateFolder(folder) {
-  const result = await execFileBuffered(process.execPath, [process.argv[1], 'plugin', 'validate', folder], {
-    timeout: 120_000,
-  });
-  if (!result.ok) {
-    console.error('[plugin validate] failed after manifest normalization');
-    if (result.stdout) console.error(result.stdout);
-    if (result.stderr) console.error(result.stderr);
-    process.exit(1);
-  }
-  return result;
-}
-
-function emitPluginWorkflowResult(flags, payload) {
-  if (flags.json) {
-    process.stdout.write(JSON.stringify(payload, null, 2) + '\n');
-    return;
-  }
-  if (!payload.ok) {
-    console.error(`[${payload.action}] failed${payload.error?.label ? ` at ${payload.error.label}` : ''}`);
-    if (payload.error?.stderr) console.error(payload.error.stderr);
-    if (payload.error?.stdout) console.error(payload.error.stdout);
-    return;
-  }
-  if (payload.action === 'publish-repo') {
-    console.log(`Plugin published: ${payload.repoUrl}`);
-    if (payload.ownerSource) console.log(`[publish-repo] owner resolved from ${payload.ownerSource}: ${payload.owner}`);
-    if (payload.apiRateLimited) console.log('[publish-repo] GitHub API was rate limited; continued with the locally resolved owner.');
-    if (payload.manifestRewritten) console.log('[publish-repo] manifest repo fields were normalized before publishing.');
-    return;
-  }
-  if (payload.action === 'open-design-pr') {
-    if (payload.ownerSource) console.log(`[open-design-pr] owner resolved from ${payload.ownerSource}: ${payload.owner}`);
-    if (payload.apiRateLimited) console.log('[open-design-pr] GitHub API was rate limited; continued with the locally resolved owner.');
-    console.log(`Open this URL and click Create to file the PR: ${payload.prUrl}`);
-    return;
-  }
-  console.log(JSON.stringify(payload, null, 2));
-}
-
-function safeJson(raw) {
-  try { return JSON.parse(raw); } catch { return null; }
-}
-
-function extractFirstUrl(text) {
-  const match = /https?:\/\/\S+/i.exec(String(text ?? ''));
-  return match ? match[0].replace(/[)\].,]+$/, '') : null;
-}
-
 function safeParseJson(s) {
   try { return JSON.parse(s); } catch { return null; }
 }
@@ -2977,7 +2673,7 @@ function printUiHelp() {
                                                      Pre-answer a surface so the run never broadcasts it.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base (default OD_DAEMON_URL, OD_SIDECAR_IPC_PATH discovery, or http://127.0.0.1:7456).
+  --daemon-url <url>   Clean Design daemon HTTP base (default OD_DAEMON_URL, OD_SIDECAR_IPC_PATH discovery, or http://127.0.0.1:7456).
   --json               Emit raw JSON (suitable for scripts) instead of human-readable output.`);
 }
 
@@ -3020,7 +2716,7 @@ Installing, upgrading, publishing, and registry commands are not available.`);
 // Plan §6 Phase 1 follow-up + Phase 2C: thin CLI wrappers over the
 // existing daemon HTTP endpoints (POST /api/projects, POST /api/runs,
 // GET /api/projects/:id/files, …). The §12.5 walkthrough relies on
-// these so a code agent can drive Open Design end-to-end without
+// these so a code agent can drive Clean Design end-to-end without
 // hitting `/api/*` directly. Spec §11.7 invariant: every UI feature is
 // reachable via the CLI; we wrap rather than duplicate.
 // ---------------------------------------------------------------------------
@@ -3047,7 +2743,7 @@ Flags:
   --notes "<text>"     Design brief folded into the reshape prompt.
   --build              After import, start a run that builds the webpage.
   --prompt / --prompt-file   Override the build prompt (file or - for stdin).
-  --daemon-url <url>   Open Design daemon HTTP base.
+  --daemon-url <url>   Clean Design daemon HTTP base.
   --json               Emit raw JSON.`);
 }
 
@@ -3727,7 +3423,7 @@ async function runProject(args) {
                     Synthesize a resume-conversation handoff prompt.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base.
+  --daemon-url <url>   Clean Design daemon HTTP base.
   --json               Emit raw JSON.`);
     process.exit(args.length === 0 ? 2 : 0);
   }
@@ -3986,7 +3682,7 @@ async function runRun(args) {
                                             provenance without applying them.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base.
+  --daemon-url <url>   Clean Design daemon HTTP base.
   --json               Emit raw JSON.`);
     process.exit(args.length === 0 ? 2 : 0);
   }
@@ -4092,7 +3788,6 @@ Common options:
         projectId: status.projectId,
         conversationId: status.conversationId,
         message,
-        analyticsHints: { entryFrom: 'resume_continue' },
         ...(status.agentId ? { agentId: status.agentId } : {}),
       };
       const data = await postJsonToDaemon(base, '/api/runs', body);
@@ -4283,7 +3978,7 @@ async function runShell(args) {
                                   working directory and attach to it.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base.
+  --daemon-url <url>   Clean Design daemon HTTP base.
   --json               Print the created terminal session as JSON and exit
                        (does not attach).`);
     process.exit(args.length === 0 ? 2 : 0);
@@ -4419,7 +4114,7 @@ async function runFiles(args) {
                                                Restore a saved HTML as a new current version.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base.
+  --daemon-url <url>   Clean Design daemon HTTP base.
   --prompt-file <path|->  Read a version prompt from file/stdin where supported.
   --source <ai|manual|restore>
                        Version provenance where supported.
@@ -4808,7 +4503,7 @@ async function runTemplates(args) {
   od templates delete <id>                          Delete a saved template by id.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base.
+  --daemon-url <url>   Clean Design daemon HTTP base.
   --json               Emit raw JSON.`);
     process.exit(args.length === 0 ? 2 : 0);
   }
@@ -4966,7 +4661,7 @@ async function runConversation(args) {
   od conversation info <conversationId>      Print one conversation.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base.
+  --daemon-url <url>   Clean Design daemon HTTP base.
   --json               Emit raw JSON.`);
     process.exit(args.length === 0 ? 2 : 0);
   }
@@ -5059,7 +4754,7 @@ async function runChat(args) {
                                            message.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base.
+  --daemon-url <url>   Clean Design daemon HTTP base.
   --json               Emit raw JSON.`);
     process.exit(args.length === 0 ? 2 : 0);
   }
@@ -5145,7 +4840,7 @@ async function runDaemon(args) {
   od daemon db     vacuum                 Run SQLite VACUUM to reclaim space after deletes.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base.
+  --daemon-url <url>   Clean Design daemon HTTP base.
   --headless           No browser auto-open; aliased --no-open.
   --serve-web          Serve the web UI over the existing port (no electron).
   --json               Emit raw JSON.`);
@@ -5356,7 +5051,7 @@ async function runAtoms(args) {
   od atoms info <id>        Print metadata + the bundled SKILL.md body.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base.
+  --daemon-url <url>   Clean Design daemon HTTP base.
   --json               Emit raw JSON.`);
     process.exit(args.length === 0 ? 2 : 0);
   }
@@ -6242,7 +5937,7 @@ async function runConfig(args) {
   od config unset <key>               Remove a top-level key.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base.
+  --daemon-url <url>   Clean Design daemon HTTP base.
   --json               Emit raw JSON.`);
     process.exit(args.length === 0 ? 2 : 0);
   }
@@ -6409,7 +6104,7 @@ function printMemoryHelp() {
       profile/rewrite/verify hooks; --extraction maps to chatExtractionEnabled.
 
 Common options:
-  --daemon-url <url>   Open Design daemon HTTP base.`);
+  --daemon-url <url>   Clean Design daemon HTTP base.`);
 }
 
 function memoryPositionals(values) {

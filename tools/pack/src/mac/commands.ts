@@ -66,9 +66,17 @@ export async function runPnpm(
 }
 
 export async function runNpmInstall(appRoot: string): Promise<void> {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    const normalized = key.toLowerCase();
+    if (normalized === "npm_config_allow_scripts" || normalized === "npm_config_userconfig") {
+      delete env[key];
+    }
+  }
+  env.NPM_CONFIG_USERCONFIG = "/dev/null";
   await execFileAsync("npm", ["install", "--omit=dev", "--no-package-lock"], {
     cwd: appRoot,
-    env: process.env,
+    env,
   });
 }
 

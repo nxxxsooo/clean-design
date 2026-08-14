@@ -43,7 +43,7 @@ type PlusMenuFlyoutPlacement = 'right' | 'left' | 'contained';
 type PlusMenuFlyoutVerticalPlacement = 'down' | 'up';
 export type PlusMenuSubmenu = 'plugins' | 'skills' | 'toolbox';
 
-// Analytics mapping for the submenu flyouts: which resource list each
+// Mapping for the submenu flyouts: which resource list each
 // submenu carries. `toolbox` is intentionally absent — the project composer
 // tracks it separately as `design_toolbox_open`.
 export const PLUS_SUBMENU_RESOURCE_KIND = {
@@ -199,7 +199,7 @@ export interface ComposerPlusMenuProps {
   /**
    * Notified when a submenu flyout actually opens (the active submenu
    * changes; repeated hovers over the same open row don't re-fire). Callers
-   * use it for analytics; `toolbox` is reported too, and the project
+   * use it for menu context; `toolbox` is reported too, and the project
    * composer filters it out because its panel tracks its own open.
    */
   onSubmenuOpen?: (submenu: PlusMenuSubmenu) => void;

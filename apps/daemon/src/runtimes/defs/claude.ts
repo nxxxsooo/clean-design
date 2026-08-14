@@ -48,7 +48,7 @@ export const claudeAgentDef = {
     // ~32 KB direct, ~8 KB via .cmd shim). `claude -p` with no positional
     // prompt reads the prompt from stdin under `--input-format text` (the
     // default), which has no length cap. Mirrors the codex/gemini/opencode/
-    // cursor/qwen entries below.
+    // other structured runtime entries.
     buildArgs: (_prompt, _imagePaths, extraAllowedDirs = [], options = {}, runtimeContext = {}) => {
       const caps = agentCapabilities.get('claude') || {};
       // `--input-format stream-json` lets the daemon stream multiple JSONL

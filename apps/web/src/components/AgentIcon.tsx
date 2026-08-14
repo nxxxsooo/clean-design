@@ -6,35 +6,15 @@ interface Props {
   className?: string;
 }
 
-// Agents that ship a bundled brand asset under `apps/web/public/agent-icons/`.
-// SVG is preferred (resolution-independent, single file ≤ a few KB); PNG is
-// the fallback for vendors that don't publish an SVG mark anywhere (Devin
-// only ships a rasterised icon on devin.ai). New brand: drop the optimised
-// file in that folder and add the id here.
-const ICON_EXT: Record<string, 'svg' | 'png'> = {
-  amr: 'svg',
+// Public local runtimes that ship a bundled brand asset under
+// `apps/web/public/agent-icons/`. BYOK stays provider-branded elsewhere and
+// the private BYOK adapter is intentionally not exposed as another CLI.
+const ICON_EXT: Record<string, 'svg'> = {
   claude: 'svg',
   codex: 'svg',
-  gemini: 'svg',
   opencode: 'svg',
-  'cursor-agent': 'svg',
-  copilot: 'svg',
-  qwen: 'svg',
-  qoder: 'svg',
-  deepseek: 'svg',
-  reasonix: 'svg',
-  mimo: 'svg',
-  hermes: 'svg',
-  'grok-build': 'svg',
-  kimi: 'svg',
   pi: 'svg',
-  kiro: 'svg',
-  kilo: 'svg',
-  vibe: 'svg',
   antigravity: 'svg',
-  aider: 'png',
-  'trae-cli': 'png',
-  devin: 'png',
 };
 
 // SVG marks that are single-color silhouettes (no baked brand colors).
@@ -46,12 +26,7 @@ const ICON_EXT: Record<string, 'svg' | 'png'> = {
 // the asset through `<img>` it still renders as a legible dark mark
 // rather than collapsing to the SVG document's default black-on-…-black.
 const MONO_ICONS = new Set([
-  'cursor-agent',
   'opencode',
-  'hermes',
-  'mimo',
-  'kilo',
-  'grok-build',
 ]);
 
 export function AgentIcon({ id, size = 36, className }: Props) {

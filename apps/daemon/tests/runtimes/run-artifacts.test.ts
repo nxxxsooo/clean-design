@@ -12,8 +12,7 @@
 // `server.ts` previously emitted `artifact_count: 0` literally, which
 // suppressed every dashboard tile that breaks "generation success" by
 // whether an artifact landed. These tests keep the new helper honest
-// for the shapes the daemon actually sees on the wire (claude-stream,
-// codex, ACP/MCP proxies).
+// for the shapes the daemon actually sees on the wire from retained CLIs.
 
 import { describe, expect, it } from 'vitest';
 
@@ -362,8 +361,8 @@ describe('runAskedUserQuestion', () => {
 
   // `<ask-question>` is an accepted alias for `<question-form>` (whitelisted by
   // the UI parser and the daemon open-tag matcher). A model that drifts to the
-  // alias still renders the clarification banner, so the analytics signal must
-  // recognize it too — otherwise the run gets misclassified in the funnel.
+  // alias still renders the clarification banner, so the run summary must
+  // recognize it too — otherwise the turn is misclassified.
   it('returns true for the renderable <ask-question> alias', () => {
     expect(
       runAskedUserQuestion([

@@ -54,8 +54,7 @@ weread-year-in-review-video-template/
 └── example.html
 ```
 
-The rendered MP4 showcase used by `example.html` is hosted at
-`https://repo-assets.open-design.ai/resources/videos/skills/weread-year-in-review-video-template/default-showcase.mp4`.
+`example.html` previews the editable bundled template without loading remote showcase media.
 
 ## Workflow
 

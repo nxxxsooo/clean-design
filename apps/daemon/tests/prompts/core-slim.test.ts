@@ -563,9 +563,9 @@ describe('slim core — regression-audit fixes vs classic', () => {
   });
 
   it('keeps the plan step agent-agnostic — no hardcoded TodoWrite in the charter', () => {
-    // Open Design drives many code agents (codex, opencode, Qwen CLI, ACP
-    // family) that have no TodoWrite tool. The charter must NOT hardcode it,
-    // or the plan step is dead for ~2/3 of production traffic. Freeze the
+    // Clean Design drives retained code agents with different plan-tool
+    // surfaces. The charter must NOT hardcode TodoWrite or the plan step is
+    // unusable for runtimes without that tool. Freeze the
     // generic wording and the anti-hallucination guard.
     const charter = renderSlimCoreCharter('filesystem');
     expect(charter).not.toContain('TodoWrite');
@@ -573,10 +573,10 @@ describe('slim core — regression-audit fixes vs classic', () => {
     expect(charter).toContain("never call a tool you don't have");
   });
 
-  it('injects the concrete TodoWrite note only for Claude-family runs', () => {
+  it('injects the concrete TodoWrite note only for Claude stream runs', () => {
     const base = { metadata: { kind: 'other' as const },
       executionProfile: 'filesystem' as const, promptCoreVariant: 'slim' as const };
-    // Claude family (claude/codebuddy/amp) → named tool + live-card benefit.
+    // Claude stream runtime → named tool + live-card benefit.
     expect(composeSystemPrompt({ ...base, streamFormat: 'claude-stream-json' }))
       .toContain('Your plan tool is `TodoWrite`');
     // codex / opencode (json-event-stream) → generic charter only, no note.

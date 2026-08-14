@@ -581,23 +581,6 @@
   justify-content: flex-end;
   margin-top: 8px;
 }
-.assistant-feedback-discord-note {
-  margin: 7px 0 0;
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.35;
-}
-.assistant-feedback-discord-note a {
-  color: #5865f2;
-  font-weight: 650;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
-.assistant-feedback-discord-note a:hover {
-  color: color-mix(in srgb, #5865f2 78%, var(--text-strong));
-}
-
 .unfinished-todos {
   margin-top: 10px;
   width: min(520px, 100%);

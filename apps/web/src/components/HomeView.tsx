@@ -19,20 +19,6 @@ import type {
   WorkspaceContextItem,
 } from '@open-design/contracts';
 import { DEFAULT_UNSELECTED_SCENARIO_PLUGIN_ID } from '@open-design/contracts';
-import { projectKindFromMetadataToTracking } from '@open-design/contracts/analytics';
-import { useAnalytics } from '../analytics/provider';
-import {
-  trackCommunityGalleryClick,
-  trackHomeChatComposerClick,
-  trackPageView,
-  trackPluginDetailModalClick,
-  trackPluginDetailModalSharePopoverClick,
-  trackPluginDetailModalSurfaceView,
-  trackPluginReplacementModalClick,
-  trackPluginReplacementModalSurfaceView,
-  trackPluginReplacementResult,
-  trackRecentProjectsClick,
-} from '../analytics/events';
 import {
   applyPlugin,
   createProject,
@@ -78,9 +64,7 @@ import { findChip, HOME_HERO_CHIPS, type HomeHeroChip } from './home-hero/chips'
 import { homeHeroChipLabel } from './home-hero/chip-labels';
 import type { PlaceholderScenario } from './home-hero/placeholderScenarios';
 import { consumePendingHomeChip, HOME_CHIP_INTENT_EVENT } from '../runtime/home-intent';
-import { navigate } from '../router';
-import { setPendingDesignSystemCreateEntry } from '../analytics/ds-create-entry';
-import { workspaceContextLinkedDirs } from './workspace-context';
+import { navigate } from '../router';import { workspaceContextLinkedDirs } from './workspace-context';
 import {
   buildHomeMediaComposer,
   homeMediaSurfaceForChipId,
@@ -167,8 +151,7 @@ interface SelectedPluginContext {
 interface PendingReplacement {
   title: string;
   // Returns a promise resolving when the underlying plugin apply has
-  // finished (or rejecting on failure) so the modal's success/failure
-  // analytics fire on the real outcome, not on the synchronous
+  // finished (or rejecting on failure), rather than the synchronous
   // queue-the-apply step.
   confirm: () => Promise<void>;
   // Plugin ids surrounding the replacement so the result event can
@@ -193,7 +176,7 @@ interface Props {
   designSystems?: DesignSystemSummary[];
   defaultDesignSystemId?: string | null;
   // `'blocked'` means the shell refused the submit but already surfaced its
-  // own UI (e.g. the AMR balance gate dialog): keep the draft, show no error.
+  // own recovery UI: keep the draft and show no duplicate error.
   onSubmit: (
     payload: PluginLoopSubmit,
   ) => Promise<boolean | 'blocked' | void> | boolean | 'blocked' | void;
@@ -219,7 +202,6 @@ interface Props {
     name: string;
     prompt: string;
     metadata: ProjectMetadata;
-    onboardingEntry: OnboardingEntry;
   }) => boolean | void | Promise<boolean | void>;
   onRecommendationDismiss?: () => void;
   executionSwitcher?: ReactNode;
@@ -295,16 +277,13 @@ export function HomeView({
   executionSwitcher,
   artifactUpgradeSlot,
 }: Props) {
-  const { locale, t } = useI18n();
-  const analytics = useAnalytics();
-  // P0 page_view page_name=home — fire once on mount. ref-keyed to survive
+  const { locale, t } = useI18n();  // P0 page_view page_name=home — fire once on mount. ref-keyed to survive
   // re-renders that flip parent state without remounting HomeView.
   const homePageViewFiredRef = useRef(false);
   useEffect(() => {
     if (homePageViewFiredRef.current) return;
     homePageViewFiredRef.current = true;
-    trackPageView(analytics.track, { page_name: 'home' });
-  }, [analytics.track]);
+  }, []);
   // Start empty + loading (cheap first render — seeding the full list here made
   // the mount do all plugin-dependent render work on the click's critical path,
   // a visible freeze). The effect below uses the cache-aware loader, which on a
@@ -437,37 +416,13 @@ export function HomeView({
     const key = `${pendingReplacement.pluginBefore ?? ''}->${pendingReplacement.pluginAfter}`;
     if (lastPluginReplacementViewRef.current === key) return;
     lastPluginReplacementViewRef.current = key;
-    trackPluginReplacementModalSurfaceView(analytics.track, {
-      page_name: 'home',
-      area: 'plugin_replacement_modal',
-    });
-  }, [pendingReplacement, analytics.track]);
-  // Community gallery analytics. Opening a tile fires both a ui_click on
-  // the card (the funnel's denominator) and a surface_view on the detail
-  // modal it reveals (the numerator); the ↗ that jumps straight to the
-  // real example page is its own ui_click so "go to the finished thing"
-  // stays distinct from "open the detail modal". plugin_id / plugin_type
-  // mirror PluginsView so the two surfaces join on the same keys.
+  }, [pendingReplacement]);
+  // Opening a community tile reveals its detail modal.
   const handleCommunityOpenDetails = useCallback(
     (record: InstalledPluginRecord) => {
-      const pluginId = record.sourceMarketplaceEntryName ?? record.id;
-      const pluginType = record.marketplaceTrust ?? 'official';
-      trackCommunityGalleryClick(analytics.track, {
-        page_name: 'home',
-        area: 'community_gallery',
-        element: 'card',
-        plugin_id: pluginId,
-        plugin_type: pluginType,
-      });
-      trackPluginDetailModalSurfaceView(analytics.track, {
-        page_name: 'home',
-        area: 'plugin_detail_modal',
-        plugin_id: pluginId,
-        plugin_type: pluginType,
-      });
       setDetailsRecord(record);
     },
-    [analytics.track],
+    [],
   );
   const inputRef = useRef<HomeHeroHandle | null>(null);
   const homeViewRef = useRef<HTMLDivElement | null>(null);
@@ -975,16 +930,7 @@ export function HomeView({
     record: InstalledPluginRecord,
     action: PluginUseAction = 'use',
     inputs?: Record<string, unknown>,
-  ) {
-    trackCommunityGalleryClick(analytics.track, {
-      page_name: 'home',
-      area: 'community_gallery',
-      element: 'use_plugin',
-      plugin_id: record.sourceMarketplaceEntryName ?? record.id,
-      plugin_type: record.marketplaceTrust ?? 'official',
-      action: action === 'use-with-query' ? 'use_with_query' : 'use',
-    });
-    if (action === 'use-with-query') {
+  ) {    if (action === 'use-with-query') {
       // Prompt-loading "Use" seeds the composer with the SAME human-friendly
       // text the Home example-prompt cards use (examplePresetSeedPrompt), NOT the
       // raw `od.useCase.query` — which for many plugins is a generator-facing
@@ -1119,22 +1065,7 @@ export function HomeView({
   }
 
   function useExamplePlugin(record: InstalledPluginRecord, chipId: string, promptText: string) {
-    setError(null);
-    // P0 ui_click area=chat_composer element=example_prompt: the user picked a
-    // plugin-preset example card below the rail. `chip_id` is the active task
-    // type, `plugin_id` the preset so example usage breaks down per plugin. (The
-    // Website-clone rail uses plain text prompt cards instead — those fire the
-    // same event from HomeHero's usePromptExample.) Raw seed text is never sent
-    // (free-text / PII rule).
-    trackHomeChatComposerClick(analytics.track, {
-      page_name: 'home',
-      area: 'chat_composer',
-      element: 'example_prompt',
-      chip_id: chipId,
-      plugin_id: record.sourceMarketplaceEntryName ?? record.id,
-      plugin_type: record.marketplaceTrust ?? 'official',
-    });
-    // Picking a preset card *binds* the plugin (not just a textarea fill):
+    setError(null);    // Picking a preset card *binds* the plugin (not just a textarea fill):
     // active switches to this exact preset so submit resolves its snapshot and
     // injects the plugin's SKILL.md + example.html as generation context — the
     // output faithfully recreates the reference. `promptText` is the short,
@@ -1156,23 +1087,7 @@ export function HomeView({
   }
 
   async function duplicateExamplePlugin(record: InstalledPluginRecord) {
-    setError(null);
-    // P0 ui_click area=chat_composer element=example_open_project: the one-click
-    // "Remix" on an example card — creates and enters a project seeded from the
-    // example (for site-clone cards it drops the pre-built clone straight in as
-    // index.html) instead of only seeding the composer. Same chip_id/plugin_id
-    // attribution as `example_prompt`; `chip_id` from the active task type since
-    // preset cards only render under an active chip. The created project's own
-    // `project_kind` (web_clone) still rides project_create_result separately.
-    trackHomeChatComposerClick(analytics.track, {
-      page_name: 'home',
-      area: 'chat_composer',
-      element: 'example_open_project',
-      chip_id: active?.chipId ?? undefined,
-      plugin_id: record.sourceMarketplaceEntryName ?? record.id,
-      plugin_type: record.marketplaceTrust ?? 'official',
-    });
-    setPendingDuplicatePluginId(record.id);
+    setError(null);    setPendingDuplicatePluginId(record.id);
     try {
       const result = await duplicatePluginAsProject(record.id, {
         name: localizePluginTitle(locale, record),
@@ -1497,14 +1412,7 @@ export function HomeView({
     const chipElement: 'plugin_chip' | 'action_chip' =
       chip.action.kind === 'apply-scenario' || chip.action.kind === 'apply-figma-migration'
         ? 'plugin_chip'
-        : 'action_chip';
-    trackHomeChatComposerClick(analytics.track, {
-      page_name: 'home',
-      area: 'chat_composer',
-      element: chipElement,
-      chip_id: chip.id,
-    });
-    switch (chip.action.kind) {
+        : 'action_chip';    switch (chip.action.kind) {
       case 'apply-scenario':
       case 'apply-figma-migration': {
         const targetId = chip.action.pluginId;
@@ -1585,7 +1493,6 @@ export function HomeView({
         // Brands merged into Design systems: brand extraction now starts from
         // the unified design-system create wizard (which carries the
         // "start from a brand" picker), rather than a separate Brand Kit tab.
-        setPendingDesignSystemCreateEntry('home_card');
         navigate({ kind: 'design-system-create' });
         return;
       }
@@ -1688,17 +1595,7 @@ export function HomeView({
     // path lands here directly — swallow re-entry during the in-flight window.
     if (sending) return;
     const trimmed = prompt.trim();
-    if (!trimmed && stagedFiles.length === 0) return;
-    // P0 ui_click area=chat_composer element=send_button. Fires before the
-    // async plugin-apply roundtrip so the click count reflects user intent
-    // even when the run is rejected (missing inputs, apply failure). The
-    // subsequent run_created/run_finished events carry the result detail.
-    trackHomeChatComposerClick(analytics.track, {
-      page_name: 'home',
-      area: 'chat_composer',
-      element: 'send_button',
-    });
-    let submittedActive = active;
+    if (!trimmed && stagedFiles.length === 0) return;    let submittedActive = active;
     if (submittedActive && !submittedActive.inputsValid) {
       const missing = missingRequiredInputs(
         submittedActive.inputFields,
@@ -1838,8 +1735,8 @@ export function HomeView({
         setError('Failed to start the run. Make sure the daemon is reachable, then try again.');
         return;
       }
-      // Blocked-and-handled (AMR balance gate): the shell already shows its
-      // dialog. Keep the composer draft and staged contexts for the retry.
+      // Blocked-and-handled: the shell already shows recovery UI. Keep the
+      // composer draft and staged contexts for the retry.
       if (accepted === 'blocked') return;
       // Create accepted — now it is safe to spend the one-shot marker.
       if (examplePromptToSend) localStorage.setItem(examplePromptKey, '1');
@@ -1991,24 +1888,9 @@ export function HomeView({
           // P0 ui_click area=recent_projects element=project_card — emit
           // before navigation so the event isn't lost when the host
           // re-renders into the project view.
-          const project = projects.find((p) => p.id === id);
-          const projectKind = projectKindFromMetadataToTracking(project?.metadata);
-          trackRecentProjectsClick(analytics.track, {
-            page_name: 'home',
-            area: 'recent_projects',
-            element: 'project_card',
-            project_id: id,
-            ...(projectKind ? { project_kind: projectKind } : {}),
-          });
           onOpenProject(id);
         }}
-        onViewAll={() => {
-          trackRecentProjectsClick(analytics.track, {
-            page_name: 'home',
-            area: 'recent_projects',
-            element: 'view_all',
-          });
-          onViewAllProjects();
+        onViewAll={() => {          onViewAllProjects();
         }}
         {...(onDeleteProject ? { onDelete: onDeleteProject } : {})}
         {...(onDuplicateProject ? { onDuplicate: onDuplicateProject } : {})}
@@ -2037,44 +1919,15 @@ export function HomeView({
         {detailsRecord ? (
           <PluginDetailsModal
             record={detailsRecord}
-            onClose={() => {
-              // Covers the close button, Esc and the backdrop — every
-              // variant funnels dismissal through this single onClose.
-              trackPluginDetailModalClick(analytics.track, {
-                page_name: 'home',
-                area: 'plugin_detail_modal',
-                element: 'close',
-                plugin_id: detailsRecord.sourceMarketplaceEntryName ?? detailsRecord.id,
-                plugin_type: detailsRecord.marketplaceTrust ?? 'official',
-              });
-              setDetailsRecord(null);
+            onClose={() => {              setDetailsRecord(null);
             }}
-            onUse={(record, action) => {
-              // Track here (not inside routePluginUse) so the gallery's
-              // own onUse keeps its community_gallery attribution; the
-              // kebab 'use-with-query' action maps to the dropdown face.
-              trackPluginDetailModalClick(analytics.track, {
-                page_name: 'home',
-                area: 'plugin_detail_modal',
-                element: action === 'use-with-query' ? 'use_plugin_dropdown' : 'use_plugin',
-                plugin_id: record.sourceMarketplaceEntryName ?? record.id,
-                plugin_type: record.marketplaceTrust ?? 'official',
-              });
-              void routePluginUse(record, action);
+            onUse={(record, action) => {              void routePluginUse(record, action);
             }}
             onDuplicate={(record) => {
               setDetailsRecord(null);
               void duplicateExamplePlugin(record);
             }}
             isApplying={pendingApplyId === detailsRecord.id}
-            onSharePopoverItemClick={(item) =>
-              trackPluginDetailModalSharePopoverClick(analytics.track, {
-                page_name: 'home',
-                area: 'plugin_detail_share_popover',
-                element: item,
-                plugin_id: detailsRecord.sourceMarketplaceEntryName ?? detailsRecord.id,
-                plugin_type: detailsRecord.marketplaceTrust ?? 'official',
-              })}
           />
         ) : null}
         {detailsSkill ? (
@@ -2144,13 +1997,7 @@ export function HomeView({
               <button
                 type="button"
                 className="home-hero-confirm__secondary"
-                onClick={() => {
-                  trackPluginReplacementModalClick(analytics.track, {
-                    page_name: 'home',
-                    area: 'plugin_replacement_modal',
-                    element: 'cancel',
-                  });
-                  setPendingReplacement(null);
+                onClick={() => {                  setPendingReplacement(null);
                 }}
               >
                 {t('common.cancel')}
@@ -2158,13 +2005,7 @@ export function HomeView({
               <button
                 type="button"
                 className="home-hero-confirm__primary"
-                onClick={() => {
-                  trackPluginReplacementModalClick(analytics.track, {
-                    page_name: 'home',
-                    area: 'plugin_replacement_modal',
-                    element: 'replace',
-                  });
-                  const pluginBefore = pendingReplacement.pluginBefore;
+                onClick={() => {                  const pluginBefore = pendingReplacement.pluginBefore;
                   const pluginAfter = pendingReplacement.pluginAfter;
                   const action = pendingReplacement.confirm;
                   setPendingReplacement(null);
@@ -2177,25 +2018,7 @@ export function HomeView({
                   // branch.
                   void (async () => {
                     try {
-                      await action();
-                      trackPluginReplacementResult(analytics.track, {
-                        page_name: 'home',
-                        area: 'plugin_replacement',
-                        plugin_before: pluginBefore ?? '',
-                        plugin_after: pluginAfter,
-                        result: 'success',
-                      });
-                    } catch (err) {
-                      trackPluginReplacementResult(analytics.track, {
-                        page_name: 'home',
-                        area: 'plugin_replacement',
-                        plugin_before: pluginBefore ?? '',
-                        plugin_after: pluginAfter,
-                        result: 'failed',
-                        error_code:
-                          err instanceof Error ? err.message : String(err),
-                      });
-                    }
+                      await action();                    } catch (err) {                    }
                   })();
                 }}
               >

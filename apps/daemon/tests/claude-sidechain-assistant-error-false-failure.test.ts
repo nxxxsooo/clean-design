@@ -66,14 +66,6 @@ type RunStatus = {
 };
 
 describe('claude sub-agent assistant error false failure', () => {
-  const originalEnv = {
-    POSTHOG_KEY: process.env.POSTHOG_KEY,
-    POSTHOG_HOST: process.env.POSTHOG_HOST,
-    LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY,
-    LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
-    LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL,
-    OPEN_DESIGN_TELEMETRY_RELAY_URL: process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL,
-  };
   let started: StartedServer | null = null;
   let binDir: string | null = null;
 
@@ -85,10 +77,6 @@ describe('claude sub-agent assistant error false failure', () => {
     started = null;
     if (binDir) await rm(binDir, { recursive: true, force: true });
     binDir = null;
-    for (const [key, value] of Object.entries(originalEnv)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
   });
 
   it('a sub-agent in-stream error must not fail a run whose main turn recovers', async () => {
@@ -96,12 +84,6 @@ describe('claude sub-agent assistant error false failure', () => {
     const controlBin = await writeRecoveringClaude(binDir, 'claude-control', { withSubagentError: false });
     const sidechainBin = await writeRecoveringClaude(binDir, 'claude-sidechain-error', { withSubagentError: true });
 
-    delete process.env.POSTHOG_KEY;
-    delete process.env.POSTHOG_HOST;
-    delete process.env.LANGFUSE_PUBLIC_KEY;
-    delete process.env.LANGFUSE_SECRET_KEY;
-    delete process.env.LANGFUSE_BASE_URL;
-    delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
 
     started = await startServer({ port: 0, returnServer: true }) as StartedServer;
 
@@ -111,8 +93,6 @@ describe('claude sub-agent assistant error false failure', () => {
     await putConfig(started.url, {
       agentId: 'claude',
       agentCliEnv: { claude: { CLAUDE_BIN: controlBin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
     const controlRun = await createAndWaitForRun(started.url);
     // Baseline: without the sub-agent error field the recovered run succeeds.
@@ -125,8 +105,6 @@ describe('claude sub-agent assistant error false failure', () => {
     await putConfig(started.url, {
       agentId: 'claude',
       agentCliEnv: { claude: { CLAUDE_BIN: sidechainBin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
     const sidechainRun = await createAndWaitForRun(started.url);
     // INVARIANT: a sub-agent (parent_tool_use_id != null) in-stream error must
@@ -232,9 +210,6 @@ async function createAndWaitForRun(url: string): Promise<RunStatus> {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-od-analytics-device-id': 'sidechain-error-claude-test',
-      'x-od-analytics-session-id': 'sidechain-error-claude-session',
-      'x-od-analytics-client-type': 'web',
     },
     body: JSON.stringify({
       projectId,

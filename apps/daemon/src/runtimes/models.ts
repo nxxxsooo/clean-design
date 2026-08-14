@@ -83,8 +83,8 @@ export function isKnownModel(
 // because they only accept concrete ids for explicit model selection. When a
 // chat run has no model at all, prefer the first model from the live list last
 // surfaced to the UI, then fall back to the def's first concrete fallback id.
-// An explicit `'default'` choice is preserved so ACP runtimes can leave model
-// selection to the upstream session's own configured default.
+// An explicit `'default'` choice is preserved so the selected CLI can use its
+// own configured default.
 export function resolveModelForAgent(
   def: RuntimeAgentDef,
   resolved: string | null,
@@ -93,13 +93,6 @@ export function resolveModelForAgent(
 ): string | null {
   if (resolved && resolved !== 'default') return resolved;
   if (resolved === 'default') return resolved;
-  // Daemon-process env override (e.g. VELA_DEFAULT_MODEL for AMR). Lets an
-  // operator pin a different fallback id without a code change when the
-  // hardcoded default goes away upstream.
-  if (def.defaultModelEnvVar) {
-    const raw = env[def.defaultModelEnvVar];
-    if (typeof raw === 'string' && raw.trim()) return raw.trim();
-  }
   const fallbacks = Array.isArray(def.fallbackModels) ? def.fallbackModels : [];
   if (fallbacks.some((m) => m.id === 'default')) return resolved;
   const liveModels = getRememberedLiveModels(def.id, liveModelScope);

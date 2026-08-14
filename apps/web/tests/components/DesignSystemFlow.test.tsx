@@ -1952,17 +1952,12 @@ describe('DesignSystemCreationFlow', () => {
         sourceFileName: system.id,
       },
     };
-    const onBeforeGenerate = vi.fn();
     mocks.createDesignSystemDraft.mockResolvedValue(system);
     mocks.ensureDesignSystemWorkspace.mockResolvedValue({ project, files: [] });
     mocks.patchProject.mockResolvedValue({ ...project, pendingPrompt: 'Create this project as a design system.' });
 
     render(
-      <DesignSystemCreationFlow
-        onBack={() => {}}
-        onCreated={() => {}}
-        onBeforeGenerate={onBeforeGenerate}
-      />,
+      <DesignSystemCreationFlow onBack={() => {}} onCreated={() => {}} />,
     );
 
     const sourceInput = screen.getByPlaceholderText('https://example.com or https://github.com/owner/repo') as HTMLInputElement;
@@ -1980,11 +1975,6 @@ describe('DesignSystemCreationFlow', () => {
     continueToGeneration();
 
     await waitFor(() => expect(mocks.createDesignSystemDraft).toHaveBeenCalled());
-    expect(onBeforeGenerate).toHaveBeenCalledWith(expect.objectContaining({
-      sourceCount: 1,
-      sourceUrlCount: 1,
-      githubRepoCount: 0,
-    }));
     const draftInput = mocks.createDesignSystemDraft.mock.calls[0]?.[0];
     expect(draftInput?.provenance?.sourceUrls).toEqual(['https://open-design.ai']);
     expect(draftInput?.provenance?.githubUrls).toBeUndefined();

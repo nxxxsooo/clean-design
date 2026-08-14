@@ -194,8 +194,8 @@ export const antigravityAgentDef = {
   // we got an identical byte-for-byte form re-emission on turn 2 when
   // turn 1's tool-call retry path returned the cached form response.
   //
-  // Instead we treat agy as a stateless plain adapter like qwen /
-  // deepseek: every spawn gets the full OD-rendered transcript via
+  // Instead we treat agy as a stateless plain adapter: every spawn gets the
+  // full OD-rendered transcript via
   // `buildDaemonTranscript`, and that transcript's prior assistant
   // turns are sanitized to strip `<question-form>` markup + form-schema
   // JSON fences (see `sanitizePriorAssistantTurnForTranscript` in
@@ -224,8 +224,8 @@ export const antigravityAgentDef = {
     // bot's environment runs a different agy build that may have
     // renamed the entry point; until upstream confirms a stable
     // headless subcommand (see google-antigravity/antigravity-cli#119)
-    // and the change actually ships in the auto-update channel that
-    // packaged OD users get, `-p -` is the contract that actually
+    // and the change actually ships in the CLI's stable release channel,
+    // `-p -` is the contract that actually
     // produces a print-mode reply on the installed CLI.
     const args: string[] = [];
     // Always opt into `--log-file` when the daemon supplied a path so
@@ -249,6 +249,4 @@ export const antigravityAgentDef = {
   },
   promptViaStdin: true,
   streamFormat: 'plain',
-  installUrl: 'https://antigravity.google/cli',
-  docsUrl: 'https://antigravity.google/docs/cli-overview',
 } satisfies RuntimeAgentDef;

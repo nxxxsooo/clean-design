@@ -48,7 +48,7 @@ describe('native session recovery metadata', () => {
     });
   });
 
-  it('describes Pi and ACP recovery modes without leaking handles', () => {
+  it('describes Pi recovery mode without leaking handles', () => {
     const pi = initialNativeSessionRecoveryMetadata({
       agent: { id: 'pi' },
       supportsSessionResume: true,
@@ -57,15 +57,6 @@ describe('native session recovery metadata', () => {
       invalidationReason: null,
       updatedAt: 200,
     });
-    const acp = initialNativeSessionRecoveryMetadata({
-      agent: { id: 'amr', resumesSessionViaAcpLoad: true },
-      supportsSessionResume: true,
-      isResuming: true,
-      resumeSessionId: 'vela-durable-session',
-      invalidationReason: null,
-      updatedAt: 300,
-    });
-
     expect(pi).toMatchObject({
       agentId: 'pi',
       state: 'no_recoverable_session',
@@ -73,14 +64,6 @@ describe('native session recovery metadata', () => {
       continuation: 'session-file-resume',
       handle: { present: false, kind: 'session-file-path' },
     });
-    expect(acp).toMatchObject({
-      agentId: 'amr',
-      state: 'resume_attempted',
-      acquisition: 'acp-session-load',
-      continuation: 'acp-session-load',
-      handle: { present: true, kind: 'acp-session-handle', display: null, redacted: true },
-    });
-    expect(JSON.stringify(acp)).not.toContain('vela-durable-session');
   });
 
   it('classifies stream-captured CLI handles from runtime capabilities', () => {

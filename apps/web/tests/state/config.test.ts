@@ -240,6 +240,46 @@ describe('mergeDaemonConfig', () => {
     });
   });
 
+  it('preserves validated-profile candidates until public discovery resolves them', () => {
+    const merged = mergeDaemonConfig(
+      {
+        ...DEFAULT_CONFIG,
+        agentId: 'work-claude',
+        agentModels: { 'work-claude': { model: 'sonnet' } },
+        agentCliEnv: { 'work-claude': { CLAUDE_CONFIG_DIR: '~/.claude-work' } },
+      },
+      {
+        agentId: 'work-claude',
+        agentModels: { 'work-claude': { model: 'opus' } },
+        agentCliEnv: { 'work-claude': { CLAUDE_CONFIG_DIR: '~/.claude-work' } },
+      },
+    );
+
+    expect(merged.agentId).toBe('work-claude');
+    expect(merged.agentModels).toEqual({ 'work-claude': { model: 'opus' } });
+    expect(merged.agentCliEnv).toEqual({
+      'work-claude': { CLAUDE_CONFIG_DIR: '~/.claude-work' },
+    });
+  });
+
+  it.each(['byok-opencode', 'invalid agent id']) (
+    'drops internal or invalid agent preferences for %s',
+    (agentId) => {
+      const merged = mergeDaemonConfig(
+        { ...DEFAULT_CONFIG, agentId: 'codex' },
+        {
+          agentId,
+          agentModels: { [agentId]: { model: 'stale' } },
+          agentCliEnv: { [agentId]: { SOME_BIN: '/tmp/stale' } },
+        },
+      );
+
+      expect(merged.agentId).toBeNull();
+      expect(merged.agentModels).toEqual({});
+      expect(merged.agentCliEnv).toEqual({});
+    },
+  );
+
 });
 
 describe('mergeDaemonMediaProviders', () => {
@@ -787,6 +827,29 @@ afterEach(() => {
 });
 
 describe('loadConfig', () => {
+  it('keeps local-profile candidates while dropping internal records', () => {
+    store.set('clean-design:config', JSON.stringify({
+      ...DEFAULT_CONFIG,
+      agentId: 'work-claude',
+      agentModels: {
+        'work-claude': { model: 'sonnet' },
+        'byok-opencode': { model: 'internal' },
+      },
+      agentCliEnv: {
+        'work-claude': { CLAUDE_CONFIG_DIR: '~/.claude-work' },
+        'byok-opencode': { OPENCODE_BIN: '/tmp/internal' },
+      },
+    }));
+
+    const config = loadConfig();
+
+    expect(config.agentId).toBe('work-claude');
+    expect(config.agentModels).toEqual({ 'work-claude': { model: 'sonnet' } });
+    expect(config.agentCliEnv).toEqual({
+      'work-claude': { CLAUDE_CONFIG_DIR: '~/.claude-work' },
+    });
+  });
+
   it('migrates legacy OpenAI-compatible API configs to an explicit apiProtocol', () => {
     const legacyConfig: Partial<AppConfig> = {
       mode: 'api',

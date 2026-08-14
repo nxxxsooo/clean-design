@@ -176,7 +176,6 @@ async function readSkillBody(
 
 function buildPortableManifest(snapshot: AppliedPluginSnapshot): Record<string, unknown> {
   return {
-    $schema:     'https://open-design.ai/schemas/plugin.v1.json',
     specVersion: snapshot.pluginSpecVersion ?? '1.0.0',
     name:        snapshot.pluginId,
     title:       snapshot.pluginTitle ?? snapshot.pluginId,

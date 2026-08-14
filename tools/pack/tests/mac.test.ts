@@ -28,7 +28,6 @@ async function pathExists(path: string): Promise<boolean> {
 
 function makeConfig(root: string, overrides: Partial<ToolPackConfig> = {}): ToolPackConfig {
   return {
-    containerized: false,
     electronBuilderCliPath: "/x/electron-builder/cli.js",
     electronDistPath: "/x/electron/dist",
     electronVersion: "41.3.0",
@@ -54,7 +53,6 @@ function makeConfig(root: string, overrides: Partial<ToolPackConfig> = {}): Tool
       cacheRoot: join(root, ".tmp", "tools-pack", "cache"),
       toolPackRoot: join(root, ".tmp", "tools-pack"),
     },
-    silent: true,
     signed: false,
     to: "app",
     webOutputMode: "standalone",
@@ -308,7 +306,7 @@ describe("createMacElectronRebuildOptions", () => {
       const appRoot = join(root, "assembled", "app");
 
       expect(createMacElectronRebuildOptions(config, appRoot)).toMatchObject({
-        arch: process.arch,
+        arch: "arm64",
         buildFromSource: false,
         buildPath: appRoot,
         electronVersion: "41.3.0",

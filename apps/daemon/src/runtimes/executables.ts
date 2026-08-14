@@ -14,27 +14,12 @@ const RUNTIME_PROJECT_ROOT = path.resolve(
 );
 
 const AGENT_BIN_ENV_KEYS = new Map<string, string>([
-  ['aider', 'AIDER_BIN'],
   ['claude', 'CLAUDE_BIN'],
-  ['codebuddy', 'CODEBUDDY_BIN'],
   ['codex', 'CODEX_BIN'],
-  ['copilot', 'COPILOT_BIN'],
-  ['cursor-agent', 'CURSOR_AGENT_BIN'],
-  ['deepseek', 'DEEPSEEK_BIN'],
-  ['devin', 'DEVIN_BIN'],
-  ['hermes', 'HERMES_BIN'],
-  ['kimi', 'KIMI_BIN'],
-  ['kiro', 'KIRO_BIN'],
-  ['kilo', 'KILO_BIN'],
-  ['mimo', 'MIMO_BIN'],
   ['opencode', 'OPENCODE_BIN'],
   ['byok-opencode', 'OPENCODE_BIN'],
   ['pi', 'PI_BIN'],
-  ['qoder', 'QODER_BIN'],
-  ['qwen', 'QWEN_BIN'],
-  ['reasonix', 'REASONIX_BIN'],
-  ['trae-cli', 'TRAE_CLI_BIN'],
-  ['vibe', 'VIBE_BIN'],
+  ['antigravity', 'ANTIGRAVITY_BIN'],
 ]);
 
 const TOOLCHAIN_DIR_CACHE_TTL_MS = 5000;

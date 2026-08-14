@@ -77,12 +77,6 @@ async function stubEmptyProjectsNewProjectData(page: Page): Promise<void> {
   await page.route('**/api/skills', async (route) => {
     await route.fulfill({ json: { skills: TAB_SKILLS } });
   });
-  await page.route('**/api/connectors', async (route) => {
-    await route.fulfill({ json: { connectors: [] } });
-  });
-  await page.route('**/api/connectors/status', async (route) => {
-    await route.fulfill({ json: { statuses: {} } });
-  });
   await page.route('**/api/projects', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({ json: { projects: [] } });
@@ -153,8 +147,6 @@ const COMPOSER_PLUS_PLUGIN = {
 test.beforeEach(async ({ page }) => {
   let appConfig = {
     onboardingCompleted: true,
-    privacyDecisionAt: 1,
-    telemetry: { metrics: false, content: false, artifactManifest: false },
     mode: 'daemon',
     agentId: 'codex',
     skillId: null,
@@ -175,8 +167,6 @@ test.beforeEach(async ({ page }) => {
         skillId: null,
         designSystemId: null,
         onboardingCompleted: true,
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
         agentModels: { codex: { model: 'default' } },
       }),
     );
@@ -229,7 +219,6 @@ test.describe('new project modal from left rail', () => {
     await expect(page.locator('.newproj-title')).toContainText('New live artifact');
     await expect(page.locator('.newproj-title')).toContainText('Beta');
     await expect(page.getByTestId('design-system-picker')).toHaveCount(0);
-    await expect(page.getByTestId('new-project-connectors')).toBeVisible();
     await expect(page.getByTestId('create-project')).toContainText('Create live artifact');
 
     await page.getByTestId('new-project-tab-deck').click();
@@ -237,7 +226,6 @@ test.describe('new project modal from left rail', () => {
     await expect(page.locator('.newproj-title')).toContainText('New slide deck');
     await expect(page.getByTestId('design-system-trigger')).toBeVisible();
     await expect(page.getByText('Use speaker notes')).toBeVisible();
-    await expect(page.getByTestId('new-project-connectors')).toHaveCount(0);
 
     await page.getByTestId('new-project-tab-prototype').click();
     await expect(page.getByTestId('new-project-tab-prototype')).toHaveAttribute('aria-selected', 'true');
@@ -273,12 +261,6 @@ test.describe('new project modal from left rail', () => {
 test('[P0] projects empty state create action opens the new project flow', async ({ page }) => {
   await page.route('**/api/skills', async (route) => {
     await route.fulfill({ json: { skills: TAB_SKILLS } });
-  });
-  await page.route('**/api/connectors', async (route) => {
-    await route.fulfill({ json: { connectors: [] } });
-  });
-  await page.route('**/api/connectors/status', async (route) => {
-    await route.fulfill({ json: { statuses: {} } });
   });
   await page.route('**/api/projects', async (route) => {
     if (route.request().method() === 'GET') {
@@ -395,8 +377,6 @@ test('[P1] stale daemon default design system is not posted when creating a proj
         json: {
           config: {
             onboardingCompleted: true,
-            privacyDecisionAt: 1,
-            telemetry: { metrics: false, content: false, artifactManifest: false },
             mode: 'daemon',
             agentId: 'codex',
             skillId: null,
@@ -412,8 +392,6 @@ test('[P1] stale daemon default design system is not posted when creating a proj
       json: {
         config: {
           onboardingCompleted: true,
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
           mode: 'daemon',
           agentId: 'codex',
           skillId: null,
@@ -590,7 +568,7 @@ test('[P1] project detail composer working directory picker opens without leavin
   await expect(composer.getByTestId('working-dir-pick')).toBeVisible();
 });
 
-test('[P1] project detail composer plus menu exposes attachment, connector, plugin, and MCP entries', async ({ page }) => {
+test('[P1] project detail composer plus menu exposes attachment and local plugin entries', async ({ page }) => {
   await routeComposerPlusFixtures(page);
   await page.goto('/');
   await createProject(page, 'Composer plus context menu');
@@ -599,18 +577,10 @@ test('[P1] project detail composer plus menu exposes attachment, connector, plug
   const composer = page.getByTestId('chat-composer');
   await composer.getByTestId('chat-plus-trigger').click();
   await expect(page.getByTestId('composer-plus-attach')).toBeVisible();
-  await expect(page.getByTestId('composer-plus-connectors')).toBeVisible();
   await expect(page.getByTestId('composer-plus-plugins')).toBeVisible();
-  await expect(page.getByTestId('composer-plus-mcp')).toBeVisible();
-
-  await page.getByTestId('composer-plus-connectors').click();
-  await expect(page.getByRole('menuitem', { name: /Figma Connector/i })).toBeVisible();
 
   await page.getByTestId('composer-plus-plugins').click();
   await expect(page.getByRole('menuitem', { name: /Composer Context Plugin/i })).toBeVisible();
-
-  await page.getByTestId('composer-plus-mcp').click();
-  await expect(page.getByRole('menuitem', { name: /Design Docs MCP/i })).toBeVisible();
 });
 
 test('[P1] project detail composer plus menu opens project, local code, Figma help, and design system context actions', async ({ page }) => {
@@ -1045,175 +1015,6 @@ test('[P1] project detail keeps local-code context when linkedDirs PATCH removal
   );
 });
 
-test('[P1] project detail composer context actions emit analytics event fields', async ({ page }) => {
-  const analyticsBodies: string[] = [];
-
-  await page.route('**/api/app-config', async (route) => {
-    if (route.request().method() !== 'GET') {
-      await route.continue();
-      return;
-    }
-    await route.fulfill({
-      json: {
-        config: {
-          mode: 'daemon',
-          apiKey: '',
-          baseUrl: 'https://api.anthropic.com',
-          model: 'claude-sonnet-4-5',
-          agentId: 'codex',
-          skillId: null,
-          designSystemId: null,
-          onboardingCompleted: true,
-          agentModels: { codex: { model: 'default', reasoning: 'default' } },
-          privacyDecisionAt: 1,
-          telemetry: { metrics: true, content: false, artifactManifest: false },
-        },
-      },
-    });
-  });
-  await page.route('**/api/analytics/config', async (route) => {
-    await route.fulfill({
-      json: {
-        enabled: true,
-        env: 'e2e',
-        key: 'phc_e2e',
-        host: 'https://analytics.open-design.test',
-        installationId: 'e2e-installation',
-      },
-    });
-  });
-  await page.route('https://analytics.open-design.test/**', async (route) => {
-    analyticsBodies.push(route.request().postData() ?? '');
-    await route.fulfill({ status: 200, json: { status: 1 } });
-  });
-  await routeComposerPlusFixtures(page);
-  await page.route('**/api/dialog/open-folder', async (route) => {
-    await route.fulfill({ json: { path: '/tmp/open-design/local-code-analytics' } });
-  });
-  await page.route('**/api/dir-exists', async (route) => {
-    await route.fulfill({ json: { exists: true } });
-  });
-  await page.route('**/api/projects/*', async (route) => {
-    if (route.request().method() === 'PATCH') {
-      const body = route.request().postDataJSON() as Record<string, unknown>;
-      await route.fulfill({
-        json: {
-          project: {
-            id: route.request().url().split('/api/projects/')[1]?.split(/[/?#]/)[0] ?? 'project',
-            name: 'Composer context analytics',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            metadata: body.metadata ?? { kind: 'prototype' },
-          },
-        },
-      });
-      return;
-    }
-    await route.continue();
-  });
-
-  await page.goto('/');
-  await createProject(page, 'Composer context analytics');
-  await expectWorkspaceReady(page);
-  const composer = page.getByTestId('chat-composer');
-
-  await composer.getByTestId('chat-plus-trigger').click();
-  await page.getByTestId('composer-plus-local-code').click();
-  const chip = composer.locator('.staged-context--workspace', { hasText: 'local-code-analytics' });
-  await expect(chip).toBeVisible();
-  await chip.getByRole('button', { name: /local-code-analytics/i }).click();
-  await expect(chip).toHaveCount(0);
-
-  await expect.poll(() => analyticsBodies.join('\n')).toContain('plus_pick');
-  const raw = analyticsBodies.join('\n');
-  expect(raw).toContain('context_remove');
-  expect(raw).toContain('workspace');
-  expect(raw).toContain('local-code');
-});
-
-test('[P1] Open Design Cloud hard balance gate blocks a project send before a daemon run starts', async ({ page }) => {
-  test.setTimeout(60_000);
-
-  const runRequestBodies: Array<Record<string, unknown>> = [];
-  await page.route('**/api/app-config', async (route) => {
-    if (route.request().method() === 'GET') {
-      await route.fulfill({
-        json: {
-          config: {
-            mode: 'daemon',
-            apiKey: '',
-            baseUrl: 'https://api.anthropic.com',
-            model: 'claude-sonnet-4-5',
-            agentId: 'amr',
-            skillId: null,
-            designSystemId: null,
-            onboardingCompleted: true,
-            privacyDecisionAt: 1,
-            telemetry: { metrics: false, content: false, artifactManifest: false },
-            agentModels: {},
-            agentCliEnv: {},
-          },
-        },
-      });
-      return;
-    }
-    await route.continue();
-  });
-  await routeAgents(page, [
-    ...AGENTS,
-    {
-      id: 'amr',
-      name: 'Open Design Cloud',
-      bin: 'amr',
-      available: true,
-      version: 'cloud',
-      models: [{ id: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5' }],
-    },
-  ]);
-  await page.route('**/api/integrations/vela/wallet**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        status: 'available',
-        profile: 'local',
-        user: { id: 'amr-balance-user', email: 'blocked@example.com', plan: 'free' },
-        balanceUsd: '0.00',
-        updatedAt: '2026-07-09T00:00:00.000Z',
-        fetchedAt: '2026-07-09T00:00:00.000Z',
-        stale: false,
-        source: 'vela_api',
-      }),
-    });
-  });
-  await page.route('**/api/runs', async (route) => {
-    runRequestBodies.push(route.request().postDataJSON() as Record<string, unknown>);
-    await route.fulfill({
-      status: 202,
-      contentType: 'application/json',
-      body: '{"runId":"should-not-start"}',
-    });
-  });
-
-  await page.goto('/');
-  await createProject(page, 'AMR balance gate project send');
-  await expectWorkspaceReady(page);
-
-  const input = page.getByTestId('chat-composer-input');
-  await input.fill('Start a cloud run that should be blocked before the daemon run.');
-  await page.getByTestId('chat-send').click();
-
-  const dialog = page.getByTestId('amr-balance-dialog');
-  await expect(dialog).toBeVisible();
-  await expect(dialog).toContainText('$0.00');
-  await expect(dialog.getByTestId('amr-balance-dialog-plans')).toBeVisible();
-  await page.waitForTimeout(500);
-  expect(runRequestBodies).toHaveLength(0);
-  await expect(page.getByTestId('chat-queued-send-strip')).toContainText(
-    'Start a cloud run that should be blocked',
-  );
-});
-
 test('[P0] @critical project detail composer agent menu lets the user switch Local CLI agents and models', async ({ page }) => {
   test.setTimeout(60_000);
   await page.goto('/');
@@ -1391,8 +1192,6 @@ test('[P0] @critical project detail composer BYOK model switch persists from the
     skillId: null,
     designSystemId: null,
     onboardingCompleted: true,
-    privacyDecisionAt: 1,
-    telemetry: { metrics: false, content: false, artifactManifest: false },
     mediaProviders: {},
     agentModels: { codex: { model: 'default' } },
     agentCliEnv: {},
@@ -1461,8 +1260,6 @@ test('[P0] @critical project detail composer keeps Local CLI and BYOK model choi
     skillId: null,
     designSystemId: null,
     onboardingCompleted: true,
-    privacyDecisionAt: 1,
-    telemetry: { metrics: false, content: false, artifactManifest: false },
     mediaProviders: {},
     agentModels: { codex: { model: 'default' } },
     agentCliEnv: {},
@@ -1643,75 +1440,6 @@ test('[P2] project header keeps the settings, handoff, and avatar controls pinne
   expect(layout.avatarRight).toBeLessThanOrEqual(layout.viewportWidth - 8);
 });
 
-test('[P1] project handoff AMR website link carries attribution from the CLI tab', async ({ page }) => {
-  await routeHandoffEditors(page);
-  await page.goto('/');
-  await createProject(page, 'Handoff AMR attribution');
-  await expectWorkspaceReady(page);
-
-  const menu = await openHandoffCliTab(page);
-  const amrLink = menu.locator('.handoff-amr-link');
-  await expect(amrLink).toBeVisible();
-  await expect(amrLink).toHaveAttribute('target', '_blank');
-  await expect(amrLink).toHaveAttribute('rel', 'noreferrer');
-
-  await amrLink.evaluate((link) => {
-    link.addEventListener('click', (event) => event.preventDefault(), { once: true });
-  });
-  await amrLink.click();
-  const href = await amrLink.getAttribute('href');
-  expect(href).toBeTruthy();
-  const url = new URL(href!);
-
-  expect(url.searchParams.get('od_origin')).toBe('open_design');
-  expect(url.searchParams.get('od_entry_source')).toBe('handoff_amr_website');
-  expect(url.searchParams.get('od_entry_id')).toBeTruthy();
-});
-
-test('[P1] project handoff CLI prompt copies the project path, framework, id, and target agent', async ({ page }) => {
-  await page.addInitScript(() => {
-    const store: string[] = [];
-    Object.defineProperty(window, '__copiedTexts', {
-      value: store,
-      configurable: true,
-    });
-    Object.defineProperty(navigator, 'clipboard', {
-      value: {
-        writeText(text: string) {
-          store.push(text);
-          return Promise.resolve();
-        },
-      },
-      configurable: true,
-    });
-  });
-  await routeHandoffEditors(page);
-  await page.goto('/');
-  await createProject(page, 'Handoff CLI prompt contract');
-  await expectWorkspaceReady(page);
-  const { projectId } = getProjectContextFromUrl(page);
-
-  const menu = await openHandoffCliTab(page);
-  const pathButton = menu.locator('.handoff-path-button');
-  await expect(pathButton).toBeEnabled();
-  const projectDir = await pathButton.getAttribute('title');
-  expect(projectDir).toBeTruthy();
-
-  await menu.getByRole('button', { name: /^Next\.js$/ }).click();
-  await menu.getByTestId('handoff-cli-item-codex').click();
-  await expect(menu.getByTestId('handoff-cli-item-codex')).toContainText('Copied');
-
-  const copied = await page.evaluate(() => {
-    return (window as typeof window & { __copiedTexts?: string[] }).__copiedTexts ?? [];
-  });
-  const prompt = copied.at(-1) ?? '';
-  expect(prompt).toContain(projectDir as string);
-  expect(prompt).toContain('cd ');
-  expect(prompt).toContain('Target: Next.js / React');
-  expect(prompt).toContain('CLI: Codex CLI (codex)');
-  expect(prompt).toContain(`Project ID: ${projectId}`);
-});
-
 test('[P1] canceling design file deletion keeps the file and open tab', async ({ page }) => {
   await page.goto('/');
   await createProject(page, 'Design file delete cancel flow');
@@ -1872,13 +1600,13 @@ test('[P1] project detail session mode and active file context survive reload in
 
 test('[P1] active project API defaults to the selected project file from the real workspace', async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await createProject(page, 'MCP active context contract');
+  await createProject(page, 'Active project context contract');
   await expectWorkspaceReady(page);
 
   const uploadedName = await uploadTinyHtml(
     page,
-    'mcp-active-context.html',
-    '<!doctype html><html><body><main><h1>MCP Active Context</h1></main></body></html>',
+    'active-project-context.html',
+    '<!doctype html><html><body><main><h1>Active Project Context</h1></main></body></html>',
   );
   const { projectId } = getProjectContextFromUrl(page);
   await expect(tabBySuffix(page, uploadedName)).toHaveAttribute('aria-selected', 'true');
@@ -2095,150 +1823,6 @@ test('[P1] project detail conversations menu supports new chat, search, counts, 
   await expect(page.getByTestId('conversation-history-count')).toHaveText('4');
   await expect(page.getByTestId('conversation-select-conv-new-history')).toContainText('Untitled');
   await expect(page.getByTestId('conversation-meta-conv-new-history')).toHaveText('0 msg · now');
-});
-
-test('[P0] project detail share menu copies the current share link for uploaded html artifacts', async ({ page }) => {
-  let uploadedName = '';
-  await page.addInitScript(() => {
-    const store: string[] = [];
-    Object.defineProperty(window, '__copiedTexts', {
-      value: store,
-      configurable: true,
-    });
-    Object.defineProperty(navigator, 'clipboard', {
-      value: {
-        writeText(text: string) {
-          store.push(text);
-          return Promise.resolve();
-        },
-      },
-      configurable: true,
-    });
-  });
-  await page.route('**/api/projects/*/deployments', async (route) => {
-    await route.fulfill({
-      json: {
-        deployments: uploadedName
-          ? [{
-              id: 'ready-share-link',
-              projectId: getProjectIdFromApiPath(route.request().url()),
-              fileName: uploadedName,
-              providerId: 'vercel-self',
-              url: 'https://share-preview.example',
-              deploymentCount: 1,
-              target: 'preview',
-              status: 'ready',
-              createdAt: 1,
-              updatedAt: 2,
-            }]
-          : [],
-      },
-    });
-  });
-
-  await page.goto('/');
-  await createProject(page, 'Share link copy flow');
-  await expectWorkspaceReady(page);
-
-  uploadedName = await uploadTinyHtml(page, 'share-link-copy.html', '<!doctype html><html><body><h1>Share link copy</h1></body></html>');
-  await openUploadedHtmlArtifactPreview(page, uploadedName);
-
-  await page.getByRole('button', { name: /^Share$/i }).click();
-  await page.getByRole('menuitem', { name: /^Copy share link$/i }).click();
-  await expect(page.getByRole('menuitem', { name: /^Copied!$/i })).toBeVisible();
-
-  const copied = await page.evaluate(() => (window as typeof window & { __copiedTexts?: string[] }).__copiedTexts ?? []);
-  expect(copied.at(-1)).toBe('https://share-preview.example');
-});
-
-test('[P0] project detail share menu opens the current share page for uploaded html artifacts', async ({ page }) => {
-  let uploadedName = '';
-  await page.addInitScript(() => {
-    const opened: string[] = [];
-    Object.defineProperty(window, '__openedUrls', {
-      value: opened,
-      configurable: true,
-    });
-    const originalOpen = window.open.bind(window);
-    window.open = ((...args: Parameters<typeof window.open>) => {
-      if (typeof args[0] === 'string') opened.push(args[0]);
-      return originalOpen(...args);
-    }) as typeof window.open;
-  });
-  await page.route('**/api/projects/*/deployments', async (route) => {
-    await route.fulfill({
-      json: {
-        deployments: uploadedName
-          ? [{
-              id: 'protected-share-link',
-              projectId: getProjectIdFromApiPath(route.request().url()),
-              fileName: uploadedName,
-              providerId: 'vercel-self',
-              url: 'https://protected-share.example',
-              deploymentCount: 1,
-              target: 'preview',
-              status: 'protected',
-              createdAt: 1,
-              updatedAt: 2,
-            }]
-          : [],
-      },
-    });
-  });
-
-  await page.goto('/');
-  await createProject(page, 'Open share page flow');
-  await expectWorkspaceReady(page);
-
-  uploadedName = await uploadTinyHtml(page, 'share-page-open.html', '<!doctype html><html><body><h1>Open share page</h1></body></html>');
-  await openUploadedHtmlArtifactPreview(page, uploadedName);
-
-  await page.getByRole('button', { name: /^Share$/i }).click();
-  await page.getByRole('menuitem', { name: /Open share page/i }).click();
-
-  await expect
-    .poll(() =>
-      page.evaluate(() => (window as typeof window & { __openedUrls?: string[] }).__openedUrls ?? []),
-    )
-    .toContain('https://protected-share.example');
-});
-
-test('[P0] @critical project detail share menu publish action opens the deploy flow for the selected provider', async ({ page }) => {
-  let deployConfigUrl: string | null = null;
-  await page.route('**/api/projects/*/deployments', async (route) => {
-    await route.fulfill({ json: { deployments: [] } });
-  });
-  await page.route('**/api/deploy/config?providerId=*', async (route) => {
-    deployConfigUrl = route.request().url();
-    const url = new URL(route.request().url());
-    await route.fulfill({
-      json: {
-        configured: false,
-        providerId: url.searchParams.get('providerId'),
-        tokenMask: '',
-        teamId: '',
-        teamSlug: '',
-      },
-    });
-  });
-
-  await page.goto('/');
-  await createProject(page, 'Deploy action flow');
-  await expectWorkspaceReady(page);
-
-  const uploadedName = await uploadTinyHtml(page, 'deploy-action.html', '<!doctype html><html><body><h1>Deploy action</h1></body></html>');
-  await openUploadedHtmlArtifactPreview(page, uploadedName);
-
-  await page.getByRole('button', { name: /^Share$/i }).click();
-  await page.getByRole('menuitem', { name: /^Deploy to Vercel$/i }).click();
-
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('heading', { name: /Deploy to Vercel/i })).toBeVisible();
-  await expect(dialog.locator('select').first()).toHaveValue('vercel-self');
-  await expect
-    .poll(() => deployConfigUrl ?? '', { timeout: T.medium })
-    .toContain('providerId=vercel-self');
 });
 
 test('[P1] home design card deletion supports cancel and confirm flows', async ({ page }) => {
@@ -2716,11 +2300,11 @@ test('[P2] projects kanban view groups cards into status columns', async ({ page
 test('[P1] projects page shows live artifact cards, supports search, and opens the live artifact project', async ({ page }) => {
   const liveProject = makeProjectsTabProject({
     id: 'proj-live',
-    name: 'Orbit Daily Digest',
+    name: 'Local Live Artifact',
     createdAt: Date.now() - 60_000,
     updatedAt: Date.now() - 30_000,
     skillId: 'live-artifact',
-    metadata: { kind: 'orbit', intent: 'live-artifact' },
+    metadata: { kind: 'prototype', intent: 'live-artifact' },
     status: { value: 'succeeded' },
   });
   const regularProject = makeProjectsTabProject({
@@ -2732,8 +2316,8 @@ test('[P1] projects page shows live artifact cards, supports search, and opens t
   const liveArtifact = {
     id: 'artifact-1',
     projectId: 'proj-live',
-    title: 'Orbit Daily Digest — 2026-05-15',
-    slug: 'orbit-daily-digest',
+    title: 'Local Live Artifact — 2026-05-15',
+    slug: 'local-live-artifact',
     status: 'ready',
     refreshStatus: 'succeeded',
     pinned: false,
@@ -2778,7 +2362,7 @@ test('[P1] projects page shows live artifact cards, supports search, and opens t
     await route.fulfill({
       status: 200,
       headers: { 'content-type': 'text/html' },
-      body: '<!doctype html><html><body><h1>Orbit Daily Digest</h1></body></html>',
+      body: '<!doctype html><html><body><h1>Local Live Artifact</h1></body></html>',
     });
   });
 
@@ -2787,20 +2371,20 @@ test('[P1] projects page shows live artifact cards, supports search, and opens t
   await expectDesignsView(page);
 
   const liveCard = page.locator('.live-artifact-card', {
-    has: page.locator('.design-card-name', { hasText: 'Orbit Daily Digest' }),
+    has: page.locator('.design-card-name', { hasText: 'Local Live Artifact' }),
   });
   await expect(liveCard).toBeVisible();
   await expect(liveCard).toContainText(/Live Artifact/i);
   await expect(liveCard).toContainText(/LIVE|Refreshed/i);
 
   const search = page.locator('.tab-panel-toolbar .toolbar-search input');
-  await search.fill('digest');
+  await search.fill('local live');
   await expect(liveCard).toBeVisible();
   await expect(homeDesignCard(page, 'Regular Prototype')).toHaveCount(0);
 
   await liveCard.click();
   await expect(page).toHaveURL(/\/projects\/proj-live\/files\/live%3Aartifact-1$/);
-  await expect(page.getByTestId('project-title')).toContainText('Orbit Daily Digest');
+  await expect(page.getByTestId('project-title')).toContainText('Local Live Artifact');
 });
 
 test('[P2] change pet opens pet settings and updates the custom companion draft', async ({ page }) => {
@@ -3194,52 +2778,8 @@ async function selectComposerSessionMode(page: Page, modeTitle: 'Ask mode' | 'Pl
 }
 
 async function routeComposerPlusFixtures(page: Page) {
-  await page.route('**/api/connectors', async (route) => {
-    await route.fulfill({
-      json: {
-        connectors: [
-          {
-            id: 'figma',
-            name: 'Figma Connector',
-            provider: 'Composio',
-            category: 'Design',
-            status: 'connected',
-            tools: [],
-          },
-        ],
-      },
-    });
-  });
-  await page.route('**/api/connectors/status', async (route) => {
-    await route.fulfill({
-      json: {
-        statuses: {
-          figma: { status: 'connected', accountLabel: 'Design Team' },
-        },
-      },
-    });
-  });
-  await page.route('**/api/connectors/discovery**', async (route) => {
-    await route.fulfill({ json: { connectors: [] } });
-  });
   await page.route('**/api/plugins', async (route) => {
     await route.fulfill({ json: { plugins: [COMPOSER_PLUS_PLUGIN] } });
-  });
-  await page.route('**/api/mcp/servers', async (route) => {
-    await route.fulfill({
-      json: {
-        servers: [
-          {
-            id: 'design-docs',
-            label: 'Design Docs MCP',
-            transport: 'stdio',
-            enabled: true,
-            command: 'npx',
-          },
-        ],
-        templates: [],
-      },
-    });
   });
 }
 
@@ -3252,43 +2792,6 @@ async function expectWorkspaceReady(page: Page) {
   await expect(page.getByTestId('chat-composer-input')).toBeVisible();
   await expect(page.locator('.chat-loading-state')).toHaveCount(0, { timeout: T.medium });
   await expect(page.getByTestId('file-workspace')).toBeVisible();
-}
-
-async function routeHandoffEditors(page: Page): Promise<void> {
-  await page.route('**/api/editors', async (route) => {
-    await route.fulfill({
-      json: {
-        platform: 'darwin',
-        editors: [
-          {
-            id: 'cursor',
-            label: 'Cursor',
-            icon: 'cursor',
-            available: true,
-            resolvedPath: '/Applications/Cursor.app',
-            platforms: ['darwin', 'win32', 'linux'],
-          },
-          {
-            id: 'finder',
-            label: 'Finder',
-            icon: 'finder',
-            available: true,
-            resolvedPath: '/System/Library/CoreServices/Finder.app',
-            platforms: ['darwin'],
-          },
-        ],
-      },
-    });
-  });
-}
-
-async function openHandoffCliTab(page: Page): Promise<Locator> {
-  await page.getByTestId('handoff-caret').click();
-  const menu = page.getByTestId('handoff-menu');
-  await expect(menu).toBeVisible();
-  await menu.getByRole('tab', { name: /^Copy for CLI$/ }).click();
-  await expect(menu.locator('.handoff-amr-link')).toBeVisible();
-  return menu;
 }
 
 async function dismissPrivacyDialog(page: Page) {
@@ -3467,13 +2970,6 @@ function getProjectContextFromUrl(page: Page) {
   ) ?? [];
   if (!projectId) throw new Error(`unexpected project route: ${url.pathname}`);
   return { projectId, conversationId };
-}
-
-function getProjectIdFromApiPath(rawUrl: string) {
-  const url = new URL(rawUrl);
-  const [, projectId] = url.pathname.match(/\/api\/projects\/([^/]+)/) ?? [];
-  if (!projectId) throw new Error(`unexpected project api path: ${url.pathname}`);
-  return projectId;
 }
 
 function escapeRegExp(value: string): string {

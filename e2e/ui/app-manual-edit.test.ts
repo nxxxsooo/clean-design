@@ -32,8 +32,6 @@ test.beforeEach(async ({ page }) => {
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: {},
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
@@ -51,8 +49,6 @@ test.beforeEach(async ({ page }) => {
           skillId: null,
           designSystemId: null,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
         },
       },
     });
@@ -453,98 +449,6 @@ test('[P1] draw annotation composer floats near the selected mark and can be que
   await expect(queuedStrip).toBeVisible();
   await expect(queuedStrip).toContainText('Float this note near the marked hero area');
   await expect(queuedStrip).toContainText('1 mark');
-});
-
-test('[P1] first-loop onboarding completes once after a successful artifact export', async ({ page }) => {
-  test.setTimeout(60_000);
-  const analyticsBodies: string[] = [];
-  const analyticsConfig = {
-    mode: 'daemon',
-    apiKey: '',
-    baseUrl: 'https://api.anthropic.com',
-    model: 'claude-sonnet-4-5',
-    agentId: 'mock',
-    skillId: null,
-    designSystemId: null,
-    onboardingCompleted: true,
-    agentModels: {},
-    privacyDecisionAt: 1,
-    telemetry: { metrics: true, content: false, artifactManifest: false },
-  };
-  await page.addInitScript(
-    ({ key, value }) => {
-      window.localStorage.setItem(key, JSON.stringify(value));
-    },
-    { key: STORAGE_KEY, value: analyticsConfig },
-  );
-  await page.route('**/api/app-config', async (route) => {
-    if (route.request().method() === 'GET') {
-      await route.fulfill({ json: { config: analyticsConfig } });
-      return;
-    }
-    await route.continue();
-  });
-  await page.route('**/api/analytics/config', async (route) => {
-    await route.fulfill({
-      json: {
-        enabled: true,
-        env: 'e2e',
-        key: 'phc_e2e',
-        host: 'https://analytics.open-design.test',
-        installationId: 'e2e-installation',
-      },
-    });
-  });
-  await page.route('https://analytics.open-design.test/**', async (route) => {
-    analyticsBodies.push(route.request().postData() ?? '');
-    await route.fulfill({ status: 200, json: { status: 1 } });
-  });
-
-  await routeMockAgents(page);
-  const projectId = await createEmptyProject(page, 'First loop export smoke');
-  await seedHtmlArtifact(page, projectId, 'first-loop-export.html', manualEditHtml());
-  await page.addInitScript(
-    ({ id }) => {
-      window.sessionStorage.setItem(
-        `open-design:first-loop-entry:${id}`,
-        JSON.stringify({
-          source: 'home_recommendation',
-          productType: 'prototype',
-          recommendationId: 'e2e-recommendation-card',
-        }),
-      );
-      window.sessionStorage.setItem(
-        `open-design:first-loop-steps:${id}`,
-        JSON.stringify(['prompt_sent', 'generated', 'artifact_viewed']),
-      );
-    },
-    { id: projectId },
-  );
-  await page.goto(`/projects/${projectId}/files/first-loop-export.html`);
-  await openDesignFile(page, 'first-loop-export.html');
-
-  await page.getByRole('button', { name: /^Download$/ }).click();
-  const htmlDownload = page.waitForEvent('download');
-  await page.locator('.share-menu-popover[role="menu"]').getByRole('menuitem', { name: /Export as standalone HTML/ }).click();
-  const download = await htmlDownload;
-  expect(download.suggestedFilename()).toMatch(/first-loop-export.*\.html$/i);
-
-  await expect.poll(() => analyticsBodies.join('\n'), { timeout: 15_000 }).toContain('onboarding_completed');
-  const raw = analyticsBodies.join('\n');
-  expect(raw).toContain('home_recommendation');
-  expect(raw).toContain('e2e-recommendation-card');
-  expect(raw).toContain('prompt_sent');
-  expect(raw).toContain('generated');
-  expect(raw).toContain('artifact_viewed');
-  expect(raw).toContain('delivered');
-
-  await page.getByRole('button', { name: /^Download$/ }).click();
-  const secondHtmlDownload = page.waitForEvent('download');
-  await page.locator('.share-menu-popover[role="menu"]').getByRole('menuitem', { name: /Export as standalone HTML/ }).click();
-  await secondHtmlDownload;
-  await page.waitForTimeout(500);
-  const completedCount = analyticsBodies.join('\n').match(/onboarding_completed/g)?.length ?? 0;
-  expect(completedCount).toBe(1);
 });
 
 async function selectStyleRowInput(

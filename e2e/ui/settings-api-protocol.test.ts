@@ -1,6 +1,6 @@
 import { expect, test } from '@/playwright/suite';
 import type { Locator, Page } from '@playwright/test';
-import { openSettingsDialog } from '../lib/playwright/amr.js';
+import { openSettingsDialog } from '../lib/playwright/app.js';
 import { routeAgents } from '../lib/playwright/mock-factory.js';
 import { T } from '@/timeouts';
 
@@ -976,9 +976,9 @@ test('[P0] @critical saving Local CLI updates the entry status pill with the sel
         models: [{ id: 'default', label: 'Default' }],
       },
       {
-        id: 'gemini',
-        name: 'Gemini CLI',
-        bin: 'gemini',
+        id: 'pi',
+        name: 'Pi',
+        bin: 'pi',
         available: false,
         version: null,
         models: [],

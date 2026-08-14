@@ -1,4 +1,7 @@
 import { build } from "esbuild";
+import { rm } from "node:fs/promises";
+
+await rm(new URL("./dist", import.meta.url), { recursive: true, force: true });
 
 await build({
   bundle: true,
@@ -16,7 +19,6 @@ await build({
     "./src/design-systems/components-manifest.ts",
     "./src/design-systems/derived-token-outputs.ts",
     "./src/design-systems/token-schema.ts",
-    "./src/analytics/index.ts",
   ],
   format: "esm",
   outbase: "./src",

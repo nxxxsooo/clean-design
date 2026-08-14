@@ -28,7 +28,6 @@ const fetchChatRunStatus = vi.fn();
 const listActiveChatRuns = vi.fn();
 const listProjectRuns = vi.fn();
 const reattachDaemonRun = vi.fn();
-const publishDaemonRunFinishedEvent = vi.fn();
 const streamViaDaemon = vi.fn();
 const saveMessage = vi.fn();
 const createConversation = vi.fn();
@@ -67,7 +66,6 @@ vi.mock('../../src/providers/daemon', () => ({
   fetchChatRunStatus: (...args: unknown[]) => fetchChatRunStatus(...args),
   listActiveChatRuns: (...args: unknown[]) => listActiveChatRuns(...args),
   listProjectRuns: (...args: unknown[]) => listProjectRuns(...args),
-  publishDaemonRunFinishedEvent: (...args: unknown[]) => publishDaemonRunFinishedEvent(...args),
   reattachDaemonRun: (...args: unknown[]) => reattachDaemonRun(...args),
   streamViaDaemon: (...args: unknown[]) => streamViaDaemon(...args),
 }));
@@ -541,9 +539,6 @@ describe('ProjectView daemon reattach restore', () => {
     renderProjectView();
 
     await waitFor(() => expect(reattachDaemonRun).toHaveBeenCalledTimes(1));
-    expect(reattachDaemonRun).toHaveBeenCalledWith(expect.objectContaining({
-      publishRunFinishedEvent: true,
-    }));
     expect(capturedHandlers).not.toBeNull();
 
     capturedHandlers!.onDelta('hello ');
@@ -561,7 +556,7 @@ describe('ProjectView daemon reattach restore', () => {
     });
   });
 
-  it('does not publish a run-finished event while replaying a historical success', async () => {
+  it('reattaches a historical success without mutating its persisted terminal state', async () => {
     const startedAt = Date.now() - 10_000;
     listConversations.mockResolvedValue([{ id: 'conv-1', title: 'Conversation' }]);
     listMessages.mockResolvedValue([
@@ -597,13 +592,15 @@ describe('ProjectView daemon reattach restore', () => {
     renderProjectView();
 
     await waitFor(() => expect(reattachDaemonRun).toHaveBeenCalledTimes(1));
-    expect(reattachDaemonRun).toHaveBeenCalledWith(expect.objectContaining({
-      publishRunFinishedEvent: false,
-    }));
-    expect(publishDaemonRunFinishedEvent).not.toHaveBeenCalled();
+    expect(saveMessage).not.toHaveBeenCalledWith(
+      'project-1',
+      'conv-1',
+      expect.objectContaining({ id: 'msg-historical-replay', runStatus: 'running' }),
+      expect.anything(),
+    );
   });
 
-  it('finalizes reattached telemetry only after trace object files are restored', async () => {
+  it('persists trace object files after reattach restores them', async () => {
     const startedAt = Date.now();
     listConversations.mockResolvedValue([{ id: 'conv-1', title: 'Conversation' }]);
     listMessages.mockResolvedValue([
@@ -682,24 +679,15 @@ describe('ProjectView daemon reattach restore', () => {
 
     await waitFor(() => {
       const saves = saveMessage.mock.calls
-        .map((call) => ({
-          message: call[2] as ChatMessage,
-          options: call[3] as { telemetryFinalized?: boolean } | undefined,
-        }))
-        .filter(({ message }) => message?.id === 'msg-reattach-trace');
-      const firstFinalizedIndex = saves.findIndex(
-        ({ options }) => options?.telemetryFinalized === true,
+        .map((call) => call[2] as ChatMessage)
+        .filter((message) => message?.id === 'msg-reattach-trace');
+      const finalized = saves.find((message) =>
+        (message.traceObjectFiles?.length ?? 0) > 0,
       );
-      expect(firstFinalizedIndex).toBeGreaterThan(-1);
-      expect(saves[firstFinalizedIndex]!.message.traceObjectFiles?.map((file) => [
+      expect(finalized?.traceObjectFiles?.map((file) => [
         file.name,
         file.traceObjectReason,
       ])).toEqual([['existing.html', 'modified']]);
-      expect(
-        saves.slice(0, firstFinalizedIndex).some(
-          ({ options }) => options?.telemetryFinalized === true,
-        ),
-      ).toBe(false);
     });
   });
 
@@ -774,17 +762,14 @@ describe('ProjectView daemon reattach restore', () => {
 
     await waitFor(() => {
       const finalized = saveMessage.mock.calls
-        .map((call) => ({
-          message: call[2] as ChatMessage,
-          options: call[3] as { telemetryFinalized?: boolean } | undefined,
-        }))
+        .map((call) => call[2] as ChatMessage)
         .filter(
-          ({ message, options }) =>
+          (message) =>
             message?.id === 'msg-reattach-full-replay-trace' &&
-            options?.telemetryFinalized === true,
+            (message.traceObjectFiles?.length ?? 0) > 0,
         )
         .at(-1);
-      expect(finalized?.message.traceObjectFiles?.map((file) => [
+      expect(finalized?.traceObjectFiles?.map((file) => [
         file.name,
         file.traceObjectReason,
       ])).toEqual([['existing.html', 'modified']]);
@@ -1153,68 +1138,6 @@ describe('ProjectView daemon reattach restore', () => {
         .filter((m) => m?.id === 'msg-fail' && (m.runStatus === 'failed' || m.runStatus === 'succeeded'))
         .at(-1);
       expect(finalSave?.runStatus).toBe('failed');
-    });
-  });
-
-  it('renders AMR recharge guidance when a reattached run reports insufficient balance', async () => {
-    const startedAt = Date.now();
-    listConversations.mockResolvedValue([{ id: 'conv-1', title: 'Conversation' }]);
-    listMessages.mockResolvedValue([
-      {
-        id: 'msg-amr-balance',
-        role: 'assistant',
-        content: '',
-        createdAt: startedAt,
-        startedAt,
-        runId: 'run-amr-balance',
-        runStatus: 'running',
-        preTurnFileNames: [],
-      } satisfies ChatMessage,
-    ]);
-    fetchPreviewComments.mockResolvedValue([]);
-    loadTabs.mockResolvedValue({ tabs: [], activeTabId: null });
-    fetchProjectFiles.mockResolvedValue([]);
-    fetchLiveArtifacts.mockResolvedValue([]);
-    fetchSkill.mockResolvedValue(null);
-    fetchDesignSystem.mockResolvedValue(null);
-    getTemplate.mockResolvedValue(null);
-    fetchChatRunStatus.mockResolvedValue({
-      id: 'run-amr-balance',
-      status: 'running',
-      createdAt: startedAt,
-      updatedAt: startedAt,
-      exitCode: null,
-      signal: null,
-    });
-    listActiveChatRuns.mockResolvedValue([]);
-
-    reattachDaemonRun.mockImplementation(async (options: any) => {
-      const error = new Error(
-        'AMR Cloud reported insufficient balance for this model. Recharge your AMR wallet at https://open-design.ai/amr/wallet, then retry this run.',
-      ) as Error & { code: string; details: unknown };
-      error.code = 'AMR_INSUFFICIENT_BALANCE';
-      error.details = {
-        kind: 'amr_account',
-        action: 'recharge',
-        actionUrl: 'https://open-design.ai/amr/wallet',
-      };
-      options.handlers.onError(error);
-    });
-
-    renderProjectView();
-
-    await waitFor(() => expect(reattachDaemonRun).toHaveBeenCalledTimes(1));
-    await waitFor(() => {
-      const finalSave = saveMessage.mock.calls
-        .map((call) => call[2] as ChatMessage)
-        .filter((m) => m?.id === 'msg-amr-balance' && m.runStatus === 'failed')
-        .at(-1);
-      const errorEvent = finalSave?.events?.find(
-        (event) => event.kind === 'status' && event.label === 'error',
-      ) as { code?: string } | undefined;
-      expect(errorEvent).toMatchObject({
-        code: 'AMR_INSUFFICIENT_BALANCE',
-      });
     });
   });
 

@@ -67,8 +67,6 @@ it('revokes the run tool token when startup fails before spawn', async () => {
     body: JSON.stringify({
       agentId: 'claude',
       agentCliEnv: { claude: { CLAUDE_BIN: fakeClaude } },
-      telemetry: { metrics: false, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     }),
   });
 
@@ -106,9 +104,6 @@ it('revokes the run tool token when startup fails before spawn', async () => {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-od-analytics-device-id': 'token-leak-test',
-      'x-od-analytics-session-id': 'token-leak-session',
-      'x-od-analytics-client-type': 'web',
     },
     body: JSON.stringify({
       projectId,

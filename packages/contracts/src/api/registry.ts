@@ -113,6 +113,10 @@ export interface AgentInfo {
    * (available and, where probed, authenticated).
    */
   diagnostics?: AgentDiagnostic[];
+  /** Present only for validated local profiles returned by public discovery. */
+  source?: 'built-in' | 'local-profile';
+  /** Public runtime contract inherited by a validated local profile. */
+  baseAgentId?: 'claude' | 'codex' | 'antigravity' | 'opencode' | 'pi';
   models?: AgentModelOption[];
   /** Whether models came from the installed CLI or Open Design's static fallback. */
   modelsSource?: 'live' | 'fallback';
@@ -125,8 +129,7 @@ export interface AgentInfo {
    * When `false`, the Settings model picker hides the "Custom (fill below)"
    * option and the free-text input. Use this for agents whose CLI doesn't
    * accept a model id (e.g. Antigravity `agy` has no `--model` flag yet —
-   * upstream issue #35) or rejects free-form ids (AMR validates against the
-   * live Vela catalog). Undefined === allow, matching the historical UX.
+   * upstream issue #35). Undefined === allow, matching the historical UX.
    */
   supportsCustomModel?: boolean;
 }
@@ -135,14 +138,10 @@ export interface AgentsResponse {
   agents: AgentInfo[];
 }
 
-export type AmrModelsSource = 'preset' | 'remote';
-
-export interface AmrModelsResponse {
-  source: AmrModelsSource;
-  models: AgentModelOption[];
-  refreshing: boolean;
-  stale?: boolean;
-  remoteError?: string;
+export interface ByokRuntimeReadinessResponse {
+  available: boolean;
+  version?: string | null;
+  diagnostics?: AgentDiagnostic[];
 }
 
 export type SkillSource = 'built-in' | 'user';

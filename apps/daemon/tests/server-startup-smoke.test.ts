@@ -126,11 +126,6 @@ describe('daemon startup route smoke', () => {
         path: '/api/agents',
         assert: (body) => expect(body).toHaveProperty('agents'),
       },
-      {
-        path: '/api/amr/models',
-        statuses: [410],
-        assert: (body) => expect(body).toMatchObject({ error: { code: 'SERVICE_DISABLED' } }),
-      },
     ];
 
     await Promise.all(routeChecks.map(async (check) => {
@@ -426,7 +421,6 @@ describe('daemon startup route smoke', () => {
 
       const events = await readRunSse(started.url, runId);
       expect(events).not.toContain('event: error');
-      expect(events).not.toContain('event: run_retry_attempted');
       expect(events.match(/^event: end$/gmu)).toHaveLength(1);
       expect(events).toContain('"status":"canceled"');
       expect(events).not.toContain('"failure_detail":"stream_error"');
@@ -483,10 +477,9 @@ describe('daemon startup route smoke', () => {
 
       const events = await readRunSse(started.url, runId);
       expect(events).toContain('event: error');
-      expect(events).not.toContain('event: run_retry_attempted');
       expect(events.match(/^event: end$/gmu)).toHaveLength(1);
       expect(events).toContain('"status":"failed"');
-      expect(events).toContain('"failure_detail":"stream_error"');
+      expect(events).toContain('"failureDetail":"stream_error"');
     } finally {
       await clearAgentCliEnv(started.url);
       await rm(binDir, { recursive: true, force: true });

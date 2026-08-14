@@ -11,18 +11,6 @@ import {
 } from 'react';
 import { Button } from '@open-design/components';
 import { createPortal } from 'react-dom';
-import type { DesignSystemEditClickProps, TrackingProjectKind } from '@open-design/contracts/analytics';
-import { useAnalytics } from '../analytics/provider';
-import {
-  trackFileManagerClick,
-  trackDesignSystemEditClick,
-  trackFileUploadResult,
-  trackPageView,
-  trackTabLauncherClick,
-  trackSketchSaveResult,
-  trackSketchExportResult,
-} from '../analytics/events';
-import { deriveUploadCohort } from '../analytics/upload-tracking';
 import { useI18n, useT, type Locale } from '../i18n';
 import { useStableHandler } from '../lib/use-stable-handler';
 import { useDeckPreviewScale } from '../lib/use-deck-preview-scale';
@@ -48,7 +36,6 @@ import {
   writeProjectTextFile,
 } from '../providers/registry';
 import type { Dict } from '../i18n/types';
-import { setPendingDesignSystemCreateEntry } from '../analytics/ds-create-entry';
 import { navigate } from '../router';
 import { downloadDesignSystemArchive, downloadProjectArchive } from '../runtime/exports';
 import { finalizeBrandProject } from '../runtime/brands';
@@ -102,6 +89,7 @@ import {
   type ChatSessionMode,
   type InstalledPluginRecord,
   type LocalizedText,
+  type ProjectKind,
   type WorkspaceContextItem,
 } from '@open-design/contracts';
 import { createTerminal, killTerminal, listPlugins } from '../state/projects';
@@ -153,10 +141,20 @@ import { AnimatePresence } from 'motion/react';
 import type { ChatMessage } from '../types';
 
 type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
+type WorkspaceProjectKind =
+  | ProjectKind
+  | 'slide_deck'
+  | 'web_clone'
+  | 'wireframe'
+  | 'mobile'
+  | 'live_artifact'
+  | 'document'
+  | 'hyperframes'
+  | 'design_system';
 
 interface Props {
   projectId: string;
-  projectKind: TrackingProjectKind;
+  projectKind: WorkspaceProjectKind;
   // Basename of the project's chosen working directory (e.g. "openclaw").
   // Threaded to DesignFilesPanel as the breadcrumb root label. Undefined for
   // default-storage projects.
@@ -263,11 +261,10 @@ interface Props {
   artifactHtml?: string | null;
   conversationError?: string | null;
   // Contextual failure recovery, mirrored from the chat error card so the
-  // preview surface can offer the same one-click fix (AMR authorize, terminal
-  // sign-in) instead of a bare retry.
+  // preview surface can offer sign-in instead of a bare retry.
   onAuthorizeAndRetry?: (message: ChatMessage) => void;
   onLaunchTerminalAuth?: () => void;
-  // Conversation id for the AMR promotion-card telemetry payload.
+  // Conversation selected by the active side-chat surface.
   conversationId?: string | null;
   // Project-level actions (settings, handoff, avatar menu) rendered at the
   // right end of the Design Files tab row. The former standalone chrome header
@@ -1247,17 +1244,6 @@ export function FileWorkspace({
   headerActions,
 }: Props) {
   const { locale, t } = useI18n();
-  const analytics = useAnalytics();
-  // P1 page_view page_name=file_manager — once per project the user lands
-  // inside the workspace. Re-fire when the projectId changes so a
-  // project-switch session shows up as a fresh view rather than reusing
-  // the previous one.
-  const fileManagerViewedProjectRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (fileManagerViewedProjectRef.current === projectId) return;
-    fileManagerViewedProjectRef.current = projectId;
-    trackPageView(analytics.track, { page_name: 'file_manager' });
-  }, [projectId, analytics.track]);
   const defaultRootTab = designSystemProject ? DESIGN_SYSTEM_TAB : DESIGN_FILES_TAB;
   // Persisted tabs come from the parent. Active tab can transiently point
   // at a pending sketch — pending sketches are not in tabsState.tabs.
@@ -2131,23 +2117,12 @@ export function FileWorkspace({
     if (picked.length === 0) return;
 
     setUploadError(null);
-    // Cohort math is shared across all three upload surfaces; see
-    // `analytics/upload-tracking.ts` for the per-file → batch reduction.
-    const cohort = deriveUploadCohort(picked);
     let result: UploadProjectFilesResult;
     try {
       result = await uploadProjectFiles(projectId, picked, uploadDir);
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       setUploadError(`Upload failed for ${picked.length} file(s) (${detail}).`);
-      trackFileUploadResult(analytics.track, {
-        page_name: 'file_manager',
-        area: 'file_manager',
-        project_id: projectId,
-        ...cohort,
-        result: 'failed',
-        error_code: detail,
-      });
       return;
     }
     if (result.uploaded.length > 0) {
@@ -2166,22 +2141,6 @@ export function FileWorkspace({
           : `Upload failed for ${failedCount} file(s)${detail}.`,
       );
       console.warn('Project upload had failures', result.failed);
-      trackFileUploadResult(analytics.track, {
-        page_name: 'file_manager',
-        area: 'file_manager',
-        project_id: projectId,
-        ...cohort,
-        result: 'failed',
-        ...(result.error ? { error_code: result.error } : {}),
-      });
-    } else if (result.uploaded.length > 0) {
-      trackFileUploadResult(analytics.track, {
-        page_name: 'file_manager',
-        area: 'file_manager',
-        project_id: projectId,
-        ...cohort,
-        result: 'success',
-      });
     }
   }
 
@@ -3550,14 +3509,6 @@ export function FileWorkspace({
           launcherContext={launcherContext}
           onOpenFile={openFile}
           onOpenTab={focusWorkspaceTab}
-          onTrack={(input) =>
-            trackTabLauncherClick(analytics.track, {
-              page_name: 'file_manager',
-              area: 'tab_launcher',
-              ...(projectId ? { project_id: projectId } : {}),
-              ...input,
-            })
-          }
           onClose={() => setLauncherOpen(false)}
         />
       ) : null}
@@ -3676,75 +3627,30 @@ export function FileWorkspace({
             navState={designFilesNavRef.current}
             onNavStateChange={onDesignFilesNavStateChange}
             onOpenFile={(name) => {
-              // Re-engagement entry: opening an existing sketch from the file
-              // list (new_sketch already covers fresh creation).
-              if (isSketchName(name)) {
-                trackFileManagerClick(analytics.track, {
-                  page_name: 'file_manager',
-                  area: 'file_manager',
-                  element: 'open_sketch',
-                });
-              }
               openFile(name);
             }}
             onOpenLiveArtifact={(tabId) => openFile(tabId)}
             onRenameFile={handleRename}
             onDeleteFile={(name) => {
-              trackFileManagerClick(analytics.track, {
-                page_name: 'file_manager',
-                area: 'file_manager',
-                element: 'delete',
-              });
               void handleDelete(name);
             }}
             onDeleteFiles={(names) => {
-              trackFileManagerClick(analytics.track, {
-                page_name: 'file_manager',
-                area: 'file_manager',
-                element: 'delete',
-              });
               return handleDeleteMany(names);
             }}
             onUpload={() => {
-              trackFileManagerClick(analytics.track, {
-                page_name: 'file_manager',
-                area: 'file_manager',
-                element: 'upload',
-              });
               fileInputRef.current?.click();
             }}
             onUploadFiles={(picked) => void uploadFiles(picked)}
             onPaste={() => {
-              trackFileManagerClick(analytics.track, {
-                page_name: 'file_manager',
-                area: 'file_manager',
-                element: 'paste',
-              });
               void createMarkdownDocument();
             }}
             onNewSketch={() => {
-              trackFileManagerClick(analytics.track, {
-                page_name: 'file_manager',
-                area: 'file_manager',
-                element: 'new_sketch',
-              });
               void startNewSketch();
             }}
             onOpenBrowser={() => {
-              trackFileManagerClick(analytics.track, {
-                page_name: 'file_manager',
-                area: 'file_manager',
-                element: 'new_browser',
-              });
               openBrowserTab();
             }}
             onCreateDesignSystem={() => {
-              trackFileManagerClick(analytics.track, {
-                page_name: 'file_manager',
-                area: 'file_manager',
-                element: 'create_design_system',
-              });
-              setPendingDesignSystemCreateEntry('project_canvas');
               navigate({ kind: 'design-system-create' });
             }}
             onCreateDesignSystemFromProject={onCreateDesignSystemFromProject}
@@ -3752,11 +3658,6 @@ export function FileWorkspace({
             onDuplicateProject={onDuplicateProject}
             duplicateProjectBusy={duplicateProjectBusy}
             onSelectFromLibrary={() => {
-              trackFileManagerClick(analytics.track, {
-                page_name: 'file_manager',
-                area: 'file_manager',
-                element: 'library',
-              });
               setShowLibraryPicker(true);
             }}
             uploadError={uploadError}
@@ -3777,27 +3678,9 @@ export function FileWorkspace({
               }
               onSceneChange={(scene, options) => setSketchScene(activeFile.name, scene, options)}
               onClear={() => clearSketch(activeFile.name)}
-              onSave={async (scene) => {
-                // Fires only on the explicit "Save" button — background
-                // autosave calls saveSketch() directly and is not tracked.
-                const result = await saveSketch(activeFile.name, scene);
-                trackSketchSaveResult(analytics.track, {
-                  page_name: 'file_manager',
-                  area: 'sketch_editor',
-                  result: result === false ? 'failed' : 'success',
-                  project_id: projectId,
-                });
-                return result;
-              }}
+              onSave={(scene) => saveSketch(activeFile.name, scene)}
               onExportImage={async (base64, fileName) => {
-                const result = await exportSketchImage(activeFile.name, base64, fileName);
-                trackSketchExportResult(analytics.track, {
-                  page_name: 'file_manager',
-                  area: 'sketch_editor',
-                  result: result === false ? 'failed' : 'success',
-                  project_id: projectId,
-                });
-                return result;
+                return exportSketchImage(activeFile.name, base64, fileName);
               }}
               onOpenExportedImage={openFile}
               saving={activeSketch.saving}
@@ -4009,7 +3892,6 @@ function DesignSystemProjectPanel({
   githubConnected?: boolean;
 }) {
   const t = useT();
-  const analytics = useAnalytics();
   const [reviewDecisions, setReviewDecisions] = useState<Record<string, DesignSystemReviewDecision>>({});
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [feedbackSection, setFeedbackSection] = useState<string | null>(null);
@@ -4050,22 +3932,6 @@ function DesignSystemProjectPanel({
   const initialDesignMdRef = useRef<string | null>(null);
   const initialBrandJsonRef = useRef<string | null>(null);
   const initialBrandJsonLoadedRef = useRef(false);
-  function emitDesignSystemProjectEditClick(
-    element: DesignSystemEditClickProps['element'],
-    module: DesignSystemEditClickProps['module'],
-  ) {
-    trackDesignSystemEditClick(analytics.track, {
-      page_name: 'design_system_project',
-      area: 'design_system_edit',
-      element,
-      module,
-      edit_surface: 'direct_module',
-      artifact_kind: 'design_system',
-      design_system_id: system.id,
-      project_id: projectId,
-    });
-  }
-
   const refreshKitDependencies = useCallback(async (options?: { finalizeBrand?: boolean }) => {
     if (options?.finalizeBrand && brandId) {
       const outcome = await finalizeBrandProject(brandId, projectId);
@@ -4714,7 +4580,6 @@ function DesignSystemProjectPanel({
       label: t('ds.refresh'),
       icon: 'refresh',
       onClick: () => {
-        emitDesignSystemProjectEditClick('kit_refresh', 'kit');
         void refreshKit();
       },
       disabled: !editable || Boolean(kitActionBusy) || statusBusy || defaultBusy,
@@ -4725,7 +4590,6 @@ function DesignSystemProjectPanel({
       label: t('dsManager.downloadTitle'),
       icon: 'download',
       onClick: () => {
-        emitDesignSystemProjectEditClick('kit_download', 'kit');
         void downloadKit();
       },
       disabled: !editable || Boolean(kitActionBusy) || statusBusy || defaultBusy,
@@ -4890,7 +4754,6 @@ function DesignSystemProjectPanel({
           onDeleteImage={editable ? (index) => void removeKitImage(index) : undefined}
           onRefresh={editable ? () => void refreshKit() : undefined}
           onDownload={editable ? () => void downloadKit() : undefined}
-          onEditClick={emitDesignSystemProjectEditClick}
           uploading={kitUploading}
           actionBusy={kitActionBusy}
           onActionFeedback={notifyKit}
@@ -5861,7 +5724,7 @@ function nextMarkdownDocumentPath(files: ProjectFile[], dir: string): string {
 
 function initialMarkdownDocument(
   path: string,
-  projectKind: TrackingProjectKind,
+  projectKind: Props['projectKind'],
   t: TranslateFn,
 ): string {
   const title = normalizeProjectFilePath(path)
@@ -5892,7 +5755,7 @@ ${t('designFiles.documentTemplate.nextBody')}
 `;
 }
 
-function defaultPagePresetId(projectKind: TrackingProjectKind): ProjectPagePresetId {
+function defaultPagePresetId(projectKind: Props['projectKind']): ProjectPagePresetId {
   switch (projectKind) {
     case 'slide_deck':
       return 'blank-slides';
@@ -6599,7 +6462,7 @@ function escapeHtmlText(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function documentTemplateScenarioKey(projectKind: TrackingProjectKind): keyof Dict {
+function documentTemplateScenarioKey(projectKind: Props['projectKind']): keyof Dict {
   switch (projectKind) {
     case 'prototype':
       return 'designFiles.documentTemplate.scenario.prototype';

@@ -3,7 +3,11 @@ import type Database from 'better-sqlite3';
 import path from 'node:path';
 import fs from 'node:fs';
 import type { DesignSystemTokenContractRebuildJobResponse } from '@open-design/contracts';
-import { detectAgents, detectAgentsStream } from '../agents.js';
+import {
+  detectAgents,
+  detectAgentsStream,
+  detectByokRuntimeReadiness,
+} from '../agents.js';
 import {
   SkillImportError,
   deleteUserSkill,
@@ -158,6 +162,22 @@ export function registerStaticResourceRoutes(app: Express, ctx: RegisterStaticRe
       }
     } finally {
       res.end();
+    }
+  });
+
+  app.get('/api/byok/runtime-readiness', async (_req, res) => {
+    let config;
+    try {
+      config = await readAppConfig(RUNTIME_DATA_DIR);
+    } catch (err: any) {
+      res.status(500).json({ error: String(err) });
+      return;
+    }
+    try {
+      const readiness = await detectByokRuntimeReadiness(config.agentCliEnv ?? {});
+      res.json(readiness);
+    } catch (err: any) {
+      res.status(500).json({ error: String(err) });
     }
   });
 

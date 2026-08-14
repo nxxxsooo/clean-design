@@ -90,7 +90,7 @@ describe('sketch-model', () => {
     const parsed = parseSketchWorkspaceDocument(JSON.stringify({
       type: 'excalidraw',
       version: 2,
-      source: 'https://open-design.ai/sketch',
+      source: 'https://legacy.example/sketch',
       elements: [
         { id: 'box', type: 'rectangle', x: 10, y: 20, width: 80, height: 40 },
       ],
@@ -129,7 +129,7 @@ describe('sketch-model', () => {
     expect(document).toMatchObject({
       type: 'excalidraw',
       version: 2,
-      source: 'https://open-design.ai/sketch',
+      source: 'clean-design://sketch',
       elements: [{ id: 'box', type: 'rectangle', isDeleted: false }],
       appState: {
         name: 'scratch.sketch.json',

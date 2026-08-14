@@ -25,8 +25,6 @@ type VisualConfig = {
   onboardingCompleted: boolean;
   agentModels: Record<string, { model?: string; reasoning?: string }>;
   agentCliEnv?: Record<string, Record<string, string>>;
-  privacyDecisionAt: number | null;
-  telemetry: { metrics?: boolean; content?: boolean; artifactManifest?: boolean };
 };
 
 const VISUAL_CONFIG = {
@@ -34,13 +32,11 @@ const VISUAL_CONFIG = {
   apiKey: '',
   baseUrl: 'https://api.anthropic.com',
   model: 'claude-sonnet-4-5',
-  agentId: 'mock',
+  agentId: 'codex',
   skillId: null,
   designSystemId: null,
   onboardingCompleted: true,
   agentModels: {},
-  privacyDecisionAt: 1,
-  telemetry: { metrics: false, content: false, artifactManifest: false },
 } satisfies VisualConfig;
 
 const visualStableTimeoutMs = 10_000;
@@ -51,15 +47,6 @@ function waitForVisualTimeout(): Promise<void> {
     setTimeout(resolve, visualStableTimeoutMs);
   });
 }
-
-const MOCK_AGENT = {
-  id: 'mock',
-  name: 'Mock Agent',
-  bin: 'mock-agent',
-  available: true,
-  version: 'test',
-  models: [{ id: 'default', label: 'Default' }],
-} as const;
 
 export const VISUAL_CLI_AGENTS = [
   {
@@ -94,21 +81,31 @@ export const VISUAL_CLI_AGENTS = [
       { id: 'gpt-5.2', label: 'GPT-5.2' },
     ],
   },
+  {
+    id: 'antigravity',
+    name: 'Antigravity',
+    bin: 'agy',
+    available: true,
+    version: '1.0.3',
+    models: [{ id: 'default', label: 'Default (CLI config)' }],
+  },
+  {
+    id: 'opencode',
+    name: 'OpenCode',
+    bin: 'opencode',
+    available: true,
+    version: '1.14.0',
+    models: [{ id: 'default', label: 'Default (CLI config)' }],
+  },
+  {
+    id: 'pi',
+    name: 'Pi',
+    bin: 'pi',
+    available: true,
+    version: '0.50.0',
+    models: [{ id: 'default', label: 'Default (CLI config)' }],
+  },
 ] as const;
-
-export const VISUAL_AMR_AGENT = {
-  id: 'amr',
-  name: 'Open Design',
-  bin: 'vela',
-  available: true,
-  version: '0.1.0',
-  models: [
-    { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-    { id: 'deepseek-v3.2', label: 'DeepSeek V3.2' },
-    { id: 'glm-5.1', label: 'GLM 5.1' },
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  ],
-} as const;
 
 const VISUAL_PROJECTS = [
   {
@@ -168,13 +165,6 @@ type VisualPageOptions = {
   projects?: readonly VisualProject[];
   config?: Partial<VisualConfig>;
   agents?: readonly unknown[];
-};
-
-type VisualVelaAccountOptions = {
-  profile?: string;
-  plan?: string;
-  balanceUsd?: string;
-  email?: string;
 };
 
 const VISUAL_PLUGINS = [
@@ -248,7 +238,7 @@ const VISUAL_DESIGN_SYSTEMS = [
 export async function configureVisualPage(page: Page, options: VisualPageOptions = {}): Promise<void> {
   const projects = options.projects ?? VISUAL_PROJECTS;
   const config = { ...VISUAL_CONFIG, ...(options.config ?? {}) };
-  const agents = options.agents ?? [MOCK_AGENT];
+  const agents = options.agents ?? VISUAL_CLI_AGENTS;
 
   await page.addInitScript(([key, config, githubStarsKey, githubStarsCount, visualStabilityKey]) => {
     window.localStorage.setItem(key, JSON.stringify(config));
@@ -312,15 +302,6 @@ export async function configureVisualPage(page: Page, options: VisualPageOptions
     await fulfillGet(route, {
       onlineCount: 0,
       memberCount: 0,
-    });
-  });
-
-  await page.route('**/api/integrations/vela/status', async (route) => {
-    await fulfillGet(route, {
-      loggedIn: false,
-      profile: 'local',
-      configPath: '/tmp/.amr/config.json',
-      user: null,
     });
   });
 
@@ -406,7 +387,6 @@ export async function configureVisualPage(page: Page, options: VisualPageOptions
         contextItems: [],
         inputs: [],
         assets: [],
-        mcpServers: [],
         projectMetadata: {},
         trust: 'trusted',
         capabilitiesGranted: ['prompt:inject'],
@@ -423,9 +403,6 @@ export async function configureVisualPage(page: Page, options: VisualPageOptions
           assetsStaged: [],
           taskKind: 'new-generation',
           appliedAt: 0,
-          connectorsRequired: [],
-          connectorsResolved: [],
-          mcpServers: [],
           status: 'fresh',
         },
       },
@@ -485,14 +462,6 @@ export async function configureVisualPage(page: Page, options: VisualPageOptions
     await fulfillGet(route, { promptTemplates: [] });
   });
 
-  await page.route('**/api/connectors', async (route) => {
-    await fulfillGet(route, { connectors: [] });
-  });
-
-  await page.route('**/api/mcp/servers', async (route) => {
-    await fulfillGet(route, { servers: [], templates: [] });
-  });
-
   await page.addInitScript(([styleId]) => {
     const installStabilityStyle = () => {
       if (document.getElementById(styleId) != null) return;
@@ -515,51 +484,8 @@ export async function configureVisualPage(page: Page, options: VisualPageOptions
   }, [VISUAL_STYLE_ID] as const);
 }
 
-export async function mockSignedInVelaAccount(
-  page: Page,
-  options: VisualVelaAccountOptions = {},
-): Promise<void> {
-  const profile = options.profile ?? 'test';
-  const plan = options.plan ?? 'plus';
-  const balanceUsd = options.balanceUsd ?? '247.51';
-  const email = options.email ?? 'leaf@example.com';
-  const fetchedAt = '2026-06-25T03:59:00.000Z';
-
-  await page.route('**/api/integrations/vela/status', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        loggedIn: true,
-        loginInFlight: false,
-        profile,
-        user: { id: 'u1', email },
-        account: { plan, balanceUsd },
-        configPath: '/home/test/.amr/config.json',
-      }),
-    });
-  });
-
-  await page.route('**/api/integrations/vela/wallet**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        status: 'available',
-        profile,
-        user: { id: 'u1', email, plan },
-        balanceUsd,
-        updatedAt: fetchedAt,
-        fetchedAt,
-        stale: false,
-        source: 'vela_api',
-      }),
-    });
-  });
-}
-
 export async function waitForVisualReady(page: Page): Promise<void> {
-  await page.getByText('Loading Open Design…').waitFor({ state: 'hidden', timeout: T.xlong });
+  await page.getByText(/Loading Clean Design(?:…|\.\.\.)/).waitFor({ state: 'hidden', timeout: T.xlong });
   await expect(page.getByTestId('home-hero')).toBeVisible({ timeout: T.medium });
   await expect(page.getByTestId('home-hero-input')).toBeVisible({ timeout: T.medium });
   await page.evaluate(async () => {

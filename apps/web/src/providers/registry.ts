@@ -1,5 +1,6 @@
 import type {
   FigmaImportResult,
+  ByokRuntimeReadinessResponse,
   ImportGitHubDesignSystemRequest,
   ImportGitHubDesignSystemResponse,
   ImportShadcnDesignSystemRequest,
@@ -54,7 +55,7 @@ import type {
   SkillSummary,
 } from '../types';
 import type { ArtifactManifest } from '../artifacts/types';
-import { isCleanDesignDisabledAgent } from '@open-design/contracts';
+import { isCleanDesignPublicAgent } from '@open-design/contracts';
 import {
   isOpenDesignHostAvailable,
   openHostExternalUrl,
@@ -68,10 +69,28 @@ export async function fetchAgents(options?: { throwOnError?: boolean }): Promise
       return [];
     }
     const json = (await resp.json()) as { agents: AgentInfo[] };
-    return (json.agents ?? []).filter((agent) => !isCleanDesignDisabledAgent(agent.id));
+    return (json.agents ?? []).filter(isCleanDesignPublicAgent);
   } catch (err) {
     if (options?.throwOnError) throw err;
     return [];
+  }
+}
+
+/**
+ * Internal readiness for the OpenCode adapter used by BYOK runs. This is
+ * deliberately separate from public agent discovery so the adapter cannot
+ * appear as a selectable sixth Local CLI.
+ */
+export async function fetchByokRuntimeReadiness(): Promise<ByokRuntimeReadinessResponse> {
+  try {
+    const resp = await fetch('/api/byok/runtime-readiness', { cache: 'no-store' });
+    if (!resp.ok) return { available: false };
+    const value = (await resp.json()) as ByokRuntimeReadinessResponse;
+    return value && typeof value.available === 'boolean'
+      ? value
+      : { available: false };
+  } catch {
+    return { available: false };
   }
 }
 
@@ -135,7 +154,7 @@ export async function fetchAgentsStream(args: {
     if (eventName === 'agent' && data) {
       try {
         const agent = JSON.parse(data) as AgentInfo;
-        if (isCleanDesignDisabledAgent(agent.id)) return;
+        if (!isCleanDesignPublicAgent(agent)) return;
         collected.push(agent);
         onAgent(agent);
       } catch {

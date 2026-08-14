@@ -39,8 +39,6 @@ test.beforeEach(async ({ page }) => {
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: { codex: { model: 'default', reasoning: 'default' } },
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
@@ -87,30 +85,17 @@ test.beforeEach(async ({ page }) => {
           designSystemId: null,
           mode: 'daemon',
           agentModels: { codex: { model: 'default', reasoning: 'default' } },
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
         },
       },
     });
   });
 });
 
-test('[P2] home topbar shows the new entry chips and links', async ({ page }) => {
+test('[P2] home topbar shows the local execution controls', async ({ page }) => {
   await gotoEntryHome(page);
 
   const topbar = page.locator('.entry-main__topbar');
   await expect(topbar).toBeVisible();
-
-  const star = page.getByTestId('entry-star-badge');
-  await expect(star).toBeVisible();
-  await expect(star).toHaveAttribute('href', 'https://github.com/nexu-io/open-design');
-  await expect(star).toContainText('Star');
-  await expect(star).toContainText('51.6K');
-
-  const discord = page.getByTestId('entry-discord-badge');
-  await expect(discord).toBeVisible();
-  await expect(discord).toHaveAttribute('href', 'https://discord.gg/mHAjSMV6gz');
-  await expect(discord).toContainText('Join Discord');
 
   await expect(page.getByTestId('inline-model-switcher-chip')).toBeVisible();
   await expect(page.getByTestId('entry-use-everywhere-button')).toBeVisible();
@@ -136,20 +121,6 @@ test('[P1] home topbar execution pill reflects the selected Local CLI agent and 
   await expect(page.getByTestId('inline-model-switcher-agent-codex')).toBeVisible();
   await expect(page.getByTestId('inline-model-switcher-agent-mock')).toBeVisible();
   await expect(popover.getByRole('radio', { name: /Codex CLI/i })).toBeVisible();
-});
-
-test('[P2] home topbar star and discord badges expose the current external-link contract', async ({ page }) => {
-  await gotoEntryHome(page);
-
-  const star = page.getByTestId('entry-star-badge');
-  await expect(star).toHaveAttribute('target', '_blank');
-  await expect(star).toHaveAttribute('rel', /noreferrer/);
-  await expect(star).toHaveAttribute('rel', /noopener/);
-
-  const discord = page.getByTestId('entry-discord-badge');
-  await expect(discord).toHaveAttribute('href', 'https://discord.gg/mHAjSMV6gz');
-  await expect(discord).toHaveAttribute('aria-label', /Join the Open Design Discord/i);
-  await expect(discord).toHaveAttribute('data-tooltip', /Join the Open Design Discord/i);
 });
 
 test('[P2] home topbar Use everywhere navigates to Integrations with the tab selected', async ({ page }) => {

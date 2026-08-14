@@ -65,13 +65,10 @@ describe('codex native session resume', () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-codex-resume-bin-'));
     const { bin, logPath } = await writeCapturingCodex(binDir, 'codex-capture');
 
-    clearTelemetryEnv();
     started = (await startServer({ port: 0, returnServer: true })) as StartedServer;
     await putConfig(started.url, {
       agentId: 'codex',
       agentCliEnv: { codex: { CODEX_BIN: bin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
 
     const conversationId = await createConversation(started.url);
@@ -112,13 +109,10 @@ describe('codex native session resume', () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-codex-fallback-bin-'));
     const { bin, logPath } = await writeMissingRolloutCodex(binDir, 'codex-fallback');
 
-    clearTelemetryEnv();
     started = (await startServer({ port: 0, returnServer: true })) as StartedServer;
     await putConfig(started.url, {
       agentId: 'codex',
       agentCliEnv: { codex: { CODEX_BIN: bin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
 
     const conversationId = await createConversation(started.url);
@@ -160,13 +154,10 @@ describe('codex native session resume', () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-codex-nohandle-bin-'));
     const { bin, logPath } = await writeNoHandleCodex(binDir, 'codex-nohandle');
 
-    clearTelemetryEnv();
     started = (await startServer({ port: 0, returnServer: true })) as StartedServer;
     await putConfig(started.url, {
       agentId: 'codex',
       agentCliEnv: { codex: { CODEX_BIN: bin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
 
     const conversationId = await createConversation(started.url);
@@ -189,13 +180,10 @@ describe('codex native session resume', () => {
     const { bin, logPath } = await writeCapturingCodex(binDir, 'codex-intervene');
     const claudeBin = await writeMinimalClaude(binDir, 'claude-intervene');
 
-    clearTelemetryEnv();
     started = (await startServer({ port: 0, returnServer: true })) as StartedServer;
     await putConfig(started.url, {
       agentId: 'codex',
       agentCliEnv: { codex: { CODEX_BIN: bin }, claude: { CLAUDE_BIN: claudeBin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
 
     const conversationId = await createConversation(started.url);
@@ -366,12 +354,6 @@ setTimeout(finish, 1500);
 
 function snapshotEnv(): Record<string, string | undefined> {
   return {
-    LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY,
-    LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
-    LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL,
-    OPEN_DESIGN_TELEMETRY_RELAY_URL: process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL,
-    POSTHOG_KEY: process.env.POSTHOG_KEY,
-    POSTHOG_HOST: process.env.POSTHOG_HOST,
   };
 }
 
@@ -380,15 +362,6 @@ function restoreEnv(env: Record<string, string | undefined>): void {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
-}
-
-function clearTelemetryEnv(): void {
-  delete process.env.POSTHOG_KEY;
-  delete process.env.POSTHOG_HOST;
-  delete process.env.LANGFUSE_PUBLIC_KEY;
-  delete process.env.LANGFUSE_SECRET_KEY;
-  delete process.env.LANGFUSE_BASE_URL;
-  delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
 }
 
 async function putConfig(url: string, patch: Record<string, unknown>): Promise<void> {
@@ -432,9 +405,6 @@ async function sendRunAndWait(
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-od-analytics-device-id': 'codex-resume-test',
-      'x-od-analytics-session-id': 'codex-resume-session',
-      'x-od-analytics-client-type': 'web',
     },
     body: JSON.stringify({
       projectId,

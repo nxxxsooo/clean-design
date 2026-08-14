@@ -9,7 +9,7 @@
 //     component maps that id to localized copy via literal i18n keys. This
 //     keeps the mapping unit-testable without a locale bundle and keeps copy
 //     edits out of the logic.
-//   - No React / DOM / analytics: callers own presentation and telemetry.
+//   - No React or DOM dependencies: callers own presentation.
 //   - No persistence: the recommendation is a value derived per session. The
 //     caller holds it in memory only (it must NOT survive a page refresh, per
 //     the onboarding spec).
@@ -23,16 +23,13 @@
 //      starting point rather than guessing a narrow path.
 
 /**
- * The four product buckets a recommendation can resolve to. Mirrors the
- * `product_type` analytics dimension so Home telemetry can group on the same
- * value the mapping produced.
+ * The four product buckets a recommendation can resolve to.
  */
 export type ProductType = 'product_ui' | 'marketing' | 'internal_tool' | 'general';
 
 /**
- * One concrete starting point the user can begin from. `id` is stable and
- * doubles as the analytics `recommendation_id` and the i18n key suffix
- * (`home.starter.<id>.*`), so it must not change once shipped.
+ * One concrete starting point the user can begin from. `id` is stable and is
+ * also the i18n key suffix (`home.starter.<id>.*`).
  */
 export interface StarterOption {
   id: string;
@@ -43,7 +40,7 @@ export interface StarterOption {
  * The resolved recommendation for a session. `primary` is the currently
  * surfaced option; `options` is the full ordered list within the same product
  * path that "换一个" cycles through (`primary` is always `options[0]` at build
- * time). `role` / `useCases` echo the inputs so callers can stamp telemetry.
+ * time). `role` / `useCases` echo the normalized inputs for downstream UI.
  */
 export interface Recommendation {
   productType: ProductType;
@@ -116,7 +113,7 @@ const ROLE_TO_PRODUCT: Record<string, ProductType> = {
 
 // Ordered starter options per product bucket. `options[0]` is the default
 // primary; the rest are "换一个" alternatives within the same path. Every id is
-// stable (analytics + i18n key). Copy lives under `home.starter.<id>.*`.
+// stable because it is an i18n key. Copy lives under `home.starter.<id>.*`.
 const STARTERS_BY_PRODUCT: Record<ProductType, StarterList> = {
   product_ui: [
     starter('product_ui_prototype', 'product_ui'),
@@ -164,7 +161,7 @@ export function resolveProductType(input: RecommendationInput): ProductType {
  */
 export function buildRecommendation(input: RecommendationInput): Recommendation {
   // Canonicalize once so both the resolved product bucket AND the echoed
-  // `useCases` (telemetry) are deterministic for a given selection set,
+  // `useCases` are deterministic for a given selection set,
   // independent of the order the user clicked the chips.
   const useCases = canonicalizeUseCases(normalizeList(input.useCases));
   const productType = resolveProductType({ role: input.role, useCases });

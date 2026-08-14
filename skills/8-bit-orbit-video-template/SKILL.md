@@ -50,8 +50,7 @@ Ship a premium template-mode Hyperframes composition with a ready default showca
 └── example.html
 ```
 
-The rendered MP4 showcase used by `example.html` is hosted at
-`https://repo-assets.open-design.ai/resources/videos/skills/8-bit-orbit-video-template/default-showcase.mp4`.
+`example.html` previews the editable bundled template without loading remote showcase media.
 
 ## Workflow
 

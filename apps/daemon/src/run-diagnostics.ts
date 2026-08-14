@@ -45,8 +45,7 @@ export interface RunDiagnosticsAnalytics {
   // is the tool-result-not-delivered root cause (a tool_use whose result never
   // came back — including a still-outstanding tool in a parallel turn).
   tool_result_sent: boolean;
-  // True when an approval/permission gate fired. Only ACP runtimes surface this
-  // (via an `acp_approval_request` diagnostic); stream/CLI runtimes bypass gates.
+  // Reserved for active runtime approval or permission gates.
   approval_requested: boolean;
   artifact_write_seen: boolean;
   live_artifact_seen: boolean;
@@ -152,7 +151,7 @@ export function collectStdoutTailSummary(
   return collectStreamTailSummary(events, 'stdout', readStdoutChunk);
 }
 
-export function summarizeRunDiagnosticsForAnalytics(args: {
+export function summarizeRunDiagnostics(args: {
   events?: RunEventForDiagnostics[];
   exitCode?: number | null;
   signal?: string | null;
@@ -171,12 +170,12 @@ export function summarizeRunDiagnosticsForAnalytics(args: {
   let toolCallSeen = false;
   // `tool_result_sent` = EVERY committed tool_use received a matching tool_result.
   // Paired by id (`tool_use.id` <-> `tool_result.toolUseId`, the same pairing
-  // summarizeRunTimingAnalytics uses), because a plain "any tool_result after a
+  // run timing summaries use), because a plain "any tool_result after a
   // tool_use" flag reports delivered for a parallel turn like tool_use(A),
   // tool_use(B), tool_result(A) where B is still outstanding.
   //
   // Degraded provider events carry NO id, symmetrically on both sides — see
-  // `agent-protocol/pi-rpc/events.ts` and `copilot-stream.ts`, which both emit
+  // `agent-protocol/pi-rpc/events.ts`, which emits
   // `toolCallId ?? null` for tool_use.id AND tool_result.toolUseId. Those are
   // paired by count instead; skipping them would let an unpaired id-less tool
   // call fall through to "delivered" and mask exactly the stall we're attributing.
@@ -184,7 +183,7 @@ export function summarizeRunDiagnosticsForAnalytics(args: {
   let idlessToolUses = 0;
   let idlessToolResults = 0;
   let sawAnyToolUse = false;
-  let approvalRequested = false;
+  const approvalRequested = false;
   let artifactWriteSeen = args.artifactWriteSeen === true;
   let liveArtifactSeen = args.liveArtifactSeen === true;
   let recordedCloseReason: RunCloseReason | null = null;
@@ -217,9 +216,6 @@ export function summarizeRunDiagnosticsForAnalytics(args: {
     if (data.type === 'tool_result') {
       if (typeof data.toolUseId === 'string') outstandingToolUseIds.delete(data.toolUseId);
       else idlessToolResults += 1;
-    }
-    if (data.type === 'diagnostic' && data.name === 'acp_approval_request') {
-      approvalRequested = true;
     }
     if (event.event === 'diagnostic' && data.type === 'agent_resume_auto_reseed') {
       resumeAutoReseeded = true;

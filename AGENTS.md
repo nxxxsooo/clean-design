@@ -6,7 +6,7 @@ Read this file first, then read the nearest `AGENTS.md` under `apps/`, `packages
 
 Clean Design is an Apple Silicon macOS, local-first visual creation studio. Preserve projects, previews, canvas editing, assets, themes, `DESIGN.md`, exports, BYOK generation, all inherited artifact families, and local CLI generation through exactly Codex, Claude Code, Antigravity (`agy`), OpenCode, and Pi. Keep `byok-opencode` internal to BYOK flows rather than exposing it as another local CLI.
 
-Do not restore accounts, hosted collaboration, AMR/Vela, teams, billing, promotions, news, deployment, external MCP/plugin-host integrations, the unused ACP transport, coding-agent adapters outside the five-runtime allowlist, automatic updates, telemetry, or global CLI installation.
+Do not restore accounts, hosted services or collaboration, teams, billing, promotions, news, deployment, external MCP/plugin-host integrations, unused agent transports, coding-agent adapters outside the five-runtime allowlist, automatic updates, telemetry, or global CLI installation.
 
 Keep internal `@open-design/*` package scopes and `OD_*` development variables until a deliberate compatibility migration is approved. User-visible identity is always Clean Design.
 

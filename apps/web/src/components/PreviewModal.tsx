@@ -98,8 +98,7 @@ export interface PreviewPrimaryAction {
   menu?: PreviewPrimaryActionMenuItem[];
 }
 
-// Every clickable item inside the local export popover. Callers receive
-// these verbatim as analytics `element` values (already snake_case).
+// Every clickable item inside the local export popover.
 export type PreviewSharePopoverItem =
   | 'pdf'
   | 'zip'
@@ -139,9 +138,7 @@ interface Props {
   // affordance reads consistently across HTML / design-system / media
   // variants.
   headerExtras?: ReactNode;
-  // Optional analytics callbacks. Fires when the user clicks the
-  // chrome-level affordances (fullscreen, share trigger, stage-edge sidebar
-  // handle). Callers wire these to their surface's tracking helper.
+  // Optional callbacks for chrome-level affordances.
   onFullscreenClick?: () => void;
   onShareClick?: () => void;
   onSidebarToggleClick?: (open: boolean) => void;

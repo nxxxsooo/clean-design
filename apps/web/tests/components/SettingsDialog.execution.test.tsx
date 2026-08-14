@@ -32,7 +32,6 @@ const {
   importGitHubDesignSystemMock,
   fetchProviderModelsMock,
   openExternalUrlMock,
-  analyticsTrackMock,
 } = vi.hoisted(() => ({
   playSoundMock: vi.fn(),
   requestNotificationPermissionMock: vi.fn(),
@@ -48,7 +47,6 @@ const {
   importGitHubDesignSystemMock: vi.fn(),
   fetchProviderModelsMock: vi.fn(),
   openExternalUrlMock: vi.fn(),
-  analyticsTrackMock: vi.fn(),
 }));
 
 vi.mock('../../src/utils/notifications', async () => {
@@ -85,18 +83,6 @@ vi.mock('../../src/providers/registry', async () => {
 
 vi.mock('../../src/providers/provider-models', () => ({
   fetchProviderModels: fetchProviderModelsMock,
-}));
-
-vi.mock('../../src/analytics/provider', () => ({
-  useAnalytics: () => ({
-    track: analyticsTrackMock,
-    setConsent: () => undefined,
-    setIdentity: () => undefined,
-    setConfigureGlobals: () => undefined,
-    anonymousId: 'test-anonymous',
-    sessionId: 'test-session',
-    newRequestId: () => 'test-request',
-  }),
 }));
 
 import { SettingsDialog } from '../../src/components/SettingsDialog';
@@ -141,10 +127,10 @@ const availableAgents: AgentInfo[] = [
   },
 ];
 
-const amrAgent: AgentInfo = {
-  id: 'amr',
-  name: 'AMR (vela)',
-  bin: 'amr',
+const removedServiceAgent: AgentInfo = {
+  id: 'hosted-service',
+  name: 'Hosted service',
+  bin: 'hosted-service',
   available: true,
   version: '1.0.0',
   models: [{ id: 'default', label: 'Default' }],
@@ -347,7 +333,6 @@ beforeEach(() => {
   importGitHubDesignSystemMock.mockReset();
   fetchProviderModelsMock.mockReset();
   openExternalUrlMock.mockReset();
-  analyticsTrackMock.mockReset();
   notificationPermissionMock.mockReturnValue('default');
   requestNotificationPermissionMock.mockResolvedValue('granted');
   showCompletionNotificationMock.mockResolvedValue('shown');
@@ -935,17 +920,6 @@ describe('SettingsDialog execution settings BYOK interactions', () => {
         },
       },
     });
-    expect(analyticsTrackMock).toHaveBeenCalledWith(
-      'byok_preflight_blocked',
-      {
-        source: 'settings',
-        reason: 'api_key_invalid',
-        provider_id: 'anthropic',
-        active_execution_mode: 'local_cli',
-      },
-      undefined,
-    );
-
     const persistedDraft = first.onPersist.mock.calls.at(-1)?.[0] as AppConfig;
     first.unmount();
 
@@ -1194,20 +1168,6 @@ describe('SettingsDialog execution settings BYOK interactions', () => {
       'gpt-4o · Suggested',
       'Custom (type below)…',
     ]));
-    expect(analyticsTrackMock).toHaveBeenCalledWith(
-      'settings_byok_models_fetch_result',
-      expect.objectContaining({
-        page_name: 'settings',
-        area: 'configure_execution_mode_byok',
-        provider_id: 'openai',
-        result: 'success',
-        trigger: 'auto',
-        source: 'network',
-        model_count: 1,
-      }),
-      undefined,
-    );
-
     fireEvent.click(screen.getByRole('tab', { name: 'Azure OpenAI' }));
     expect(screen.queryByRole('button', { name: 'Fetch models' })).toBeNull();
     expect(screen.getByText(/Azure deployments can’t be fetched automatically/)).toBeTruthy();
@@ -1964,22 +1924,6 @@ describe('SettingsDialog execution settings BYOK interactions', () => {
       );
       expect(testConnectionCalls).toHaveLength(0);
     });
-    expect(analyticsTrackMock).toHaveBeenCalledWith(
-      'settings_byok_test_result',
-      expect.objectContaining({
-        page_name: 'settings',
-        area: 'execution_model',
-        provider_id: 'anthropic',
-        result: 'failed',
-        error_code: 'api_key_wrong_protocol',
-        error_kind: 'api_key_wrong_protocol',
-        field_missing: 'none',
-        config_key_changed: false,
-        success_after_action: false,
-        duration_ms: 0,
-      }),
-      undefined,
-    );
   });
 
   it('shows API key and Base URL errors together for mistyped first-party URLs', async () => {
@@ -2193,7 +2137,7 @@ describe('SettingsDialog execution settings BYOK interactions', () => {
     expect(testConnectionCalls).toHaveLength(2);
   });
 
-  it('marks a successful BYOK test after a config edit as success after action', async () => {
+  it('passes a successful BYOK test after a config edit', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString();
       if (url === '/api/memory') {
@@ -2237,19 +2181,6 @@ describe('SettingsDialog execution settings BYOK interactions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Test' }));
 
     expect(await screen.findByText(/Connected\. Replied in 20 ms/)).toBeTruthy();
-    expect(analyticsTrackMock).toHaveBeenCalledWith(
-      'settings_byok_test_result',
-      expect.objectContaining({
-        page_name: 'settings',
-        area: 'execution_model',
-        provider_id: 'anthropic',
-        result: 'success',
-        field_missing: 'none',
-        config_key_changed: true,
-        success_after_action: true,
-      }),
-      undefined,
-    );
   });
 
   it('renders invalid Base URL test failures on the Base URL field', async () => {
@@ -2391,7 +2322,7 @@ describe('SettingsDialog execution settings Local CLI interactions', () => {
 
     renderSettingsDialog(
       { mode: 'daemon', agentId: 'codex' },
-      { agents: [availableAgents[0]!, claudeAgent, amrAgent] },
+      { agents: [availableAgents[0]!, claudeAgent, removedServiceAgent] },
     );
 
     fireEvent.click(screen.getByRole('tab', { name: /Local CLI.*2 installed/i }));
@@ -2404,20 +2335,19 @@ describe('SettingsDialog execution settings Local CLI interactions', () => {
       'settings-agent-card-codex',
       'settings-agent-card-claude',
     ]);
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/integrations/vela/status');
   });
 
   it('lets users switch to Local CLI, select an installed agent, and autosave', async () => {
     const installed = availableAgents[0]!;
     const unavailable: AgentInfo = {
-      id: 'kimi',
-      name: 'Kimi CLI',
-      bin: 'kimi',
+      id: 'pi',
+      name: 'Pi',
+      bin: 'pi',
       available: false,
       version: null,
       models: [],
-      installUrl: 'https://github.com/MoonshotAI/kimi-cli',
-      docsUrl: 'https://www.kimi.com/code/docs/en/kimi-cli/guides/getting-started.html?aff=open-design',
+      installUrl: 'https://github.com/badlogic/pi-mono',
+      docsUrl: 'https://github.com/badlogic/pi-mono',
     };
     const { onPersist } = renderSettingsDialog(
       { mode: 'daemon', agentId: null },
@@ -2432,12 +2362,12 @@ describe('SettingsDialog execution settings Local CLI interactions', () => {
     expect(installGroupSummary.closest('details')?.hasAttribute('open')).toBe(false);
     const codexCard = screen.getByRole('button', { name: /Codex CLI/i }) as HTMLButtonElement;
     fireEvent.click(installGroupSummary);
-    const kimiGroup = screen.getByRole('group', { name: /Kimi CLI/i });
-    expect(within(kimiGroup).getByText('Moonshot Kimi CLI')).toBeTruthy();
+    const piGroup = screen.getByRole('group', { name: /Pi/i });
+    expect(within(piGroup).getByText('Pi coding agent')).toBeTruthy();
     expect(
-      (within(kimiGroup).getByRole('link', { name: en['settings.agentInstall.install'] }) as HTMLAnchorElement).getAttribute('href'),
+      (within(piGroup).getByRole('link', { name: en['settings.agentInstall.install'] }) as HTMLAnchorElement).getAttribute('href'),
     ).toBe(
-      'https://github.com/MoonshotAI/kimi-cli',
+      'https://github.com/badlogic/pi-mono',
     );
     expect(
       screen.getByText(en['settings.agentInstall.stepAuth']),
@@ -2742,13 +2672,13 @@ describe('SettingsDialog execution settings Local CLI interactions', () => {
 
   it('rescans automatically when returning after opening an install link', async () => {
     const unavailable: AgentInfo = {
-      id: 'kimi',
-      name: 'Kimi CLI',
-      bin: 'kimi',
+      id: 'pi',
+      name: 'Pi',
+      bin: 'pi',
       available: false,
       version: null,
       models: [],
-      installUrl: 'https://github.com/MoonshotAI/kimi-cli',
+      installUrl: 'https://github.com/badlogic/pi-mono',
     };
     const onRefreshAgents = vi.fn(async () => availableAgents);
 

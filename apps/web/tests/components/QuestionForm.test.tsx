@@ -912,16 +912,8 @@ describe('QuestionFormView', () => {
     expect(screen.getByText('Editorial narrative')).toBeTruthy();
     expect(screen.getByText('Product keynote')).toBeTruthy();
     expect(screen.getByText('Bold storytelling')).toBeTruthy();
-    expect(
-      (screen.getByAltText(
-        'Editorial narrative deck style preview.',
-      ) as HTMLImageElement).getAttribute('src'),
-    ).toBe('https://repo-assets.open-design.ai/style-catalog/v1/deck-editorial-narrative-v1.webp');
-    expect(
-      (screen.getByAltText(
-        'Product keynote deck style preview.',
-      ) as HTMLImageElement).getAttribute('src'),
-    ).toBe('https://repo-assets.open-design.ai/style-catalog/v1/deck-product-keynote-v1.webp');
+    expect(document.querySelector('[data-style="editorial"]')).toBeTruthy();
+    expect(document.querySelector('[data-style="minimal"]')).toBeTruthy();
     expect(document.querySelector('[data-artifact-type="deck"]')).toBeTruthy();
 
     fireEvent.click(screen.getByLabelText('Editorial narrative'));
@@ -1044,11 +1036,7 @@ describe('QuestionFormView', () => {
     });
     const dialog = screen.getByRole('dialog', { name: 'Visual direction' });
     expect(dialog.querySelectorAll('.qf-visual-card input')).toHaveLength(25);
-    expect(
-      dialog.querySelector(
-        'img[src="https://repo-assets.open-design.ai/style-catalog/v1/deck-editorial-narrative-v1.webp"]',
-      ),
-    ).toBeTruthy();
+    expect(dialog.querySelector('[data-style="editorial"]')).toBeTruthy();
     expect(dialog.querySelector('[aria-label="Bento modular"]')).toBeTruthy();
     expect(visibleLabels()).toHaveLength(4);
     const customInput = screen.getByLabelText('Custom answer') as HTMLInputElement;
@@ -1091,7 +1079,7 @@ describe('QuestionFormView', () => {
     );
   });
 
-  it('exposes all uploaded style previews for every supported artifact type', () => {
+  it('provides the local style catalog for every supported artifact type', () => {
     const deckCards = visualStyleCardsForContext('deck');
     const prototypeCards = visualStyleCardsForContext('prototype');
     const documentCards = visualStyleCardsForContext('document');
@@ -1103,20 +1091,9 @@ describe('QuestionFormView', () => {
     expect(documentCards).toHaveLength(11);
     expect(imageCards).toHaveLength(22);
     expect(videoCards).toHaveLength(12);
-    expect(deckCards.find((card) => card.value === 'deck-academic-research')?.preview.src).toBe(
-      'https://repo-assets.open-design.ai/style-catalog/v1/deck-academic-research-v1.webp',
-    );
     expect(
-      prototypeCards.find((card) => card.value === 'prototype-y2k-chrome')?.preview.src,
-    ).toBe('https://repo-assets.open-design.ai/style-catalog/v1/prototype-y2k-chrome-v1.webp');
-    expect(
-      documentCards.find((card) => card.value === 'document-academic-paper')?.preview.src,
-    ).toBe('https://repo-assets.open-design.ai/style-catalog/v1/document-academic-paper-v1.webp');
-    expect(
-      imageCards.find((card) => card.value === 'image-chrome-3d')?.preview.src,
-    ).toBe('https://repo-assets.open-design.ai/style-catalog/v1/image-chrome-3d-v1.webp');
-    expect(
-      videoCards.find((card) => card.value === 'video-kinetic-type')?.preview.src,
-    ).toBe('https://repo-assets.open-design.ai/style-catalog/v1/video-kinetic-type-v1.webp');
+      [...deckCards, ...prototypeCards, ...documentCards, ...imageCards, ...videoCards]
+        .every((card) => card.preview === undefined),
+    ).toBe(true);
   });
 });

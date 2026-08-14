@@ -1,11 +1,9 @@
-import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { mkdir, rename, rm } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import type { ToolPackConfig } from "../config.js";
 import { PRODUCT_NAME } from "./constants.js";
 import { pathExists, scrubMacExtendedAttributes } from "./fs.js";
-import { readPackagedVersion } from "./manifest.js";
 import { sanitizeNamespace } from "./paths.js";
 import type { MacPackResult, MacPaths } from "./types.js";
 
@@ -24,50 +22,12 @@ async function moveBuilderArtifact(options: {
   return options.destinationPath;
 }
 
-async function cleanBuilderScratchMetadata(paths: MacPaths): Promise<void> {
-  const entries = await readdir(paths.appBuilderOutputRoot).catch(() => []);
-
-  await Promise.all(
-    entries
-      .filter((entry) => entry === "latest-mac.yml" || entry.endsWith(".blockmap"))
-      .map(async (entry) => {
-        await rm(join(paths.appBuilderOutputRoot, entry), { force: true, recursive: true });
-      }),
-  );
-}
-
-async function writeLocalLatestMacYml(config: ToolPackConfig, paths: MacPaths): Promise<void> {
-  const packagedVersion = await readPackagedVersion(config);
-  const zipName = basename(paths.zipPath);
-  const zipPayload = await readFile(paths.zipPath);
-  const zipMetadata = await stat(paths.zipPath);
-  const sha512 = createHash("sha512").update(zipPayload).digest("base64");
-
-  await mkdir(dirname(paths.latestMacYmlPath), { recursive: true });
-  await writeFile(
-    paths.latestMacYmlPath,
-    [
-      `version: ${JSON.stringify(packagedVersion)}`,
-      "files:",
-      `  - url: ${JSON.stringify(zipName)}`,
-      `    sha512: ${JSON.stringify(sha512)}`,
-      `    size: ${zipMetadata.size}`,
-      `path: ${JSON.stringify(zipName)}`,
-      `sha512: ${JSON.stringify(sha512)}`,
-      `releaseDate: ${JSON.stringify(new Date().toISOString())}`,
-      "",
-    ].join("\n"),
-    "utf8",
-  );
-}
-
 export async function finalizeMacArtifacts(
   config: ToolPackConfig,
   paths: MacPaths,
-): Promise<Pick<MacPackResult, "dmgPath" | "latestMacYmlPath" | "zipPath">> {
+): Promise<Pick<MacPackResult, "dmgPath" | "zipPath">> {
   const namespaceToken = sanitizeNamespace(config.namespace);
   let dmgPath: string | null = null;
-  let latestMacYmlPath: string | null = null;
   let zipPath: string | null = null;
 
   if (config.to === "dmg" || config.to === "all") {
@@ -84,11 +44,7 @@ export async function finalizeMacArtifacts(
       label: "zip artifact",
       sourcePath: join(paths.appBuilderOutputRoot, `${PRODUCT_NAME}-${namespaceToken}.zip`),
     });
-    await writeLocalLatestMacYml(config, paths);
-    latestMacYmlPath = paths.latestMacYmlPath;
   }
 
-  await cleanBuilderScratchMetadata(paths);
-
-  return { dmgPath, latestMacYmlPath, zipPath };
+  return { dmgPath, zipPath };
 }

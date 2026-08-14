@@ -325,7 +325,7 @@ describe('diagnostics export handler — run event logs', () => {
   it('warns when runsDir is set but no per-run event logs were found', async () => {
     // An empty/absent runs dir adds no manifest file entries, so without an
     // explicit warning an empty bundle is indistinguishable from a healthy run
-    // — exactly the gap that made an AMR loop look like "nothing happened."
+    // — exactly the gap that can make a failed run look like "nothing happened."
     const runsDir = join(tmpdir(), `od-diag-empty-runs-${randomUUID()}`);
     const handler = createDiagnosticsExportHandler({
       runtime: null,

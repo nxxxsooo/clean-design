@@ -80,8 +80,6 @@ type ManagedSidecarChild = {
 type PackagedDaemonManagedPathEnv = {
   OD_DATA_DIR: string;
   OD_RESOURCE_ROOT: string;
-  /** Channel-root path used by launcher runtime metadata. */
-  OD_INSTALLATION_DIR: string;
 };
 
 function resolveSidecarEntry(packageName: string, exportName: string): string {
@@ -143,7 +141,7 @@ const DAEMON_STATUS_TIMEOUT_MS = 35_000;
 // Windows first launches routinely blow past the 35s POSIX budget: Defender
 // real-time scanning of the freshly-written packaged binaries inflates the
 // daemon cold start (native better-sqlite3 load + first SQLite open/migrate +
-// status-pipe bind) well past 35s. PostHog on the packaged_runtime_failed
+// status-pipe bind) well past 35s. Failure diagnostics for the packaged runtime
 // status-timeout bucket showed ~90% of affected devices DID open the app on a
 // later launch — the daemon was merely slow, not dead — so a wider win32 budget
 // lets that first launch succeed instead of failing to a recovery screen and
@@ -352,7 +350,6 @@ function createPackagedDaemonManagedPathEnv(
   return {
     OD_DATA_DIR: paths.dataRoot,
     OD_RESOURCE_ROOT: paths.resourceRoot,
-    OD_INSTALLATION_DIR: paths.installationRoot,
   };
 }
 
@@ -413,7 +410,6 @@ export function buildPackagedDaemonSpawnEnv(
 
 async function spawnSidecarChild(options: {
   app: AppKey;
-  electronNodeCommand: string | null;
   entryPath: string;
   env: NodeJS.ProcessEnv;
   nodeCommand: string | null;
@@ -437,7 +433,6 @@ async function spawnSidecarChild(options: {
   await retireExistingSidecarEndpoint(ipcPath, logPath);
   const usesElectronAsNode = options.nodeCommand == null;
   const command = options.nodeCommand
-    ?? options.electronNodeCommand
     ?? await resolvePackagedElectronNodeCommand();
   const childEnv = createSidecarLaunchEnv({
     base: options.paths.runtimeRoot,
@@ -517,7 +512,6 @@ export async function startPackagedSidecars(
     appVersion: string | null;
     daemonCliEntry: string | null;
     daemonSidecarEntry: string | null;
-    electronNodeCommand: string | null;
     nodeCommand: string | null;
     /**
      * PR #974 round-5 (lefarcen P2): caller asserts whether a desktop
@@ -565,7 +559,6 @@ export async function startPackagedSidecars(
         legacyDataDir: process.env.OD_LEGACY_DATA_DIR ?? null,
         requireDesktopAuth: options.requireDesktopAuth,
       }),
-      electronNodeCommand: options.electronNodeCommand,
       nodeCommand: options.nodeCommand,
       paths,
       runtime,
@@ -596,7 +589,6 @@ export async function startPackagedSidecars(
         OD_WEB_OUTPUT_MODE: options.webOutputMode,
         PORT: "0",
       },
-      electronNodeCommand: options.electronNodeCommand,
       nodeCommand: options.nodeCommand,
       paths,
       runtime,

@@ -91,7 +91,7 @@ export async function scaffoldPlugin(input: ScaffoldInput): Promise<ScaffoldResu
     '3. Generate the artifact.',
     '4. Self-critique against the design system + craft rules.',
     '',
-    `Replace this body with the actual ${title} workflow before publishing.`,
+    `Replace this body with the actual ${title} workflow before sharing it locally.`,
     '',
   ].join('\n');
   const skillPath = path.join(folder, 'SKILL.md');
@@ -99,7 +99,6 @@ export async function scaffoldPlugin(input: ScaffoldInput): Promise<ScaffoldResu
   written.push(skillPath);
 
   const manifest: Record<string, unknown> = {
-    $schema:     'https://open-design.ai/schemas/plugin.v1.json',
     specVersion: '1.0.0',
     name:        input.id,
     title,
@@ -143,10 +142,10 @@ export async function scaffoldPlugin(input: ScaffoldInput): Promise<ScaffoldResu
     '## Files',
     '',
     '- `SKILL.md` — the canonical agent skill body.',
-    '- `open-design.json` — the versioned Open Design marketplace sidecar.',
+    '- `open-design.json` — the versioned local plugin manifest.',
     '',
     'Edit `SKILL.md` to teach the agent how to perform the workflow.',
-    'Edit `open-design.json` to refine the marketplace card and inputs.',
+    'Edit `open-design.json` to refine the local plugin card and inputs.',
     '',
   ].join('\n');
   const readmePath = path.join(folder, 'README.md');

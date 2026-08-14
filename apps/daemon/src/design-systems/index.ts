@@ -1710,13 +1710,7 @@ export function buildDesignSystemSkillsMarkdown(input: {
 
   lines.push('---');
   lines.push('');
-  lines.push(
-    'Generated with **Open Design** — the open-source, local-first Claude Design alternative. ' +
-      'Generate decks, landing pages, dashboards, and brand systems with your favourite AI ' +
-      'coding agent.',
-  );
-  lines.push('');
-  lines.push('https://github.com/nexu-io/open-design');
+  lines.push('Generated with **Clean Design**.');
   lines.push('');
 
   return lines.join('\n');

@@ -215,7 +215,7 @@ describe('AssistantMessage feedback gate', () => {
 });
 
 describe('AssistantMessage status badge updates (Bug A)', () => {
-  // Regression coverage for the model-badge stale-detail bug. ACP agents
+  // Regression coverage for the model-badge stale-detail bug. Streaming agents
   // emit two `status: 'model'` events per turn:
   //   1. After session/new returns — the agent's initial default model
   //      (e.g. `swe-1-6-fast` for Devin for Terminal)
@@ -280,8 +280,7 @@ describe('AssistantMessage status badge updates (Bug A)', () => {
             {
               kind: 'status',
               label: 'error',
-              detail:
-                'AMR Cloud reported insufficient balance. Recharge at https://open-design.ai/amr/wallet, then retry.',
+              detail: 'The provider returned an error. See https://status.example.invalid for details.',
             } as ChatMessage['events'][number],
           ],
         })}
@@ -291,8 +290,8 @@ describe('AssistantMessage status badge updates (Bug A)', () => {
       />,
     );
 
-    const link = screen.getByRole('link', { name: 'https://open-design.ai/amr/wallet' });
-    expect(link.getAttribute('href')).toBe('https://open-design.ai/amr/wallet');
+    const link = screen.getByRole('link', { name: 'https://status.example.invalid' });
+    expect(link.getAttribute('href')).toBe('https://status.example.invalid');
     expect(link.classList.contains('md-link')).toBe(true);
   });
 });
@@ -818,7 +817,7 @@ describe('AssistantMessage question forms', () => {
     expect(screen.getByText('mood.png')).toBeTruthy();
   });
 
-  it('keeps selected visual style previews in the answered summary', () => {
+  it('keeps the selected visual style in the answered summary', () => {
     const form = [
       '<question-form id="discovery" title="Quick brief">',
       JSON.stringify({
@@ -848,53 +847,41 @@ describe('AssistantMessage question forms', () => {
     );
 
     expect(screen.getByText('Visual tone')).toBeTruthy();
-    expect(screen.getByText('Editorial narrative')).toBeTruthy();
-    expect(screen.getByRole('img', { name: 'Visual tone: Editorial narrative' })).toHaveAttribute(
-      'src',
-      'https://repo-assets.open-design.ai/style-catalog/v1/deck-editorial-narrative-v1.webp',
-    );
+    expect(screen.getByText('Editorial / magazine')).toBeTruthy();
   });
 
   it.each([
     {
       projectKind: 'web_clone' as const,
       title: 'Quiet SaaS',
-      src: 'https://repo-assets.open-design.ai/style-catalog/v1/prototype-quiet-saas-v1.webp',
     },
     {
       projectKind: 'wireframe' as const,
       title: 'Quiet SaaS',
-      src: 'https://repo-assets.open-design.ai/style-catalog/v1/prototype-quiet-saas-v1.webp',
     },
     {
       projectKind: 'live_artifact' as const,
       title: 'Quiet SaaS',
-      src: 'https://repo-assets.open-design.ai/style-catalog/v1/prototype-quiet-saas-v1.webp',
     },
     {
       projectKind: 'document' as const,
       title: 'Docs reference',
-      src: 'https://repo-assets.open-design.ai/style-catalog/v1/document-docs-reference-v1.webp',
     },
     {
       projectKind: 'image' as const,
       title: 'Editorial photo',
-      src: 'https://repo-assets.open-design.ai/style-catalog/v1/image-photo-editorial-v1.webp',
     },
     {
       projectKind: 'video' as const,
       title: 'Swiss Pulse',
-      src: 'https://repo-assets.open-design.ai/style-catalog/v1/video-swiss-pulse-v1.webp',
     },
     {
       projectKind: 'hyperframes' as const,
       title: 'Swiss Pulse',
-      src: 'https://repo-assets.open-design.ai/style-catalog/v1/video-swiss-pulse-v1.webp',
     },
   ])('keeps selected $projectKind style previews in the answered summary', ({
     projectKind,
     title,
-    src,
   }) => {
     const form = [
       '<question-form id="discovery" title="Quick brief">',
@@ -924,10 +911,10 @@ describe('AssistantMessage question forms', () => {
       />,
     );
 
-    expect(screen.getByRole('img', { name: `Visual tone: ${title}` })).toHaveAttribute('src', src);
+    expect(screen.getByText(title)).toBeTruthy();
   });
 
-  it('normalizes every selected legacy visual style to its preview card', () => {
+  it('keeps every selected legacy visual style in the summary', () => {
     const form = [
       '<question-form id="discovery" title="Quick brief">',
       JSON.stringify({
@@ -959,14 +946,10 @@ describe('AssistantMessage question forms', () => {
       />,
     );
 
-    expect(screen.getByRole('img', { name: 'Visual tone: Editorial narrative' })).toBeTruthy();
-    expect(screen.getByRole('img', { name: 'Visual tone: Premium pitch' })).toHaveAttribute(
-      'src',
-      'https://repo-assets.open-design.ai/style-catalog/v1/deck-premium-pitch-v1.webp',
-    );
+    expect(screen.getByText('Editorial / magazine, Luxury / refined')).toBeTruthy();
   });
 
-  it('keeps a custom visual style selection alongside preview cards', () => {
+  it('keeps a custom visual style selection alongside the preset', () => {
     const form = [
       '<question-form id="discovery" title="Quick brief">',
       JSON.stringify({
@@ -998,8 +981,7 @@ describe('AssistantMessage question forms', () => {
       />,
     );
 
-    expect(screen.getByRole('img', { name: 'Visual tone: Editorial narrative' })).toBeTruthy();
-    expect(screen.getByText('Warm Japanese editorial')).toBeTruthy();
+    expect(screen.getByText('Editorial / magazine, Warm Japanese editorial')).toBeTruthy();
   });
 
   it('does not recommend next steps on the same turn as an inline question form', () => {

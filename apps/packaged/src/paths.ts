@@ -15,8 +15,6 @@ export type PackagedNamespacePaths = {
   electronSessionDataRoot: string;
   electronUserDataRoot: string;
   headlessIdentityPath: string;
-  /** Channel-root directory shared by launcher runtime metadata. */
-  installationRoot: string;
   logsRoot: string;
   namespaceRoot: string;
   resourceRoot: string;
@@ -97,12 +95,6 @@ export function resolvePackagedNamespacePaths(
   const normalizedNamespace = normalizeNamespace(namespace);
   const namespaceRoot = join(config.namespaceBaseRoot, normalizedNamespace);
   const dataRoot = resolvePackagedDataRoot(config, normalizedNamespace, env);
-  // Channel root = parent of the `namespaces/` directory. With the default
-  // packaged layout this resolves to `<electronApp.userData>` — e.g.
-  // `~/Library/Application Support/Clean Design Prerelease/` on mac. Custom
-  // `namespaceBaseRoot` overrides (tests, multi-namespace deployments)
-  // still get a usable parent here.
-  const installationRoot = join(config.namespaceBaseRoot, "..");
 
   return {
     cacheRoot: join(namespaceRoot, "cache"),
@@ -113,7 +105,6 @@ export function resolvePackagedNamespacePaths(
     electronSessionDataRoot: join(namespaceRoot, "user-data", "session"),
     electronUserDataRoot: join(namespaceRoot, "user-data"),
     headlessIdentityPath: join(namespaceRoot, "runtime", "headless-root.json"),
-    installationRoot,
     logsRoot: join(namespaceRoot, "logs"),
     namespaceRoot,
     resourceRoot: config.resourceRoot,

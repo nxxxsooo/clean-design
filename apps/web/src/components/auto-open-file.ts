@@ -167,7 +167,7 @@ export interface SelectAutoOpenTurnOptions extends SelectAutoOpenOptions {
   // autosave on, so its mtime lands inside the turn window from the user's
   // own keystrokes — without this restriction a text-only turn would yank
   // focus back to it. Protocols that emit no write events (codex, gemini,
-  // opencode, ACP agents) supply an empty set and keep the pure time window;
+  // opencode) supply an empty set and keep the pure time window;
   // that window exists precisely because they have no per-write signal.
   readonly agentTouchedFileNames?: ReadonlySet<string> | null;
 }

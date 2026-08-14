@@ -1,5 +1,4 @@
 export const CLEAN_DESIGN_DISABLED_API_PREFIXES = Object.freeze([
-  '/api/amr',
   '/api/analytics',
   '/api/active',
   '/api/attribution',
@@ -13,7 +12,6 @@ export const CLEAN_DESIGN_DISABLED_API_PREFIXES = Object.freeze([
   '/api/deploy',
   '/api/github/open-design',
   '/api/host-tools',
-  '/api/integrations/vela',
   '/api/marketplaces',
   '/api/mcp',
   '/api/observability',
@@ -31,7 +29,29 @@ export const CLEAN_DESIGN_DISABLED_API_PREFIXES = Object.freeze([
   '/api/whats-new',
 ] as const);
 
-export const CLEAN_DESIGN_DISABLED_AGENT_IDS = Object.freeze(['amr'] as const);
+export const CLEAN_DESIGN_PUBLIC_CLI_AGENT_IDS = Object.freeze([
+  'claude',
+  'codex',
+  'antigravity',
+  'opencode',
+  'pi',
+] as const);
+
+export type CleanDesignPublicCliAgentId =
+  (typeof CLEAN_DESIGN_PUBLIC_CLI_AGENT_IDS)[number];
+
+export const CLEAN_DESIGN_INTERNAL_AGENT_IDS = Object.freeze([
+  'byok-opencode',
+] as const);
+
+export type CleanDesignInternalAgentId =
+  (typeof CLEAN_DESIGN_INTERNAL_AGENT_IDS)[number];
+
+export interface CleanDesignAgentIdentity {
+  id: string;
+  source?: string;
+  baseAgentId?: string;
+}
 
 export function isCleanDesignDisabledApiPath(pathname: string): boolean {
   const normalized = pathname.startsWith('/api/')
@@ -50,6 +70,22 @@ export function isCleanDesignDisabledApiPath(pathname: string): boolean {
   ].some((pattern) => pattern.test(normalized));
 }
 
-export function isCleanDesignDisabledAgent(agentId: string): boolean {
-  return CLEAN_DESIGN_DISABLED_AGENT_IDS.some((disabled) => disabled === agentId);
+export function isCleanDesignPublicCliAgent(
+  agentId: string,
+): agentId is CleanDesignPublicCliAgentId {
+  return (CLEAN_DESIGN_PUBLIC_CLI_AGENT_IDS as readonly string[]).includes(agentId);
+}
+
+export function isCleanDesignInternalAgent(
+  agentId: string,
+): agentId is CleanDesignInternalAgentId {
+  return (CLEAN_DESIGN_INTERNAL_AGENT_IDS as readonly string[]).includes(agentId);
+}
+
+export function isCleanDesignPublicAgent(agent: CleanDesignAgentIdentity): boolean {
+  if (isCleanDesignPublicCliAgent(agent.id)) return true;
+  return agent.source === 'local-profile' &&
+    typeof agent.baseAgentId === 'string' &&
+    isCleanDesignPublicCliAgent(agent.baseAgentId) &&
+    !isCleanDesignInternalAgent(agent.id);
 }

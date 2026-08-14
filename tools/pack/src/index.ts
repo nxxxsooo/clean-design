@@ -1,7 +1,7 @@
 import { cac } from "cac";
 import type { CAC } from "cac";
 
-import { resolveToolPackConfig, type ToolPackCliOptions, type ToolPackPlatform } from "./config.js";
+import { resolveToolPackConfig, type ToolPackCliOptions } from "./config.js";
 import {
   cleanupPackedMacNamespace,
   installPackedMacDmg,
@@ -12,31 +12,6 @@ import {
   stopPackedMacApp,
   uninstallPackedMacApp,
 } from "./mac/index.js";
-import {
-  cleanupPackedWinNamespace,
-  diagnosePackedWinIpc,
-  installPackedWinApp,
-  inspectPackedWinApp,
-  listPackedWinNamespaces,
-  packWin,
-  readPackedWinLogs,
-  resetPackedWinNamespaces,
-  startPackedWinApp,
-  stopPackedWinApp,
-  uninstallPackedWinApp,
-  validateWinLauncherPayloadArchive,
-} from "./win/index.js";
-import {
-  cleanupPackedLinuxNamespace,
-  installPackedLinuxApp,
-  inspectPackedLinuxApp,
-  packLinux,
-  readPackedLinuxLogs,
-  startPackedLinuxApp,
-  stopPackedLinuxApp,
-  uninstallPackedLinuxApp,
-} from "./linux.js";
-
 type CliOptions = ToolPackCliOptions;
 
 function printJson(payload: unknown): void {
@@ -61,55 +36,43 @@ function addSharedOptions(command: CacCommand) {
   return command
     .option("--cache-dir <path>", "advanced escape hatch for relocating tools-pack cache")
     .option("--dir <path>", "tools-pack output/runtime root directory")
-    .option("--diagnose-attempts <count>", "diagnose-ipc: start/poll/stop attempts")
     .option("--json", "print JSON")
     .option("--namespace <name>", "runtime namespace")
     .option("--expr <expression>", "desktop inspect eval expression")
-    .option("--path <path>", "desktop inspect screenshot path")
-    .option("--status-poll-count <count>", "inspect: poll desktop/daemon/web STATUS this many times")
-    .option("--status-poll-interval-ms <ms>", "inspect: delay between STATUS poll samples");
+    .option("--path <path>", "desktop inspect screenshot path");
 }
 
-// Per-platform `--to` help text mirroring resolveToolPackBuildOutput in
-// config.ts. Keep these in sync: the resolver throws on any value not listed
-// here for the given platform.
-const TO_HELP_BY_PLATFORM: Record<ToolPackPlatform, string> = {
-  linux: "build target: all|appimage|dir (default: all)",
-  mac: "build target: all|app|dmg|zip (default: all)",
-  win: "build target: all|dir|nsis|zip (default: nsis). `zip` produces a portable zip from the unpacked build; `all` produces dir+nsis+zip.",
-};
+const MAC_TO_HELP = "build target: all|app|dmg|zip (default: all)";
 
-function addBuildOptions(command: CacCommand, platform: ToolPackPlatform) {
+function addBuildOptions(command: CacCommand) {
   return command
-    .option("--app-version <version>", "override packaged app version for release artifacts")
+    .option("--app-version <version>", "override the packaged app version")
     .option("--portable", "do not bake local tools-pack runtime roots into the packaged config")
     .option("--signed", "build a signed mac artifact")
     .option("--notarize", "notarize a signed mac artifact")
-    .option("--to <target>", TO_HELP_BY_PLATFORM[platform]);
+    .option("--to <target>", MAC_TO_HELP);
 }
 
 function addMacBuildOptions(command: CacCommand) {
-  return addBuildOptions(command, "mac")
+  return addBuildOptions(command)
     .option("--mac-compression <mode>", "mac artifact compression: normal|maximum|store (default: normal)");
 }
 
-function addWinLifecycleOptions(command: CacCommand) {
+function addMacLifecycleOptions(command: CacCommand) {
   return command
-    .option("--expected-version <version>", "validate-payload: expected launcher payload version")
-    .option("--payload-path <path>", "validate-payload: launcher payload archive path")
-    .option("--remove-cache", "remove packaged download/cache data during uninstall/reset/cleanup")
-    .option("--remove-data", "remove packaged data during uninstall/reset/cleanup")
-    .option("--remove-logs", "remove packaged logs during uninstall/reset/cleanup")
-    .option("--remove-product-user-data", "remove the public Electron app userData root during Windows uninstall/reset/cleanup")
-    .option("--remove-sidecars", "remove packaged sidecar runtime during uninstall/reset/cleanup")
-    .option("--silent", "run installer/uninstaller silently", { default: true });
+    .option("--remove-data", "remove current-namespace packaged data during uninstall/cleanup")
+    .option("--remove-logs", "remove current-namespace packaged logs during uninstall/cleanup")
+    .option("--remove-product-user-data", "remove current-product Electron userData for this namespace during uninstall/cleanup")
+    .option("--remove-sidecars", "remove current-namespace packaged sidecar runtime during uninstall/cleanup");
 }
 
 const cli = cac("tools-pack");
 
-addMacBuildOptions(addSharedOptions(cli.command("mac <action>", "Mac packaging commands: build|install|start|stop|logs|uninstall|cleanup|inspect"))).action(
+addMacLifecycleOptions(
+  addMacBuildOptions(addSharedOptions(cli.command("mac <action>", "Mac packaging commands: build|install|start|stop|logs|uninstall|cleanup|inspect"))),
+).action(
   async (action: string, options: CliOptions) => {
-    const config = resolveToolPackConfig("mac", options);
+    const config = resolveToolPackConfig(options);
     switch (action) {
       case "build":
         printJson(await packMac(config));
@@ -140,113 +103,6 @@ addMacBuildOptions(addSharedOptions(cli.command("mac <action>", "Mac packaging c
     }
   },
 );
-
-addWinLifecycleOptions(
-  addBuildOptions(
-    addSharedOptions(
-      cli.command(
-        "win <action>",
-        "Windows packaging commands: build|install|start|stop|logs|uninstall|cleanup|list|reset|inspect|diagnose-ipc|validate-payload",
-      ),
-    ),
-    "win",
-  ),
-).action(async (action: string, options: CliOptions) => {
-  const config = resolveToolPackConfig("win", options);
-  switch (action) {
-    case "build":
-      printJson(await packWin(config));
-      return;
-    case "install":
-      printJson(await installPackedWinApp(config));
-      return;
-    case "start":
-      printJson(await startPackedWinApp(config));
-      return;
-    case "stop":
-      printJson(await stopPackedWinApp(config));
-      return;
-    case "logs":
-      printLogs(await readPackedWinLogs(config), options);
-      return;
-    case "uninstall":
-      printJson(await uninstallPackedWinApp(config));
-      return;
-    case "cleanup":
-      printJson(await cleanupPackedWinNamespace(config));
-      return;
-    case "list":
-      printJson(await listPackedWinNamespaces(config));
-      return;
-    case "reset":
-      printJson(await resetPackedWinNamespaces(config));
-      return;
-    case "inspect":
-      printJson(await inspectPackedWinApp(config, options));
-      return;
-    case "diagnose-ipc":
-      printJson(await diagnosePackedWinIpc(config, options));
-      return;
-    case "validate-payload": {
-      if (options.payloadPath == null || options.payloadPath.length === 0) {
-        throw new Error("win validate-payload requires --payload-path");
-      }
-      if (options.expectedVersion == null || options.expectedVersion.length === 0) {
-        throw new Error("win validate-payload requires --expected-version");
-      }
-      printJson(await validateWinLauncherPayloadArchive({
-        expectedVersion: options.expectedVersion,
-        namespace: config.namespace,
-        payloadPath: options.payloadPath,
-        workspaceRoot: config.workspaceRoot,
-      }));
-      return;
-    }
-    default:
-      throw new Error(`unsupported win action: ${action}`);
-  }
-});
-
-addBuildOptions(addSharedOptions(cli.command("linux <action>", "Linux packaging commands: build|install|start|stop|logs|uninstall|cleanup|inspect")), "linux")
-  .option("--containerized", "build inside electronuserland/builder Docker for wider glibc compatibility")
-  .action(async (action: string, options: CliOptions) => {
-    const config = resolveToolPackConfig("linux", options);
-    switch (action) {
-      case "build":
-        printJson(await packLinux(config));
-        return;
-      case "install": {
-        printJson(await installPackedLinuxApp(config));
-        return;
-      }
-      case "start": {
-        printJson(await startPackedLinuxApp(config));
-        return;
-      }
-      case "stop": {
-        printJson(await stopPackedLinuxApp(config));
-        return;
-      }
-      case "logs":
-        printLogs(await readPackedLinuxLogs(config), options);
-        return;
-      case "inspect":
-        printJson(await inspectPackedLinuxApp(config, {
-          expr: options.expr,
-          path: options.path,
-        }));
-        return;
-      case "uninstall": {
-        printJson(await uninstallPackedLinuxApp(config));
-        return;
-      }
-      case "cleanup":
-        printJson(await cleanupPackedLinuxNamespace(config, { headless: false }));
-        return;
-      default:
-        throw new Error(`unsupported linux action: ${action}`);
-    }
-  });
 
 cli.help();
 cli.parse();

@@ -66,8 +66,6 @@ test.beforeEach(async ({ page }) => {
         skillId: null,
         designSystemId: null,
         onboardingCompleted: true,
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
         agentModels: { codex: { model: 'default' } },
       }),
     );
@@ -78,8 +76,6 @@ test.beforeEach(async ({ page }) => {
       json: {
         config: {
           onboardingCompleted: true,
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
           mode: 'daemon',
           agentId: 'codex',
           skillId: null,

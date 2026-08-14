@@ -23,12 +23,6 @@ import {
   type RunContextSelection,
 } from '@open-design/contracts';
 import type { OpenDesignHostProjectImportSuccess } from '@open-design/host';
-import type { DesignSystemGenerateSnapshot } from './DesignSystemFlow';
-import { useAnalytics } from '../analytics/provider';
-import {
-  trackHomeNavClick,
-  trackHomeToolbarClick,
-} from '../analytics/events';
 import { useT } from '../i18n';
 import { navigate, useRoute } from '../router';
 import type {
@@ -120,8 +114,8 @@ type EntryCreateProjectInput = Omit<CreateInput, 'metadata'> & {
   initialRunContext?: RunContextSelection | null;
   conversationMode?: ChatSessionMode;
   autoSendFirstMessage?: boolean;
-  /** The home submit already ran the Clean Design Cloud balance gate; the
-   *  project's first auto-send must not re-gate. */
+  /** The home submit already validated the local setup; the project's first
+   *  auto-send can proceed directly. */
   requestId?: string;
   pendingFiles?: File[];
   userWorkingDirToken?: string;
@@ -267,33 +261,6 @@ interface Props {
   onOpenSettings: (section?: EntrySettingsSection) => void;
 }
 
-// Map an EntryNavRail view id to the analytics `element` enum on
-// `home/nav` ui_click. Returns `null` for views without a dedicated nav
-// button (the rail's "Home" target is the brand logo, which gets its own
-// element value via the logo click handler — not the changeView path).
-function navElementForView(
-  next: EntryViewKind,
-):
-  | 'home'
-  | 'projects'
-  | 'design_systems'
-  | null {
-  switch (next) {
-    case 'home':
-      return 'home';
-    case 'projects':
-      return 'projects';
-    case 'design-systems':
-      return 'design_systems';
-    case 'brands':
-      // No dedicated brands analytics element yet; reuse the design_systems
-      // slot since Brands replaces that nav destination.
-      return 'design_systems';
-    default:
-      return null;
-  }
-}
-
 // Tab views stay mounted (so previews/thumbnails survive a tab switch) but the
 // inactive ones must leave layout, the accessibility tree, and tab order.
 // `content-visibility: hidden` still reserves the hidden pane's block size,
@@ -393,16 +360,7 @@ export function EntryShell({
     if (!scrollContainer) return;
     scrollContainer.scrollTop = 0;
   }, [view]);
-  const analytics = useAnalytics();
   function changeView(next: EntryViewKind) {
-    const navElement = navElementForView(next);
-    if (navElement) {
-      trackHomeNavClick(analytics.track, {
-        page_name: 'home',
-        area: 'nav',
-        element: navElement,
-      });
-    }
     navigate({ kind: 'home', view: next });
   }
 
@@ -542,13 +500,6 @@ export function EntryShell({
       config={config}
       onThemeChange={onThemeChange}
       onOpenSettings={onOpenSettings}
-      onTrackTriggerClick={() => {
-        trackHomeToolbarClick(analytics.track, {
-          page_name: 'home',
-          area: 'toolbar',
-          element: 'settings',
-        });
-      }}
     />
   );
 
@@ -592,11 +543,6 @@ export function EntryShell({
           view={view}
           onViewChange={changeView}
           onNewProject={() => {
-            trackHomeNavClick(analytics.track, {
-              page_name: 'home',
-              area: 'nav',
-              element: 'new_project_plus',
-            });
             openNewProject();
           }}
           open={railOpen}

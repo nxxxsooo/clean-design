@@ -135,36 +135,20 @@ export function appConfigDir(projectRoot: string, env: NodeJS.ProcessEnv = proce
 }
 
 const AGENT_MODEL_KEYS: ReadonlySet<string> = new Set(['model', 'reasoning']);
-const RETIRED_AGENT_IDS: ReadonlySet<string> = new Set(['gemini']);
+const PUBLIC_AGENT_IDS: ReadonlySet<string> = new Set([
+  'claude',
+  'codex',
+  'opencode',
+  'pi',
+  'antigravity',
+]);
 
 const AGENT_CLI_ENV_KEYS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
-  ['amr', new Set([
-    'VELA_BIN',
-    'VELA_API_URL',
-    'VELA_LINK_URL',
-    'VELA_RUNTIME_KEY',
-    'VELA_OPENCODE_BIN',
-    'OPEN_DESIGN_AMR_PROFILE',
-    'OPENCODE_TEST_HOME',
-  ])],
-  ['aider', new Set(['AIDER_BIN'])],
   ['claude', new Set(['CLAUDE_CONFIG_DIR', 'CLAUDE_BIN', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'MMD_MODEL_ROUTES_FILE'])],
   ['codex', new Set(['CODEX_HOME', 'CODEX_BIN', 'OPENAI_BASE_URL', 'CODEX_API_KEY', 'OPENAI_API_KEY'])],
-  ['copilot', new Set(['COPILOT_BIN'])],
-  ['cursor-agent', new Set(['CURSOR_AGENT_BIN'])],
-  ['deepseek', new Set(['DEEPSEEK_BIN'])],
-  ['devin', new Set(['DEVIN_BIN'])],
-  ['mimo', new Set(['MIMO_BIN'])],
-  ['hermes', new Set(['HERMES_BIN'])],
-  ['kimi', new Set(['KIMI_BIN'])],
-  ['kiro', new Set(['KIRO_BIN'])],
-  ['kilo', new Set(['KILO_BIN'])],
   ['opencode', new Set(['OPENCODE_BIN'])],
   ['pi', new Set(['PI_BIN'])],
-  ['qoder', new Set(['QODER_BIN'])],
-  ['qwen', new Set(['QWEN_BIN'])],
-  ['trae-cli', new Set(['TRAE_CLI_BIN'])],
-  ['vibe', new Set(['VIBE_BIN'])],
+  ['antigravity', new Set(['ANTIGRAVITY_BIN'])],
 ]);
 
 const AGENT_CLI_AUTH_ENV_KEYS: ReadonlyMap<string, {
@@ -372,11 +356,11 @@ function normalizeAgentCliEnvPrefs(prefs: AppConfigPrefs): AppConfigPrefs {
   return next;
 }
 
-function normalizeRetiredAgentPrefs(prefs: AppConfigPrefs): AppConfigPrefs {
+function normalizeAgentPrefs(prefs: AppConfigPrefs): AppConfigPrefs {
   let changed = false;
   let next = prefs;
 
-  if (typeof next.agentId === 'string' && RETIRED_AGENT_IDS.has(next.agentId)) {
+  if (typeof next.agentId === 'string' && !PUBLIC_AGENT_IDS.has(next.agentId)) {
     next = { ...next };
     delete next.agentId;
     changed = true;
@@ -384,8 +368,8 @@ function normalizeRetiredAgentPrefs(prefs: AppConfigPrefs): AppConfigPrefs {
 
   if (next.agentModels) {
     let nextAgentModels = next.agentModels;
-    for (const agentId of RETIRED_AGENT_IDS) {
-      if (!Object.prototype.hasOwnProperty.call(nextAgentModels, agentId)) continue;
+    for (const agentId of Object.keys(nextAgentModels)) {
+      if (PUBLIC_AGENT_IDS.has(agentId)) continue;
       if (nextAgentModels === next.agentModels) nextAgentModels = { ...next.agentModels };
       delete nextAgentModels[agentId];
       changed = true;
@@ -531,7 +515,7 @@ function filterAllowedKeys(obj: Record<string, unknown>): AppConfigPrefs {
       applyConfigValue(result, key as keyof AppConfigPrefs, obj[key]);
     }
   }
-  return normalizeRetiredAgentPrefs(normalizeAgentCliEnvPrefs(result as AppConfigPrefs));
+  return normalizeAgentPrefs(normalizeAgentCliEnvPrefs(result as AppConfigPrefs));
 }
 
 function applyConfigDefaults(prefs: AppConfigPrefs): AppConfigPrefs {
@@ -618,7 +602,7 @@ async function doWrite(
     ? inferAgentCliEnvIntentForExplicitEnvWrite(next as AppConfigPrefs)
     : next as AppConfigPrefs;
   const normalizedNext = normalizeAgentCliEnvPrefs(nextWithInferredIntent);
-  const normalizedNextWithoutRetiredAgents = normalizeRetiredAgentPrefs(normalizedNext);
+  const normalizedNextWithoutRetiredAgents = normalizeAgentPrefs(normalizedNext);
   const file = configFile(dataDir);
   await mkdir(path.dirname(file), { recursive: true });
   const tmp = file + '.' + randomBytes(4).toString('hex') + '.tmp';

@@ -91,8 +91,6 @@ describe('decideSafeRunRetry', () => {
 
   it('allows named transient process-exit details before side effects', () => {
     for (const failure_detail of [
-      'agent_protocol_error',
-      'qoder_stop_sequence',
       'session_resume_expired',
       'stream_error',
       'fatal_rpc_error',

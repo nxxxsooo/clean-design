@@ -48,7 +48,6 @@ describe('resolveDaemonStatusTimeoutMs', () => {
   it('widens the baseline to 90 seconds on win32 for AV-scan-slow first launches', () => {
     // Windows Defender scanning freshly-written packaged binaries inflates the
     // daemon cold start (native better-sqlite3 load + first SQLite open + pipe
-    // bind) past 35s; PostHog showed ~90% of the status-timeout devices did open
     // on a later launch, so the wider budget lets the first launch succeed.
     expect(resolveDaemonStatusTimeoutMs({}, 'win32')).toBe(90_000);
   });
@@ -332,7 +331,6 @@ describe('buildPackagedDaemonSpawnEnv', () => {
       electronSessionDataRoot: '/tmp/od-pkg/user-data/session',
       electronUserDataRoot: '/tmp/od-pkg/user-data',
       headlessIdentityPath: '/tmp/od-pkg/runtime/headless-root.json',
-      installationRoot: '/tmp/od-pkg/..',
       logsRoot: '/tmp/od-pkg/logs',
       namespaceRoot: '/tmp/od-pkg',
       resourceRoot: '/tmp/od-pkg/resources',
@@ -373,6 +371,7 @@ describe('buildPackagedDaemonSpawnEnv', () => {
     expect(env.OD_REQUIRE_DESKTOP_AUTH).toBe('1');
     expect(env.OD_DATA_DIR).toBe('/tmp/od-pkg/data');
     expect(env.OD_RESOURCE_ROOT).toBe('/tmp/od-pkg/resources');
+    expect(env.OD_INSTALLATION_DIR).toBeUndefined();
     expect(env.OD_APP_VERSION).toBe('1.2.3');
     expect(env.OD_LEGACY_DATA_DIR).toBeUndefined();
   });
@@ -424,17 +423,13 @@ describe('buildPackagedDaemonSpawnEnv', () => {
     expect(env.OD_DAEMON_CLI_PATH).toBe('/path/to/cli/dist/index.js');
   });
 
-  it('never forwards AMR or telemetry configuration to the daemon', () => {
+  it('forwards only the supported local daemon configuration', () => {
     const env = buildPackagedDaemonSpawnEnv(fakePaths(), {
       appVersion: null,
       daemonCliEntry: null,
       legacyDataDir: null,
       requireDesktopAuth: true,
     });
-    expect(env.OPEN_DESIGN_AMR_PROFILE).toBeUndefined();
-    expect(env.OPEN_DESIGN_TELEMETRY_RELAY_URL).toBeUndefined();
-    expect(env.POSTHOG_KEY).toBeUndefined();
-    expect(env.POSTHOG_HOST).toBeUndefined();
   });
 });
 

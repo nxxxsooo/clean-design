@@ -55,9 +55,7 @@ describe('dialog send-now interrupt', () => {
           agentModels: { codex: { model: 'default', reasoning: 'default' } },
           designSystemId: null,
           onboardingCompleted: true,
-          privacyDecisionAt: 1,
           skillId: null,
-          telemetry: { artifactManifest: true, content: false, metrics: false },
         },
         method: 'PUT',
       });
@@ -87,10 +85,8 @@ describe('dialog send-now interrupt', () => {
             skillId: null,
             designSystemId: null,
             onboardingCompleted: true,
-            privacyDecisionAt: 1,
             agentModels: { codex: { model: 'default', reasoning: 'default' } },
             agentCliEnv: { codex: codexEnv },
-            telemetry: { metrics: false, content: false, artifactManifest: true },
           }),
         );
       }, { key: STORAGE_KEY, codexEnv: fakeAgents.codex.env });

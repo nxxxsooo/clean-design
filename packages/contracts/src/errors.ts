@@ -22,10 +22,6 @@ export const API_ERROR_CODES = [
   // triage can count this failure class by code.
   'AGENT_CONNECTION_DROPPED',
   'AGENT_PROMPT_TOO_LARGE',
-  'AMR_MODEL_UNAVAILABLE',
-  'AMR_AUTH_REQUIRED',
-  'AMR_INSUFFICIENT_BALANCE',
-  'AMR_TIER_UPGRADE_REQUIRED',
   // The agent emitted a fabricated Markdown role marker
   // (`## user` / `## assistant` / `## system`) inside its own response.
   // The chat host parses those lowercase lines as real turn

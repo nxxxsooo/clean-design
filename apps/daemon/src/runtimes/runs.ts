@@ -4,7 +4,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { todoSnapshotHasUnfinishedWork } from '@open-design/contracts';
 import { normalizeMediaExecutionPolicyForRun } from '../media/policy.js';
-import { createRunLifecycleTracer } from '../run-lifecycle-tracer.js';
 import { projectWorkspaceProvenance } from '../workspace-contract.js';
 
 export const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'canceled']);
@@ -48,7 +47,6 @@ function durableRunState(run) {
       ? { designSystemSelectionSource: run.designSystemSelectionSource }
       : {}),
     ...(typeof run.clientType === 'string' ? { clientType: run.clientType } : {}),
-    ...(run.lifecycleTimings ? { lifecycleTimings: run.lifecycleTimings } : {}),
     ...(run.promptCache ? { promptCache: run.promptCache } : {}),
   };
 }
@@ -132,7 +130,7 @@ export function createChatRunService({
       clients: new Set(),
       waiters: new Set(),
       child: null,
-      acpSession: null,
+      rpcSession: null,
       childPid: null,
       processGroupId: null,
       childExitObservedAt: null,
@@ -143,18 +141,13 @@ export function createChatRunService({
       cancelRequested: false,
       runtimeFailureObservedBeforeCancellation: false,
       retryRestartTimer: null,
-      // First failure that triggered a same-run retry. The next attempt creates
-      // a fresh startChatRun closure and clears run.error/errorCode, so keep the
-      // compact analytics snapshot on the shared run until terminal telemetry.
-      retryOriginFailure: null,
-      retryOriginErrorCode: null,
       stdinOpen: false,
-      // E-lite root-cause telemetry. `stdinBackpressure` records whether the
+      // Runtime diagnostics. `stdinBackpressure` records whether the
       // prompt write to the child's stdin was queued (pipe buffer full — a
       // corroborating signal for a `stdin_write`-phase stall). `lastAgentActivityAt`
       // is the clock the inactivity watchdog keys off, read at finish to derive
       // `last_progress_age_ms`. (`approval_requested` and `tool_result_sent` are
-      // derived from run.events by summarizeRunDiagnosticsForAnalytics.)
+      // derived from run.events by the diagnostics summarizer.)
       stdinBackpressure: false,
       lastAgentActivityAt: now,
       // Work-completeness signals (#1247 / #1060), folded from agent events by
@@ -200,7 +193,7 @@ export function createChatRunService({
     if (run.eventsLogStream) return run.eventsLogStream;
     // finish() has already closed + nulled this run's log stream. Re-opening it
     // here for a late event (async child-close diagnostic, trailing tool
-    // callback, telemetry) would leak a file descriptor that nothing ever
+    // callback, or other late event) would leak a file descriptor that nothing ever
     // closes. We gate on the explicit `eventsLogClosed` flag — NOT on terminal
     // status — so finish()'s own `end` emit (which runs while status is already
     // terminal but before the stream is closed) can still open + write + close
@@ -346,7 +339,6 @@ export function createChatRunService({
   };
 
   const start = (run, starter) => {
-    createRunLifecycleTracer(run).mark('start_requested');
     void starter(run).catch((err) => {
       fail(run, 'AGENT_EXECUTION_FAILED', err instanceof Error ? err.message : String(err));
     });
@@ -558,12 +550,12 @@ export function createChatRunService({
       return statusBody(run);
     }
 
-    // Prefer RPC-level abort for agents that support it (pi, ACP adapters).
-    // If the adapter does not exit within its grace window, fall back to
+    // Prefer RPC-level abort for Pi. If the adapter does not exit within its
+    // grace window, fall back to
     // process signals and finally SIGKILL the process group.
-    if (run.acpSession?.abort) {
+    if (run.rpcSession?.abort) {
       try {
-        run.acpSession.abort();
+        run.rpcSession.abort();
       } catch {
         // Signal fallback below owns eventual process termination.
       }
@@ -596,9 +588,9 @@ export function createChatRunService({
       run.updatedAt = Date.now();
       clearPendingRetryRestart(run);
       closeRunStdin(run);
-      if (run.acpSession?.abort) {
+      if (run.rpcSession?.abort) {
         try {
-          run.acpSession.abort();
+          run.rpcSession.abort();
         } catch {
           // Process signals below are the shutdown fallback.
         }

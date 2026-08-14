@@ -113,14 +113,15 @@ function isTruthyEnv(value: string | undefined): boolean {
   return value === "1" || value === "true" || value === "yes";
 }
 
-function resolvePackagedWebStandaloneRoot(
+export function resolvePackagedWebStandaloneRoot(
   webOutputMode: PackagedWebOutputMode,
   value: string | undefined,
+  resourcesPath: string = process.resourcesPath,
 ): string | null {
   const configured = resolveOptionalPath(value);
   if (configured != null) return configured;
   if (webOutputMode !== "standalone") return null;
-  return join(process.resourcesPath, "open-design-web-standalone");
+  return join(resourcesPath, "clean-design-web-standalone");
 }
 
 async function resolvePackagedRelativeEntry(value: string | undefined): Promise<string | null> {

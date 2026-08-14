@@ -1,6 +1,5 @@
 export * from './parsers/frontmatter.js';
 export * from './parsers/manifest.js';
-export * from './parsers/marketplace.js';
 export * from './adapters/agent-skill.js';
 export * from './adapters/claude-plugin.js';
 export * from './merge.js';

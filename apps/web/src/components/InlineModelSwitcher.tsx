@@ -16,10 +16,7 @@ import type { AgentInfo, ApiProtocol, AppConfig, ExecMode } from '../types';
 import { apiProtocolLabel } from '../utils/apiProtocol';
 import { isVisibleLocalCliAgent } from '../utils/visibleAgents';
 import { AgentIcon } from './AgentIcon';
-import {
-  effectiveAgentModelChoice,
-  normalizeAgentModelChoice,
-} from './agentModelSelection';
+import { effectiveAgentModelChoice } from './agentModelSelection';
 import { Icon } from './Icon';
 import { SearchableModelSelect } from './modelOptions';
 import {
@@ -80,21 +77,11 @@ export function InlineModelSwitcher({
     [config.agentId, visibleAgents],
   );
   const currentChoice = config.agentId ? config.agentModels?.[config.agentId] ?? {} : {};
-  const normalizedChoice = normalizeAgentModelChoice(currentAgent, currentChoice);
   const effectiveChoice = effectiveAgentModelChoice(currentAgent, currentChoice) ?? currentChoice;
   const currentModelId = effectiveChoice.model || currentAgent?.models?.[0]?.id || '';
   const currentModelLabel = currentAgent?.models?.find((model) => model.id === currentModelId)?.label
     ?? currentModelId
     ?? t('inlineSwitcher.modelDefault');
-
-  useEffect(() => {
-    if (!currentAgent || !normalizedChoice?.model) return;
-    if (
-      normalizedChoice.model === currentChoice.model
-      && normalizedChoice.reasoning === currentChoice.reasoning
-    ) return;
-    onAgentModelChange(currentAgent.id, normalizedChoice);
-  }, [currentAgent, currentChoice.model, currentChoice.reasoning, normalizedChoice, onAgentModelChange]);
 
   useEffect(() => {
     if (!open) return;

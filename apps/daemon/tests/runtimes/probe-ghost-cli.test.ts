@@ -163,7 +163,7 @@ describe('probe (issue #658) — ghost CLI after the binary is uninstalled', () 
     expect(codex?.version).toBe('codex 1.2.3');
   });
 
-  it('honors Trae CLI adapter-specific version probe timeout', async () => {
+  it('honors Pi adapter-specific version probe timeout', async () => {
     execAgentFileMock.mockResolvedValue({ stdout: 'agent 1.2.3\n', stderr: '' });
     resolveAgentLaunchMock.mockImplementation((def: { id: string }) => ({
       configuredOverridePath: null,
@@ -178,15 +178,15 @@ describe('probe (issue #658) — ghost CLI after the binary is uninstalled', () 
 
     await detectAgents();
 
-    const traeVersionCall = execAgentFileMock.mock.calls.find(
+    const piVersionCall = execAgentFileMock.mock.calls.find(
       ([command, args]) =>
-        command === '/fake/bin/trae-cli' &&
+        command === '/fake/bin/pi' &&
         Array.isArray(args) &&
         args.join('\0') === '--version',
     );
 
-    expect(traeVersionCall).toBeDefined();
-    expect(traeVersionCall?.[2]).toMatchObject({ timeout: 10_000 });
+    expect(piVersionCall).toBeDefined();
+    expect(piVersionCall?.[2]).toMatchObject({ timeout: 15_000 });
   });
 
   it('keeps the default version probe timeout for other runtimes', async () => {
@@ -215,9 +215,9 @@ describe('probe (issue #658) — ghost CLI after the binary is uninstalled', () 
     expect(codexVersionCall?.[2]).toMatchObject({ timeout: 3000 });
   });
 
-  it('reports missing Trae CLI as unavailable without breaking full detection', async () => {
+  it('reports missing Pi as unavailable without breaking full detection', async () => {
     resolveAgentLaunchMock.mockImplementation((def: { id: string }) => {
-      if (def.id === 'trae-cli') {
+      if (def.id === 'pi') {
         return {
           configuredOverridePath: null,
           pathResolvedPath: null,
@@ -242,11 +242,11 @@ describe('probe (issue #658) — ghost CLI after the binary is uninstalled', () 
     const { detectAgents } = await import('../../src/runtimes/detection.js');
 
     const agents = await detectAgents();
-    const traeCli = agents.find((agent) => agent.id === 'trae-cli');
+    const pi = agents.find((agent) => agent.id === 'pi');
     const codex = agents.find((agent) => agent.id === 'codex');
 
-    expect(traeCli).toBeDefined();
-    expect(traeCli?.available).toBe(false);
+    expect(pi).toBeDefined();
+    expect(pi?.available).toBe(false);
     expect(codex).toBeDefined();
     expect(codex?.available).toBe(true);
   });

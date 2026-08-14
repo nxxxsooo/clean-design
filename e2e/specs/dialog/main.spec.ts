@@ -53,7 +53,6 @@ describe('dialog main spec', () => {
           designSystemId: null,
           onboardingCompleted: true,
           skillId: null,
-          telemetry: { artifactManifest: true, content: false, metrics: false },
         },
         method: 'PUT',
       });
@@ -159,7 +158,6 @@ describe('dialog main spec', () => {
         runId: finalRun.id,
         runStatus: 'succeeded',
         startedAt: now,
-        telemetryFinalized: true,
       });
 
       const messages = await listMessages(

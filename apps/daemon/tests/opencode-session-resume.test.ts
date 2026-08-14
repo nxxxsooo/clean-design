@@ -64,13 +64,10 @@ describe('opencode native session resume', () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-opencode-resume-bin-'));
     const { bin, logPath } = await writeCapturingOpencode(binDir, 'opencode-capture');
 
-    clearTelemetryEnv();
     started = (await startServer({ port: 0, returnServer: true })) as StartedServer;
     await putConfig(started.url, {
       agentId: 'opencode',
       agentCliEnv: { opencode: { OPENCODE_BIN: bin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
 
     const conversationId = await createConversation(started.url);
@@ -104,13 +101,10 @@ describe('opencode native session resume', () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-opencode-fallback-bin-'));
     const { bin, logPath } = await writeMissingSessionOpencode(binDir, 'opencode-fallback');
 
-    clearTelemetryEnv();
     started = (await startServer({ port: 0, returnServer: true })) as StartedServer;
     await putConfig(started.url, {
       agentId: 'opencode',
       agentCliEnv: { opencode: { OPENCODE_BIN: bin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
 
     const conversationId = await createConversation(started.url);
@@ -151,13 +145,10 @@ describe('opencode native session resume', () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-opencode-nohandle-bin-'));
     const { bin, logPath } = await writeNoHandleOpencode(binDir, 'opencode-nohandle');
 
-    clearTelemetryEnv();
     started = (await startServer({ port: 0, returnServer: true })) as StartedServer;
     await putConfig(started.url, {
       agentId: 'opencode',
       agentCliEnv: { opencode: { OPENCODE_BIN: bin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
 
     const conversationId = await createConversation(started.url);
@@ -179,13 +170,10 @@ describe('opencode native session resume', () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-opencode-context-rollover-bin-'));
     const { bin, logPath } = await writeHighContextOpencode(binDir, 'opencode-context-rollover');
 
-    clearTelemetryEnv();
     started = (await startServer({ port: 0, returnServer: true })) as StartedServer;
     await putConfig(started.url, {
       agentId: 'opencode',
       agentCliEnv: { opencode: { OPENCODE_BIN: bin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
 
     const conversationId = await createConversation(started.url);
@@ -362,12 +350,6 @@ setTimeout(finish, 1500);
 
 function snapshotEnv(): Record<string, string | undefined> {
   return {
-    LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY,
-    LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
-    LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL,
-    OPEN_DESIGN_TELEMETRY_RELAY_URL: process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL,
-    POSTHOG_KEY: process.env.POSTHOG_KEY,
-    POSTHOG_HOST: process.env.POSTHOG_HOST,
   };
 }
 
@@ -376,15 +358,6 @@ function restoreEnv(env: Record<string, string | undefined>): void {
     if (value === undefined) delete process.env[key];
     else process.env[key] = value;
   }
-}
-
-function clearTelemetryEnv(): void {
-  delete process.env.POSTHOG_KEY;
-  delete process.env.POSTHOG_HOST;
-  delete process.env.LANGFUSE_PUBLIC_KEY;
-  delete process.env.LANGFUSE_SECRET_KEY;
-  delete process.env.LANGFUSE_BASE_URL;
-  delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
 }
 
 async function putConfig(url: string, patch: Record<string, unknown>): Promise<void> {
@@ -429,9 +402,6 @@ async function sendRunAndWait(
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-od-analytics-device-id': 'opencode-resume-test',
-      'x-od-analytics-session-id': 'opencode-resume-session',
-      'x-od-analytics-client-type': 'web',
     },
     body: JSON.stringify({
       projectId,

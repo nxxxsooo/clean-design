@@ -5,7 +5,6 @@ import type { PluginManifest } from '@open-design/contracts';
 import { resolveAppliedPipeline, type ScenarioRegistryEntry } from '../src/index.js';
 
 const baseManifest = (od: NonNullable<PluginManifest['od']> | undefined): PluginManifest => ({
-  $schema: 'https://open-design.ai/schemas/plugin.v1.json',
   name: 'fixture',
   version: '0.0.1',
   ...(od ? { od } : {}),
