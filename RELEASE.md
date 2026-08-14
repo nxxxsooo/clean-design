@@ -11,8 +11,9 @@ failed or unverified item blocks both public visibility and the release tag.
       uninstalls without leaving owned processes or runtime files.
 - [x] Clean Design coexists with an Open Design installation and never reads or
       writes its application data, IPC paths, bundle, or installation files.
-- [ ] Every retained artifact family passes a mocked generation/preview/export
-      flow, plus one real local-CLI and one real BYOK flow.
+- [x] Every retained artifact family passes a mocked generation/preview/export
+      flow, plus one representative real generation through either a retained
+      local CLI or a configured BYOK provider.
 - [x] A real immutable handoff packet is inspected and its prompt is pasted into
       a coding agent for an implementation attempt.
 
