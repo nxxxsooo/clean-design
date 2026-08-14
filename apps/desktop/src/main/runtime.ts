@@ -1490,6 +1490,10 @@ export type SplashWindowHandle = {
  * + matching size so the reveal swap reads as a single window, never a flash.
  */
 export function createSplashWindow(): SplashWindowHandle {
+  // The splash is the first visible window on a cold start. Apply the branded
+  // Dock icon before constructing it so macOS never exposes Electron's default
+  // atom icon while the real workspace is still booting.
+  applyDockIcon();
   // Stamp creation time at the instant the window appears (see SplashWindowHandle).
   const startedAt = Date.now();
   const splash = new BrowserWindow({
