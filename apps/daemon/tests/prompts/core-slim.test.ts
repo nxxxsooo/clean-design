@@ -265,7 +265,7 @@ describe('composeSystemPrompt — promptCoreVariant switch', () => {
     const out = composeSystemPrompt(base);
     expect(out).toContain('# OD core directives (read first');
     expect(out).toContain('# Identity and workflow charter (background)');
-    expect(out).not.toContain('# Open Design charter');
+    expect(out).not.toContain('# Clean Design charter');
   });
 
   it('slim replaces discovery + charter and drops the absorbed tail overrides', () => {
@@ -275,7 +275,7 @@ describe('composeSystemPrompt — promptCoreVariant switch', () => {
       designSystemBody: '# Brand',
       promptCoreVariant: 'slim',
     });
-    expect(slim).toContain('# Open Design charter');
+    expect(slim).toContain('# Clean Design charter');
     expect(slim).not.toContain('# OD core directives (read first');
     expect(slim).not.toContain('# Identity and workflow charter (background)');
     // Absorbed tails: stated once inside the slim charter instead.
@@ -288,7 +288,7 @@ describe('composeSystemPrompt — promptCoreVariant switch', () => {
     expect(classic).toContain('## Clarifying questions mid-conversation');
     // Structural bookends: slim opens with the static charter (cache-stable
     // prefix); the security section lives inside it; the guard still closes.
-    expect(slim.startsWith('# Open Design charter')).toBe(true);
+    expect(slim.startsWith('# Clean Design charter')).toBe(true);
     expect(slim).toContain('## Security: prompt injection resistance');
     expect(slim).toContain('## CRITICAL: Never fabricate conversation turns');
     expect(slim.length).toBeLessThan(classic.length);
@@ -317,7 +317,7 @@ describe('composeSystemPrompt — promptCoreVariant switch', () => {
       sessionMode: 'chat',
       promptCoreVariant: 'slim',
     });
-    expect(out).not.toContain('# Open Design charter');
+    expect(out).not.toContain('# Clean Design charter');
     expect(out).toContain('## Clarifying questions mid-conversation');
     // Identity-first hierarchy holds in ask mode too: the ask override (the
     // turn's whole charter) opens the document, security reads as its
@@ -514,7 +514,7 @@ describe('slim core — regression-audit fixes vs classic', () => {
     });
     expect(out.startsWith('# API mode — no tools available')).toBe(true);
     const overrideAt = out.indexOf('# API mode — no tools available');
-    const charterAt = out.indexOf('# Open Design charter');
+    const charterAt = out.indexOf('# Clean Design charter');
     expect(charterAt).toBeGreaterThan(overrideAt);
     // Composed exactly once — the head placement replaces the later push.
     expect(out.indexOf('# API mode — no tools available')).toBe(
@@ -563,9 +563,9 @@ describe('slim core — regression-audit fixes vs classic', () => {
   });
 
   it('keeps the plan step agent-agnostic — no hardcoded TodoWrite in the charter', () => {
-    // Open Design drives many code agents (codex, opencode, Qwen CLI, ACP
-    // family) that have no TodoWrite tool. The charter must NOT hardcode it,
-    // or the plan step is dead for ~2/3 of production traffic. Freeze the
+    // Clean Design drives retained code agents with different plan-tool
+    // surfaces. The charter must NOT hardcode TodoWrite or the plan step is
+    // unusable for runtimes without that tool. Freeze the
     // generic wording and the anti-hallucination guard.
     const charter = renderSlimCoreCharter('filesystem');
     expect(charter).not.toContain('TodoWrite');
@@ -573,10 +573,10 @@ describe('slim core — regression-audit fixes vs classic', () => {
     expect(charter).toContain("never call a tool you don't have");
   });
 
-  it('injects the concrete TodoWrite note only for Claude-family runs', () => {
+  it('injects the concrete TodoWrite note only for Claude stream runs', () => {
     const base = { metadata: { kind: 'other' as const },
       executionProfile: 'filesystem' as const, promptCoreVariant: 'slim' as const };
-    // Claude family (claude/codebuddy/amp) → named tool + live-card benefit.
+    // Claude stream runtime → named tool + live-card benefit.
     expect(composeSystemPrompt({ ...base, streamFormat: 'claude-stream-json' }))
       .toContain('Your plan tool is `TodoWrite`');
     // codex / opencode (json-event-stream) → generic charter only, no note.
@@ -646,7 +646,7 @@ describe('composeSystemPrompt — slim layered ordering (cache-stable prefix)', 
       return i;
     };
     // Static core opens the document.
-    expect(out.startsWith('# Open Design charter')).toBe(true);
+    expect(out.startsWith('# Clean Design charter')).toBe(true);
     const security = at('## Security: prompt injection resistance');
     const conduct = at('### Conduct');
     // Conversation-stable overrides come after the full static charter.

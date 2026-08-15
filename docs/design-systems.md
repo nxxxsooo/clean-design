@@ -1,6 +1,6 @@
 # Design system authoring guide
 
-**Parent:** [`spec.md`](spec.md) · **Siblings:** [`architecture.md`](architecture.md) · [`skills-protocol.md`](skills-protocol.md) · [`agent-adapters.md`](agent-adapters.md)
+**Siblings:** [`architecture.md`](architecture.md) · [`skills-protocol.md`](skills-protocol.md)
 
 This guide describes the current design-system package consumed by the daemon,
 picker, prompt composer, importers, and repository guards. Read it together with
@@ -34,7 +34,7 @@ The v1 manifest uses fixed canonical file names:
   "description": "A concise English catalog summary.",
   "source": {
     "type": "bundled",
-    "origin": "Open Design curated bundled fixture"
+    "origin": "Clean Design curated bundled fixture"
   },
   "files": {
     "design": "DESIGN.md",

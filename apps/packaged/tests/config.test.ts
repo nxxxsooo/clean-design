@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PACKAGED_NAMESPACE_BASE_ROOT_ENV,
   resolvePackagedNamespaceBaseRoot,
+  resolvePackagedWebStandaloneRoot,
 } from '../src/config.js';
 
 describe('resolvePackagedNamespaceBaseRoot', () => {
@@ -25,5 +26,12 @@ describe('resolvePackagedNamespaceBaseRoot', () => {
     expect(resolvePackagedNamespaceBaseRoot(undefined, userDataRoot, {})).toBe(
       join(userDataRoot, 'namespaces'),
     );
+  });
+});
+
+describe('resolvePackagedWebStandaloneRoot', () => {
+  it('uses the Clean Design standalone resource for packaged builds', () => {
+    expect(resolvePackagedWebStandaloneRoot('standalone', undefined, '/Applications/Clean Design.app/Contents/Resources'))
+      .toBe('/Applications/Clean Design.app/Contents/Resources/clean-design-web-standalone');
   });
 });

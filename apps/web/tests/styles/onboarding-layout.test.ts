@@ -19,7 +19,7 @@ function cssDeclarations(selector: string): string {
 }
 
 describe('onboarding layout styles', () => {
-  it('lets AMR benefit chips wrap inside the featured card', () => {
+  it('lets onboarding benefit chips wrap inside the featured card', () => {
     const asideBlock = cssDeclarations('.onboarding-view__benefit-aside');
     const benefitsBlock = cssDeclarations(
       '.onboarding-view__benefit-aside .onboarding-view__benefits',

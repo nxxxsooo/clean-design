@@ -19,9 +19,9 @@ The repository is a history-free snapshot of Open Design 0.16.1 at `276b4d8e970b
 
 ## Decisions
 
-### Snapshot provenance and release topology
+### Snapshot provenance
 
-Keep the squashed baseline commit, Apache-2.0 license, an upstream reference remote, and an explicit provenance notice. Develop in a private GitHub repository and make it public only after the scrub gate. This avoids GitHub's public-fork visibility restriction and keeps the inherited history out of the new repository; retaining upstream history was rejected because it expands secret/branding audit surface without improving selective patching.
+Keep the squashed baseline commit, Apache-2.0 license, an upstream reference remote, and an explicit provenance notice. Retaining upstream history was rejected because it expands audit surface without improving selective patching. Repository visibility and version tags are distribution decisions, not implementation acceptance criteria.
 
 ### Identity changes stop at installed/runtime boundaries
 
@@ -30,6 +30,10 @@ Use `Clean Design`, version `0.1.0`, bundle ID `fun.mjshao.clean-design`, scheme
 ### Removed services are denied by construction
 
 Remove their UI routes and daemon route registration, disable updater startup, remove telemetry initialization/relay packages from active dependency graphs, and add a central outbound allow-policy around application-owned fetches. Release/landing automation inherited from upstream is disabled or deleted before public visibility. Hiding controls alone was rejected because background egress and callable endpoints would remain.
+
+### Local coding runtimes use a strict allowlist
+
+Expose and execute only Codex (`codex`), Claude Code (`claude`), Antigravity (`antigravity`, executable `agy`), OpenCode (`opencode`), and Pi (`pi`) as local coding CLIs. Keep `byok-opencode` as an internal BYOK execution adapter rather than a sixth local-CLI choice. Local agent profiles remain available only when they inherit one of the five public CLI definitions; profiles based on removed runtime IDs fail closed. Delete every other inherited runtime definition, executable override, transport, metadata entry, UI affordance, account or wallet flow, documentation reference, fixture, and test. Keeping dormant adapters behind UI filtering was rejected because it preserves unsupported executable and egress paths and expands the first-release regression surface.
 
 ### Credentials cross one privileged desktop boundary
 
@@ -50,10 +54,11 @@ Use existing HTML screenshot, PDF, deck, document, and media exporters. Required
 ## Risks / Trade-offs
 
 - [Large inherited daemon leaves dormant code reachable by future changes] -> remove route registration and add forbidden-surface/egress regression guards.
+- [Existing local profiles reference removed runtime families] -> load profiles only against the five public CLI definitions and skip unknown base IDs with an explicit local warning.
 - [Provider credentials exist in daemon memory during use] -> keep registration authenticated, avoid persistence/logging, and minimize lifetime.
 - [Secret scanning can produce false positives] -> use high-confidence signatures plus explicit filenames and report the rejected relative path without echoing content.
 - [Format renderers have uneven reliability] -> distinguish required from optional outputs and verify every artifact family with fixtures.
-- [Public catalogs contain third-party names or assets] -> keep the repository private until the explicit licensing, trademark, branding, link, and secret scrub passes.
+- [Bundled catalogs contain third-party names or assets] -> retain only assets required by the local creation surface and review their provenance before distribution.
 
 ## Migration Plan
 
@@ -62,6 +67,6 @@ Use existing HTML screenshot, PDF, deck, document, and media exporters. Required
 3. Remove service surfaces and establish zero-egress tests before credential work.
 4. Migrate provider settings to credential references; do not import legacy plaintext Open Design localStorage.
 5. Add trusted roots and handoff packets behind shared contracts, then expose the Studio UI command.
-6. Package and install the Apple Silicon app, run full regression and scrub audits, then tag `v0.1.0` and change repository visibility only if every release gate passes.
+6. Package and install the Apple Silicon app, run the finite regression suite, exercise one representative real generation and handoff, and repair concrete boundary-audit findings.
 
 Rollback is a Git revert to the last green slice. The product uses isolated data and identity, so rollback does not require migration of Open Design data.

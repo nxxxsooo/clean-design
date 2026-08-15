@@ -1148,97 +1148,10 @@
   min-height: 72px;
   overflow: hidden;
 }
-
-/* Failed-run AMR nudge: when the chat error card's "Try Clean Design AMR" link
-   opens Settings, the AMR card scrolls into view and pulses a couple of times.
-   The card's own box-shadow is not clipped by `overflow: hidden`, so the glow
-   reads fully even though inner content is clipped. */
-.agent-card--amr-highlight {
-  border-color: var(--accent);
-  animation: amr-card-pulse 1s cubic-bezier(0.23, 1, 0.32, 1) 2;
-}
-@keyframes amr-card-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
-  }
-  35% {
-    box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 34%, transparent);
-  }
-}
-
-/* Authorize-button coachmark: a fake cursor that fades + slides in from the
-   lower-right, landing with its tip on the AMR authorize button, inside a
-   pulsing ring. Anchored to the button (`.amr-auth-anchor`) so it always lines
-   up. `pointer-events: none` keeps the real button clickable; it dismisses the
-   moment the real pointer reaches the button (handled in JS). */
-.amr-auth-anchor {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 14px;
-  border-left: 1px solid var(--border-soft);
-}
-.amr-coachmark {
-  position: absolute;
-  /* Horizontally centered on the button, sitting low — the hand's fingertip
-     (top of the glyph) then points up into the button. `margin-left` centers
-     the box at `left: 50%` so `transform` stays free for the entrance. */
-  left: 50%;
-  margin-left: -12px;
-  bottom: 7px;
-  width: 24px;
-  height: 24px;
-  pointer-events: none;
-  z-index: 4;
-  animation: amr-coachmark-in 460ms cubic-bezier(0.23, 1, 0.32, 1) both;
-}
-/* Fade + rise straight up into place (bottom → up). */
-@keyframes amr-coachmark-in {
-  0% {
-    opacity: 0;
-    transform: translateY(16px) scale(0.8);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-.amr-coachmark__ring {
-  position: absolute;
-  inset: -3px;
-  border-radius: 50%;
-  border: 2px solid var(--accent);
-  opacity: 0;
-  /* Start pulsing only after the cursor has settled in. */
-  animation: amr-coachmark-ring 1.5s cubic-bezier(0.23, 1, 0.32, 1) 460ms infinite;
-}
-@keyframes amr-coachmark-ring {
-  0% {
-    transform: scale(0.55);
-    opacity: 0;
-  }
-  30% {
-    opacity: 0.65;
-  }
-  100% {
-    transform: scale(1.25);
-    opacity: 0;
-  }
-}
-.amr-coachmark__cursor {
-  position: absolute;
-  inset: 0;
-  filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--text-muted) 45%, transparent));
-}
 .agent-card-main {
   display: flex;
   align-items: stretch;
   min-width: 0;
-}
-.agent-card-installed:has(.agent-card-amr-auth) .agent-card-main {
-  flex-wrap: wrap;
 }
 .agent-card-select {
   flex: 1;
@@ -1253,9 +1166,6 @@
   color: inherit;
   text-align: left;
   cursor: pointer;
-}
-.agent-card-installed:has(.agent-card-amr-auth) .agent-card-select {
-  flex: 1 1 420px;
 }
 .agent-card-test-btn {
   align-self: stretch;
@@ -1300,15 +1210,9 @@
       color-mix(in srgb, var(--accent-tint) 10%, var(--bg-panel))
     );
 }
-.agent-card-installed:has(.agent-card-amr-auth) .agent-card-main {
-  flex-wrap: nowrap;
-}
 .agent-card-installed.active .agent-card-select {
   min-height: 78px;
   padding: 14px 18px 12px 22px;
-}
-.agent-card-installed:has(.agent-card-amr-auth) .agent-card-select {
-  flex: 1;
 }
 .agent-card-installed.active .agent-icon {
   border-radius: var(--radius-md);
@@ -1454,21 +1358,6 @@
 .agent-card-title {
   min-width: 0;
 }
-.agent-card-name--amr {
-  align-items: center;
-  gap: 8px;
-  row-gap: 5px;
-  flex-wrap: wrap;
-  max-width: 100%;
-  white-space: normal;
-  overflow: hidden;
-}
-.agent-card-name.agent-card-name--amr .agent-card-title {
-  flex: 0 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .agent-card-benefits {
   display: inline-flex;
   align-items: center;
@@ -1525,127 +1414,6 @@
   line-height: 1.35;
 }
 .agent-card-meta .muted { color: var(--text-soft); font-style: italic; }
-.agent-card-amr-email {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  margin-top: 4px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.35;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.agent-card-amr-email-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.agent-card-amr-profile-badge {
-  flex: 0 0 auto;
-  padding: 1px 5px;
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
-  border-radius: 999px;
-  color: var(--accent-strong);
-  font-size: 9px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-.agent-card-amr-meta-row {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px 20px;
-  margin-top: 4px;
-}
-.agent-card-amr-meta-row .agent-card-amr-balance {
-  margin-top: 0;
-}
-.agent-card-amr-balance {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-top: 4px;
-  font-size: 12px;
-  line-height: 1.35;
-}
-.agent-card-amr-balance-label {
-  color: var(--text-muted);
-  font-weight: 500;
-}
-.agent-card-amr-balance-value {
-  color: var(--text-strong);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.agent-card-amr-wallet__meta {
-  min-width: 0;
-  margin-top: 2px;
-  color: var(--text-soft);
-  font-size: 10.5px;
-  font-weight: 500;
-  line-height: 1.25;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.agent-card-amr-upgrade {
-  appearance: none;
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 32px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  white-space: nowrap;
-  box-shadow:
-    0 1px 2px color-mix(in srgb, var(--accent) 38%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 20%, transparent);
-  transition:
-    transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
-    background-color 160ms ease,
-    box-shadow 160ms ease;
-}
-@media (hover: hover) and (pointer: fine) {
-  /* `:not(:disabled)` raises specificity above the global
-     `button:hover:not(:disabled)` reset (primitives.css), which would
-     otherwise paint this filled CTA with a pale `--bg-subtle` on hover. */
-  .agent-card-amr-upgrade:hover:not(:disabled) {
-    background: var(--accent-hover);
-    border-color: transparent;
-    color: #fff;
-    box-shadow:
-      0 3px 10px color-mix(in srgb, var(--accent) 42%, transparent),
-      inset 0 1px 0 color-mix(in srgb, #fff 24%, transparent);
-  }
-}
-.agent-card-amr-upgrade:active {
-  transform: scale(0.97);
-}
-.agent-card-amr-upgrade:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  outline-offset: 2px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .agent-card-amr-upgrade {
-    transition: background-color 160ms ease;
-  }
-  .agent-card-amr-upgrade:active {
-    transform: none;
-  }
-}
 .agent-card-model-summary {
   display: flex;
   align-items: baseline;
@@ -1668,165 +1436,6 @@
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.agent-card-amr-auth {
-  flex: 0 1 auto;
-  max-width: 280px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.agent-card-amr-auth--placeholder {
-  visibility: hidden;
-  pointer-events: none;
-}
-.agent-card-amr-auth .amr-account-control {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  gap: 8px;
-  padding: 0;
-}
-.agent-card-amr-auth .amr-account-control__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 150px;
-  overflow: hidden;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.agent-card-amr-auth .amr-account-control__status-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.agent-card-amr-auth .amr-account-control__action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 32px;
-  padding: 0 14px;
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent-tint) 62%, var(--bg-panel));
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 650;
-  text-decoration: none;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background-color 120ms var(--ease-out), border-color 120ms var(--ease-out), color 120ms var(--ease-out), transform 120ms var(--ease-out);
-}
-.agent-card-amr-auth .amr-account-control__action--icon {
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
-  min-height: 32px;
-  padding: 0;
-  border-color: color-mix(in srgb, var(--accent) 16%, var(--border-soft));
-  background: color-mix(in srgb, var(--bg-panel) 88%, var(--accent-tint) 12%);
-  color: var(--text-muted);
-}
-.agent-card-amr-auth .amr-account-control__action:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
-  background: color-mix(in srgb, var(--accent-tint) 76%, var(--bg-panel));
-  color: var(--accent-strong);
-  transform: translateY(-1px);
-}
-.agent-card-amr-auth .amr-account-control__action--icon:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
-  background: color-mix(in srgb, var(--bg-panel) 78%, var(--accent-tint) 22%);
-  color: var(--text);
-}
-.agent-card-amr-auth .amr-account-control__action:disabled {
-  cursor: default;
-  opacity: 0.62;
-}
-.agent-card-amr-auth .amr-account-control--error {
-  width: 100%;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  row-gap: 6px;
-  padding: 6px 12px;
-}
-.agent-card-amr-auth .amr-account-control__error {
-  flex: 1 1 100%;
-  max-width: 100%;
-  color: var(--danger-text, #991b1b);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-  text-align: left;
-}
-/* Device-authorization fallback shown while signing in to AMR. Surfaced from
-   vela login's stdout so the user can finish even when the browser did not
-   auto-open. Unscoped so it renders consistently in Settings, onboarding, and
-   the chat auth surfaces; takes a full row inside the wrapping flex pill. */
-/* The pill's base layout is a single non-wrapping flex row; let it wrap so the
-   full-width activation block drops onto its own line below the status. Scoped
-   by :has so only the signing-in-with-activation case is affected. */
-.amr-account-control--signing-in:has(.amr-login-activation) {
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  row-gap: 6px;
-  padding-top: 8px;
-  padding-bottom: 8px;
-}
-.amr-login-activation {
-  flex: 1 1 100%;
-  max-width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-  padding: 8px 10px;
-  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border));
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
-  text-align: left;
-}
-.amr-login-activation__hint {
-  font-size: 11px;
-  line-height: 1.35;
-  color: var(--text-muted, #6b7280);
-}
-.amr-login-activation__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.amr-login-activation__open {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-contrast, #fff);
-  font-size: 11px;
-  font-weight: 700;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.amr-login-activation__open:hover {
-  background: var(--accent-strong, var(--accent));
-}
-.agent-card-amr-auth .amr-login-pill-badge {
-  flex: 0 0 auto;
-  padding: 1px 5px;
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
-  border-radius: 999px;
-  color: var(--accent-strong);
-  font-size: 9px;
-  font-weight: 800;
-  line-height: 1.2;
 }
 .agent-model-row-head {
   font-size: 12px;
@@ -2106,9 +1715,6 @@
 .agent-card-config .hint,
 .agent-model-row .hint { margin: 0; font-size: 11.5px; }
 
-/* Model picker loading row — shown for AMR between sign-in and the moment
-   vela's live catalog arrives, so the dropdown appears immediately rather
-   than popping in seconds later. Mirrors the select's box metrics. */
 .agent-model-select-loading {
   display: inline-flex;
   align-items: center;

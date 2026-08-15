@@ -13,7 +13,7 @@ import { routeAgents } from '../lib/playwright/mock-factory.js';
 // project/composer picker (DesignSystemPicker.tsx) avoids this by portalling to
 // document.body with viewport-aware up/down placement; the local one does not.
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 const AGENTS = [
   {
@@ -51,8 +51,6 @@ test.beforeEach(async ({ page }) => {
         skillId: null,
         designSystemId: null,
         onboardingCompleted: true,
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
         agentModels: { codex: { model: 'default' } },
       }),
     );
@@ -63,8 +61,6 @@ test.beforeEach(async ({ page }) => {
       json: {
         config: {
           onboardingCompleted: true,
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
           mode: 'daemon',
           agentId: 'codex',
           skillId: null,

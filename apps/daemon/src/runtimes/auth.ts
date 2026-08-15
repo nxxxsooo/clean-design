@@ -5,8 +5,7 @@ import type { RuntimeAgentDef, RuntimeEnv } from './types.js';
 export type AgentAuthProbeResult = {
   status: 'ok' | 'missing' | 'unknown';
   message?: string;
-  // Output captured from the probe child process (e.g.
-  // `cursor-agent status`). Exposed so callers like the connection
+  // Output captured from the probe child process. Exposed so callers like the connection
   // test layer can fold the probe's own stderr/exit context into their
   // structured diagnostics — the probe runs before the smoke spawn,
   // so without this the diagnostics block would otherwise drop the
@@ -17,24 +16,18 @@ export type AgentAuthProbeResult = {
   signal?: string | null;
 };
 
-const CURSOR_AUTH_GUIDANCE =
-  'Cursor Agent is not authenticated. Run `cursor-agent login`, then `cursor-agent status`, and retry. For automation, ensure CURSOR_API_KEY is set in the Open Design process environment.';
-
-const DEEPSEEK_AUTH_GUIDANCE =
-  'DeepSeek TUI is installed but is not authenticated. Add or verify your API key in `~/.deepseek/config.toml` as `api_key = "..."`, or expose DEEPSEEK_API_KEY to the Open Design daemon process, then retry. If Open Design is launched outside an interactive shell, shell rc files such as ~/.zshrc may not be loaded.';
-
 // agy's print mode (`-p`) detects a missing OAuth token, prints the
 // Google sign-in URL to stdout, waits 30s for completion, then exits
 // "Error: authentication timed out." That URL points at a callback page
 // that asks the user to paste the resulting auth code BACK into agy —
-// which only works in the interactive TUI. So in OD's chat, surfacing
+// which only works in the interactive TUI. In Clean Design chat, surfacing
 // the raw URL is a dead end (no input field to paste the code into).
 // Instead we ask the user to run `agy` in a terminal once, which opens
 // the browser, completes OAuth, and writes the credentials to the
 // system keyring — both `-p` and TUI invocations read from there
 // afterward, so the chat run can succeed on retry.
 const ANTIGRAVITY_AUTH_GUIDANCE =
-  'Antigravity needs to sign in. The agy CLI\'s keyring entry has expired or been cleared, and `-p` print mode cannot complete OAuth on its own (it has no field to paste the auth code into).\n\nFix: open a terminal and run `agy` once — it will open Google sign-in in your browser, accept the redirect, and store the token in your system keyring. After you finish, return here and retry this chat. You only need to do this once; the keyring entry persists across both terminal and Open Design runs.';
+  'Antigravity needs to sign in. The agy CLI\'s keyring entry has expired or been cleared, and `-p` print mode cannot complete OAuth on its own (it has no field to paste the auth code into).\n\nFix: open a terminal and run `agy` once — it will open Google sign-in in your browser, accept the redirect, and store the token in your system keyring. After you finish, return here and retry this chat. You only need to do this once; the keyring entry persists across both terminal and Clean Design runs.';
 
 // agy's account-level quota is per-model (consumer accounts get a
 // separate quota for Gemini 3 Pro vs Flash vs Claude vs GPT-OSS), and
@@ -48,21 +41,10 @@ const ANTIGRAVITY_AUTH_GUIDANCE =
 // the picker from OD until upstream issue #35 ships a `--model`
 // flag — see antigravity.ts notes.
 const ANTIGRAVITY_QUOTA_GUIDANCE =
-  'Antigravity returned "RESOURCE_EXHAUSTED: Individual quota reached" for the current model. Each Antigravity model (Gemini 3 Pro / Flash, Claude 4.6, GPT-OSS) has its own quota.\n\nFix: open `agy` in a terminal and use its Switch Model picker (the menu at the bottom of the TUI) to pick a model with available quota, then retry here. Open Design uses whatever model you pick in agy\'s TUI when the Settings model picker is left on "Default". Quotas reset automatically on Antigravity\'s schedule.';
-
-const REASONIX_AUTH_GUIDANCE =
-  'DeepSeek Reasonix is installed but is not authenticated. Add your API key in `~/.reasonix/config.json` under `apiKey`, or expose DEEPSEEK_API_KEY to the Open Design daemon process, then retry. If Open Design is launched outside an interactive shell, shell rc files such as ~/.zshrc may not be loaded.';
+  'Antigravity returned "RESOURCE_EXHAUSTED: Individual quota reached" for the current model. Each Antigravity model (Gemini 3 Pro / Flash, Claude 4.6, GPT-OSS) has its own quota.\n\nFix: open `agy` in a terminal and use its Switch Model picker (the menu at the bottom of the TUI) to pick a model with available quota, then retry here. Clean Design uses whatever model you pick in agy\'s TUI when the Settings model picker is left on "Default". Quotas reset automatically on Antigravity\'s schedule.';
 
 const CLAUDE_AUTH_GUIDANCE =
-  'Claude Code is installed but is not authenticated. Run `claude auth login` or open `claude` and complete login in a terminal, then rescan. If Open Design was launched outside an interactive shell, your shell rc files (e.g. ~/.zshrc) may not be loaded into its environment.';
-
-export function cursorAuthGuidance(): string {
-  return CURSOR_AUTH_GUIDANCE;
-}
-
-export function deepseekAuthGuidance(): string {
-  return DEEPSEEK_AUTH_GUIDANCE;
-}
+  'Claude Code is installed but is not authenticated. Run `claude auth login` or open `claude` and complete login in a terminal, then rescan. If Clean Design was launched outside an interactive shell, your shell rc files (e.g. ~/.zshrc) may not be loaded into its environment.';
 
 export function antigravityAuthGuidance(): string {
   return ANTIGRAVITY_AUTH_GUIDANCE;
@@ -72,25 +54,8 @@ export function antigravityQuotaGuidance(): string {
   return ANTIGRAVITY_QUOTA_GUIDANCE;
 }
 
-export function reasonixAuthGuidance(): string {
-  return REASONIX_AUTH_GUIDANCE;
-}
-
 export function claudeAuthGuidance(): string {
   return CLAUDE_AUTH_GUIDANCE;
-}
-
-export function isCursorAuthFailureText(text: string): boolean {
-  const value = String(text || '');
-  if (!value.trim()) return false;
-  return (
-    /authentication required/i.test(value) ||
-    /not authenticated/i.test(value) ||
-    /not logged in/i.test(value) ||
-    /unauthenticated/i.test(value) ||
-    /agent login/i.test(value) ||
-    /cursor_api_key/i.test(value)
-  );
 }
 
 // agy's plain-mode output when no keyring credentials are available:
@@ -111,30 +76,6 @@ export function isAntigravityAuthFailureText(text: string): boolean {
     /authentication timed out/i.test(value) ||
     /not logged into antigravity/i.test(value) ||
     /accounts\.google\.com\/o\/oauth2\/auth.*antigravity/i.test(value)
-  );
-}
-
-export function isDeepSeekAuthFailureText(text: string): boolean {
-  const value = String(text || '');
-  if (!value.trim()) return false;
-  return (
-    /KEY=<your-key>/i.test(value) ||
-    /api_key\s*=\s*["']<your-key>["']/i.test(value) ||
-    (/~\/\.deepseek\/config\.toml/i.test(value) && /api[_ -]?key|KEY=/i.test(value)) ||
-    (/DEEPSEEK_API_KEY/i.test(value) &&
-      /auth|api[_ -]?key|missing|not set|required|unauthorized/i.test(value))
-  );
-}
-
-export function isReasonixAuthFailureText(text: string): boolean {
-  const value = String(text || '');
-  if (!value.trim()) return false;
-  return (
-    /~\/\.reasonix\/config\.json/i.test(value) &&
-    /api[_ -]?key|missing|not set|required|unauthorized|invalid/i.test(value)
-  ) || (
-    /DEEPSEEK_API_KEY/i.test(value) &&
-    /auth|missing|not set|required|unauthorized|invalid/i.test(value)
   );
 }
 
@@ -172,20 +113,6 @@ export function classifyAgentAuthFailure(
       message: claudeAuthGuidance(),
     };
   }
-  if (agentId === 'cursor-agent') {
-    if (!isCursorAuthFailureText(text)) return null;
-    return {
-      status: 'missing',
-      message: cursorAuthGuidance(),
-    };
-  }
-  if (agentId === 'deepseek') {
-    if (!isDeepSeekAuthFailureText(text)) return null;
-    return {
-      status: 'missing',
-      message: deepseekAuthGuidance(),
-    };
-  }
   if (agentId === 'antigravity') {
     if (!isAntigravityAuthFailureText(text)) return null;
     return {
@@ -193,23 +120,15 @@ export function classifyAgentAuthFailure(
       message: antigravityAuthGuidance(),
     };
   }
-  if (agentId === 'reasonix') {
-    if (!isReasonixAuthFailureText(text)) return null;
-    return {
-      status: 'missing',
-      message: reasonixAuthGuidance(),
-    };
-  }
   return null;
 }
 
 // Model-service failure classes that map a CLI agent's raw error text to a
-// structured API error code. `classifyAgentAuthFailure` only covers the two
-// agents (cursor-agent, deepseek) that ship a tailored sign-in hint; every
-// other CLI agent (Claude Code, codex, …) used to collapse auth / quota /
+// structured API error code. `classifyAgentAuthFailure` covers the supported
+// agents that ship a tailored sign-in hint; other CLI agents can collapse auth / quota /
 // upstream failures into the generic `AGENT_EXECUTION_FAILED`. This agent-
 // agnostic, text-based classifier recovers the specific class so the chat
-// shows an accurate reason — and so the hosted-AMR nudge can key off it.
+// shows an accurate reason.
 export type AgentServiceFailureCode =
   | 'AGENT_AUTH_REQUIRED'
   | 'RATE_LIMITED'
@@ -238,9 +157,9 @@ const AGENT_AUTH_FAILURE_RE = new RegExp(
   'i',
 );
 
-// Quota / rate limit / billing balance — the wall the hosted gateway avoids.
+// Quota and rate-limit failures.
 const AGENT_RATE_FAILURE_RE = new RegExp(
-  `(\\b(rate[ _-]?limit|too many requests|quota|insufficient[ _-]?(?:quota|balance|credit|funds)|credit balance is too low|exceeded your current quota|usage limit|session limit|limit reached|billing (?:hard )?limit)\\b|${STATUS_CTX}429\\b)`,
+  `(\\b(rate[ _-]?limit|too many requests|quota|insufficient[ _-]?quota|exceeded your current quota|usage limit|session limit|limit reached)\\b|${STATUS_CTX}429\\b)`,
   'i',
 );
 
@@ -291,26 +210,21 @@ function withProbeTails(
 }
 
 // Default generic sign-in hint for adapters that declare an `authProbe`
-// but ship no tailored guidance (cursor / deepseek / antigravity / reasonix
-// each have their own via `classifyAgentAuthFailure`). Kept agent-agnostic
+// but ship no tailored guidance. Kept agent-agnostic
 // so a newly-onboarded CLI gets an actionable banner the moment it opts into
 // auth probing, without bespoke copy.
-function genericAuthGuidance(agentName: string): string {
-  return `${agentName} appears to be installed but is not authenticated. Sign in with the CLI in a terminal, then rescan. If Open Design was launched outside an interactive shell, your shell rc files (e.g. ~/.zshrc) may not be loaded into its environment.`;
+export function genericAgentAuthGuidance(agentName: string): string {
+  return `${agentName} appears to be installed but is not authenticated. Sign in with the CLI in a terminal, then rescan. If Clean Design was launched outside an interactive shell, your shell rc files (e.g. ~/.zshrc) may not be loaded into its environment.`;
 }
 
 // Agents that ship a bespoke auth-failure classifier + tailored sign-in hint
 // via `classifyAgentAuthFailure`. For these, a null result is authoritative
 // ("authenticated"); we must NOT second-guess it with the broad generic
-// regex (e.g. cursor-agent's healthy `status` output mentions "login" in
-// ways the generic matcher would misread). The generic classifier is only a
+// regex. The generic classifier is only a
 // fallback for adapters with no tailored classifier of their own.
 const TAILORED_AUTH_AGENTS = new Set([
   'claude',
-  'cursor-agent',
-  'deepseek',
   'antigravity',
-  'reasonix',
 ]);
 
 function hasNonEmptyEnv(env: RuntimeEnv, keys: string[]): boolean {
@@ -345,7 +259,7 @@ function classifyProbedAuthFailure(
     return classifyAgentAuthFailure(classifierId, text);
   }
   if (classifyAgentServiceFailure(text) === 'AGENT_AUTH_REQUIRED') {
-    return { status: 'missing', message: genericAuthGuidance(agentName) };
+    return { status: 'missing', message: genericAgentAuthGuidance(agentName) };
   }
   return null;
 }

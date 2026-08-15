@@ -20,7 +20,6 @@ import { TrustBadge } from '../TrustBadge';
 import { localizePluginTitle } from '../plugins-home/localization';
 import { PluginPreviewHero } from './PluginPreviewHero';
 import { PluginMetaSections } from './PluginMetaSections';
-import { PluginShareMenu } from './PluginShareMenu';
 import { buildPluginUseMenu, pluginUsePrimaryAction } from './pluginUseMenu';
 import type { PluginUseAction } from '../plugins-home/useActions';
 
@@ -117,7 +116,6 @@ export function PluginScenarioDetail({
             </div>
           </div>
           <div className="plugin-details-modal__head-actions">
-            <PluginShareMenu record={record} variant="default" />
             <button
               ref={closeRef}
               type="button"

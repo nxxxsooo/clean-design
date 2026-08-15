@@ -1,4 +1,7 @@
 import { build } from "esbuild";
+import { rm } from "node:fs/promises";
+
+await rm(new URL("./dist", import.meta.url), { recursive: true, force: true });
 
 await build({
   bundle: true,
@@ -7,8 +10,6 @@ await build({
     "./src/index.ts",
     "./src/critique.ts",
     "./src/api/connectionTest.ts",
-    "./src/api/amrWallet.ts",
-    "./src/api/orbit.ts",
     "./src/api/finalize.ts",
     "./src/api/handoff.ts",
     "./src/api/providerModels.ts",
@@ -18,7 +19,6 @@ await build({
     "./src/design-systems/components-manifest.ts",
     "./src/design-systems/derived-token-outputs.ts",
     "./src/design-systems/token-schema.ts",
-    "./src/analytics/index.ts",
   ],
   format: "esm",
   outbase: "./src",

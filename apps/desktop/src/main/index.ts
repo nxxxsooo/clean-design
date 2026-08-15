@@ -513,6 +513,13 @@ export async function runDesktopMain(
   // helper is promoted to a shared workspace package.
   attachDesktopProcessErrorFilter();
 
+  // Development launches execute through Electron.app, whose internal name is
+  // literally "Electron". Set our product name before menu initialization so
+  // role labels and application-owned identity use Clean Design. macOS derives
+  // the system process/menu title from the executable bundle, so the installed
+  // Clean Design.app remains the authoritative system-level identity.
+  app.setName("Clean Design");
+
   // dev (tools-dev) enters here without a prior `whenReady` — so this
   // is where the `--lang` switch actually lands. In packaged builds
   // `apps/packaged/src/index.ts` has already applied the switch before

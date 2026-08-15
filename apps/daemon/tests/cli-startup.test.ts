@@ -16,7 +16,6 @@ describe('CLI startup boundaries', () => {
     ['doctor', ['doctor', '--help']],
     ['config', ['config', 'get', 'apiProtocol', '--daemon-url', 'http://127.0.0.1:9']],
     ['diagnostics', ['diagnostics', 'export', '--daemon-url', 'http://127.0.0.1:9']],
-    ['amr', ['amr', 'status', '--daemon-url', 'http://127.0.0.1:9']],
   ])('initializes flag constants before dispatching od %s', async (_name, args) => {
     let output = '';
     try {
@@ -38,7 +37,6 @@ describe('CLI startup boundaries', () => {
     expect(output).not.toContain('before initialization');
     expect(output).not.toContain('CONFIG_STRING_FLAGS');
     expect(output).not.toContain('DIAGNOSTICS_STRING_FLAGS');
-    expect(output).not.toContain('AMR_STRING_FLAGS');
   });
 
   it('keeps od daemon start alive until SIGTERM and reports the actual listening port', async () => {

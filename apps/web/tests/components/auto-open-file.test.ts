@@ -395,7 +395,7 @@ describe('selectAutoOpenTurnArtifact', () => {
     });
 
     it('falls back to the pure time window when the touched set is empty (no-event protocols)', () => {
-      // codex/gemini/opencode/ACP agents emit no Write tool events, so the
+      // codex/antigravity/opencode agents emit no Write tool events, so the
       // touched set is empty — the mtime window is the only signal and must
       // keep attributing the in-place rewrite.
       const result = selectAutoOpenTurnArtifact(

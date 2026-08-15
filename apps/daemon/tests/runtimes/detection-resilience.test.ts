@@ -18,7 +18,7 @@ vi.mock('../../src/runtimes/launch.js', async (importOriginal) => {
 
 import * as launchModule from '../../src/runtimes/launch.js';
 import { detectAgents } from '../../src/runtimes/detection.js';
-import { AGENT_DEFS } from '../../src/runtimes/registry.js';
+import { PUBLIC_AGENT_DEFS } from '../../src/runtimes/registry.js';
 
 const mockedResolveAgentLaunch = vi.mocked(launchModule.resolveAgentLaunch);
 const mockedApplyAgentLaunchEnv = vi.mocked(launchModule.applyAgentLaunchEnv);
@@ -50,14 +50,14 @@ test('detectAgents isolates a single agent probe throw so the picker still lists
   // Every adapter from the registry must still appear, including the
   // one whose probe blew up — it just gets surfaced as unavailable so
   // the rest of the picker (and the BYOK fallback row) stays intact.
-  expect(agents.length).toBe(AGENT_DEFS.length);
+  expect(agents.length).toBe(PUBLIC_AGENT_DEFS.length);
   const claude = agents.find((a) => a.id === 'claude');
   expect(claude, 'broken adapter must still appear in the detection result').toBeDefined();
   expect(claude?.available).toBe(false);
   // And the other adapters must keep whatever availability the real
   // probe would have returned — none of them get blanket-marked
   // unavailable just because claude's slot threw.
-  expect(agents.filter((a) => a.id !== 'claude').length).toBe(AGENT_DEFS.length - 1);
+  expect(agents.filter((a) => a.id !== 'claude').length).toBe(PUBLIC_AGENT_DEFS.length - 1);
 });
 
 test('detectAgents isolates a probe throw from applyAgentLaunchEnv just like resolveAgentLaunch', async () => {
@@ -83,7 +83,7 @@ test('detectAgents isolates a probe throw from applyAgentLaunchEnv just like res
 
   const agents = await detectAgents();
 
-  expect(agents.length).toBe(AGENT_DEFS.length);
+  expect(agents.length).toBe(PUBLIC_AGENT_DEFS.length);
   // At least one adapter is marked unavailable because of the throw;
   // every other adapter keeps its real availability.
   const unavailableFromThrow = agents.filter((a) => a.available === false);

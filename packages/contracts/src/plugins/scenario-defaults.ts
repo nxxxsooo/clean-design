@@ -40,7 +40,6 @@ export type DefaultScenarioPluginId =
   | 'od-default'
   | 'od-new-generation'
   | 'od-media-generation'
-  | 'od-plugin-authoring'
   | 'od-figma-migration'
   | 'od-code-migration'
   | 'od-tune-collab'

@@ -30,8 +30,6 @@ const listActiveChatRuns = vi.fn();
 const listProjectRuns = vi.fn();
 const reattachDaemonRun = vi.fn();
 const publishDaemonRunFinishedEvent = vi.fn();
-const fetchVelaLoginStatus = vi.fn();
-const fetchAmrWalletSnapshot = vi.fn();
 const launchAntigravityOauth = vi.fn();
 const streamViaDaemon = vi.fn();
 const streamMessage = vi.fn();
@@ -42,14 +40,6 @@ const patchProject = vi.fn();
 const saveTabs = vi.fn();
 const playSound = vi.fn();
 const showCompletionNotification = vi.fn();
-const analyticsTrackMock = vi.fn();
-
-vi.mock('../../src/analytics/provider', () => ({
-  useAnalytics: () => ({
-    track: analyticsTrackMock,
-  }),
-}));
-
 vi.mock('../../src/i18n', () => ({
   useI18n: () => ({
     locale: 'zh-CN',
@@ -67,9 +57,6 @@ vi.mock('../../src/providers/daemon', () => ({
   GENERIC_DAEMON_DISCONNECT_CODE: 'GENERIC_DAEMON_DISCONNECT',
   GENERIC_DAEMON_DISCONNECT_MESSAGE: 'daemon stream disconnected before run completed',
   fetchChatRunStatus: (...args: unknown[]) => fetchChatRunStatus(...args),
-  fetchVelaLoginStatus: (...args: unknown[]) => fetchVelaLoginStatus(...args),
-  fetchAmrWalletSnapshot: (...args: unknown[]) => fetchAmrWalletSnapshot(...args),
-  formatVelaBalanceUsd: (raw: string | null | undefined) => (raw == null ? null : `$${raw}`),
   launchAntigravityOauth: (...args: unknown[]) => launchAntigravityOauth(...args),
   listActiveChatRuns: (...args: unknown[]) => listActiveChatRuns(...args),
   listProjectRuns: (...args: unknown[]) => listProjectRuns(...args),
@@ -163,14 +150,9 @@ vi.mock('../../src/components/FileWorkspace', () => ({
       .map((event) => (event as { code?: string }).code ?? null)
       .filter(Boolean)
       .at(-1) ?? null;
-    const showAuthorizeAction = failedAssistant?.agentId === 'amr' && errorCode === 'AMR_AUTH_REQUIRED';
     const showLaunchTerminalAction =
       failedAssistant?.agentId === 'antigravity'
       && (errorCode === 'AGENT_AUTH_REQUIRED' || errorCode === 'RATE_LIMITED');
-    const showSwitchToAmrPromotion =
-      failedAssistant?.agentId !== 'amr'
-      && failedAssistant?.agentId !== 'antigravity'
-      && (errorCode === 'AGENT_AUTH_REQUIRED' || errorCode === 'UNAUTHORIZED' || errorCode === 'RATE_LIMITED');
     return (
       <>
       <output data-testid="workspace-streaming-state">{streaming ? 'streaming' : 'idle'}</output>
@@ -195,28 +177,6 @@ vi.mock('../../src/components/FileWorkspace', () => ({
       >
         workspace send
       </button>
-      {showAuthorizeAction && onAuthorizeAndRetry ? (
-        <button
-          type="button"
-          data-testid="workspace-authorize"
-          onClick={() => {
-            if (failedAssistant) onAuthorizeAndRetry(failedAssistant);
-          }}
-        >
-          authorize
-        </button>
-      ) : null}
-      {showSwitchToAmrPromotion && onAuthorizeAndRetry ? (
-        <button
-          type="button"
-          data-testid="workspace-switch-amr"
-          onClick={() => {
-            if (failedAssistant) onAuthorizeAndRetry(failedAssistant);
-          }}
-        >
-          switch to amr
-        </button>
-      ) : null}
       {showLaunchTerminalAction && onLaunchTerminalAuth ? (
         <button
           type="button"
@@ -599,20 +559,6 @@ describe('ProjectView conversation run isolation', () => {
       signal: null,
     });
     reattachDaemonRun.mockImplementation(async () => new Promise<void>(() => {}));
-    fetchVelaLoginStatus.mockResolvedValue({ loggedIn: false });
-    // Positive wallet balance so the pre-run AMR balance gate lets sends
-    // through; the gate's own behavior is covered in
-    // tests/runtime/amr-balance-gate.test.ts.
-    fetchAmrWalletSnapshot.mockResolvedValue({
-      status: 'available',
-      profile: 'prod',
-      user: null,
-      balanceUsd: '10.00',
-      updatedAt: null,
-      fetchedAt: '2026-07-02T00:00:00.000Z',
-      stale: false,
-      source: 'vela_api',
-    });
     launchAntigravityOauth.mockResolvedValue({ ok: true });
     streamViaDaemon.mockImplementation(async () => {});
   });
@@ -1629,7 +1575,6 @@ describe('ProjectView conversation run isolation', () => {
       missing: 'API key',
       apiKey: '',
       model: 'api-model',
-      reason: 'api_key_required' as const,
     },
     {
       mode: 'api' as const,
@@ -1637,19 +1582,10 @@ describe('ProjectView conversation run isolation', () => {
       missing: 'model',
       apiKey: 'test-key',
       model: '',
-      reason: 'model_required' as const,
-    },
-    {
-      mode: 'daemon' as const,
-      agentId: 'byok-opencode',
-      missing: 'API key through the daemon selector',
-      apiKey: '',
-      model: 'api-model',
-      reason: 'api_key_required' as const,
     },
   ])(
     'opens Settings and blocks a BYOK send with a missing $missing',
-    async ({ mode, agentId, apiKey, model, reason }) => {
+    async ({ mode, agentId, apiKey, model }) => {
       listMessages.mockResolvedValue([]);
       const onOpenSettings = vi.fn();
 
@@ -1678,16 +1614,6 @@ describe('ProjectView conversation run isolation', () => {
       fireEvent.click(screen.getByTestId('send-message'));
 
       await waitFor(() => expect(onOpenSettings).toHaveBeenCalledWith('execution'));
-      expect(analyticsTrackMock).toHaveBeenCalledWith(
-        'byok_preflight_blocked',
-        {
-          source: 'run',
-          reason,
-          provider_id: 'openai',
-          active_execution_mode: mode === 'api' ? 'byok' : 'local_cli',
-        },
-        undefined,
-      );
       expect(streamViaDaemon).not.toHaveBeenCalled();
       expect(saveMessage).not.toHaveBeenCalled();
     },
@@ -1989,7 +1915,7 @@ describe('ProjectView conversation run isolation', () => {
     await waitFor(() => expect(streamViaDaemon).toHaveBeenCalledTimes(2));
   });
 
-  it('does not promote switching to AMR for upstream outages', async () => {
+  it('does not show auth recovery controls for upstream outages', async () => {
     conversationAMessages = [];
     fetchChatRunStatus.mockResolvedValue(null);
     streamViaDaemon.mockImplementation(
@@ -2031,8 +1957,6 @@ describe('ProjectView conversation run isolation', () => {
 
     await waitFor(() => expect(streamViaDaemon).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.getByTestId('chat-retry')).toBeTruthy());
-    expect(screen.queryByTestId('workspace-switch-amr')).toBeNull();
-    expect(screen.queryByTestId('workspace-authorize')).toBeNull();
     expect(screen.queryByTestId('workspace-launch-terminal')).toBeNull();
   });
 });
@@ -2060,6 +1984,7 @@ function renderProjectView(
       designTemplates={[]}
       designSystems={[]}
       daemonLive
+      byokRuntimeAvailable={renderAgents.some((agent) => agent.id === 'byok-opencode' && agent.available)}
       onModeChange={handlers.onModeChange ?? (() => {})}
       onAgentChange={handlers.onAgentChange ?? (() => {})}
       onAgentModelChange={() => {}}

@@ -79,7 +79,7 @@ async function fetchOdTargetWithTransientRetry(
       const waitMs = backoffMs * attempt;
       // Main-process console output lands in the packaged desktop logs, so
       // real-world transient frequency stays diagnosable.
-      console.warn("[open-design packaged] cleandesign:// proxy fetch failed; retrying", {
+      console.warn("[clean-design packaged] cleandesign:// proxy fetch failed; retrying", {
         attempt,
         attempts,
         message: error instanceof Error ? error.message : String(error),

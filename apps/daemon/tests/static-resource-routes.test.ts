@@ -123,6 +123,21 @@ describe('static resource mutation routes', () => {
     expect(catalogReadCount).toBe(0);
   });
 
+  it('reports internal BYOK runtime readiness without exposing an agent record', async () => {
+    const res = await fetch(`${baseUrl}/api/byok/runtime-readiness`);
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as Record<string, unknown>;
+    expect(typeof body.available).toBe('boolean');
+    expect(Object.keys(body).sort()).toEqual(
+      Object.keys(body).filter((key) => ['available', 'version', 'diagnostics'].includes(key)).sort(),
+    );
+    expect(body).not.toHaveProperty('id');
+    expect(body).not.toHaveProperty('name');
+    expect(body).not.toHaveProperty('bin');
+    expect(body).not.toHaveProperty('models');
+  });
+
   it('returns a bad request for a missing local design-system import path', async () => {
     catalogReadCount = 0;
     const res = await fetch(`${baseUrl}/api/design-systems/import/local`, {

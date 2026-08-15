@@ -195,7 +195,7 @@ export function createMacElectronRebuildOptions(
   appRoot: string,
 ): RebuildOptions {
   return {
-    arch: process.arch,
+    arch: "arm64",
     buildFromSource: ELECTRON_BUILDER_BUILD_DEPENDENCIES_FROM_SOURCE,
     buildPath: appRoot,
     electronVersion: config.electronVersion,
@@ -329,7 +329,7 @@ export async function writeAssembledApp(
         dependencies,
         description: "Clean Design packaged runtime",
         main: "./main.cjs",
-        name: "open-design-packaged-app",
+        name: "clean-design-packaged-app",
         ...(optionalDependencies == null ? {} : { optionalDependencies }),
         private: true,
         productName: identity.productName,

@@ -16,8 +16,6 @@ import {
   computeIncludeStable,
   hashStableInstructions,
   isAgentResumeFailure,
-  isAmrOpencodeEventStreamResumeFailure,
-  isAmrResumeFailure,
   isClaudeResumeFailure,
   isCodexResumeFailure,
   isOpencodeResumeFailure,
@@ -474,19 +472,7 @@ describe('isOpencodeResumeFailure', () => {
   });
 });
 
-describe('isAmrResumeFailure', () => {
-
-  it('does not match a bare mention of resume_failed in assistant prose', () => {
-    expect(isAmrResumeFailure('The build step logged resume_failed as a warning.')).toBe(false);
-    expect(isAmrResumeFailure('')).toBe(false);
-  });
-});
-
-describe('isAmrOpencodeEventStreamResumeFailure', () => {
-});
-
 describe('isAgentResumeFailure dispatch', () => {
-
   it('routes codex to the rollout-not-found detector', () => {
     expect(
       isAgentResumeFailure('codex', 'no rollout found for thread id abc'),

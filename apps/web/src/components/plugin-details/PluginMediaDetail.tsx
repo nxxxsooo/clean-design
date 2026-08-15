@@ -25,7 +25,6 @@ import {
   type PreviewView,
 } from '../PreviewModal';
 import { PluginMetaSections } from './PluginMetaSections';
-import { PluginShareMenu } from './PluginShareMenu';
 import { buildPluginUseMenu, pluginUsePrimaryAction } from './pluginUseMenu';
 import type { PluginUseAction } from '../plugins-home/useActions';
 
@@ -36,9 +35,7 @@ interface Props {
   onDuplicate?: (record: InstalledPluginRecord) => void;
   isApplying?: boolean;
   hideUseAction?: boolean;
-  // Analytics — forwarded to PreviewModal's share popover. Does NOT cover
-  // the headerExtras PluginShareMenu (copy install command), which is a
-  // separate menu.
+  // Forwarded to PreviewModal's local export popover.
   onSharePopoverItemClick?: (item: PreviewSharePopoverItem) => void;
 }
 
@@ -250,7 +247,6 @@ export function PluginMediaDetail({
             testId: `plugin-details-use-${record.id}`,
             menu: buildPluginUseMenu(record, onUse, t, onDuplicate),
           }}
-      headerExtras={<PluginShareMenu record={record} variant="inline" />}
       onSharePopoverItemClick={onSharePopoverItemClick}
     />
   );

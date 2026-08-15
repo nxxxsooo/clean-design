@@ -13,7 +13,7 @@ import { routeAgents } from '../lib/playwright/mock-factory.js';
 // and cannot rise above later sibling sections. The fix lifts the OPEN
 // picker's stacking context above its siblings.
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 const AGENTS = [
   {
@@ -66,8 +66,6 @@ test.beforeEach(async ({ page }) => {
         skillId: null,
         designSystemId: null,
         onboardingCompleted: true,
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
         agentModels: { codex: { model: 'default' } },
       }),
     );
@@ -78,8 +76,6 @@ test.beforeEach(async ({ page }) => {
       json: {
         config: {
           onboardingCompleted: true,
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
           mode: 'daemon',
           agentId: 'codex',
           skillId: null,

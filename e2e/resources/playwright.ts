@@ -197,7 +197,7 @@ export const playwrightUiScenarios: UiScenario[] = [
       fidelity: 'high-fidelity',
     },
     notes: [
-      'Keeps this smoke focused on create-time routing and metadata instead of connector execution.',
+      'Keeps this smoke focused on create-time routing and persisted local metadata.',
     ],
   },
   {

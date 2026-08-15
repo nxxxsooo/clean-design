@@ -464,7 +464,7 @@ export async function startBrandExtraction(
       : null;
     // Persist the transcript handles so EVERY terminal point — finalize success,
     // soft-fail/blocked/timeout, and user stop — can reconcile the synthetic
-    // "AMR · Working" row out of its perpetual `running` state, regardless of the
+    // synthetic working row out of its perpetual `running` state, regardless of the
     // racy background timer. Without this the row stays "Working 13m…" forever
     // even after the brand finalizes `ready` in the background.
     if (programmaticTranscript) {
@@ -878,7 +878,7 @@ export type ProgrammaticExtractionOutcome = 'succeeded' | 'needs_attention' | 's
 /**
  * Flip the seeded programmatic-extraction transcript row to a terminal run
  * status. This is the SINGLE authority that retires the synthetic
- * "AMR · Working 13m…" row, driven entirely by persisted brand meta + the
+ * working row, driven entirely by persisted brand meta + the
  * message itself, so it works from EVERY completion point — finalize success,
  * give-up / blocked / stall, and user stop — and survives a daemon restart.
  * Best-effort and idempotent; safe to call repeatedly.

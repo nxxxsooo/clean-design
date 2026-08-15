@@ -1,7 +1,7 @@
 /**
  * @module protocol
  *
- * The Open Design renderer host-bridge wire contract: the injected-global name
+ * The Clean Design renderer host-bridge wire contract: the injected-global name
  * and version, client constant registries, and every request/result
  * type that crosses the host bridge — including the {@link OpenDesignHostBridge}
  * shape itself. Pure declarations only; depends on nothing else in the package.

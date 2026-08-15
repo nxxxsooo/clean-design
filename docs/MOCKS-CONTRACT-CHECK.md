@@ -7,7 +7,7 @@ when:
 
 - An agent CLI ships a new event `type` that the mock doesn't know about.
 - A field gets renamed (`sessionID` → `sessionId`) and the mock keeps
-  emitting the old name. OD's parser may have been updated to accept
+  emitting the old name. Clean Design's parser may have been updated to accept
   both, so smoke tests stay green, but new fields aren't surfaced.
 - A protocol version bump changes the shape of `usage` / tool calls /
   init blocks.

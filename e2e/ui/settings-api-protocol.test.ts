@@ -1,10 +1,10 @@
 import { expect, test } from '@/playwright/suite';
 import type { Locator, Page } from '@playwright/test';
-import { openSettingsDialog } from '../lib/playwright/amr.js';
+import { openSettingsDialog } from '../lib/playwright/app.js';
 import { routeAgents } from '../lib/playwright/mock-factory.js';
 import { T } from '@/timeouts';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 const OPEN_SETTINGS_LABEL = /Open settings|打开设置|開啟設定|Account & settings/i;
 const LOCAL_CLI_LABEL = /Local CLI|本机 CLI|本地 CLI/i;
 const MODEL_POPOVER_SELECTOR = '.model-select-searchable__popover';
@@ -976,9 +976,9 @@ test('[P0] @critical saving Local CLI updates the entry status pill with the sel
         models: [{ id: 'default', label: 'Default' }],
       },
       {
-        id: 'gemini',
-        name: 'Gemini CLI',
-        bin: 'gemini',
+        id: 'pi',
+        name: 'Pi',
+        bin: 'pi',
         available: false,
         version: null,
         models: [],

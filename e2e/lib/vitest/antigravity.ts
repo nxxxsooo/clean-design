@@ -20,7 +20,6 @@ export async function putAntigravityAppConfig(
       designSystemId: null,
       onboardingCompleted: config.onboardingCompleted ?? true,
       skillId: null,
-      telemetry: { artifactManifest: true, content: false, metrics: false },
     },
     method: 'PUT',
   });

@@ -56,14 +56,6 @@ type RunStatus = {
 };
 
 describe('claude sub-agent turn_end false success (#5487)', () => {
-  const originalEnv = {
-    POSTHOG_KEY: process.env.POSTHOG_KEY,
-    POSTHOG_HOST: process.env.POSTHOG_HOST,
-    LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY,
-    LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
-    LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL,
-    OPEN_DESIGN_TELEMETRY_RELAY_URL: process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL,
-  };
   let started: StartedServer | null = null;
   let binDir: string | null = null;
 
@@ -75,10 +67,6 @@ describe('claude sub-agent turn_end false success (#5487)', () => {
     started = null;
     if (binDir) await rm(binDir, { recursive: true, force: true });
     binDir = null;
-    for (const [key, value] of Object.entries(originalEnv)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
   });
 
   it('a sub-agent end_turn must not classify a crashed main turn as succeeded', async () => {
@@ -86,12 +74,6 @@ describe('claude sub-agent turn_end false success (#5487)', () => {
     const controlBin = await writeCrashClaude(binDir, 'claude-control', { withSubagent: false });
     const sidechainBin = await writeCrashClaude(binDir, 'claude-sidechain', { withSubagent: true });
 
-    delete process.env.POSTHOG_KEY;
-    delete process.env.POSTHOG_HOST;
-    delete process.env.LANGFUSE_PUBLIC_KEY;
-    delete process.env.LANGFUSE_SECRET_KEY;
-    delete process.env.LANGFUSE_BASE_URL;
-    delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
 
     started = await startServer({ port: 0, returnServer: true }) as StartedServer;
 
@@ -100,8 +82,6 @@ describe('claude sub-agent turn_end false success (#5487)', () => {
     await putConfig(started.url, {
       agentId: 'claude',
       agentCliEnv: { claude: { CLAUDE_BIN: controlBin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
     const controlRun = await createAndWaitForRun(started.url);
     expect(controlRun.exitCode).toBe(1);
@@ -114,8 +94,6 @@ describe('claude sub-agent turn_end false success (#5487)', () => {
     await putConfig(started.url, {
       agentId: 'claude',
       agentCliEnv: { claude: { CLAUDE_BIN: sidechainBin } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
     const sidechainRun = await createAndWaitForRun(started.url);
     expect(sidechainRun.exitCode).toBe(1);
@@ -200,9 +178,6 @@ async function createAndWaitForRun(url: string): Promise<RunStatus> {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-od-analytics-device-id': 'sidechain-claude-test',
-      'x-od-analytics-session-id': 'sidechain-claude-session',
-      'x-od-analytics-client-type': 'web',
     },
     body: JSON.stringify({
       projectId,

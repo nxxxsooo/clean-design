@@ -534,31 +534,7 @@
 /* ============================================================
    Icon-only topbar chips
    ============================================================ */
-.entry-main__topbar-chips--icon-only .entry-discord-badge,
-.entry-main__topbar-chips--icon-only .inline-switcher__chip {
-  width: 32px;
-  height: 32px;
-  min-width: 0;
-  padding: 0;
-  gap: 0;
-  justify-content: center;
-  border-radius: var(--radius);
-  position: relative;
-  /* The model-switcher chip clips overflow to truncate long model names;
-     collapsed there's no text, so let the downward tooltip escape. */
-  overflow: visible;
-}
-/* Hide every text fragment; keep only the leading icon glyph. The Discord
-   badge also carries a "· {n} online" suffix; collapsed it must hide too,
-   otherwise the separator + count leak out of the 32px square and render as
-   clipped text (e.g. "212 在s"). The full label lives in the hover tooltip. */
-.entry-main__topbar-chips--icon-only .entry-discord-badge__label,
-.entry-main__topbar-chips--icon-only .entry-discord-badge__sep,
-.entry-main__topbar-chips--icon-only .entry-discord-badge__online,
-.entry-main__topbar-chips--icon-only .inline-switcher__chip-text,
-.entry-main__topbar-chips--icon-only .inline-switcher__chip-chevron {
-  display: none;
-}
+/* Hide text fragments in collapsed chips and keep the leading icon glyph. */
 
 /* Center the surviving icon wrappers inside the square. */
 .entry-main__topbar-chips--icon-only .inline-switcher__chip-icon {
@@ -1006,22 +982,6 @@
 .inline-switcher--compact .inline-switcher__chip-text {
   display: none;
 }
-.inline-switcher__amr-reminder-dot {
-  position: absolute;
-  z-index: 1;
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-pill);
-  background: var(--danger, #dc2626);
-  box-shadow:
-    0 0 0 2px var(--bg-panel),
-    0 0 0 4px color-mix(in srgb, var(--danger, #dc2626) 12%, transparent);
-  pointer-events: none;
-}
-.inline-switcher__amr-reminder-dot--chip {
-  top: -2px;
-  right: -2px;
-}
 
 /* Popover */
 .inline-switcher__popover {
@@ -1096,8 +1056,6 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
-  /* Clean Design renders as `.inline-switcher__account`; keep the third-party
-     CLI grid after that account row even though their source order differs. */
   order: 1;
 }
 .inline-switcher__agent-row {
@@ -1128,10 +1086,6 @@
   border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
   background: var(--accent-tint);
   color: var(--text-strong);
-}
-.inline-switcher__amr-reminder-dot--agent {
-  top: 6px;
-  left: 26px;
 }
 .inline-switcher__agent-name {
   flex: 1 1 auto;
@@ -1214,190 +1168,6 @@
   .inline-switcher__agent-action-hover {
   opacity: 1;
   transform: translateY(0);
-}
-
-/* Account row: Clean Design login/plan, lifted out of the agent card so the
-   agent name is never truncated. */
-.inline-switcher__account {
-  order: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius);
-  background: var(--bg-subtle);
-  transition: background-color 120ms var(--ease-out),
-    border-color 120ms var(--ease-out);
-}
-/* The Clean Design entry is also the agent selector now: hovering the clickable
-   area previews selectability, and the active agent gets the same accent
-   highlight the grid rows use. */
-.inline-switcher__account:has(.inline-switcher__account-select:hover):not(.is-active) {
-  background: var(--bg-panel);
-  border-color: var(--border);
-}
-.inline-switcher__account.is-active {
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
-  background: color-mix(in srgb, var(--bg-subtle) 82%, var(--accent-tint));
-}
-.inline-switcher__account.is-active:has(.inline-switcher__account-select:hover) {
-  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
-  background: color-mix(in srgb, var(--bg-panel) 74%, var(--accent-tint));
-}
-.inline-switcher__account-id {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-strong);
-}
-/* The icon+name+plan+balance block is the radio control that selects Open
-   Design; the upgrade / sign-in buttons stay siblings so they never nest in
-   this button. */
-.inline-switcher__account-select {
-  flex: 1 1 auto;
-  appearance: none;
-  border: none;
-  background: none;
-  padding: 0;
-  margin: 0;
-  text-align: left;
-  cursor: pointer;
-}
-.inline-switcher__account-id-icon {
-  position: relative;
-  flex: 0 0 auto;
-  display: inline-flex;
-}
-.inline-switcher__amr-reminder-dot--account {
-  top: -1px;
-  right: -1px;
-}
-.inline-switcher__account-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.inline-switcher__account-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.inline-switcher__account-name-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-}
-/* Balance shown as a muted subtitle line under the Clean Design name. Each
-   stat is "label value"; the gap (not a literal separator) keeps them apart. */
-.inline-switcher__account-subtitle {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 2px 14px;
-  min-width: 0;
-}
-.inline-switcher__account-stat {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-}
-.inline-switcher__account-stat-label {
-  flex: 0 0 auto;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-muted);
-}
-.inline-switcher__account-stat-value {
-  flex: 0 0 auto;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-strong);
-  font-variant-numeric: tabular-nums;
-  text-transform: capitalize;
-}
-.inline-switcher__account-upgrade {
-  flex: 0 0 auto;
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  height: 22px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  box-shadow:
-    0 1px 2px color-mix(in srgb, var(--accent) 45%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 20%, transparent);
-  transition:
-    transform 150ms cubic-bezier(0.23, 1, 0.32, 1),
-    background-color 150ms ease,
-    box-shadow 150ms ease;
-}
-@media (hover: hover) and (pointer: fine) {
-  .inline-switcher__account-upgrade:hover:not(:disabled) {
-    background: var(--accent-hover);
-    color: #fff;
-    box-shadow:
-      0 2px 8px color-mix(in srgb, var(--accent) 42%, transparent),
-      inset 0 1px 0 color-mix(in srgb, #fff 22%, transparent);
-  }
-}
-.inline-switcher__account-upgrade:active {
-  transform: scale(0.96);
-}
-.inline-switcher__account-upgrade:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  outline-offset: 2px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .inline-switcher__account-upgrade {
-    transition: background-color 150ms ease;
-  }
-  .inline-switcher__account-upgrade:active {
-    transform: none;
-  }
-}
-.inline-switcher__account-status.is-error {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--danger);
-}
-.inline-switcher__account-action {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex: 0 0 auto;
-  padding: 2px 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--accent-strong);
-  cursor: pointer;
-  border-radius: var(--radius);
-}
-.inline-switcher__account-action:hover {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-}
-.inline-switcher__account-action svg {
-  animation: spin 0.8s linear infinite;
 }
 
 /* Provider chips (BYOK mode) */
@@ -1741,43 +1511,7 @@
   justify-items: center;
 }
 
-/* Connect step, cloud sign-in landing. Replaces the grid layout with a
-   centered single column: a top-left language/theme bar, the centered CTA
-   block, and a footer pinned to the bottom. */
-.onboarding-view--cloud {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  width: 100%;
-  max-width: none;
-  min-height: 100%;
-  margin: 0;
-  padding: 72px 24px 64px;
-  gap: 0;
-}
-
-.onboarding-cloud__topbar {
-  position: absolute;
-  top: 18px;
-  right: 22px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Brand mark above the title; the glyph itself comes from the shared
-   .od-brand-glyph primitive. */
-.onboarding-cloud__logo {
-  display: block;
-  width: 52px;
-  height: 52px;
-  margin-bottom: 22px;
-}
-
-/* Compact, icon-only language switcher used in the cloud landing top bar —
-   matches the round theme toggle next to it instead of the labelled foot-pill. */
+/* Compact, icon-only language switcher used beside round theme controls. */
 .lang-pill--compact {
   width: 36px;
   height: 36px;
@@ -1793,170 +1527,6 @@
   color: var(--text-strong);
 }
 
-.onboarding-cloud__theme {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--bg-panel);
-  color: var(--text);
-  cursor: pointer;
-  transition:
-    color 160ms cubic-bezier(0.23, 1, 0.32, 1),
-    border-color 160ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.onboarding-cloud__theme:hover:not(:disabled) {
-  background: var(--bg-panel);
-  border-color: var(--text-muted);
-  color: var(--text-strong);
-}
-
-.onboarding-cloud__center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  width: min(440px, 100%);
-}
-
-.onboarding-cloud__title {
-  margin: 0;
-  color: var(--text-strong);
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-}
-
-.onboarding-cloud__body {
-  margin: 14px 0 0;
-  max-width: 42ch;
-  color: var(--text-muted);
-  font-size: 15px;
-  line-height: 1.6;
-}
-
-.onboarding-cloud__primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  min-height: 52px;
-  margin-top: 32px;
-  padding: 0 20px;
-  border: 0;
-  border-radius: 14px;
-  background: var(--text-strong);
-  color: var(--bg);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    opacity 160ms cubic-bezier(0.23, 1, 0.32, 1),
-    transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.onboarding-cloud__primary:hover:not(:disabled) {
-  /* Keep the dark fill on hover — the global `button:hover` rule in
-     primitives.css would otherwise repaint the background to --bg-subtle and
-     wash the white label away. Opacity alone carries the hover feedback. */
-  background: var(--text-strong);
-  border-color: transparent;
-  opacity: 0.88;
-}
-
-.onboarding-cloud__primary:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.onboarding-cloud__primary:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.onboarding-cloud__primary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.onboarding-cloud__secondary,
-.onboarding-cloud__cancel {
-  margin-top: 22px;
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color 160ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.onboarding-cloud__secondary:hover,
-.onboarding-cloud__cancel:hover {
-  color: var(--text-strong);
-}
-
-/* Two secondary links ("local CLI" or "your own key") on one row. */
-.onboarding-cloud__alts {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 22px;
-}
-
-.onboarding-cloud__alts .onboarding-cloud__secondary {
-  margin-top: 0;
-}
-
-.onboarding-cloud__alts-or {
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-.onboarding-cloud__error {
-  margin-top: 16px;
-  color: var(--danger-text, #991b1b);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.onboarding-cloud__footer {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 22px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-/* Back link from the expanded runtime chooser to the cloud landing. */
-.onboarding-view__back-to-cloud {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  align-self: start;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: color 160ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.onboarding-view__back-to-cloud:hover {
-  color: var(--text-strong);
-}
 
 /* Brand mark above the welcome heading — the app icon in a soft rounded
    chip, mirroring the home-hero brand lockup. */
@@ -2680,18 +2250,6 @@
   box-shadow: 0 18px 40px color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
-.onboarding-view__card--featured.onboarding-view__card--amr {
-  grid-template-columns: max-content minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  column-gap: 22px;
-  row-gap: 18px;
-  align-items: center;
-  min-height: 246px;
-  padding: 40px 34px 36px;
-  overflow: visible;
-  position: relative;
-  z-index: 3;
-}
 
 .onboarding-view__card.is-selected {
   border-color: color-mix(in srgb, var(--accent) 52%, var(--border));
@@ -2759,10 +2317,6 @@
   border-radius: inherit;
 }
 
-.onboarding-view__card--amr > .onboarding-view__icon {
-  grid-column: 1;
-  grid-row: 1;
-}
 
 .onboarding-view__badge {
   display: inline-flex;
@@ -2801,10 +2355,6 @@
   box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 4%, transparent);
 }
 
-.onboarding-view__card--amr.is-selected .onboarding-view__identity {
-  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
-  background: color-mix(in srgb, var(--bg-panel) 96%, var(--accent) 4%);
-}
 
 .onboarding-view__identity .onboarding-view__card-copy {
   align-self: center;
@@ -2882,9 +2432,6 @@
   width: min(260px, 100%);
 }
 
-.onboarding-view__card--amr .onboarding-view__model-picker {
-  width: 100%;
-}
 
 .onboarding-view__alternatives .onboarding-view__model-picker {
   width: 100%;
@@ -3098,64 +2645,12 @@
   pointer-events: none;
 }
 
-.onboarding-view__card-status .amr-account-control {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  max-width: 100%;
-  min-height: 20px;
-  gap: 6px;
-  padding: 0 8px;
-  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--border));
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--bg-panel) 90%, var(--accent) 10%);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
-  color: currentColor;
-  font-size: 11px;
-  font-weight: 650;
-  line-height: 1;
-}
 
-.onboarding-view__card-status .amr-account-control__status {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  gap: 6px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-.onboarding-view__card-status .amr-account-control__status::before {
-  content: '';
-  flex: 0 0 auto;
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: currentColor;
-  opacity: 0.7;
-}
 
-.onboarding-view__card-status .amr-account-control--signed-in {
-  color: var(--success-text, #15803d);
-  border-color: color-mix(in srgb, var(--success-text, #15803d) 18%, var(--border));
-  background: color-mix(in srgb, var(--bg-panel) 88%, var(--success-text, #15803d) 12%);
-}
 
-.onboarding-view__card-status .amr-account-control--signing-in {
-  color: var(--accent-strong);
-}
 
-.onboarding-view__card-status .amr-account-control--error {
-  color: var(--danger-text, #991b1b);
-  border-color: color-mix(in srgb, var(--danger-text, #991b1b) 18%, var(--border));
-  background: color-mix(in srgb, var(--bg-panel) 88%, var(--danger-text, #991b1b) 12%);
-}
 
-.onboarding-view__card-status .amr-account-control__error {
-  display: none;
-}
 
 .onboarding-view__card-action {
   grid-column: 2;
@@ -4025,56 +3520,6 @@
   opacity: 0.55;
 }
 
-.entry-discord-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--bg-panel);
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  text-decoration: none;
-  cursor: pointer;
-  box-shadow: var(--shadow-xs);
-  transition: background-color 120ms var(--ease-out), border-color 120ms var(--ease-out),
-    color 120ms var(--ease-out), transform 120ms var(--ease-out);
-  white-space: nowrap;
-}
-.entry-discord-badge:hover {
-  background: var(--bg-subtle);
-  border-color: var(--border-strong);
-  color: var(--text-strong);
-}
-.entry-discord-badge:active {
-  transform: scale(0.98);
-}
-.entry-discord-badge:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-.entry-discord-badge__icon {
-  color: #5865f2;
-  flex: 0 0 auto;
-}
-.entry-discord-badge:hover .entry-discord-badge__icon {
-  color: #5865f2;
-}
-.entry-discord-badge__label {
-  white-space: nowrap;
-}
-.entry-discord-badge__sep {
-  color: var(--text-faint);
-}
-.entry-discord-badge__online {
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
 
 /* Workspace entry. Neutral white-panel chip matching the adjacent controls. */
 .entry-workspace-chip {
@@ -4129,15 +3574,6 @@
     display: none;
   }
   .entry-star-badge__sep {
-    display: none;
-  }
-  .entry-discord-badge {
-    padding: 0 9px;
-  }
-  .entry-discord-badge__label {
-    display: none;
-  }
-  .entry-discord-badge__sep {
     display: none;
   }
 }
@@ -4318,22 +3754,12 @@
 }
 
 @media (max-width: 760px) {
-  .onboarding-view__card--featured.onboarding-view__card--amr {
-    grid-template-columns: 1fr;
-    gap: 14px;
-    align-items: center;
-    min-height: 190px;
-    padding: 28px 18px 32px;
-  }
 
   .onboarding-view__identity {
     grid-column: 1 / -1;
     width: 100%;
   }
 
-  .onboarding-view__card--amr .onboarding-view__card-model {
-    grid-column: 1 / -1;
-  }
 
   .onboarding-view__card--benefit-aside .onboarding-view__benefit-aside {
     grid-column: 1 / -1;
@@ -4355,13 +3781,6 @@
 
 }
 
-/* ============================================================
-   AMR cloud card — detecting / skeleton state
-   Shown while AMR availability is still being probed. Reuses the
-   featured/amr card classes (so min-height: 246px and the responsive
-   grid are inherited — no layout jump when the real card resolves).
-   Only the probe-dependent parts shimmer; the brand stays solid.
-   ============================================================ */
 .onboarding-view__card--skeleton {
   cursor: default;
   /* Neutral, un-selected resting surface — the card is not yet actionable,
@@ -4411,7 +3830,6 @@
     color-mix(in srgb, var(--bg-elevated) 70%, var(--bg-muted));
 }
 
-/* Version meta placeholder (sits where "AMR v0.1.0" renders). */
 .onboarding-view__skeleton-line--meta {
   width: 116px;
   height: 11px;
@@ -4437,14 +3855,10 @@
 .onboarding-view__benefit-stack--skeleton
   .onboarding-view__skeleton-line--benefit:nth-child(4) { width: 58%; }
 
-/* Model picker placeholder (sits where the AMR model select renders). */
 .onboarding-view__skeleton-model {
   display: grid;
   gap: 8px;
   width: min(260px, 100%);
-}
-.onboarding-view__card--amr .onboarding-view__skeleton-model {
-  width: 100%;
 }
 .onboarding-view__skeleton-model-label {
   width: 96px;

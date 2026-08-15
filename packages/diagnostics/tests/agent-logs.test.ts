@@ -74,26 +74,20 @@ describe("buildRunEventLogSources", () => {
 });
 
 describe("buildAgentCliLogSources", () => {
-  it("collects claude / codex / opencode / amr log files under their known dirs", async () => {
+  it("collects claude / codex / opencode log files under their known dirs", async () => {
     const home = join(tempDir, "home");
-    const dataDir = join(tempDir, "data");
     await touch(join(home, ".claude", "daemon.log"));
     await touch(join(home, ".codex", "log", "codex-tui.log"));
     await touch(join(home, ".local", "share", "opencode", "log", "2026-01-01T00.log"));
-    await touch(
-      join(dataDir, "amr", "opencode-home", ".local", "share", "opencode", "log", "2026-01-02T00.log"),
-    );
     // Secret-bearing files outside *.log dirs must NOT be swept.
     await touch(join(home, ".codex", "auth.json"), "secret");
-    await touch(join(home, ".amr", "config.json"), "secret");
 
-    const sources = await buildAgentCliLogSources({ homeDir: home, dataDir });
+    const sources = await buildAgentCliLogSources({ homeDir: home });
     const names = sources.map((s) => s.name);
 
     expect(names).toContain("agent-cli-logs/claude/daemon.log");
     expect(names).toContain("agent-cli-logs/codex/codex-tui.log");
     expect(names).toContain("agent-cli-logs/opencode/2026-01-01T00.log");
-    expect(names).toContain("agent-cli-logs/amr/2026-01-02T00.log");
     // No secrets, and only *.log files.
     expect(names.some((n) => n.includes("auth.json"))).toBe(false);
     expect(names.some((n) => n.includes("config.json"))).toBe(false);
@@ -101,25 +95,6 @@ describe("buildAgentCliLogSources", () => {
       expect(source.name.endsWith(".log")).toBe(true);
       expect(source.tailBytes).toBeGreaterThan(0);
     }
-  });
-
-  it("honors an explicit amrOpenCodeHome override over the dataDir default", async () => {
-    const home = join(tempDir, "home");
-    const dataDir = join(tempDir, "data");
-    const overrideHome = join(tempDir, "custom-amr-home");
-    // Default location has a log, but the override points elsewhere — only the
-    // override's logs should be swept (mirrors a user OPENCODE_TEST_HOME).
-    await touch(
-      join(dataDir, "amr", "opencode-home", ".local", "share", "opencode", "log", "default.log"),
-    );
-    await touch(
-      join(overrideHome, ".local", "share", "opencode", "log", "override.log"),
-    );
-
-    const sources = await buildAgentCliLogSources({ homeDir: home, dataDir, amrOpenCodeHome: overrideHome });
-    const amrNames = sources.filter((s) => s.name.startsWith("agent-cli-logs/amr/")).map((s) => s.name);
-    expect(amrNames).toContain("agent-cli-logs/amr/override.log");
-    expect(amrNames).not.toContain("agent-cli-logs/amr/default.log");
   });
 
   it("honors claudeConfigDir / codexHome overrides over the home defaults", async () => {

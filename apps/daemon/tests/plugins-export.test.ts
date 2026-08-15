@@ -75,6 +75,7 @@ describe('exportPlugin', () => {
     const manifest = JSON.parse(
       await readFile(path.join(result.folder, 'open-design.json'), 'utf8'),
     );
+    expect(manifest).not.toHaveProperty('$schema');
     expect(manifest.provenance.snapshotId).toBe(snap.snapshotId);
     expect(manifest.provenance.manifestSourceDigest).toBe('a'.repeat(64));
   });

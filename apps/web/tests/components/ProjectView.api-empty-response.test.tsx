@@ -248,6 +248,7 @@ function renderProjectView(
       designTemplates={[] as SkillSummary[]}
       designSystems={[] as DesignSystemSummary[]}
       daemonLive
+      byokRuntimeAvailable={agents.some((agent) => agent.id === 'byok-opencode' && agent.available)}
       onModeChange={vi.fn()}
       onAgentChange={vi.fn()}
       onAgentModelChange={vi.fn()}
@@ -539,7 +540,7 @@ describe('ProjectView API empty response handling', () => {
     await sendTestPrompt();
 
     await waitFor(() =>
-      expect(screen.getAllByText(/BYOK API runs require OpenCode/i).length).toBeGreaterThan(0),
+      expect(screen.getAllByText(/bundled BYOK runtime is unavailable/i).length).toBeGreaterThan(0),
     );
     expect(mockedStreamViaDaemon).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalledWith(

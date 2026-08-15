@@ -1,8 +1,8 @@
 import { expect, test } from '@/playwright/suite';
 import type { Page } from '@playwright/test';
-import { openSettingsDialog } from '../lib/playwright/amr.js';
+import { openSettingsDialog } from '../lib/playwright/app.js';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 // WCAG AA threshold for normal text. We assert against this rather than AAA
 // because the codebase has historically targeted AA for muted-on-subtle

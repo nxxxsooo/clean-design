@@ -44,12 +44,6 @@ type RunStatus = {
 
 describe('same-run retry stale turnCompletedCleanly (review red spec)', () => {
   const originalEnv = {
-    POSTHOG_KEY: process.env.POSTHOG_KEY,
-    POSTHOG_HOST: process.env.POSTHOG_HOST,
-    LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY,
-    LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
-    LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL,
-    OPEN_DESIGN_TELEMETRY_RELAY_URL: process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL,
     OD_CHAT_RUN_INACTIVITY_TIMEOUT_MS: process.env.OD_CHAT_RUN_INACTIVITY_TIMEOUT_MS,
   };
   let started: StartedServer | null = null;
@@ -73,12 +67,6 @@ describe('same-run retry stale turnCompletedCleanly (review red spec)', () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-stale-turn-flag-bin-'));
     const fakeClaude = await writeEmptyTurnThenCrashClaude(binDir, 'claude-staleflag');
 
-    delete process.env.POSTHOG_KEY;
-    delete process.env.POSTHOG_HOST;
-    delete process.env.LANGFUSE_PUBLIC_KEY;
-    delete process.env.LANGFUSE_SECRET_KEY;
-    delete process.env.LANGFUSE_BASE_URL;
-    delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
     // Trip the no-output watchdog after the empty clean turn. The window must
     // comfortably outlast the time it takes the daemon to parse attempt 1's
     // `turn_end` and set run.turnCompletedCleanly — otherwise (e.g. a cold
@@ -90,8 +78,6 @@ describe('same-run retry stale turnCompletedCleanly (review red spec)', () => {
     await putConfig(started.url, {
       agentId: 'claude',
       agentCliEnv: { claude: { CLAUDE_BIN: fakeClaude } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
 
     const run = await createAndWaitForRun(started.url);
@@ -169,9 +155,6 @@ async function createAndWaitForRun(url: string): Promise<RunStatus> {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-od-analytics-device-id': 'stale-flag-test',
-      'x-od-analytics-session-id': 'stale-flag-session',
-      'x-od-analytics-client-type': 'web',
     },
     body: JSON.stringify({
       projectId,

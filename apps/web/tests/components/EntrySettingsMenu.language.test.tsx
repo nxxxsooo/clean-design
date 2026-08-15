@@ -7,11 +7,6 @@ import { EntrySettingsMenu } from '../../src/components/EntrySettingsMenu';
 import { I18nProvider } from '../../src/i18n';
 import type { AppConfig } from '../../src/types';
 
-vi.mock('../../src/analytics/provider', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/analytics/provider')>();
-  return { ...actual, useAnalytics: () => ({ track: vi.fn() }) };
-});
-
 const originalFetch = globalThis.fetch;
 
 function jsonResponse(body: unknown, status = 200): Response {

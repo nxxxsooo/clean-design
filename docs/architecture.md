@@ -1,19 +1,11 @@
 # Architecture
 
-**Parent:** [`spec.md`](spec.md) · **Siblings:** [`skills-protocol.md`](skills-protocol.md) · [`agent-adapters.md`](agent-adapters.md) · [`modes.md`](modes.md)
+**Sibling:** [`skills-protocol.md`](skills-protocol.md)
 
 This document describes the code-backed runtime topology and the boundaries
-between the web app, daemon, desktop/packaged shells, agent runtimes, and
+between the web app, daemon, desktop/packaged shells, agent runtimes, and local
 content registries. For repository ownership rules, the root and layer
-`AGENTS.md` files remain authoritative. For embedding Open Design behind
-another control plane, see [`orchestrator-workspaces.md`](orchestrator-workspaces.md).
-
-> Historical note: the first architecture draft sketched a Vercel tunnel
-> mode, a browser-only direct-API mode, WebSocket `session.generate` messages,
-> an in-memory session bus, `history.jsonl`, and a three-root watched skill
-> registry. Those sketches were overtaken by the implemented HTTP/SSE,
-> SQLite-backed daemon, request-time registries, packaged sidecars, and BYOK
-> proxy. They are not current deployment modes or compatibility promises.
+`AGENTS.md` files remain authoritative.
 
 ## 1. Runtime shapes
 
@@ -30,27 +22,15 @@ receives the selected daemon port and rewrites `/api/*`, `/artifacts/*`, and
 `/frames/*` to the sibling Express process. Ports are transport details; they
 do not define process identity, namespaces, or daemon data roots.
 
-### Packaged desktop and packaged headless
+### Packaged desktop
 
-`apps/packaged` starts the packaged daemon and web sidecars. The Electron entry
-also starts the desktop shell; the headless entry omits desktop. Packaged code
-resolves channel/namespace-scoped runtime and data identities before spawning
-the daemon, and the desktop discovers the web URL through sidecar IPC rather
-than assuming a port.
+`apps/packaged` starts the packaged daemon and web sidecars alongside the
+Electron desktop shell. Packaged code resolves namespace-scoped runtime and
+data identities before spawning the daemon, and the desktop discovers the web
+URL through authenticated sidecar IPC rather than assuming a port.
 
-Read `tools/pack/AGENTS.md` before changing packaged launch, update, installer,
-or channel identity behavior.
-
-### Container and daemon-served production
-
-The production daemon can serve the static Next.js export from `apps/web/out`
-and the `/api/*` surface from one origin. The repository Docker Compose file
-uses that shape as one service. Its published host port is configurable; the
-container's documented default remains `7456`.
-
-Public or shared deployments must configure API authentication, allowed
-origins, and reverse-proxy SSE behavior. See [`deployment/docker.md`](deployment/docker.md)
-and [`../deploy/README.md`](../deploy/README.md).
+Read `tools/pack/AGENTS.md` before changing packaged launch, install, cleanup,
+or namespace identity behavior.
 
 ## 2. Component topology
 
@@ -66,15 +46,14 @@ Next.js web app ────────────────┐
 Express daemon ◄────────────────┘
    │       │        │
    │       │        ├─ SQLite state and daemon-owned project files
-   │       ├─ skills / design templates / design systems / plugins
-   └─ runtime registry → spawned CLI or ACP process
+   │       ├─ skills / design templates / design systems
+   └─ runtime registry → one of five supported local CLIs
                             │
                             └─ structured events, file writes, or text output
 ```
 
-The web UI and the `od` CLI call the same daemon HTTP APIs. The CLI is not a
-second business-logic implementation; it is the machine-readable surface for
-the same capabilities.
+The web UI and internal commands share the same daemon HTTP APIs rather than
+implementing product logic twice.
 
 ## 3. Main components
 
@@ -82,7 +61,7 @@ the same capabilities.
 
 The web app is a Next.js 16 App Router application using React 18. It owns:
 
-- project, chat, file-workspace, preview, Settings, marketplace, and creation
+- project, chat, file-workspace, preview, Settings, and creation
   workflows;
 - daemon and BYOK transport providers;
 - rendering of streamed runtime events and inline artifacts such as
@@ -102,7 +81,7 @@ The Express daemon is the product authority for `/api/*`. It owns:
 - agent detection, launch, run bookkeeping, cancellation, and SSE output;
 - prompt composition from the active design system, primary skill/template,
   craft rules, project metadata, and per-turn additions;
-- plugin, MCP, media, automation, memory, library, and design-system services;
+- media, memory, library, and design-system services;
 - static production serving and loopback/security policy.
 
 `apps/daemon/src/server.ts` still composes the application, while route modules
@@ -111,8 +90,10 @@ Shared request/response shapes live in `packages/contracts`.
 
 ### 3.3 Runtime registry and detection
 
-`apps/daemon/src/runtimes/registry.ts` collects one `RuntimeAgentDef` per
-shipped runtime plus user-defined local profiles. Definitions declare launch,
+`apps/daemon/src/runtimes/registry.ts` collects one `RuntimeAgentDef` for Codex,
+Claude Code, Antigravity, OpenCode, and Pi, plus allowed user-defined profiles.
+The internal `byok-opencode` definition is not public runtime discovery.
+Definitions declare launch,
 prompt delivery, model discovery, auth probing, stream format, and optional
 capabilities; the shared engine performs the lifecycle.
 
@@ -121,7 +102,7 @@ uses `resolveAgentLaunch()` so the probed executable is the same configured,
 fallback, or packaged path a run will spawn. A successful version launch gates
 availability; help/capability, model, and declared auth probes then run in
 parallel. There is no config-directory confidence heuristic or persisted
-24-hour availability cache. See [`agent-adapters.md`](agent-adapters.md).
+24-hour availability cache.
 
 ### 3.4 Content registries
 
@@ -132,7 +113,6 @@ Functional skills and rendering templates are separate listing surfaces:
 | Functional skills | `skills/` | `/api/skills` | Capabilities an agent invokes while working |
 | Design templates | `design-templates/` | `/api/design-templates` | Renderable starting points for creation workflows |
 | Design systems | `design-systems/` | `/api/design-systems` | Brand tokens, rules, and fixtures |
-| Plugins | `plugins/_official/` plus configured registries | `/api/plugins` | Installable bundles and marketplace metadata |
 | Craft | `craft/` | composed by the daemon | Universal rules requested by a skill/template |
 
 The skill and template endpoints scan their user-writable root first and their
@@ -142,15 +122,15 @@ project's primary `skillId` may identify either a functional skill or a design
 template. Listing separation does not imply automatic composition: selecting
 a Start from template replaces the creation tab's default primary skill.
 
-The design-system and plugin services have their own import, validation, and
-storage rules; they are not additional skill roots.
+The design-system service has its own import, validation, and storage rules; it
+is not an additional skill root.
 
 ### 3.5 Persistence and project files
 
 On startup, `apps/daemon/src/server.ts` resolves `OD_DATA_DIR` once into
 `RUNTIME_DATA_DIR`. SQLite, managed project workspaces, artifacts, user-owned
-registry entries, credentials, automation state, plugin state, and other
-daemon-owned data derive from that resolved root.
+registry entries, credentials, and other daemon-owned data derive from that
+resolved root.
 
 The one project-workspace exception is folder import: an imported project uses
 the user-selected external `metadata.baseDir`. The daemon validates and bounds
@@ -176,7 +156,7 @@ signals that must come from the active frame re-check the active window.
 
 ### Filesystem execution profile
 
-1. The web UI or `od` CLI creates/selects a project through `/api/projects`.
+1. The web UI creates or selects a project through `/api/projects`.
 2. A chat/run request reaches the daemon over `/api/*`.
 3. The daemon resolves the project, design system, primary skill or design
    template, per-turn skills, runtime definition, and execution metadata.
@@ -221,9 +201,8 @@ POST /api/chat                         -> text/event-stream
 The exact API list and DTOs evolve in route modules and `packages/contracts`;
 the table above is an orientation aid, not an exhaustive protocol schema.
 
-SSE responses disable proxy buffering/transform and emit keepalives. A reverse
-proxy must keep `/api/*` streaming routes unbuffered and uncompressed and use
-timeouts long enough for model runs.
+SSE responses disable transforms and emit keepalives so long local runs remain
+observable through the loopback boundary.
 
 ## 6. Folder import and desktop trust
 
@@ -233,7 +212,7 @@ managed storage, and applies safe path resolution to every later file access.
 
 When paired with desktop, folder import is guarded by a short-lived,
 single-use HMAC token minted by the trusted main process after the native
-folder picker succeeds. Packaged/headless and web-only launches explicitly
+folder picker succeeds. Packaged and source-development launches explicitly
 select whether that desktop-auth gate applies. Imported projects that may use
 the desktop open-path bridge carry a server-controlled trusted-picker marker;
 ordinary project create/update requests cannot forge it.
@@ -244,11 +223,11 @@ Shared DTOs live in `packages/contracts`.
 
 ## 7. Security boundaries
 
-- The daemon binds to loopback by default. Non-loopback/public deployment
-  requires explicit bind, origin, and authentication configuration.
+- The daemon binds to loopback. Clean Design has no public server or deployment
+  mode.
 - External fetch/proxy routes enforce URL and SSRF policy at their daemon
   boundary.
-- Artifact and plugin previews run in sandboxed iframes without host
+- Artifact previews run in sandboxed iframes without host
   same-origin access; individual surfaces opt into only the sandbox features
   they require, such as downloads or popups.
 - File routes resolve and validate paths against the active project root.
@@ -275,5 +254,4 @@ Shared DTOs live in `packages/contracts`.
 | User-level validation | `e2e/` |
 
 When a user-facing capability changes, keep its daemon endpoint, shared
-contract, web surface, and `od` CLI surface aligned as required by the root
-`AGENTS.md` dual-track rule.
+contract and web surface aligned as required by the root `AGENTS.md` rules.

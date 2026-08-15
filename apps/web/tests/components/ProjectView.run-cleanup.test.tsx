@@ -976,7 +976,7 @@ describe('ProjectView daemon cleanup', () => {
           id: 'brand-assistant-1',
           runStatus: 'canceled',
         }),
-        expect.objectContaining({ telemetryFinalized: true }),
+        undefined,
       );
     });
     expect(streamViaDaemon).not.toHaveBeenCalled();
@@ -1951,7 +1951,7 @@ describe('ProjectView daemon cleanup', () => {
     expect(phantomSave).toBeUndefined();
   });
 
-  it('persists a daemon assistant row as failed after an AMR auth error returns post-run creation', async () => {
+  it('persists a daemon assistant row as failed after an auth error returns post-run creation', async () => {
     listConversations.mockResolvedValue([{ id: 'conv-1', title: 'Conversation' }]);
     listMessages.mockResolvedValue([]);
     fetchPreviewComments.mockResolvedValue([]);
@@ -2270,7 +2270,7 @@ describe('ProjectView daemon cleanup', () => {
           producedFiles: [existingArtifact],
           runStatus: 'succeeded',
         }),
-        expect.objectContaining({ telemetryFinalized: true }),
+        undefined,
       );
     });
     expect(reattachDaemonRun).not.toHaveBeenCalled();
@@ -2350,7 +2350,7 @@ describe('ProjectView daemon cleanup', () => {
           runStatus: 'failed',
           resumable: true,
         }),
-        expect.objectContaining({ telemetryFinalized: true }),
+        undefined,
       );
     });
     expect(reattachDaemonRun).not.toHaveBeenCalled();
@@ -2954,7 +2954,7 @@ describe('ProjectView daemon cleanup', () => {
           id: 'msg-reattach-terminal-success',
           runStatus: 'succeeded',
         }),
-        expect.objectContaining({ telemetryFinalized: true }),
+        undefined,
       );
     });
     const recoveredSave = saveMessage.mock.calls.find(
@@ -3071,7 +3071,7 @@ describe('ProjectView daemon cleanup', () => {
           id: 'msg-reattach-code-only-generic-disconnect',
           runStatus: 'succeeded',
         }),
-        expect.objectContaining({ telemetryFinalized: true }),
+        undefined,
       );
     });
   });
@@ -3555,7 +3555,7 @@ describe('ProjectView daemon cleanup', () => {
           id: 'msg-reattach-canceled',
           runStatus: 'canceled',
         }),
-        expect.objectContaining({ telemetryFinalized: true }),
+        undefined,
       );
     });
     expect(saveMessage).not.toHaveBeenCalledWith(
@@ -3565,7 +3565,7 @@ describe('ProjectView daemon cleanup', () => {
         id: 'msg-reattach-canceled',
         runStatus: 'succeeded',
       }),
-      expect.objectContaining({ telemetryFinalized: true }),
+      undefined,
     );
   });
 
@@ -3820,7 +3820,7 @@ describe('ProjectView daemon cleanup', () => {
           producedFiles: [recoveredArtifact],
           runStatus: 'succeeded',
         }),
-        expect.objectContaining({ telemetryFinalized: true }),
+        undefined,
       );
     });
   });
@@ -4011,7 +4011,7 @@ describe('ProjectView daemon cleanup', () => {
           content: replayedContent,
           runStatus: 'succeeded',
         }),
-        expect.objectContaining({ telemetryFinalized: true }),
+        undefined,
       );
     });
   });
@@ -4094,7 +4094,7 @@ describe('ProjectView daemon cleanup', () => {
           id: 'msg-recover-failed',
           producedFiles: [recoveredArtifact],
         }),
-        expect.objectContaining({ telemetryFinalized: true }),
+        undefined,
       );
     });
   });
@@ -4372,7 +4372,7 @@ describe('ProjectView daemon cleanup', () => {
           id: 'msg-reattach-endedat-succeeded',
           runStatus: 'succeeded',
         }),
-        expect.objectContaining({ telemetryFinalized: true }),
+        undefined,
       );
     });
     const recoveredSave = saveMessage.mock.calls.find(
@@ -4655,7 +4655,7 @@ describe('ProjectView daemon cleanup', () => {
           id: 'msg-reload-active-run',
           runStatus: 'succeeded',
         }),
-        expect.objectContaining({ telemetryFinalized: true }),
+        undefined,
       );
     });
     const recoveredSave = saveMessage.mock.calls.find(

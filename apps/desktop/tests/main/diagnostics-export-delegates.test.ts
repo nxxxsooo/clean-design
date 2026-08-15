@@ -6,7 +6,7 @@ describe("fetchDiagnosticsBundle", () => {
   it("GETs the daemon's own diagnostics export endpoint and returns its bytes", async () => {
     // Regression for the desktop-ipc export that rebuilt the bundle with a
     // GUESSED data dir (`<namespaceRoot>/data`) and so missed the daemon's real
-    // `runs/<id>/events.jsonl` + AMR logs in dev / OD_DATA_DIR-override setups.
+    // `runs/<id>/events.jsonl` plus agent logs in dev / OD_DATA_DIR-override setups.
     // The fix delegates to the daemon, which knows its real RUNTIME_DATA_DIR.
     const bytes = new Uint8Array([0x50, 0x4b, 0x03, 0x04]); // "PK\x03\x04" (zip magic)
     const fetchImpl = vi.fn(async () => new Response(bytes, { status: 200 }));

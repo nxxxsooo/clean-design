@@ -5,7 +5,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   detectAgents,
-  getDetectedRuntimeVersions,
 } from '../../src/runtimes/detection.js';
 
 const roots: string[] = [];
@@ -27,35 +26,11 @@ function executable(name: string, version: string): string {
 }
 
 describe('runtime version provenance', () => {
-  it('remembers the exact detected CLI version for later run telemetry', async () => {
+  it('reports the exact detected CLI version in the agent inventory', async () => {
     executable('claude', 'claude 9.8.7');
 
     const agents = await detectAgents();
 
     expect(agents.find((agent) => agent.id === 'claude')?.version).toBe('claude 9.8.7');
-    expect(getDetectedRuntimeVersions('claude')).toEqual({
-      agentCliVersion: 'claude 9.8.7',
-    });
   });
-
-  it.runIf(process.platform !== 'win32')(
-    'records the Vela CLI and its OpenCode companion as separate versions',
-    async () => {
-      const vela = executable('vela', 'vela 0.0.26');
-      const opencode = executable('opencode', 'opencode 1.2.3');
-
-      await detectAgents({
-        amr: {
-          VELA_BIN: vela,
-          VELA_OPENCODE_BIN: opencode,
-        },
-      });
-
-      expect(getDetectedRuntimeVersions('amr')).toEqual({
-        agentCliVersion: 'vela 0.0.26',
-        runtimeCompanionName: 'opencode',
-        runtimeCompanionVersion: 'opencode 1.2.3',
-      });
-    },
-  );
 });

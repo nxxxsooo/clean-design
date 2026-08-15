@@ -15,10 +15,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { startServer } from '../src/server.js';
-import { migratePlugins } from '../src/plugins/persistence.js';
-import { defaultRegistryRoots, upsertInstalledPlugin } from '../src/plugins/registry.js';
+import { upsertInstalledPlugin } from '../src/plugins/registry.js';
+import type { InstalledPluginRecord, PluginManifest } from '@open-design/contracts';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(here, '../../..');
+const serverRuntimeDataRoot = process.env.OD_DATA_DIR
+  ? path.resolve(projectRoot, process.env.OD_DATA_DIR)
+  : path.join(projectRoot, '.od');
 
 let server: http.Server;
 let baseUrl: string;
@@ -33,18 +40,16 @@ beforeAll(async () => {
     path.join(surfacesDir, 'index.html'),
     '<!DOCTYPE html><title>fixture</title><script>console.log(1)</script>',
   );
-  await writeFile(
-    path.join(pluginRoot, 'open-design.json'),
-    JSON.stringify({
-      $schema: 'https://open-design.ai/schemas/plugin.v1.json',
-      name: 'asset-plugin',
-      title: 'Asset',
-      version: '1.0.0',
-      description: 'fixture',
-      license: 'MIT',
-      od: { kind: 'skill', capabilities: ['prompt:inject', 'genui:custom-component'] },
-    }),
-  );
+  const manifest = {
+    $schema: 'https://open-design.ai/schemas/plugin.v1.json',
+    name: 'asset-plugin',
+    title: 'Asset',
+    version: '1.0.0',
+    description: 'fixture',
+    license: 'MIT',
+    od: { kind: 'skill', capabilities: ['prompt:inject', 'genui:custom-component'] },
+  } as PluginManifest;
+  await writeFile(path.join(pluginRoot, 'open-design.json'), JSON.stringify(manifest));
 
   const started = (await startServer({ port: 0, returnServer: true })) as {
     url: string;
@@ -55,36 +60,29 @@ beforeAll(async () => {
   server = started.server;
   shutdown = started.shutdown;
 
-  // Insert the plugin row into the running daemon's DB. We can't reach
-  // the daemon's `db` handle directly, so we open a sibling SQLite
-  // session against the same RUNTIME_DATA_DIR. Instead, simulate the
-  // installer's effect by hitting the install API:
-  //
-  // For test simplicity we open a private DB and skip the daemon's
-  // registry. The asset route reads through `getInstalledPlugin(db,…)`
-  // backed by the daemon's own DB, so we must use the install route.
-  // But install requires SAFE_BASENAME id matching the folder name —
-  // achievable by pointing at our prepared fixture.
-  const installResp = await fetch(`${baseUrl}/api/plugins/install`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
-    body: JSON.stringify({ source: pluginRoot }),
-  });
-  // Drain SSE.
-  if (installResp.body) {
-    const reader = installResp.body.getReader();
-    while (true) {
-      const { done } = await reader.read();
-      if (done) break;
-    }
-  }
+  const now = Date.now();
+  const db = new Database(path.join(serverRuntimeDataRoot, 'app.sqlite'));
+  upsertInstalledPlugin(db, {
+    id: 'asset-plugin',
+    title: 'Asset',
+    version: '1.0.0',
+    sourceKind: 'bundled',
+    source: pluginRoot,
+    trust: 'bundled',
+    capabilitiesGranted: ['prompt:inject', 'genui:custom-component'],
+    manifest,
+    fsPath: pluginRoot,
+    installedAt: now,
+    updatedAt: now,
+  } as InstalledPluginRecord);
+  db.close();
   const secretPath = path.join(pluginRoot, 'secret.txt');
   const outsideDir = path.join(pluginRoot, 'outside');
   await mkdir(outsideDir, { recursive: true });
   await writeFile(secretPath, 'outside secret');
   await writeFile(path.join(outsideDir, 'nested-secret.txt'), 'nested outside secret');
-  const installedSurfacesDir = path.join(defaultRegistryRoots().userPluginsRoot, 'asset-plugin', 'surfaces');
-  const installedInternalDir = path.join(defaultRegistryRoots().userPluginsRoot, 'asset-plugin', 'internal-assets');
+  const installedSurfacesDir = surfacesDir;
+  const installedInternalDir = path.join(pluginRoot, 'internal-assets');
   await mkdir(installedInternalDir, { recursive: true });
   await writeFile(path.join(installedInternalDir, 'nested-internal.txt'), 'nested internal secret');
   await symlink(
@@ -93,16 +91,18 @@ beforeAll(async () => {
   );
   await symlink(outsideDir, path.join(installedSurfacesDir, 'linked-outside'), 'dir');
   await symlink(installedInternalDir, path.join(installedSurfacesDir, 'linked-internal'), 'dir');
-  void migratePlugins;
-  void upsertInstalledPlugin;
-  void Database;
 });
 
 afterAll(async () => {
-  await fetch(`${baseUrl}/api/plugins/asset-plugin/uninstall`, { method: 'POST' }).catch(() => undefined);
   await Promise.resolve(shutdown?.());
   await new Promise<void>((resolve) => server.close(() => resolve()));
-  await rm(path.join(defaultRegistryRoots().userPluginsRoot, 'asset-plugin'), { recursive: true, force: true });
+  try {
+    const db = new Database(path.join(serverRuntimeDataRoot, 'app.sqlite'));
+    db.prepare('DELETE FROM installed_plugins WHERE id = ?').run('asset-plugin');
+    db.close();
+  } catch {
+    // ignore cleanup failures after a failed server boot
+  }
   await rm(pluginRoot, { recursive: true, force: true });
 });
 

@@ -2,14 +2,13 @@
 // `run_finished` events with `result === 'failed'` to carry a non-empty
 // `error_code` so dashboards keyed on it can break failures down by
 // reason. Several daemon failure paths reach `runs.finish('failed',
-// ...)` WITHOUT first emitting an SSE `error` event (ACP fatal,
+// ...)` WITHOUT first emitting an SSE `error` event (fatal RPC,
 // agentStreamError fall-through, child close with no diagnostic). When
 // they do, the run status body's `errorCode` is `null`. The fallback
 // chain in `run-result.ts` turns those signal/exitCode hints into a
 // best-effort code so the wire emission never blanks out.
 //
 // This pins each failure shape's expected output. A future refactor
-// that loses the fallback re-introduces the original symptom: PostHog
 // shows `result=failed` events with no `error_code`.
 
 import { describe, expect, it } from 'vitest';
@@ -92,7 +91,6 @@ describe('deriveRunErrorCode', () => {
     // This is the shape produced when `acpSession.hasFatalError()` is
     // true even though the child exited cleanly (code=0, no signal) —
     // see `child.on('close', ...)` in server.ts. Without this fallback,
-    // those failures would still blank out on PostHog.
     expect(
       deriveRunErrorCode({
         status: 'failed',

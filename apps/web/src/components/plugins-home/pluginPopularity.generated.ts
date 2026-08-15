@@ -1,7 +1,7 @@
 // AUTO-GENERATED — DO NOT EDIT BY HAND.
 //
 // Frozen upstream template ranking used to order the plugin/example grid and
-// Home rail. Clean Design does not collect or refresh usage analytics.
+// Home rail. Clean Design does not collect or refresh usage counters.
 //
 // How it is built (deterministic, creds-free transform):
 //   score = 0.6 * norm(log1p(distinctUsers)) + 0.4 * norm(log1p(runs))

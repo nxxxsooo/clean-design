@@ -13,20 +13,16 @@ const buildTargets = [
   "packages/contracts",
   "packages/components",
   "packages/platform",
-  "packages/download",
   "packages/host",
   "packages/registry-protocol",
   "packages/agui-adapter",
   "packages/plugin-runtime",
   "packages/sidecar-proto",
-  "packages/launcher-proto",
   "packages/sidecar",
   "packages/diagnostics",
   "apps/daemon",
   "tools/dev",
   "tools/pack",
-  "tools/release",
-  "tools/serve",
 ];
 
 const jsExtensions = new Set([".js", ".cjs", ".mjs"]);

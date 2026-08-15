@@ -10,15 +10,13 @@ import {
 import type { FakeAgentId } from '@/playwright/fake-agents';
 import { T } from '@/timeouts';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 const ACTIVE_ARTIFACT_PREVIEW_SELECTOR = '[data-testid="artifact-preview-frame"]:visible, [data-testid="artifact-preview-frame-url-load"]:visible, [data-testid="artifact-preview-frame-srcdoc"]:visible, [data-testid="live-artifact-preview-frame"]:visible';
 const GENERATED_FILE = 'real-daemon-smoke.html';
 const GENERATED_HEADING = 'Real Daemon Smoke';
 const EDITED_GENERATED_HEADING = 'Real Daemon Smoke Edited';
 const CHUNKED_FILE = 'chunked-daemon-smoke.html';
 const CHUNKED_HEADING = 'Chunked Daemon Smoke';
-const PLAIN_STREAM_FILE = 'fake-agent-runtime-qwen.html';
-const PLAIN_STREAM_HEADING = 'Fake Agent Runtime qwen';
 const DELAYED_FILE = 'delayed-daemon-smoke.html';
 const DELAYED_HEADING = 'Delayed Daemon Smoke';
 const SLOW_RELOAD_FILE = 'slow-reload-daemon-smoke.html';
@@ -118,20 +116,6 @@ test('[P0] real daemon run persists an artifact streamed across multiple chunks'
   await expect(frame.getByRole('heading', { name: CHUNKED_HEADING })).toBeVisible();
 
   await expectProjectFileToContain(page, projectId, CHUNKED_FILE, CHUNKED_HEADING);
-});
-
-test('[P1] plain stdout daemon runtime persists artifact tags into project files and preview', async ({ page }) => {
-  await page.goto('/');
-  await createProject(page, 'Plain stream artifact smoke', 'qwen');
-  await expectWorkspaceReady(page);
-
-  await sendPrompt(page, 'Fake runtime smoke for qwen');
-
-  const { projectId } = await currentProjectContext(page);
-  await expectProjectFilesToContain(page, projectId, [PLAIN_STREAM_FILE]);
-  await expect(artifactPreview(page)).toBeVisible();
-  await expect(artifactPreviewFrame(page).getByRole('heading', { name: PLAIN_STREAM_HEADING })).toBeVisible();
-  await expectProjectFileToContain(page, projectId, PLAIN_STREAM_FILE, PLAIN_STREAM_HEADING);
 });
 
 test('[P0] real daemon run surfaces process/parser errors in chat', async ({ page }) => {
@@ -521,29 +505,6 @@ test('[P0] empty daemon output fails cleanly, persists after reload, and does no
   expect(await listProjectFiles(page, projectId)).toEqual([]);
 });
 
-test('[P1] plain stdout daemon runtime surfaces stderr-only failures without ghost files', async ({ page }) => {
-  await page.goto('/');
-  await createProject(page, 'Plain stderr failure smoke', 'qwen');
-  await expectWorkspaceReady(page);
-
-  await sendPrompt(page, 'Return a stderr-only daemon smoke failure');
-
-  const expectedError = 'stderr-only daemon smoke failure from fake qwen';
-  await expect(runErrorCard(page)).toContainText(expectedError, { timeout: 15_000 });
-
-  const { projectId, conversationId } = await currentProjectContext(page);
-  await expect.poll(async () => {
-    const messages = await listConversationMessages(page, projectId, conversationId);
-    return messages.find((message) => message.role === 'assistant')?.runStatus ?? 'missing';
-  }, { timeout: 15_000 }).toBe('failed');
-  expect(await listProjectFiles(page, projectId)).toEqual([]);
-
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await expectWorkspaceReady(page);
-  await expect(runErrorCard(page)).toContainText(expectedError);
-  expect(await listProjectFiles(page, projectId)).toEqual([]);
-});
-
 test('[P0] separate projects keep daemon artifacts isolated across recent-project navigation', async ({ page }) => {
   await page.goto('/');
   await createProject(page, 'Real daemon isolation alpha');
@@ -627,71 +588,6 @@ test('[P1] BYOK OpenCode run is blocked before spawn when provider config is mis
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expectWorkspaceReady(page);
   expect(await listProjectFiles(page, projectId)).toEqual([]);
-});
-
-test('[P1] plugin authoring produces a generated-plugin scaffold with action cards', async ({ page }) => {
-  await configureFakeAgent(page, 'codex');
-  await installBrowserAgentConfig(page, 'codex');
-  await gotoEntryHome(page);
-  await setBrowserAgentConfig(page, 'codex');
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await waitForLoadingToClear(page);
-  await setBrowserAgentConfig(page, 'codex');
-  await configureFakeAgent(page, 'codex');
-  await expectBrowserAgentConfig(page, 'codex');
-  await dismissPrivacyDialog(page);
-
-  // Enter plugin authoring through the Plugins page create button. It drives
-  // the same queuePluginAuthoring flow as the home shortcuts menu, and this
-  // spec's oracle is the generated scaffold plus its action cards — not the
-  // menu chrome. The shortcuts trigger itself sits disabled on CI runners
-  // while a home plugin apply hangs; that anomaly is tracked as its own
-  // follow-up rather than blocking this journey.
-  await page.goto('/plugins', { waitUntil: 'domcontentloaded' });
-  await waitForLoadingToClear(page);
-  await page.getByTestId('plugins-create-button').click();
-  await expect(page.getByTestId('home-hero-input')).toHaveText(/Create an Open Design plugin for:/);
-
-  const projectRequestPromise = page.waitForRequest(isCreateProjectRequest);
-  const runRequestPromise = page.waitForRequest(isCreateRunRequest);
-  await page.getByTestId('home-hero-submit').click();
-
-  const projectRequest = await projectRequestPromise;
-  const projectBody = projectRequest.postDataJSON() as {
-    pluginId?: string;
-    pendingPrompt?: string;
-  };
-  expect(projectBody.pluginId).toBe('od-plugin-authoring');
-  expect(projectBody.pendingPrompt).toContain('produce a folder named generated-plugin');
-
-  const runRequest = await runRequestPromise;
-  const runBody = runRequest.postDataJSON() as { message?: string; agentId?: string };
-  expect(runBody.agentId).toBe('codex');
-  expect(runBody.message).toContain('produce a folder named generated-plugin');
-
-  await expectWorkspaceReady(page);
-  const { projectId } = await currentProjectContext(page);
-  await expectProjectFilesToContain(page, projectId, [
-    'generated-plugin/open-design.json',
-    'generated-plugin/SKILL.md',
-    'generated-plugin/examples/demo.md',
-  ]);
-  await expectProjectFileToContain(page, projectId, 'generated-plugin/open-design.json', '"name": "generated-plugin"');
-  await expectProjectFileToContain(page, projectId, 'generated-plugin/SKILL.md', '# Generated Plugin');
-
-  await expect(page.getByText('Files from this turn')).toBeVisible();
-  await expect(page.getByTestId('assistant-plugin-actions-generated-plugin')).toBeVisible();
-  await expect(page.getByTestId('assistant-plugin-install-generated-plugin')).toBeVisible();
-  await expect(page.getByTestId('assistant-plugin-publish-generated-plugin')).toBeVisible();
-  await expect(page.getByTestId('assistant-plugin-contribute-generated-plugin')).toBeVisible();
-
-  // The run auto-opens the produced file tab; the plugin-folder card lives in
-  // the Design Files ("All project files") view, so navigate there first.
-  await openAllProjectFiles(page);
-  await expect(page.getByTestId('design-plugin-folder-generated-plugin')).toBeVisible();
-  await expect(page.getByTestId('design-plugin-folder-install-generated-plugin')).toBeVisible();
-  await expect(page.getByTestId('design-plugin-folder-publish-generated-plugin')).toBeVisible();
-  await expect(page.getByTestId('design-plugin-folder-contribute-generated-plugin')).toBeVisible();
 });
 
 test('[P0] real daemon run supports fake non-Codex runtime protocols', async ({ page }) => {
@@ -1033,7 +929,7 @@ async function resetDaemonAppConfig(page: Page) {
   const response = await page.request.put('/api/app-config', {
     data: {
       onboardingCompleted: true,
-      agentId: 'mock',
+      agentId: null,
       agentModels: {},
       agentCliEnv: {},
       skillId: null,

@@ -1,60 +1,55 @@
-import { describe, expect, it } from "vitest";
 import { join, resolve } from "node:path";
+
+import { describe, expect, it } from "vitest";
 
 import { resolveToolPackConfig, WORKSPACE_ROOT } from "../src/config.js";
 
-describe("resolveToolPackConfig win build target", () => {
-  it("accepts the portable zip target and rejects unsupported values", () => {
-    expect(resolveToolPackConfig("win", { to: "zip" }).to).toBe("zip");
-    expect(resolveToolPackConfig("win", { to: "all" }).to).toBe("all");
-    expect(resolveToolPackConfig("win", { to: "nsis" }).to).toBe("nsis");
-    expect(() => resolveToolPackConfig("win", { to: "dmg" })).toThrow(/unsupported win --to target: dmg/);
+describe("resolveToolPackConfig mac build target", () => {
+  it("accepts mac artifacts and rejects unsupported values", () => {
+    expect(resolveToolPackConfig({ to: "zip" }).to).toBe("zip");
+    expect(resolveToolPackConfig({ to: "all" }).to).toBe("all");
+    expect(resolveToolPackConfig({ to: "dmg" }).to).toBe("dmg");
+    expect(() => resolveToolPackConfig({ to: "nsis" })).toThrow(/unsupported mac --to target: nsis/);
   });
 });
 
 describe("resolveToolPackConfig cache root", () => {
   it("keeps the default cache outside custom tools-pack roots", () => {
-    const config = resolveToolPackConfig("win", {
-      dir: "C:\\odqa-release-4ch",
+    const config = resolveToolPackConfig({
+      dir: "/tmp/clean-design-pack",
       namespace: "cache-root-test",
     });
 
-    expect(config.roots.toolPackRoot).toBe(resolve("C:\\odqa-release-4ch"));
+    expect(config.roots.toolPackRoot).toBe(resolve("/tmp/clean-design-pack"));
     expect(config.roots.cacheRoot).toBe(resolve(join(WORKSPACE_ROOT, ".tmp", "tools-pack", "cache")));
   });
 
   it("uses an explicit cache-dir when supplied", () => {
-    const config = resolveToolPackConfig("win", {
-      cacheDir: "C:\\odqa-tools-pack-cache",
-      dir: "C:\\odqa-release-4ch",
+    const config = resolveToolPackConfig({
+      cacheDir: "/tmp/clean-design-pack-cache",
+      dir: "/tmp/clean-design-pack",
       namespace: "cache-root-test",
     });
 
-    expect(config.roots.toolPackRoot).toBe(resolve("C:\\odqa-release-4ch"));
-    expect(config.roots.cacheRoot).toBe(resolve("C:\\odqa-tools-pack-cache"));
+    expect(config.roots.toolPackRoot).toBe(resolve("/tmp/clean-design-pack"));
+    expect(config.roots.cacheRoot).toBe(resolve("/tmp/clean-design-pack-cache"));
   });
 });
 
 describe("resolveToolPackConfig namespace defaults", () => {
   it("keeps ordinary local builds on the default namespace", () => {
-    expect(resolveToolPackConfig("mac").namespace).toBe("default");
-    expect(resolveToolPackConfig("win", { appVersion: "0.8.0" }).namespace).toBe("default");
+    expect(resolveToolPackConfig().namespace).toBe("default");
+    expect(resolveToolPackConfig({ appVersion: "0.8.0" }).namespace).toBe("default");
   });
 
-  it("defaults prerelease mac builds to their release channel namespace", () => {
-    expect(resolveToolPackConfig("mac", { appVersion: "0.8.0-beta.4" }).namespace).toBe("release-beta");
-    expect(resolveToolPackConfig("mac", { appVersion: "0.8.0-preview.4" }).namespace).toBe("release-preview");
-    expect(resolveToolPackConfig("mac", { appVersion: "0.8.0-prerelease.4" }).namespace).toBe("release-prerelease");
-  });
-
-  it("defaults prerelease non-mac builds to platform-specific release channel namespaces", () => {
-    expect(resolveToolPackConfig("win", { appVersion: "0.8.0-beta.4" }).namespace).toBe("release-beta-win");
-    expect(resolveToolPackConfig("linux", { appVersion: "0.8.0-preview.4" }).namespace).toBe("release-preview-linux");
-    expect(resolveToolPackConfig("win", { appVersion: "0.8.0-prerelease.4" }).namespace).toBe("release-prerelease-win");
+  it("defaults prerelease builds to their mac release-channel namespace", () => {
+    expect(resolveToolPackConfig({ appVersion: "0.8.0-beta.4" }).namespace).toBe("release-beta");
+    expect(resolveToolPackConfig({ appVersion: "0.8.0-preview.4" }).namespace).toBe("release-preview");
+    expect(resolveToolPackConfig({ appVersion: "0.8.0-prerelease.4" }).namespace).toBe("release-prerelease");
   });
 
   it("keeps an explicit namespace ahead of the prerelease channel default", () => {
-    expect(resolveToolPackConfig("mac", { appVersion: "0.8.0-beta.4", namespace: "custom-beta" }).namespace).toBe(
+    expect(resolveToolPackConfig({ appVersion: "0.8.0-beta.4", namespace: "custom-beta" }).namespace).toBe(
       "custom-beta",
     );
   });

@@ -22,7 +22,7 @@ function fakeConfig(): PackagedConfig {
     namespace: "release-stable-win",
     namespaceBaseRoot: join("C:", "Users", "Fred", "AppData", "Roaming", "Clean Design", "namespaces"),
     nodeCommand: null,
-    resourceRoot: join("C:", "Program Files", "Clean Design", "resources", "open-design"),
+    resourceRoot: join("C:", "Program Files", "Clean Design", "resources", "clean-design"),
     webOutputMode: "server",
     webSidecarEntry: null,
     webStandaloneRoot: null,

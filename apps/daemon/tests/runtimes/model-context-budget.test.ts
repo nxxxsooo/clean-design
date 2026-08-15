@@ -117,7 +117,7 @@ describe('model context budget', () => {
     const compacted = compactTranscriptForSessionRollover(transcript, 5_000);
 
     expect(compacted.omittedMessageBlocks).toBeGreaterThan(0);
-    expect(compacted.prompt).toContain('Open Design compacted');
+    expect(compacted.prompt).toContain('Clean Design compacted');
     expect(compacted.prompt).not.toContain('turn-0');
     expect(compacted.prompt).toContain('turn-7');
     expect(compacted.compactedTokens).toBeLessThanOrEqual(5_000);

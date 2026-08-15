@@ -1,9 +1,9 @@
 import { expect, test } from '@/playwright/suite';
 import { openNewProjectModal } from '@/playwright/rail';
 import type { Page, Route } from '@playwright/test';
-import { openSettingsDialog } from '../lib/playwright/amr.js';
+import { openSettingsDialog } from '../lib/playwright/app.js';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 function baseConfig(): Record<string, unknown> {
   return {
@@ -83,10 +83,6 @@ async function routeBootstrapApis(
         return;
       }
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
-      return;
-    }
-    if (path === '/api/connectors/composio/config') {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"configured":false,"apiKeyTail":""}' });
       return;
     }
     if (path === '/api/media/config' && method === 'GET') {
@@ -191,16 +187,12 @@ async function routeBootstrapApis(
 }
 
 async function waitForLoadingToClear(page: Page) {
-  await expect(page.getByText('Loading Open Design…')).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByText('Loading Clean Design…')).toHaveCount(0, { timeout: 15_000 });
 }
 
 async function gotoEntryHome(page: Page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await waitForLoadingToClear(page);
-  const privacyDialog = page.getByRole('dialog').filter({ hasText: 'Help us improve Open Design' });
-  if (await privacyDialog.isVisible().catch(() => false)) {
-    await privacyDialog.getByRole('button', { name: /I get it|not now|got it|don't share/i }).click();
-  }
 }
 
 async function openMediaSettings(page: Page) {

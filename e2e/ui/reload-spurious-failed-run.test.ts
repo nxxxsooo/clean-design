@@ -5,7 +5,7 @@ import { createFakeAgentRuntimes } from '@/playwright/fake-agents';
 import type { FakeAgentId } from '@/playwright/fake-agents';
 import { T } from '@/timeouts';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 const SLOW_RELOAD_FILE = 'slow-reload-daemon-smoke.html';
 const SLOW_RELOAD_HEADING = 'Slow Reload Daemon Smoke';
 

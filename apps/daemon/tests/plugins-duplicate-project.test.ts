@@ -31,6 +31,7 @@ async function makePreviewPlugin(root: string, id = 'duplicate-fixture'): Promis
   return {
     id,
     title: 'Duplicate Fixture',
+    sourceKind: 'bundled',
     fsPath: pluginRoot,
     manifest: {
       name: id,

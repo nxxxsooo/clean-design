@@ -153,7 +153,7 @@ async function findCodexRolloutPath(
  * Locate and read this run's codex rollout, returning the first-call usage of
  * its last turn. Fully best-effort: any failure (no CODEX_HOME, no session id,
  * missing rollout, unreadable file, partial turn) resolves to null so the
- * run_finished analytics path simply omits codex first-call fields rather than
+ * run summary simply omits codex first-call fields rather than
  * failing the capture.
  */
 export async function readCodexRolloutFirstCall(opts: {

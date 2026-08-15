@@ -5,9 +5,8 @@ import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as platform from '@open-design/platform';
 import {
-  assert, chmodSync, detectAgents, detectAgentsStream, inspectAgentExecutableResolution, join, minimalAgentDef, mkdirSync, mkdtempSync, opencode, resolveAgentExecutable, rmSync, spawnEnvForAgent, tmpdir, withEnvSnapshot, withPlatform, writeFileSync,
+  assert, chmodSync, detectAgents, inspectAgentExecutableResolution, join, minimalAgentDef, mkdirSync, mkdtempSync, opencode, resolveAgentExecutable, rmSync, spawnEnvForAgent, tmpdir, withEnvSnapshot, withPlatform, writeFileSync,
 } from './helpers/test-helpers.js';
-import { isCursorAuthFailureText } from '../../src/runtimes/auth.js';
 import { getRememberedLiveModels } from '../../src/runtimes/models.js';
 
 const fsTest = process.platform === 'win32' ? test.skip : test;
@@ -15,7 +14,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 
 // Claude Code owns its own auth resolution. Preserve credentials from the
 // inherited environment so users who run the local CLI with API-key auth get
-// the same behavior through Open Design.
+// the same behavior through Clean Design.
 test('spawnEnvForAgent preserves inherited Anthropic API credentials for the claude adapter', () => {
   const env = spawnEnvForAgent('claude', {
     ANTHROPIC_API_KEY: 'sk-leak',
@@ -82,10 +81,10 @@ test('spawnEnvForAgent applies configured Codex env without mutating the base en
   assert.equal('CODEX_BIN' in base, false);
 });
 
-test('spawnEnvForAgent backfills Windows cache directory env for Trae CLI launches', () => {
+test('spawnEnvForAgent backfills Windows cache directory env for Codex launches', () => {
   const env = withPlatform('win32', () =>
     spawnEnvForAgent(
-      'trae-cli',
+      'codex',
       {
         Path: 'C:\\Windows\\System32',
         USERPROFILE: 'C:\\Users\\ai',
@@ -107,7 +106,7 @@ test('spawnEnvForAgent keeps Windows cache directory env inside sandbox roots', 
   try {
     const env = withPlatform('win32', () =>
       spawnEnvForAgent(
-        'trae-cli',
+        'codex',
         {
           OD_DATA_DIR: dataDir,
           OD_SANDBOX_MODE: '1',
@@ -172,20 +171,20 @@ test('spawnEnvForAgent reapplies sandbox state roots after configured env overri
       join(dataDir, 'sandbox', 'config', 'claude'),
     );
 
-    const amrEnv = spawnEnvForAgent(
-      'amr',
+    const openCodeEnv = spawnEnvForAgent(
+      'opencode',
       {
         OD_DATA_DIR: dataDir,
         OD_SANDBOX_MODE: '1',
         PATH: '/usr/bin',
       },
       {
-        OPENCODE_TEST_HOME: '/Users/test/.opencode-host',
+        XDG_DATA_HOME: '/Users/test/.local/share-host',
       },
     );
     assert.equal(
-      amrEnv.OPENCODE_TEST_HOME,
-      join(dataDir, 'sandbox', 'agent-home', '.opencode'),
+      openCodeEnv.XDG_DATA_HOME,
+      join(dataDir, 'sandbox', 'config', 'data'),
     );
   } finally {
     rmSync(dataDir, { recursive: true, force: true });
@@ -385,17 +384,12 @@ test('inspectAgentExecutableResolution reports configured and PATH Codex binarie
   }
 });
 
-test('resolveAgentExecutable supports configured binary overrides for non-Codex adapters', () => {
+test('resolveAgentExecutable supports configured binary overrides for public non-Codex adapters', () => {
   const cases: Array<[string, string, string]> = [
     ['claude', 'claude', 'CLAUDE_BIN'],
     ['opencode', 'opencode', 'OPENCODE_BIN'],
-    ['cursor-agent', 'cursor-agent', 'CURSOR_AGENT_BIN'],
-    ['qwen', 'qwen', 'QWEN_BIN'],
-    ['qoder', 'qodercli', 'QODER_BIN'],
-    ['copilot', 'copilot', 'COPILOT_BIN'],
-    ['deepseek', 'deepseek', 'DEEPSEEK_BIN'],
-    ['trae-cli', 'traecli', 'TRAE_CLI_BIN'],
-    ['aider', 'aider', 'AIDER_BIN'],
+    ['pi', 'pi', 'PI_BIN'],
+    ['antigravity', 'agy', 'ANTIGRAVITY_BIN'],
   ];
   const dir = mkdtempSync(join(tmpdir(), 'od-agent-bin-overrides-'));
   try {
@@ -444,7 +438,7 @@ test('resolveAgentExecutable prefers opencode-cli before desktop opencode fallba
   }
 });
 
-test('detectAgents includes sanitized install and docs metadata from split runtime metadata', async () => {
+test('detectAgents exposes only the five public CLI runtimes', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'od-agent-install-meta-'));
   try {
     return await withEnvSnapshot(['PATH', 'OD_AGENT_HOME'], async () => {
@@ -452,68 +446,14 @@ test('detectAgents includes sanitized install and docs metadata from split runti
       process.env.OD_AGENT_HOME = dir;
 
       const agents = await detectAgents();
-      const qoder = agents.find((agent) => agent.id === 'qoder');
-      const deepseek = agents.find((agent) => agent.id === 'deepseek');
-      const kimi = agents.find((agent) => agent.id === 'kimi');
-
-      assert.ok(qoder);
-      assert.equal(qoder.available, false);
-      assert.equal(qoder.installUrl, 'https://qoder.com/download');
-      assert.equal(qoder.docsUrl, 'https://docs.qoder.com/');
-      assert.ok(deepseek);
-      assert.equal(
-        deepseek.docsUrl,
-        'https://github.com/Hmbown/CodeWhale/blob/main/README.md',
+      assert.deepEqual(
+        agents.map((agent) => agent.id).sort(),
+        ['antigravity', 'claude', 'codex', 'opencode', 'pi'],
       );
-      assert.ok(kimi);
-      assert.equal(
-        kimi.docsUrl,
-        'https://www.kimi.com/code/docs/en/kimi-cli/guides/getting-started.html',
-      );
-    });
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-fsTest('detectAgents keeps Kimi available when ACP model discovery fails', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'od-detect-kimi-modern-'));
-  try {
-    return await withEnvSnapshot(['PATH', 'OD_AGENT_HOME'], async () => {
-      const kimiBin = join(dir, 'kimi');
-      writeFileSync(
-        kimiBin,
-        [
-          '#!/usr/bin/env node',
-          'const args = process.argv.slice(2);',
-          "if (args.includes('acp')) {",
-          "  console.error('error: too many arguments. Expected 0 arguments but got 1.');",
-          '  process.exit(1);',
-          '}',
-          "if (args.length === 1 && args[0] === '--version') {",
-          "  console.log('kimi 0.6.0');",
-          '  process.exit(0);',
-          '}',
-          "console.error('unexpected args: ' + JSON.stringify(args));",
-          'process.exit(1);',
-          '',
-        ].join('\n'),
-      );
-      chmodSync(kimiBin, 0o755);
-
-      process.env.PATH = dir;
-      process.env.OD_AGENT_HOME = dir;
-
-      const agents = await detectAgents();
-      const kimi = agents.find((agent) => agent.id === 'kimi');
-
-      assert.ok(kimi);
-      assert.equal(kimi.available, true);
-      assert.equal(kimi.version, 'kimi 0.6.0');
-      assert.equal(kimi.models[0]?.id, 'default');
-      assert.equal(kimi.models[1]?.id, 'kimi-k2-turbo-preview');
-      assert.equal(kimi.models[2]?.id, 'moonshot-v1-8k');
-      assert.equal(kimi.models[3]?.id, 'moonshot-v1-32k');
+      for (const agent of agents) {
+        assert.equal(agent.installUrl, undefined);
+        assert.equal(agent.docsUrl, undefined);
+      }
     });
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -716,188 +656,6 @@ test('detectAgents applies configured env while probing the CLI', async () => {
   }
 });
 
-test('detectAgents reuses the opencode configured env for byok-opencode availability', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'od-byok-opencode-detect-'));
-  try {
-    await withEnvSnapshot(['PATH', 'OD_AGENT_HOME'], async () => {
-      const bin = join(dir, process.platform === 'win32' ? 'opencode.cmd' : 'opencode');
-      if (process.platform === 'win32') {
-        writeFileSync(
-          bin,
-          '@echo off\r\nif "%~1"=="--version" echo byok-opencode-test& exit /b 0\r\nif "%~1"=="models" echo openai/gpt-5& exit /b 0\r\nexit /b 0\r\n',
-        );
-      } else {
-        writeFileSync(
-          bin,
-          '#!/bin/sh\nif [ "$1" = "--version" ]; then echo byok-opencode-test; exit 0; fi\nif [ "$1" = "models" ]; then echo openai/gpt-5; exit 0; fi\nexit 0\n',
-        );
-        chmodSync(bin, 0o755);
-      }
-      process.env.PATH = '';
-      process.env.OD_AGENT_HOME = dir;
-
-      const configuredEnv = { opencode: { OPENCODE_BIN: bin } };
-      const agents = await detectAgents(configuredEnv);
-      const detected = agents.find((agent) => agent.id === 'byok-opencode');
-
-      assert.equal(detected?.available, true);
-      assert.equal(detected?.path, bin);
-      assert.equal(detected?.version, 'byok-opencode-test');
-
-      const streamed: string[] = [];
-      for await (const agent of detectAgentsStream(configuredEnv)) {
-        if (agent.id === 'byok-opencode') {
-          streamed.push(`${agent.available}:${agent.path}:${agent.version}`);
-        }
-      }
-
-      assert.deepEqual(streamed, [`true:${bin}:byok-opencode-test`]);
-    });
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('detectAgents marks Cursor Agent auth ok when cursor-agent status succeeds', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'od-cursor-auth-ok-'));
-  try {
-    await withEnvSnapshot(['PATH', 'OD_AGENT_HOME'], async () => {
-      const bin = join(dir, process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent');
-      if (process.platform === 'win32') {
-        writeFileSync(
-          bin,
-          '@echo off\r\nif "%~1"=="--version" echo 2026.05.07-test& exit /b 0\r\nif "%~1"=="models" echo auto& exit /b 0\r\nif "%~1"=="status" echo Authenticated& exit /b 0\r\nexit /b 0\r\n',
-        );
-      } else {
-        writeFileSync(
-          bin,
-          '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "2026.05.07-test"; exit 0; fi\nif [ "$1" = "models" ]; then echo "auto"; exit 0; fi\nif [ "$1" = "status" ]; then echo "Authenticated"; exit 0; fi\nexit 0\n',
-        );
-        chmodSync(bin, 0o755);
-      }
-      process.env.PATH = dir;
-      process.env.OD_AGENT_HOME = dir;
-
-      const agents = await detectAgents();
-      const detected = agents.find((agent) => agent.id === 'cursor-agent');
-
-      assert.equal(detected?.available, true);
-      assert.equal(detected?.authStatus, 'ok');
-      assert.equal(detected?.authMessage, undefined);
-    });
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('detectAgents surfaces Cursor Agent model labels without putting labels in ids', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'od-cursor-model-labels-'));
-  try {
-    await withEnvSnapshot(['PATH', 'OD_AGENT_HOME'], async () => {
-      const bin = join(dir, process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent');
-      if (process.platform === 'win32') {
-        writeFileSync(
-          bin,
-          '@echo off\r\nif "%~1"=="--version" echo 2026.05.16-test& exit /b 0\r\nif "%~1"=="models" (\r\n  echo Available models\r\n  echo auto - Auto\r\n  echo composer-2.5 - Composer 2.5 (current)\r\n  exit /b 0\r\n)\r\nif "%~1"=="status" echo Authenticated& exit /b 0\r\nexit /b 0\r\n',
-        );
-      } else {
-        writeFileSync(
-          bin,
-          '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "2026.05.16-test"; exit 0; fi\nif [ "$1" = "models" ]; then printf "%s\\n" "Available models" "auto - Auto" "composer-2.5 - Composer 2.5 (current)"; exit 0; fi\nif [ "$1" = "status" ]; then echo "Authenticated"; exit 0; fi\nexit 0\n',
-        );
-        chmodSync(bin, 0o755);
-      }
-      process.env.PATH = dir;
-      process.env.OD_AGENT_HOME = dir;
-
-      const agents = await detectAgents();
-      const detected = agents.find((agent) => agent.id === 'cursor-agent');
-
-      assert.equal(detected?.available, true);
-      assert.equal(detected?.modelsSource, 'live');
-      assert.deepEqual(detected?.models, [
-        { id: 'default', label: 'Default (CLI config)' },
-        { id: 'auto', label: 'Auto' },
-        { id: 'composer-2.5', label: 'Composer 2.5 (current)' },
-      ]);
-    });
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('detectAgents keeps Cursor Agent available when auth is missing', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'od-cursor-auth-missing-'));
-  try {
-    await withEnvSnapshot(['PATH', 'OD_AGENT_HOME'], async () => {
-      const bin = join(dir, process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent');
-      if (process.platform === 'win32') {
-        writeFileSync(
-          bin,
-          '@echo off\r\nif "%~1"=="--version" echo 2026.05.07-test& exit /b 0\r\nif "%~1"=="models" echo No models available for this account.& exit /b 0\r\nif "%~1"=="status" echo Authentication required. Please run agent login first, or set CURSOR_API_KEY environment variable. 1>&2& exit /b 1\r\nexit /b 0\r\n',
-        );
-      } else {
-        writeFileSync(
-          bin,
-          '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "2026.05.07-test"; exit 0; fi\nif [ "$1" = "models" ]; then echo "No models available for this account."; exit 0; fi\nif [ "$1" = "status" ]; then echo "Authentication required. Please run agent login first, or set CURSOR_API_KEY environment variable." >&2; exit 1; fi\nexit 0\n',
-        );
-        chmodSync(bin, 0o755);
-      }
-      process.env.PATH = dir;
-      process.env.OD_AGENT_HOME = dir;
-
-      const agents = await detectAgents();
-      const detected = agents.find((agent) => agent.id === 'cursor-agent');
-
-      assert.equal(detected?.available, true);
-      assert.equal(detected?.authStatus, 'missing');
-      assert.match(detected?.authMessage ?? '', /cursor-agent login/);
-      assert.deepEqual(
-        detected?.models.map((model) => model.id),
-        ['default', 'auto', 'sonnet-4', 'sonnet-4-thinking', 'gpt-5'],
-      );
-    });
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('detectAgents treats Cursor Agent Not logged in status as missing auth', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'od-cursor-not-logged-in-'));
-  try {
-    await withEnvSnapshot(['PATH', 'OD_AGENT_HOME'], async () => {
-      const bin = join(dir, process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent');
-      if (process.platform === 'win32') {
-        writeFileSync(
-          bin,
-          '@echo off\r\nif "%~1"=="--version" echo 2026.05.07-test& exit /b 0\r\nif "%~1"=="models" echo No models available for this account.& exit /b 0\r\nif "%~1"=="status" echo Not logged in 1>&2& exit /b 1\r\nexit /b 0\r\n',
-        );
-      } else {
-        writeFileSync(
-          bin,
-          '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "2026.05.07-test"; exit 0; fi\nif [ "$1" = "models" ]; then echo "No models available for this account."; exit 0; fi\nif [ "$1" = "status" ]; then echo "Not logged in" >&2; exit 1; fi\nexit 0\n',
-        );
-        chmodSync(bin, 0o755);
-      }
-      process.env.PATH = dir;
-      process.env.OD_AGENT_HOME = dir;
-
-      const agents = await detectAgents();
-      const detected = agents.find((agent) => agent.id === 'cursor-agent');
-
-      assert.equal(detected?.available, true);
-      assert.equal(detected?.authStatus, 'missing');
-      assert.match(detected?.authMessage ?? '', /cursor-agent login/);
-    });
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('Cursor auth matcher covers current unauthenticated Cursor error records', () => {
-  assert.equal(isCursorAuthFailureText('ConnectError: [unauthenticated]'), true);
-  assert.equal(isCursorAuthFailureText('Error: [unauthenticated] Error'), true);
-});
 
 // agy's print mode (`-p -`) exits with code 0 but emits one of these
 // shapes when the keyring entry is missing or expired. Without the
@@ -998,8 +756,8 @@ test('spawnEnvForAgent preserves Anthropic credentials when claude resolves to O
   assert.equal(env.PATH, '/usr/bin');
 });
 
-test('spawnEnvForAgent preserves Anthropic credentials for non-claude adapters', () => {
-  for (const agentId of ['codex', 'opencode', 'devin']) {
+test('spawnEnvForAgent preserves Anthropic credentials for public non-Claude adapters', () => {
+  for (const agentId of ['codex', 'opencode', 'pi', 'antigravity']) {
     const env = spawnEnvForAgent(agentId, {
       ANTHROPIC_API_KEY: 'sk-keep',
       ANTHROPIC_AUTH_TOKEN: 'sk-token-keep',
@@ -1020,7 +778,7 @@ test('spawnEnvForAgent preserves Anthropic credentials for non-claude adapters',
 
 // Codex CLI owns its own auth resolution. Preserve credentials from the
 // inherited environment so users who run the local CLI with API-key auth get
-// the same behavior through Open Design.
+// the same behavior through Clean Design.
 test('spawnEnvForAgent preserves inherited OPENAI_API_KEY for the codex adapter', () => {
   const env = spawnEnvForAgent('codex', {
     OPENAI_API_KEY: 'sk-stale-byok',
@@ -1107,8 +865,8 @@ test('spawnEnvForAgent preserves configured Codex API keys', () => {
   assert.equal(env.PATH, '/usr/bin');
 });
 
-test('spawnEnvForAgent preserves Codex API keys for non-codex adapters', () => {
-  for (const agentId of ['claude', 'opencode', 'devin']) {
+test('spawnEnvForAgent preserves Codex API keys for public non-Codex adapters', () => {
+  for (const agentId of ['claude', 'opencode', 'pi', 'antigravity']) {
     const env = spawnEnvForAgent(agentId, {
       OPENAI_API_KEY: 'sk-keep',
       CODEX_API_KEY: 'sk-keep',
@@ -1162,13 +920,13 @@ test('spawnEnvForAgent lets configured Codex API credentials override inherited 
 
 test('spawnEnvForAgent preserves inherited Anthropic API credentials when ANTHROPIC_BASE_URL is set', () => {
   const env = spawnEnvForAgent('claude', {
-    ANTHROPIC_API_KEY: 'sk-kimi',
+    ANTHROPIC_API_KEY: 'sk-proxy',
     ANTHROPIC_AUTH_TOKEN: 'sk-token',
     ANTHROPIC_BASE_URL: 'https://api.moonshot.cn/v1',
     PATH: '/usr/bin',
   });
 
-  assert.equal(env.ANTHROPIC_API_KEY, 'sk-kimi');
+  assert.equal(env.ANTHROPIC_API_KEY, 'sk-proxy');
   assert.equal(env.ANTHROPIC_AUTH_TOKEN, 'sk-token');
   assert.equal(env.ANTHROPIC_BASE_URL, 'https://api.moonshot.cn/v1');
   assert.equal(env.PATH, '/usr/bin');
@@ -1206,57 +964,4 @@ test('spawnEnvForAgent does not mutate the input env', () => {
 
   assert.equal(original.ANTHROPIC_API_KEY, 'sk-leak');
   assert.notEqual(env, original);
-});
-
-test('spawnEnvForAgent strips inherited MIMOCODE_* env for mimo', () => {
-  const env = spawnEnvForAgent('mimo', {
-    MIMOCODE: '/leak/mimo',
-    MIMOCODE_PID: 'pid-leak',
-    MIMOCODE_RUN_ID: 'run-id-leak',
-    MIMOCODE_SERVER_PASSWORD: 'password-leak',
-    PATH: '/usr/bin',
-    OD_DAEMON_URL: 'http://127.0.0.1:7456',
-  });
-
-  assert.equal('MIMOCODE' in env, false);
-  assert.equal('MIMOCODE_PID' in env, false);
-  assert.equal('MIMOCODE_RUN_ID' in env, false);
-  assert.equal('MIMOCODE_SERVER_PASSWORD' in env, false);
-  assert.equal(env.OD_DAEMON_URL, 'http://127.0.0.1:7456');
-  assert.equal(env.PATH, '/usr/bin');
-});
-
-test('spawnEnvForAgent forces MIMOCODE_DISABLE_PROJECT_CONFIG=true for mimo when unset', () => {
-  const env = spawnEnvForAgent('mimo', {
-    PATH: '/usr/bin',
-  });
-
-  assert.equal(env.MIMOCODE_DISABLE_PROJECT_CONFIG, 'true');
-  assert.equal(env.PATH, '/usr/bin');
-});
-
-test('spawnEnvForAgent forces MIMOCODE_DISABLE_PROJECT_CONFIG=true for mimo when empty', () => {
-  const env = spawnEnvForAgent('mimo', {
-    MIMOCODE_DISABLE_PROJECT_CONFIG: '',
-    PATH: '/usr/bin',
-  });
-
-  assert.equal(env.MIMOCODE_DISABLE_PROJECT_CONFIG, 'true');
-  assert.equal(env.PATH, '/usr/bin');
-});
-
-test('spawnEnvForAgent preserves a configured MIMOCODE_DISABLE_PROJECT_CONFIG override for mimo', () => {
-  const env = spawnEnvForAgent(
-    'mimo',
-    {
-      MIMOCODE_DISABLE_PROJECT_CONFIG: '',
-      PATH: '/usr/bin',
-    },
-    {
-      MIMOCODE_DISABLE_PROJECT_CONFIG: '0',
-    },
-  );
-
-  assert.equal(env.MIMOCODE_DISABLE_PROJECT_CONFIG, '0');
-  assert.equal(env.PATH, '/usr/bin');
 });

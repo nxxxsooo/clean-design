@@ -4,47 +4,37 @@ import os from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 
-import {
-  DISABLED_TELEMETRY_ENV_KEYS,
-  loadWorkspaceLocalEnv,
-  parseDotEnvLocal,
-} from "../src/local-env.js";
+import { loadWorkspaceLocalEnv, parseDotEnvLocal } from "../src/local-env.js";
 
 describe("tools-dev local env loading", () => {
   it("parses common .env.local assignment forms", () => {
     assert.deepEqual({ ...parseDotEnvLocal([
       "# comment",
-      "POSTHOG_KEY=phc_local",
-      "POSTHOG_HOST=https://us.i.posthog.com # trailing comment",
-      "export LANGFUSE_PUBLIC_KEY=\"pk local\"",
-      "LANGFUSE_SECRET_KEY='sk#local'",
+      "PLAIN_VALUE=local",
+      "URL_VALUE=https://example.invalid/path # trailing comment",
+      "export QUOTED_VALUE=\"two words\"",
+      "HASH_VALUE='value#kept'",
       "BAD-KEY=ignored",
       "",
     ].join("\n")) }, {
-      POSTHOG_KEY: "phc_local",
-      POSTHOG_HOST: "https://us.i.posthog.com",
-      LANGFUSE_PUBLIC_KEY: "pk local",
-      LANGFUSE_SECRET_KEY: "sk#local",
+      PLAIN_VALUE: "local",
+      URL_VALUE: "https://example.invalid/path",
+      QUOTED_VALUE: "two words",
+      HASH_VALUE: "value#kept",
     });
   });
 
-  it("loads ordinary workspace variables and strips disabled telemetry variables", async () => {
+  it("loads ordinary workspace variables", async () => {
     const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "od-local-env-"));
     await writeFile(path.join(workspaceRoot, ".env.local"), [
-      "POSTHOG_KEY=phc_from_file",
-      "LANGFUSE_PUBLIC_KEY=pk_from_file",
       "ANTHROPIC_API_KEY=sk-provider",
     ].join("\n"));
-    const env: NodeJS.ProcessEnv = {
-      OPEN_DESIGN_TELEMETRY_RELAY_URL: "https://telemetry.invalid",
-      POSTHOG_KEY: "phc_from_parent",
-    };
+    const env: NodeJS.ProcessEnv = {};
 
     const result = loadWorkspaceLocalEnv({ workspaceRoot, env });
 
     assert.equal(result.loaded, true);
     assert.equal(env.ANTHROPIC_API_KEY, "sk-provider");
-    for (const key of DISABLED_TELEMETRY_ENV_KEYS) assert.equal(env[key], undefined);
     assert.deepEqual(result.loadedFiles, [".env.local"]);
     assert.deepEqual(result.keys, ["ANTHROPIC_API_KEY"]);
   });
@@ -85,27 +75,13 @@ describe("tools-dev local env loading", () => {
   it("can be disabled with --no-env-file", async () => {
     const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "od-local-env-"));
     await writeFile(path.join(workspaceRoot, ".env.local"), "SHOULD_NOT_LOAD=yes\n");
-    const env: NodeJS.ProcessEnv = { POSTHOG_KEY: "inherited" };
+    const env: NodeJS.ProcessEnv = { INHERITED_VALUE: "kept" };
 
     const result = loadWorkspaceLocalEnv({ args: ["--no-env-file"], workspaceRoot, env });
 
     assert.equal(result.loaded, false);
     assert.equal(env.SHOULD_NOT_LOAD, undefined);
-    assert.equal(env.POSTHOG_KEY, undefined);
-  });
-
-  it("strips inherited telemetry variables when no env file exists", async () => {
-    const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "od-local-env-"));
-    const env: NodeJS.ProcessEnv = {
-      LANGFUSE_SECRET_KEY: "inherited",
-      POSTHOG_HOST: "https://telemetry.invalid",
-    };
-
-    const result = loadWorkspaceLocalEnv({ workspaceRoot, env });
-
-    assert.equal(result.loaded, false);
-    assert.equal(env.LANGFUSE_SECRET_KEY, undefined);
-    assert.equal(env.POSTHOG_HOST, undefined);
+    assert.equal(env.INHERITED_VALUE, "kept");
   });
 
   it("does not load env files for help output and suppresses logs for json output", async () => {

@@ -153,7 +153,7 @@ describe('memory extraction media-provider fallback', () => {
     });
   });
 
-  it('does not blame unsupported media providers when a text-capable media key is also saved', async () => {
+  it('uses a text-capable media provider when one is saved alongside an unsupported provider', async () => {
     await writeMediaConfig({
       providers: {
         minimax: {
@@ -165,22 +165,25 @@ describe('memory extraction media-provider fallback', () => {
       },
     });
 
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify({ choices: [{ message: { content: '{"entries":[]}' } }] }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ));
     vi.stubGlobal('fetch', fetchMock);
 
     const suggestions = await extractWithLLM(
       dataDir,
       { userMessage: 'Remember that I prefer quiet transitions.' },
-      // Gemini constrains extraction to Google; the saved MiniMax key is
-      // text-capable, but not usable for this chat-protocol family.
-      { projectRoot, chatAgentId: 'gemini' },
+      { projectRoot, chatAgentId: 'antigravity' },
     );
 
     expect(suggestions).toEqual([]);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.minimax.io/v1/chat/completions',
+      expect.objectContaining({ method: 'POST' }),
+    );
     expect(listExtractions()[0]).toMatchObject({
-      phase: 'skipped',
-      reason: 'no-provider',
+      phase: 'success',
     });
   });
 });

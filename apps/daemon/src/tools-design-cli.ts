@@ -27,7 +27,7 @@ const DESIGN_TOOLS_USAGE = `Usage:
 
 Environment:
   OD_NODE_BIN     Node-compatible runtime for agent wrapper invocations
-  OD_BIN          Open Design CLI script for agent wrapper invocations
+  OD_BIN          Clean Design CLI script for agent wrapper invocations
 Repository and folder intake run entirely through tools available on this device.
 `;
 
@@ -1202,7 +1202,7 @@ export async function auditDesignSystemPackage(
 
   if (options.referencePackage === true) {
     if (!fileSet.has('DESIGN.md')) {
-      addIssue('warning', 'missing_open_design_rules', 'Reference packages may omit DESIGN.md, but generated Open Design packages must include it as the canonical rules file.', 'DESIGN.md');
+      addIssue('warning', 'missing_open_design_rules', 'Reference packages may omit DESIGN.md, but generated Clean Design packages must include it as the canonical rules file.', 'DESIGN.md');
     }
   } else {
     requireFile('DESIGN.md', 'Claude Design-style packages need DESIGN.md as the canonical system rules.');

@@ -7,43 +7,9 @@ import {
   configureVisualPage,
   gotoVisualHome,
   scrollVisualLocatorIntoStableView,
-  VISUAL_AMR_AGENT,
-  VISUAL_CLI_AGENTS,
   waitForVisualFonts,
   waitForVisualProjects,
 } from '@/playwright/visual';
-
-test('[P2] captures the onboarding cloud sign-in surface', async ({ page }) => {
-  test.setTimeout(T.xlong);
-
-  await configureVisualPage(page, {
-    projects: [],
-    agents: [VISUAL_AMR_AGENT, ...VISUAL_CLI_AGENTS],
-    config: {
-      onboardingCompleted: false,
-    },
-  });
-
-  await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
-  await page.getByText('Loading Open Design…').waitFor({ state: 'hidden', timeout: T.long });
-  // The connect step opens on the cloud sign-in landing. Local CLI and BYOK
-  // remain available as secondary paths from the same first screen.
-  await expect(
-    page.getByRole('heading', { name: /Sign in to Open Design|登录 Open Design/i }),
-  ).toBeVisible({ timeout: T.medium });
-  await expect(
-    page.getByRole('button', { name: /Sign in to Open Design|登录 Open Design/i }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: /Local coding agent|本地 Coding Agent/i }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: /Bring your own key|自己的模型 Key/i }),
-  ).toBeVisible();
-  await waitForVisualFonts(page);
-
-  await captureVisual(page, 'visual-onboarding-cloud');
-});
 
 test('[P2] captures the visual home harness', async ({ page }) => {
   await configureVisualPage(page, { projects: [] });

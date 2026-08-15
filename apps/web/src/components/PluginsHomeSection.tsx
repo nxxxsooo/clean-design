@@ -18,7 +18,6 @@ import { Button, Input } from '@open-design/components';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { InstalledPluginRecord } from '@open-design/contracts';
 import { useI18n, useT } from '../i18n';
-import type { PluginShareAction } from '../state/projects';
 import { Icon } from './Icon';
 import { PluginCard } from './plugins-home/PluginCard';
 import { isFeaturedPlugin, type FacetOption } from './plugins-home/facets';
@@ -42,14 +41,9 @@ interface Props {
   activePluginId: string | null;
   pendingApplyId: string | null;
   pendingDuplicateId?: string | null;
-  pendingShareAction?: { pluginId: string; action: PluginShareAction } | null;
   onUse: (record: InstalledPluginRecord, action: PluginUseAction) => void;
   onDuplicate?: (record: InstalledPluginRecord) => void;
   onOpenDetails: (record: InstalledPluginRecord) => void;
-  onPluginShareAction?: (
-    record: InstalledPluginRecord,
-    action: PluginShareAction,
-  ) => void;
   onBrowseRegistry?: () => void;
   preferDefaultFacet?: boolean;
   title?: string;
@@ -66,11 +60,9 @@ export function PluginsHomeSection({
   activePluginId,
   pendingApplyId,
   pendingDuplicateId = null,
-  pendingShareAction = null,
   onUse,
   onDuplicate,
   onOpenDetails,
-  onPluginShareAction,
   onBrowseRegistry,
   preferDefaultFacet = true,
   title,
@@ -247,14 +239,12 @@ export function PluginsHomeSection({
                   pendingAny={pendingApplyId !== null}
                   isDuplicatePending={pendingDuplicateId === p.id}
                   pendingDuplicateAny={pendingDuplicateId !== null}
-                  pendingShareAction={pendingShareAction}
                   isFeatured={isFeaturedPlugin(p)}
                   isSaved={savedPluginIds.has(p.id)}
                   onUse={onUse}
                   onDuplicate={onDuplicate}
                   onOpenDetails={onOpenDetails}
                   onSave={handleSavePlugin}
-                  onShareAction={onPluginShareAction}
                   layout={cardLayout}
                 />
               ))}

@@ -135,13 +135,11 @@ test('[P0] @critical entry chrome exposes the primary home creation surface and 
   });
 
   await gotoEntryHome(page);
-  await expect(page.getByTestId('entry-star-badge')).toBeVisible();
-  await expect(page.getByTestId('entry-use-everywhere-button')).toBeVisible();
   await expect(page.getByTestId('recent-projects-strip')).toHaveCount(0);
   // The nav rail is collapsed by default — only the topbar toggle shows.
   // Expand it to assert the rail and its logo are reachable.
   await expect(page.getByTestId('entry-rail-toggle')).toBeVisible();
-  await page.getByTestId('entry-rail-toggle').click();
+  await ensureRailOpen(page);
   await expect(page.locator('.entry-nav-rail')).toBeVisible();
   await expect(page.getByTestId('entry-nav-logo')).toBeVisible();
   await expect(page.locator('.entry-brand')).toHaveCount(0);
@@ -238,8 +236,6 @@ test('[P1] onboarding recommendation creates a project with prefilled first prom
         designSystemId: null,
         onboardingCompleted: false,
         agentModels: {},
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
@@ -257,8 +253,6 @@ test('[P1] onboarding recommendation creates a project with prefilled first prom
             skillId: null,
             designSystemId: null,
             agentModels: {},
-            privacyDecisionAt: 1,
-            telemetry: { metrics: false, content: false, artifactManifest: false },
           },
         },
       });
@@ -300,7 +294,7 @@ test('[P1] onboarding recommendation creates a project with prefilled first prom
   });
 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.getByText('Loading Open Design…').waitFor({ state: 'hidden', timeout: T.long });
+  await page.getByText('Loading Clean Design…').waitFor({ state: 'hidden', timeout: T.long });
   await page.getByRole('button', { name: LOCAL_CLI_LABEL }).click();
   await page.getByRole('button', { name: /^Continue$/i }).click();
   await page.getByRole('button', { name: /Engineer$/i }).click();
@@ -418,8 +412,6 @@ test('[P1] design systems page is reachable from entry nav and supports search, 
             skillId: null,
             designSystemId: 'agentic',
             agentModels: {},
-            privacyDecisionAt: 1,
-            telemetry: { metrics: false, content: false, artifactManifest: false },
           },
         },
       });
@@ -486,8 +478,6 @@ test('[P1] disabled design systems are filtered from entry creation surfaces', a
             designSystemId: 'agentic',
             disabledDesignSystems: ['airbnb'],
             agentModels: {},
-            privacyDecisionAt: 1,
-            telemetry: { metrics: false, content: false, artifactManifest: false },
           },
         },
       });
@@ -562,8 +552,6 @@ test('[P0] @critical entry execution pill opens the Local CLI and BYOK switcher 
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: { codex: { model: 'default' } },
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
@@ -594,17 +582,17 @@ test('[P0] @critical entry execution pill opens the Local CLI and BYOK switcher 
         models: [{ id: 'default', label: 'Default' }],
       },
       {
-        id: 'hermes',
-        name: 'Hermes',
-        bin: 'hermes',
+        id: 'antigravity',
+        name: 'Antigravity',
+        bin: 'agy',
         available: true,
         version: '0.5.0',
         models: [{ id: 'default', label: 'Default' }],
       },
       {
-        id: 'cursor-agent',
-        name: 'Cursor Agent',
-        bin: 'cursor-agent',
+        id: 'pi',
+        name: 'Pi',
+        bin: 'pi',
         available: true,
         version: '0.5.0',
         models: [{ id: 'default', label: 'Default' }],
@@ -624,8 +612,6 @@ test('[P0] @critical entry execution pill opens the Local CLI and BYOK switcher 
           skillId: null,
           designSystemId: null,
           agentModels: { codex: { model: 'default' } },
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
         },
       },
     });
@@ -648,185 +634,12 @@ test('[P0] @critical entry execution pill opens the Local CLI and BYOK switcher 
   await expect(page.getByTestId('inline-model-switcher-agent-claude')).toBeVisible();
   await expect(page.getByTestId('inline-model-switcher-agent-codex')).toBeVisible();
   await expect(page.getByTestId('inline-model-switcher-agent-opencode')).toBeVisible();
-  await expect(page.getByTestId('inline-model-switcher-agent-hermes')).toBeVisible();
-  await expect(page.getByTestId('inline-model-switcher-agent-cursor-agent')).toBeVisible();
+  await expect(page.getByTestId('inline-model-switcher-agent-antigravity')).toBeVisible();
+  await expect(page.getByTestId('inline-model-switcher-agent-pi')).toBeVisible();
 
   await page.getByTestId('inline-model-switcher-open-settings').click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('tab', { name: LOCAL_CLI_LABEL })).toBeVisible();
-});
-
-test('[P1] Settings About reads desktop updater status and runs a manual update check', async ({ page }) => {
-  await page.addInitScript(() => {
-    const idleStatus = {
-      arch: 'arm64',
-      capabilities: {
-        canApplyInPlace: false,
-        canDownload: true,
-        canOpenInstaller: true,
-        requiresManualInstall: false,
-      },
-      channel: 'beta',
-      currentVersion: '0.13.4',
-      enabled: true,
-      mode: 'package-launcher',
-      platform: 'darwin',
-      state: 'idle',
-      supported: true,
-    };
-    const checkedStatus = {
-      ...idleStatus,
-      lastCheckedAt: '2026-06-30T00:00:00.000Z',
-      state: 'not-available',
-    };
-    (window as unknown as { __odUpdaterCalls?: string[] }).__odUpdaterCalls = [];
-    (window as unknown as { __od__?: unknown }).__od__ = {
-      version: 2,
-      client: { type: 'desktop', platform: 'darwin', osLocale: 'en-US' },
-      browser: { clearData: async () => ({ ok: true }) },
-      capture: { page: async () => ({ ok: false, reason: 'not mocked' }) },
-      pdf: { print: async () => ({ ok: true }) },
-      pet: { setVisible: () => {} },
-      project: {
-        pickAndImport: async () => ({ ok: false, canceled: true }),
-        pickAndReplaceWorkingDir: async () => ({ ok: false, canceled: true }),
-      },
-      shell: {
-        openExternal: async () => ({ ok: true }),
-        openPath: async () => ({ ok: true }),
-      },
-      updater: {
-        status: async () => idleStatus,
-        check: async () => {
-          (window as unknown as { __odUpdaterCalls: string[] }).__odUpdaterCalls.push('check');
-          return checkedStatus;
-        },
-        download: async () => checkedStatus,
-        install: async () => checkedStatus,
-        quit: async () => ({ ok: true }),
-        subscribe: () => () => {},
-      },
-    };
-  });
-  await page.route('**/api/version', async (route) => {
-    await route.fulfill({
-      json: {
-        version: {
-          version: '0.13.4',
-          channel: 'beta',
-          packaged: true,
-          platform: 'darwin',
-          arch: 'arm64',
-        },
-      },
-    });
-  });
-
-  await gotoEntryHome(page);
-  await page.getByTestId('entry-settings-menu-trigger').click();
-  await page.getByTestId('entry-settings-open-details').click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-
-  await dialog.getByRole('button', { name: /^About\b/i }).click();
-  await expect(dialog.locator('.settings-about-version-num')).toContainText('0.13.4');
-  await expect(dialog.locator('.settings-about-update-status')).toContainText('Not checked yet');
-
-  await dialog.getByRole('button', { name: 'Check for updates' }).click();
-  await expect(dialog.locator('.settings-about-update-status')).toContainText('You are already on the latest version.');
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as { __odUpdaterCalls?: string[] }).__odUpdaterCalls ?? []))
-    .toEqual(['check']);
-});
-
-test('[P2] entry help menu exposes community links and topbar routes Use everywhere', async ({ page }) => {
-  await gotoEntryHome(page);
-
-  // The help launcher lives in the (collapsed-by-default) rail footer.
-  await ensureRailOpen(page);
-  await page.getByTestId('entry-help-trigger').click();
-  const menu = page.locator('.entry-help-popover[role="menu"]');
-  await expect(menu).toBeVisible();
-  await expect(menu.getByRole('menuitem', { name: /Follow @OpenDesignHQ on X/i })).toHaveAttribute(
-    'href',
-    'https://x.com/OpenDesignHQ',
-  );
-  await expect(menu.getByRole('menuitem', { name: /Join Discord/i })).toHaveAttribute(
-    'href',
-    'https://discord.gg/mHAjSMV6gz',
-  );
-
-  await page.getByTestId('entry-use-everywhere-button').click();
-  await expect(page.getByRole('heading', { name: 'Integrations' })).toBeVisible();
-  await expect(page.getByTestId('integrations-tab-use-everywhere')).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
-
-  await ensureRailOpen(page);
-  // Return home via the explicit Home nav (the logo is overlaid by the
-  // collapse button on hover, which would intercept the click).
-  await page.getByTestId('entry-nav-home').click();
-  await expect(page.getByTestId('home-hero')).toBeVisible();
-  await page.getByTestId('entry-help-trigger').click();
-  await expect(menu).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(menu).toHaveCount(0);
-});
-
-test('[P1] Use everywhere guide uses daemon MCP install info and copies an agent guide', async ({ page }) => {
-  await page.addInitScript(() => {
-    const store: string[] = [];
-    Object.defineProperty(window, '__copiedTexts', {
-      value: store,
-      configurable: true,
-    });
-    Object.defineProperty(navigator, 'clipboard', {
-      value: {
-        writeText(text: string) {
-          store.push(text);
-          return Promise.resolve();
-        },
-      },
-      configurable: true,
-    });
-  });
-  await page.route('**/api/mcp/install-info', async (route) => {
-    await route.fulfill({
-      json: {
-        command: '/Applications/Open Design.app/Contents/MacOS/od',
-        args: ['mcp', '--daemon-url', 'http://127.0.0.1:7456'],
-        env: {
-          OD_DATA_DIR: '/Users/test/.open-design',
-        },
-      },
-    });
-  });
-
-  await gotoEntryHome(page);
-  await page.getByTestId('entry-use-everywhere-button').click();
-  await expect(page.getByRole('heading', { name: 'Integrations' })).toBeVisible();
-  await expect(page.getByTestId('integrations-tab-use-everywhere')).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
-
-  await page.getByTestId('use-everywhere-tab-mcp').click();
-  const mcpSection = page.getByTestId('use-everywhere-section-mcp');
-  await expect(mcpSection).toContainText('/Applications/Open Design.app/Contents/MacOS/od');
-  await expect(mcpSection).toContainText('OD_DATA_DIR');
-
-  await page.getByTestId('use-everywhere-copy-guide').click();
-  await expect(page.getByTestId('use-everywhere-copy-guide')).toContainText(/Copied|已复制|已複製/i);
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as { __copiedTexts?: string[] }).__copiedTexts?.at(-1) ?? ''))
-    .toContain('/Applications/Open Design.app/Contents/MacOS/od');
-  await expect
-    .poll(() => page.evaluate(() => (window as unknown as { __copiedTexts?: string[] }).__copiedTexts?.at(-1) ?? ''))
-    .toMatch(/http:\/\/127\.0\.0\.1:\d+\/api\/mcp\/install-info/);
-
-  await page.getByTestId('use-everywhere-open-settings').click();
-  await expect(page.getByTestId('integrations-tab-mcp')).toHaveAttribute('aria-selected', 'true');
 });
 
 test('[P2] home topbar overlays close on outside click, Escape, and Settings open', async ({ page }) => {
@@ -1081,7 +894,7 @@ test('[P1] home starters can jump into plugin creation through the registry brow
   await expect(page.locator('h1').filter({ hasText: 'Plugins' })).toBeVisible();
   await page.getByTestId('plugins-create-button').click();
 
-  await expect(page.getByTestId('home-hero-input')).toHaveText(/Create an Open Design plugin/i);
+  await expect(page.getByTestId('home-hero-input')).toHaveText(/Create a Clean Design plugin/i);
 });
 
 test('[P2] home starters search can enter a no-results state and recover with clear', async ({ page }) => {
@@ -1524,7 +1337,7 @@ test('[P1] home starters html details sidebar handle stays clickable after info 
     inputs: [{ name: 'topic', type: 'string', default: 'sidebar scroll' }],
     previewEntry: './example.html',
     tags: ['prototype', 'webgl', 'gallery', 'animation', 'landing-page', 'dashboard'],
-    authorName: 'Open Design',
+    authorName: 'Clean Design',
     context: {
       skills: [{ path: './SKILL.md' }, { path: './QA.md' }],
       assets: ['./example.html', './textures/noise.png', './textures/depth.png'],
@@ -1583,8 +1396,7 @@ test('[P2] home starters html details modal shows metadata links and supports co
     inputs: [{ name: 'topic', type: 'string', default: 'editorial systems' }],
     previewEntry: './example.html',
     tags: ['deck', 'marketing'],
-    authorName: 'Open Design',
-    authorUrl: 'https://github.com/nexu-io/open-design',
+    authorName: 'Clean Design',
     homepage: 'https://example.com/html-metadata-plugin',
     context: {
       skills: [{ path: './SKILL.md' }],
@@ -1638,15 +1450,7 @@ test('[P2] home starters html details modal shows metadata links and supports co
   // preview-edge handle before inspecting the manifest metadata.
   await dialog.locator('.ds-modal-stage-handle.is-expand').click();
   await expect(dialog.locator('.ds-modal-sidebar')).toBeVisible();
-  await expect(page.getByTestId('plugin-details-author')).toContainText('Open Design');
-  await expect(page.getByTestId('plugin-details-author-profile')).toHaveAttribute(
-    'href',
-    'https://github.com/nexu-io/open-design',
-  );
-  await expect(page.getByTestId('plugin-details-author-homepage')).toHaveAttribute(
-    'href',
-    'https://github.com/nexu-io/open-design',
-  );
+  await expect(page.getByTestId('plugin-details-author')).toContainText('Clean Design');
   await expect(dialog).toContainText('Context bundles');
   await expect(dialog).toContainText('./SKILL.md');
   await expect(dialog).toContainText('./example.html');
@@ -2103,7 +1907,7 @@ test('[P0] @critical clearing the home working directory removes linked dirs fro
   expect(body.metadata?.userWorkingDir).toBeUndefined();
 });
 
-test('[P0] @critical home hero input keeps Shift+Enter as a newline and submits on Enter', async ({ page }) => {
+test('[P1] home hero input keeps Shift+Enter as a newline and submits on Enter', async ({ page }) => {
   await gotoEntryHome(page);
 
   const input = page.getByTestId('home-hero-input');
@@ -2186,8 +1990,6 @@ test('[P1] disabled skills are filtered from the home hero mention picker', asyn
           skillId: null,
           disabledSkills: ['disabled-home-skill'],
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
         },
       },
     });
@@ -2349,13 +2151,8 @@ async function gotoEntryHome(page: Page) {
     )
     .catch(() => null);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.getByText('Loading Open Design…').waitFor({ state: 'hidden', timeout: T.long });
+  await page.getByText('Loading Clean Design…').waitFor({ state: 'hidden', timeout: T.long });
   await projectsSettled;
-  const privacyDialog = page.getByRole('dialog').filter({ hasText: 'Help us improve Open Design' });
-  if (await privacyDialog.isVisible()) {
-    await privacyDialog.getByRole('button', { name: /I get it|not now|got it|don't share/i }).click();
-    await expect(privacyDialog).toHaveCount(0);
-  }
   if (!(await page.getByTestId('home-hero').isVisible().catch(() => false))) {
     const homeWorkspaceTab = page.getByRole('tab', { name: /^Home$/ }).first();
     if (await homeWorkspaceTab.isVisible().catch(() => false)) {
@@ -2659,7 +2456,6 @@ function makeApplyResult(
     contextItems: [],
     inputs: [{ name: 'topic', type: 'string', default: 'design systems' }],
     assets: [],
-    mcpServers: [],
     trust: 'trusted',
     capabilitiesGranted: ['prompt:inject'],
     capabilitiesRequired: ['prompt:inject'],
@@ -2675,9 +2471,6 @@ function makeApplyResult(
       assetsStaged: [],
       taskKind: 'new-generation',
       appliedAt: 0,
-      connectorsRequired: [],
-      connectorsResolved: [],
-      mcpServers: [],
       status: 'fresh',
     },
     projectMetadata: {},

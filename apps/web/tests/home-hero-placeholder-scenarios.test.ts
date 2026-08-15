@@ -19,7 +19,7 @@ describe('PLACEHOLDER_SCENARIO_DEFS bindings', () => {
       const chip = findChip(def.chipId);
       expect(chip, `chip "${def.chipId}" for scenario "${def.id}"`).toBeDefined();
       // One-click create reuses the rail's apply-scenario path; a chip that
-      // navigates away (create-plugin / template / brand-kit) would dead-end.
+      // navigates away (template / brand-kit) would dead-end.
       expect(chip?.action.kind, `scenario "${def.id}"`).toBe('apply-scenario');
       expect(chip?.group).toBe('create');
     }

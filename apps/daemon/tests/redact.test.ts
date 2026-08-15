@@ -16,15 +16,6 @@ describe('redactSecrets', () => {
     );
   });
 
-  it('redacts Langfuse pk-lf- / sk-lf- keys', () => {
-    expect(
-      redactSecrets('export LANGFUSE_PUBLIC_KEY=pk-lf-12345678-aaaa-bbbb-cccc-dddddddddddd'),
-    ).toBe('export LANGFUSE_PUBLIC_KEY=[REDACTED:langfuse_key]');
-    expect(
-      redactSecrets('and LANGFUSE_SECRET_KEY=sk-lf-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'),
-    ).toBe('and LANGFUSE_SECRET_KEY=[REDACTED:langfuse_key]');
-  });
-
   it('redacts GitHub fine-grained / oauth tokens', () => {
     const ghp = 'ghp_' + 'a'.repeat(36);
     const gho = 'gho_' + 'b'.repeat(36);

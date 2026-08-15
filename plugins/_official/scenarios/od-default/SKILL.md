@@ -1,6 +1,6 @@
 ---
 name: od-default
-description: Hidden fallback scenario for free-form Home prompts. Ask the task type first, then continue through the matching Open Design flow.
+description: Hidden fallback scenario for free-form Home prompts. Ask the task type first, then continue through the matching Clean Design flow.
 od:
   scenario: default-router
   mode: scenario
@@ -25,7 +25,7 @@ option you recommend, so the user can submit the form unchanged.
 <question-form id="task-type" title="Choose the task type">
 {
   "lang": "en",
-  "description": "I'll route this through the right Open Design workflow and lock the brief in one shot. Prefilled for you — send as is, or adjust first.",
+  "description": "I'll route this through the right Clean Design workflow and lock the brief in one shot. Prefilled for you — send as is, or adjust first.",
   "questions": [
     {
       "id": "taskType",
@@ -101,7 +101,7 @@ task type as authoritative and continue:
 - `Audio`: plan voice/music/SFX intent, then use the OD media generation
   CLI for audio output.
 - `Other`: ask only the minimum follow-up needed, then choose the closest
-  Open Design workflow and continue.
+  Clean Design workflow and continue.
 
 This single form already locks the discovery brief. Do not emit a second
 `<question-form id="discovery">`; proceed directly to the matching planning,

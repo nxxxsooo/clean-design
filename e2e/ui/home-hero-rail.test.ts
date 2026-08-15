@@ -1,11 +1,11 @@
 import { expect, test } from '@/playwright/suite';
 import type { Page } from '@playwright/test';
-import { routeAgents, suppressWhatsNew } from '@/playwright/mock-factory';
+import { routeAgents } from '@/playwright/mock-factory';
 import { T } from '@/timeouts';
 
 test.describe.configure({ timeout: T.xlong });
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 const LOCALE_KEY = 'open-design:locale';
 const LOCALE_SOURCE_KEY = 'open-design:locale-source';
 const OPEN_SETTINGS_LABEL = /Open settings|打开设置|開啟設定/i;
@@ -20,8 +20,6 @@ const HOME_CONFIG = {
   designSystemId: null,
   onboardingCompleted: true,
   agentModels: { codex: { model: 'default', reasoning: 'default' } },
-  privacyDecisionAt: 1,
-  telemetry: { metrics: false, content: false, artifactManifest: false },
 };
 
 const HOME_DESIGN_SYSTEMS = [
@@ -169,7 +167,7 @@ const HOME_PLUGINS = [
       name: 'example-live-artifact',
       title: 'Live Artifact',
       version: '0.1.0',
-      description: 'Create refreshable, auditable Open Design artifacts.',
+      description: 'Create refreshable, auditable Clean Design artifacts.',
       od: {
         kind: 'scenario',
         taskKind: 'new-generation',
@@ -177,7 +175,7 @@ const HOME_PLUGINS = [
         scenario: 'live',
         useCase: {
           query:
-            'Create refreshable, auditable Open Design artifacts backed by connector or local data.',
+            'Create refreshable, auditable Clean Design artifacts backed by local data.',
         },
       },
     },
@@ -269,7 +267,6 @@ const APPLY_RESPONSES: Record<string, unknown> = {
     contextItems: [],
     inputs: [],
     assets: [],
-    mcpServers: [],
     trust: 'bundled',
     capabilitiesGranted: ['prompt:inject'],
     capabilitiesRequired: ['prompt:inject'],
@@ -285,9 +282,6 @@ const APPLY_RESPONSES: Record<string, unknown> = {
       assetsStaged: [],
       taskKind: 'new-generation',
       appliedAt: 0,
-      connectorsRequired: [],
-      connectorsResolved: [],
-      mcpServers: [],
       status: 'fresh',
     },
     projectMetadata: {},
@@ -328,7 +322,7 @@ const PROMPT_TEMPLATES = [
 ];
 
 async function waitForLoadingToClear(page: Page) {
-  await page.getByText('Loading Open Design…').waitFor({ state: 'hidden', timeout: 15_000 });
+  await page.getByText('Loading Clean Design…').waitFor({ state: 'hidden', timeout: 15_000 });
 }
 
 async function seedBrowserConfig(page: Page, config: Record<string, unknown>) {
@@ -353,28 +347,15 @@ async function seedBrowserLocale(page: Page, locale: string) {
 async function gotoEntryHome(page: Page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await waitForLoadingToClear(page);
-  const privacyDialog = page.getByRole('dialog').filter({ hasText: 'Help us improve Open Design' });
-  if (await privacyDialog.isVisible().catch(() => false)) {
-    await privacyDialog.getByRole('button', { name: /I get it|not now|got it|don't share/i }).click();
-  }
   await expect(page.getByRole('button', { name: OPEN_SETTINGS_LABEL })).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
-  await suppressWhatsNew(page);
   await page.addInitScript(({ key, value }) => {
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.localStorage.setItem(key, JSON.stringify(value));
   }, { key: STORAGE_KEY, value: HOME_CONFIG });
-
-  await page.route('**/api/github/open-design', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ stargazers_count: 51600 }),
-    });
-  });
 
   await routeAgents(page, [
     {
@@ -429,25 +410,6 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({ plugins: HOME_PLUGINS }),
     });
   });
-  await page.route('**/api/mcp/servers', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        servers: [
-          {
-            id: 'docs',
-            label: 'Docs MCP',
-            transport: 'stdio',
-            enabled: true,
-            command: 'npx',
-          },
-        ],
-        templates: [],
-      }),
-    });
-  });
-
   await page.route('**/api/plugins/*/apply', async (route) => {
     const pluginId = route.request().url().split('/api/plugins/')[1]?.split('/apply')[0];
     const body = pluginId ? APPLY_RESPONSES[pluginId] : null;
@@ -484,28 +446,18 @@ test('[P1] home left rail expands and collapses from the shell controls', async 
   await expect(expand).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('[P1] home composer plus menu exposes attachment, connector, plugin, and MCP entries', async ({ page }) => {
+test('[P1] home composer plus menu exposes local attachment and internal catalog entries', async ({ page }) => {
   await gotoEntryHome(page);
 
   const input = page.getByTestId('home-hero-input');
 
   await page.getByTestId('home-hero-plus-trigger').click();
   await expect(page.getByTestId('composer-plus-attach')).toBeVisible();
-  await expect(page.getByTestId('composer-plus-connectors')).toBeVisible();
   await expect(page.getByTestId('composer-plus-plugins')).toBeVisible();
-  await expect(page.getByTestId('composer-plus-mcp')).toBeVisible();
-
-  await page.getByTestId('composer-plus-connectors').click();
-  await expect(page.getByText(/No connected connectors/i)).toBeVisible();
 
   await page.getByTestId('composer-plus-plugins').click();
   await page.getByRole('menuitem', { name: /Web Prototype/i }).click();
   await expect(input).toContainText(/Web Prototype/i);
-
-  await page.getByTestId('home-hero-plus-trigger').click();
-  await page.getByTestId('composer-plus-mcp').click();
-  await page.getByRole('menuitem', { name: /Docs MCP/i }).click();
-  await expect(input).toContainText(/Docs MCP/i);
 
   await page.getByTestId('home-hero-file-input').setInputFiles('../package.json');
   await expect(page.getByTestId('home-hero-staged-files')).toContainText('package.json');
@@ -1080,7 +1032,7 @@ test('[P2] home hero exposes the template picker, starter cards, blank project, 
   await page.getByTestId('home-hero-shortcuts-trigger').click();
   const menu = page.getByTestId('home-hero-shortcuts-menu');
   await expect(menu).toBeVisible();
-  for (const id of ['create-plugin', 'figma', 'template']) {
+  for (const id of ['figma', 'template']) {
     await expect(menu.getByTestId(`home-hero-rail-${id}`)).toBeVisible();
   }
 });
@@ -1765,7 +1717,7 @@ test('[P1] selecting another example updates the composer input', async ({ page 
   await expect(input).toHaveText('Create a live Notion dashboard artifact.');
 
   await useExamplePreset(page, 'example-live-artifact');
-  await expect(input).toHaveText('Create refreshable, auditable Open Design artifacts.');
+  await expect(input).toHaveText('Create refreshable, auditable Clean Design artifacts.');
 });
 
 async function expectChipSelection(page: Page, chipId: string, _label: string) {

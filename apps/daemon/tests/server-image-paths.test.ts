@@ -55,3 +55,13 @@ test('resolveSafePromptImagePaths surfaces stat failures instead of dropping the
     { path: '/tmp/od-uploads/unreadable.png', error: 'EACCES: permission denied' },
   ]);
 });
+
+test('selectPromptImagePaths always returns validated local uploads', () => {
+  const safeImages = ['/tmp/od-uploads/validated.png'];
+  expect(
+    selectPromptImagePaths('claude', safeImages, ['/tmp/staged/legacy.png']),
+  ).toEqual(safeImages);
+  expect(
+    selectPromptImagePaths('opencode', safeImages, ['/tmp/staged/legacy.png']),
+  ).toEqual(safeImages);
+});

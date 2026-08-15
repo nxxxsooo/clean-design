@@ -1,4 +1,4 @@
-// OD-faithful codex renderer. Emits the shape OD's
+// Clean Design Codex renderer. Emits the shape the daemon's
 // `json-event-stream.ts:handleCodexEvent` parser accepts.
 // Codex parser only knows command_execution (Bash) + agent_message —
 // non-Bash tools are translated to a shell-equivalent command.

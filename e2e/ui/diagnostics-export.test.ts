@@ -8,7 +8,7 @@ import { expect, test } from '@/playwright/suite';
 import type { Page } from '@playwright/test';
 
 const execFileAsync = promisify(execFile);
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 test.describe.configure({ timeout: 45_000 });
 
@@ -26,8 +26,6 @@ test.beforeEach(async ({ page }) => {
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: {},
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);

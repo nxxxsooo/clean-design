@@ -51,7 +51,7 @@ export function resolveProcessResourcesPath(): string | null {
 
   const normalizedExecPath = process.execPath.toLowerCase();
   const windowsResourceBinMarker =
-    `${path.sep}resources${path.sep}open-design${path.sep}bin${path.sep}`.toLowerCase();
+    `${path.sep}resources${path.sep}clean-design${path.sep}bin${path.sep}`.toLowerCase();
   const windowsMarkerIndex = normalizedExecPath.indexOf(windowsResourceBinMarker);
   if (windowsMarkerIndex !== -1) {
     return process.execPath.slice(

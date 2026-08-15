@@ -129,18 +129,18 @@ describe('derivePluginSourceLinks · url + local + bundled sources', () => {
     expect(out.sourceKindLabel).toBe('Local');
   });
 
-  it('routes bundled official sources to the Open Design repo', () => {
+  it('keeps bundled official sources local to the installed app', () => {
     const out = derivePluginSourceLinks(
       makeRecord({
         sourceKind: 'bundled',
         source:     'plugins/_official/scenarios/od-code-migration',
       }),
     );
-    expect(out.sourceUrl).toBe('https://github.com/nexu-io/open-design');
+    expect(out.sourceUrl).toBeNull();
     expect(out.sourceKindLabel).toBe('Official');
-    expect(out.sourceLabel).toBe('nexu-io/open-design');
-    expect(out.authorProfileUrl).toBe('https://github.com/nexu-io/open-design');
-    expect(out.homepageUrl).toBe('https://github.com/nexu-io/open-design');
+    expect(out.sourceLabel).toBe('od-code-migration');
+    expect(out.authorProfileUrl).toBeNull();
+    expect(out.homepageUrl).toBeNull();
   });
 });
 
@@ -151,11 +151,11 @@ describe('derivePluginSourceLinks · author + contribute', () => {
         manifest: {
           name:    'p',
           version: '1.0.0',
-          author:  { name: 'Open Design', url: 'https://github.com/nexu-io' },
+          author:  { name: 'Clean Design', url: 'https://github.com/nexu-io' },
         } as InstalledPluginRecord['manifest'],
       }),
     );
-    expect(out.authorName).toBe('Open Design');
+    expect(out.authorName).toBe('Clean Design');
     expect(out.authorProfileUrl).toBe('https://github.com/nexu-io');
     expect(out.authorAvatarUrl).toBe('https://github.com/nexu-io.png?size=80');
   });
@@ -187,7 +187,7 @@ describe('derivePluginSourceLinks · author + contribute', () => {
     expect(out.authorAvatarUrl).toBeNull();
   });
 
-  it('falls back to homepage for the contribute link when source is not github', () => {
+  it('does not expose bundled manifest homepages as upstream links', () => {
     const out = derivePluginSourceLinks(
       makeRecord({
         sourceKind: 'bundled',
@@ -199,9 +199,9 @@ describe('derivePluginSourceLinks · author + contribute', () => {
         } as InstalledPluginRecord['manifest'],
       }),
     );
-    expect(out.contributeUrl).toBe('https://github.com/nexu-io/open-design/issues/new');
-    expect(out.contributeOnGithub).toBe(true);
-    expect(out.homepageUrl).toBe('https://github.com/nexu-io/open-design');
+    expect(out.contributeUrl).toBeNull();
+    expect(out.contributeOnGithub).toBe(false);
+    expect(out.homepageUrl).toBeNull();
   });
 
   it('drops malformed homepage values', () => {
@@ -229,7 +229,7 @@ describe('derivePluginSourceLinks · author + contribute', () => {
 
 describe('authorInitials', () => {
   it('builds two-letter monograms', () => {
-    expect(authorInitials('Open Design')).toBe('OD');
+    expect(authorInitials('Clean Design')).toBe('CD');
     expect(authorInitials('jane')).toBe('J');
     expect(authorInitials('Long Multi Word Name')).toBe('LM');
   });

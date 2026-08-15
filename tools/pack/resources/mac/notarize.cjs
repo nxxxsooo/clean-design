@@ -106,7 +106,7 @@ async function stapleApp(appPath) {
 }
 
 async function notarizeApp(appPath, credentials) {
-  const tempDir = await mkdtemp(path.join(tmpdir(), "open-design-notarize-"));
+  const tempDir = await mkdtemp(path.join(tmpdir(), "clean-design-notarize-"));
   try {
     const filePath = path.join(tempDir, `${path.parse(appPath).name}.zip`);
     const zipResult = await run("ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", path.basename(appPath), filePath], {

@@ -764,7 +764,7 @@ describe('DesignSystemCreationFlow', () => {
     await waitFor(() => expect(mocks.patchProject).toHaveBeenCalledWith(
       project.id,
       expect.objectContaining({
-        pendingPrompt: expect.stringContaining('Create this project as a complete Open Design design system workspace.'),
+        pendingPrompt: expect.stringContaining('Create this project as a complete Clean Design design system workspace.'),
       }),
     ));
     await waitFor(() => expect(onProjectPrepared).toHaveBeenCalledWith(
@@ -851,7 +851,7 @@ describe('DesignSystemCreationFlow', () => {
     expect(mocks.patchProject).toHaveBeenCalledWith(
       project.id,
       expect.objectContaining({
-        pendingPrompt: expect.stringContaining('Create this project as a complete Open Design design system workspace.'),
+        pendingPrompt: expect.stringContaining('Create this project as a complete Clean Design design system workspace.'),
       }),
     );
     expect(mocks.patchProject).toHaveBeenCalledWith(
@@ -1927,12 +1927,12 @@ describe('DesignSystemCreationFlow', () => {
   it.skip('adds website source links with Enter and keeps them out of GitHub intake', async () => {
     const system: DesignSystemDetail = {
       id: 'user:open-design-website-design-system',
-      title: 'Open Design Website Design System',
+      title: 'Clean Design Website Design System',
       category: 'Custom',
-      summary: 'Open Design website source.',
+      summary: 'Clean Design website source.',
       swatches: [],
       surface: 'web',
-      body: '# Open Design Website Design System\n',
+      body: '# Clean Design Website Design System\n',
       source: 'user',
       status: 'draft',
       isEditable: true,
@@ -1940,7 +1940,7 @@ describe('DesignSystemCreationFlow', () => {
     };
     const project: Project = {
       id: 'ds-open-design-website-design-system',
-      name: 'Open Design Website Design System',
+      name: 'Clean Design Website Design System',
       skillId: null,
       designSystemId: system.id,
       createdAt: 1,
@@ -1952,17 +1952,12 @@ describe('DesignSystemCreationFlow', () => {
         sourceFileName: system.id,
       },
     };
-    const onBeforeGenerate = vi.fn();
     mocks.createDesignSystemDraft.mockResolvedValue(system);
     mocks.ensureDesignSystemWorkspace.mockResolvedValue({ project, files: [] });
     mocks.patchProject.mockResolvedValue({ ...project, pendingPrompt: 'Create this project as a design system.' });
 
     render(
-      <DesignSystemCreationFlow
-        onBack={() => {}}
-        onCreated={() => {}}
-        onBeforeGenerate={onBeforeGenerate}
-      />,
+      <DesignSystemCreationFlow onBack={() => {}} onCreated={() => {}} />,
     );
 
     const sourceInput = screen.getByPlaceholderText('https://example.com or https://github.com/owner/repo') as HTMLInputElement;
@@ -1974,17 +1969,12 @@ describe('DesignSystemCreationFlow', () => {
     expect(sourceInput.value).toBe('');
 
     fireEvent.change(screen.getByPlaceholderText(/Mission Impastabowl/i), {
-      target: { value: 'Open Design website source' },
+      target: { value: 'Clean Design website source' },
     });
     continueToGeneration();
     continueToGeneration();
 
     await waitFor(() => expect(mocks.createDesignSystemDraft).toHaveBeenCalled());
-    expect(onBeforeGenerate).toHaveBeenCalledWith(expect.objectContaining({
-      sourceCount: 1,
-      sourceUrlCount: 1,
-      githubRepoCount: 0,
-    }));
     const draftInput = mocks.createDesignSystemDraft.mock.calls[0]?.[0];
     expect(draftInput?.provenance?.sourceUrls).toEqual(['https://open-design.ai']);
     expect(draftInput?.provenance?.githubUrls).toBeUndefined();

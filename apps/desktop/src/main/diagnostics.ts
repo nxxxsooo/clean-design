@@ -56,7 +56,7 @@ export async function exportDiagnosticsToFile(
     // Delegate the bundle to the daemon's own export endpoint instead of
     // rebuilding it here with a guessed data dir. The daemon owns its real
     // RUNTIME_DATA_DIR, so the bundle's run-event logs (`runs/<id>/events.jsonl`)
-    // and AMR/agent CLI logs resolve correctly in dev, packaged, and
+    // and agent CLI logs resolve correctly in dev, packaged, and
     // OD_DATA_DIR-override setups alike. See diagnostics-fetch.ts.
     const baseUrl = await deps.discoverDaemonBaseUrl();
     const zip = await fetchDiagnosticsBundle(baseUrl);

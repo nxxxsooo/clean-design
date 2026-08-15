@@ -24,7 +24,6 @@ type ScopePlan = ScopeOutputs & {
   run_preflight: boolean;
   run_ui_p0: boolean;
   run_web_workspace_tests: boolean;
-  run_windows_tools_pack_payload_tests: boolean;
   run_workspace_unit_tests: boolean;
   ui_p0_matrix: string;
   visual_matrix: string;
@@ -132,7 +131,6 @@ function createRunPlan(
     run_preflight: true,
     run_ui_p0: runUiP0,
     run_web_workspace_tests: isFull || outputs.web_tests_required,
-    run_windows_tools_pack_payload_tests: isFull || outputs.tools_pack_tests_required,
     run_workspace_unit_tests: true,
   };
 }

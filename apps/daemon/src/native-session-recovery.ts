@@ -17,16 +17,14 @@ function sha256(value: string): string {
 
 function handleKindForAgent(agentId: string | null): NativeSessionHandleKind {
   if (agentId === 'codex') return 'cli-thread-id';
-  if (agentId === 'amr') return 'acp-session-handle';
   if (agentId === 'pi') return 'session-file-path';
   if (agentId) return 'opaque-id';
   return 'unknown';
 }
 
 function handleKindForRuntime(
-  def: Pick<RuntimeAgentDef, 'id' | 'capturesSessionIdFromStream' | 'resumesSessionViaAcpLoad'>,
+  def: Pick<RuntimeAgentDef, 'id' | 'capturesSessionIdFromStream'>,
 ): NativeSessionHandleKind {
-  if (def.resumesSessionViaAcpLoad === true) return 'acp-session-handle';
   if (def.id === 'pi') return 'session-file-path';
   if (def.capturesSessionIdFromStream === true) return 'cli-thread-id';
   return handleKindForAgent(def.id);
@@ -50,11 +48,10 @@ export function redactNativeSessionHandle(input: {
 }
 
 function acquisitionForRuntime(
-  def: Pick<RuntimeAgentDef, 'id' | 'resumesSessionViaCli' | 'capturesSessionIdFromStream' | 'resumesSessionViaAcpLoad'>,
+  def: Pick<RuntimeAgentDef, 'id' | 'resumesSessionViaCli' | 'capturesSessionIdFromStream'>,
   supported: boolean,
 ): NativeSessionAcquisitionMode {
   if (!supported) return 'none';
-  if (def.resumesSessionViaAcpLoad === true) return 'acp-session-load';
   if (def.id === 'pi') return 'session-file-discovered';
   if (def.capturesSessionIdFromStream === true) return 'stream-captured';
   if (def.resumesSessionViaCli === true) return 'daemon-specified';
@@ -62,11 +59,10 @@ function acquisitionForRuntime(
 }
 
 function continuationForRuntime(
-  def: Pick<RuntimeAgentDef, 'id' | 'resumesSessionViaCli' | 'resumesSessionViaAcpLoad'>,
+  def: Pick<RuntimeAgentDef, 'id' | 'resumesSessionViaCli'>,
   supported: boolean,
 ): NativeSessionContinuationMode {
   if (!supported) return 'none';
-  if (def.resumesSessionViaAcpLoad === true) return 'acp-session-load';
   if (def.id === 'pi') return 'session-file-resume';
   if (def.resumesSessionViaCli === true) return 'native-resume-by-id';
   return 'unknown';
@@ -77,7 +73,7 @@ function guardReason(reason: ResumeInvalidationReason | null | undefined): Nativ
 }
 
 export function initialNativeSessionRecoveryMetadata(input: {
-  agent: Pick<RuntimeAgentDef, 'id' | 'resumesSessionViaCli' | 'capturesSessionIdFromStream' | 'resumesSessionViaAcpLoad'>;
+  agent: Pick<RuntimeAgentDef, 'id' | 'resumesSessionViaCli' | 'capturesSessionIdFromStream'>;
   supportsSessionResume: boolean;
   isResuming: boolean;
   resumeSessionId: string | null | undefined;

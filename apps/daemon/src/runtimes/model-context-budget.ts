@@ -47,7 +47,7 @@ const CLAUDE_MODEL_ALIASES = new Set(['sonnet', 'opus', 'haiku']);
 export function estimatePromptTokens(prompt: string): number {
   // UTF-8 bytes / 3 deliberately overestimates normal English/code (usually
   // closer to 4 bytes per token) while remaining realistic for CJK text.
-  // This is a launch guard, not billing telemetry: a small false-positive
+  // This is a launch guard, not provider billing: a small false-positive
   // margin is safer than forwarding a request the provider will reject.
   return Math.ceil(Buffer.byteLength(prompt, 'utf8') / 3);
 }
@@ -75,7 +75,7 @@ function knownModelFamilyContextWindow(modelId: string | null): number | null {
 
 function compactionMarker(omittedMessageBlocks: number): string {
   return [
-    `[Open Design compacted ${omittedMessageBlocks} older transcript message block${omittedMessageBlocks === 1 ? '' : 's'} while rolling over the upstream agent session.`,
+    `[Clean Design compacted ${omittedMessageBlocks} older transcript message block${omittedMessageBlocks === 1 ? '' : 's'} while rolling over the upstream agent session.`,
     'The complete history remains persisted; continue from the retained recent turns.]',
   ].join(' ');
 }

@@ -6,10 +6,6 @@ import {
   type SidecarStamp,
 } from "@open-design/sidecar-proto";
 import {
-  parseLauncherAfterQuitArgs,
-  parseLauncherHandoffResumeArgs,
-} from "@open-design/launcher-proto";
-import {
   bootstrapSidecarRuntime,
   createSidecarLaunchEnv,
   resolveAppIpcPath,
@@ -23,12 +19,6 @@ import { readPackagedConfig } from "./config.js";
 import { writePackagedDesktopIdentity } from "./identity.js";
 import { PackagedPathAccessError } from "./errors.js";
 import {
-  exitPackagedLauncherForExistingDesktop,
-  inspectExistingDesktopForLauncher,
-  waitForLauncherAfterQuit,
-} from "./launcher-after-quit.js";
-import { confirmPackagedLauncherRuntime, resolvePackagedLauncherRuntime } from "./launcher-runtime.js";
-import {
   applyPackagedElectronPathOverrides,
   claimPackagedSingleInstanceLock,
   ensurePackagedNamespacePaths,
@@ -40,12 +30,10 @@ import {
   type PackagedDesktopLogger,
 } from "./logging.js";
 import { resolvePackagedNamespacePaths } from "./paths.js";
-import { launchPackagedPayloadDesktop } from "./payload-desktop-launch.js";
 import { packagedEntryUrl, registerOdProtocol } from "./protocol.js";
 import { startPackagedSidecars } from "./sidecars.js";
 import { resolvePackagedWindowTitle } from "./window-title.js";
 import { syncWindowsUninstallDisplayVersion } from "./windows-lifecycle.js";
-import { createObsoleteInstalledOuterRetirement } from "./obsolete-installed-outer.js";
 
 let packagedLogger: PackagedDesktopLogger | null = null;
 let pendingSecondInstanceFocus = false;
@@ -86,47 +74,16 @@ async function main(): Promise<void> {
   applyOsLocaleSwitch(app);
 
   const config = await readPackagedConfig();
-  const afterQuit = parseLauncherAfterQuitArgs(process.argv.slice(1));
-  const handoffResume = parseLauncherHandoffResumeArgs(process.argv.slice(1));
   const argvStamp = readProcessStamp(process.argv.slice(1), OPEN_DESIGN_SIDECAR_CONTRACT);
   const namespace = argvStamp?.namespace ?? config.namespace;
   const namespaceConfig = namespace === config.namespace ? config : { ...config, namespace };
-  const initialPaths = resolvePackagedNamespacePaths(namespaceConfig, namespace, process.env);
-  if (!await waitForLauncherAfterQuit(afterQuit, initialPaths)) {
-    app.exit(1);
-    return;
-  }
-  const existingDesktop = await inspectExistingDesktopForLauncher(namespace, {
-    logger: console,
-    paths: initialPaths,
-  });
-  if (exitPackagedLauncherForExistingDesktop(existingDesktop, (code) => app.exit(code))) {
-    return;
-  }
   const stamp = argvStamp ?? createPackagedDesktopStamp(namespace);
-  const launcherRuntime = await resolvePackagedLauncherRuntime(namespaceConfig, initialPaths, {
-    resume: handoffResume,
-  });
-  if (await launchPackagedPayloadDesktop(launcherRuntime, stamp)) {
-    app.exit(0);
-    return;
-  }
-  const activeConfig = launcherRuntime.config;
-  const paths = launcherRuntime.paths;
+  const paths = resolvePackagedNamespacePaths(namespaceConfig, namespace, process.env);
 
   await ensurePackagedNamespacePaths(paths);
   stabilizePackagedWorkingDirectory(paths);
   packagedLogger = createPackagedDesktopLogger(paths);
   attachPackagedDesktopProcessLogging({ logger: packagedLogger, paths, stamp });
-  const retireObsoleteInstalledOuter = createObsoleteInstalledOuterRetirement({
-    currentExecutablePath: process.execPath,
-    currentPid: process.pid,
-    installedLaunchPath: launcherRuntime.installedLaunchPath,
-    logger: packagedLogger,
-    payloadDesktopProcess: launcherRuntime.payloadDesktopProcess,
-    payloadExecutablePath: launcherRuntime.desktopExecutablePath,
-    platform: process.platform,
-  });
   applyPackagedElectronPathOverrides(paths);
   if (!claimPackagedSingleInstanceLock(app, () => {
     if (showExistingDesktop == null) {
@@ -158,19 +115,18 @@ async function main(): Promise<void> {
   });
 
   const sidecars = await startPackagedSidecars(runtime, paths, {
-    appVersion: activeConfig.appVersion,
-    daemonCliEntry: activeConfig.daemonCliEntry,
-    daemonSidecarEntry: activeConfig.daemonSidecarEntry,
-    electronNodeCommand: launcherRuntime.electronNodeCommand,
-    nodeCommand: activeConfig.nodeCommand,
+    appVersion: namespaceConfig.appVersion,
+    daemonCliEntry: namespaceConfig.daemonCliEntry,
+    daemonSidecarEntry: namespaceConfig.daemonSidecarEntry,
+    nodeCommand: namespaceConfig.nodeCommand,
     // PR #974 round-5 (lefarcen P2): the Electron entry runs desktop
     // main alongside the daemon, so the import-folder gate must be
     // pinned ON from request 0. See `apps/packaged/src/headless.ts` for
     // the daemon+web-only counterpart that passes `false`.
     requireDesktopAuth: true,
-    webSidecarEntry: activeConfig.webSidecarEntry,
-    webStandaloneRoot: activeConfig.webStandaloneRoot,
-    webOutputMode: activeConfig.webOutputMode,
+    webSidecarEntry: namespaceConfig.webSidecarEntry,
+    webStandaloneRoot: namespaceConfig.webStandaloneRoot,
+    webOutputMode: namespaceConfig.webOutputMode,
     // Surface each sidecar boot phase on the splash status line so a slow
     // cold start (Defender scans, native module loads) never reads as a hang.
     // Both the "spawning" and "ready" edges are mapped so the step counter
@@ -199,13 +155,9 @@ async function main(): Promise<void> {
     splashStartedAt: splash.startedAt,
     async beforeShutdown() {
       try {
-        await retireObsoleteInstalledOuter();
+        await sidecars.close();
       } finally {
-        try {
-          await sidecars.close();
-        } finally {
-          await identity.close();
-        }
+        await identity.close();
       }
     },
     async discoverWebUrl() {
@@ -218,17 +170,11 @@ async function main(): Promise<void> {
     async discoverDaemonUrl() {
       return sidecars.daemon.url;
     },
-    windowTitle: resolvePackagedWindowTitle(activeConfig),
-    async onExternalShow() {
-      await retireObsoleteInstalledOuter();
-    },
+    windowTitle: resolvePackagedWindowTitle(namespaceConfig),
     onDesktopReady(controls) {
-      void confirmPackagedLauncherRuntime(launcherRuntime).catch((error: unknown) => {
-        packagedLogger?.warn("failed to confirm packaged launcher runtime", { error });
-      });
       void syncWindowsUninstallDisplayVersion({
         namespace,
-        version: launcherRuntime.config.appVersion,
+        version: namespaceConfig.appVersion,
       }).catch((error: unknown) => {
         packagedLogger?.warn("failed to sync Windows uninstall registry version", { error });
       });

@@ -3,8 +3,8 @@
 <head>
 <meta charset='utf-8' />
 <meta name='viewport' content='width=device-width, initial-scale=1' />
-<title>Open Design — Designing intelligence with skills, taste, and your own agent.</title>
-<meta name='description' content='Open Design is the open-source alternative to Claude Design. 12 coding-agent CLIs · 31 composable skills · 72 brand-grade design systems. Local-first, web-deployable, BYOK at every layer.' />
+<title>Clean Design — Designing intelligence with skills, taste, and your own agent.</title>
+<meta name='description' content='Clean Design is the open-source alternative to Claude Design. 12 coding-agent CLIs · 31 composable skills · 72 brand-grade design systems. Local-first, web-deployable, BYOK at every layer.' />
 <link rel='preconnect' href='https://fonts.googleapis.com' />
 <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin />
 <link href='https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,400;1,500;1,600;1,700&family=JetBrains+Mono:wght@400;500&display=swap' rel='stylesheet' />
@@ -252,7 +252,6 @@ body::before {
   .nav-inner .nav-side { gap: 14px; }
   .nav-inner .nav-side .nav-cta.ghost { font-size: 13px; }
   .nav-inner .nav-side .locale-trigger { font-size: 13px; }
-  .nav-inner .nav-side .nav-amr img { width: 68px; height: auto; }
 }
 .brand {
   display: inline-flex;
@@ -1590,127 +1589,6 @@ section.tight { padding: 90px 0; }
 }
 .testimonial-art img { width: 100%; height: 100%; object-fit: contain; }
 
-/* ---------- AMR band ---------- */
-.amr-band {
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  overflow: hidden;
-}
-.amr-band-inner {
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 18px 0 0;
-  text-align: center;
-}
-.amr-band-kicker {
-  display: inline-block;
-  font-family: var(--sans);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
-}
-.amr-band-title {
-  font-family: var(--sans);
-  font-size: clamp(30px, 5vw, 52px);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.08;
-  margin: 16px auto 0;
-  max-width: 720px;
-  color: var(--ink);
-}
-.amr-band-lead {
-  font-family: var(--sans);
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--ink-mute);
-  margin: 16px auto 0;
-  max-width: 620px;
-}
-.amr-band-chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  list-style: none;
-  margin: 24px 0 0;
-  padding: 0;
-}
-.amr-band-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 16px 7px 13px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-family: var(--sans);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink-soft);
-  background: color-mix(in srgb, var(--paper) 60%, transparent);
-}
-.amr-band-chip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent, var(--ink-soft));
-  flex: none;
-}
-.amr-band-logos {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 28px;
-  list-style: none;
-  margin: 30px 0 0;
-  padding: 0;
-}
-.amr-band-logos li {
-  display: inline-flex;
-  align-items: center;
-}
-.amr-band-logo {
-  /* <img>-loaded SVGs can't inherit page color; they paint in their own
-     default ink (near-black). Opacity softens the row. */
-  width: 26px;
-  height: 26px;
-  display: block;
-  opacity: 0.74;
-  transition: opacity 160ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-.amr-band-logos li:hover .amr-band-logo {
-  opacity: 1;
-}
-.amr-band-more {
-  font-family: var(--sans);
-  font-size: 26px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: 0.05em;
-  color: var(--ink-faint);
-  transform: translateY(-4px);
-}
-.amr-band-actions {
-  display: flex;
-  justify-content: center;
-  margin-top: 30px;
-}
-.amr-band-cta {
-  /* Reuse the dark .nav-cta pill; add the trailing arrow the nav CTAs use. */
-  padding: 11px 22px;
-  font-size: 14px;
-}
-.amr-band-cta::after {
-  content: '→';
-  color: var(--paper);
-  font-size: 13px;
-  margin-left: 7px;
-}
-
 /* ---------- CTA ---------- */
 .cta-grid {
   display: grid;
@@ -2190,7 +2068,7 @@ footer {
 <body>
 
 <div class='side-rail right' data-od-id='rail-right'>
-  <span class='rail-text'>Open Design — Vol. 01 · Issue Nº 26 · Apache-2.0</span>
+  <span class='rail-text'>Clean Design — Vol. 01 · Issue Nº 26 · Apache-2.0</span>
 </div>
 <div class='side-rail left' data-od-id='rail-left'>
   <span class='rail-text'>Skills · Systems · Agents · BYOK · Local-first</span>
@@ -2215,7 +2093,7 @@ footer {
   <div class='container nav-inner'>
     <a href='#top' class='brand'>
       <span class='brand-mark'>Ø</span>
-      <span>Open Design</span>
+      <span>Clean Design</span>
       <span class='brand-meta'><b>Studio Nº 01</b>Berlin / Open / Earth</span>
     </a>
     <nav>
@@ -2242,7 +2120,7 @@ footer {
       <span class='meta-grp'>
         <span>Hero / Cover Plate</span>
         <span class='dot-mark'>•</span>
-        <span>Open Design / Volume 01</span>
+        <span>Clean Design / Volume 01</span>
       </span>
       <span>001 / 008</span>
     </div>
@@ -2289,7 +2167,7 @@ footer {
       <span class='annot annot-tl coord'>FIG. 01 / OD-26</span>
       <span class='annot annot-tr'>Plate Nº 08</span>
       <span class='annot annot-bl coord'>SHA · a1b2c3d</span>
-      <span class='annot annot-br'>Composed in&nbsp;<span style='color:var(--coral);'>Open Design</span></span>
+      <span class='annot annot-br'>Composed in&nbsp;<span style='color:var(--coral);'>Clean Design</span></span>
       <img src='./assets/hero.png' alt='' />
       <div class='index'>
       <span><span class='n'>01</span>Detect</span>
@@ -2390,7 +2268,7 @@ footer {
     <span class='meta-grp'>
       <span>About / Manifesto</span>
       <span class='dot-mark'>•</span>
-      <span>Open Design / Volume 01</span>
+      <span>Clean Design / Volume 01</span>
     </span>
     <span>002 / 008</span>
   </div>
@@ -2420,7 +2298,7 @@ footer {
         </div>
         <div class='about-caption'>
           <b>Studies in form · perception · machine imagination.</b>
-          (Open Design, MMXXVI)
+          (Clean Design, MMXXVI)
         </div>
       </div>
     </div>
@@ -2641,7 +2519,7 @@ footer {
       <span style='display:inline-flex;gap:24px;'>
         <span>Selected Work · 2026 Catalog</span>
         <span style='color:var(--coral);'>•</span>
-        <span>Edited by Open Design</span>
+        <span>Edited by Clean Design</span>
       </span>
       <span>006 / 008</span>
     </div>
@@ -2699,7 +2577,7 @@ footer {
     <div class='testimonial-grid'>
       <div class='testimonial-copy' data-reveal>
         <span class='label'>Collaborators <span class='ix'>· Nº 06</span></span>
-        <h2 style='margin-top:30px;'>&ldquo;Open Design helped us turn vague <em>AI ideas</em> into a visual system that felt <em>sharp, believable,</em> and genuinely new.&rdquo;</h2>
+        <h2 style='margin-top:30px;'>&ldquo;Clean Design helped us turn vague <em>AI ideas</em> into a visual system that felt <em>sharp, believable,</em> and genuinely new.&rdquo;</h2>
         <div class='author'>
           <span class='avatar'>m</span>
           <p>Mina Kovac<br/><span>Creative Director · North Form</span></p>
@@ -2771,40 +2649,6 @@ footer {
   </div>
 </section>
 
-<!-- AMR band: Open Design AMR ships SOTA frontier models out of the box.
-     Static monochrome vendor-logo row + ellipsis, sits under the testimonial. -->
-<section class='amr-band' data-od-id='amr-band' data-reveal>
-  <div class='container'>
-    <div class='amr-band-inner'>
-      <span class='amr-band-kicker'>Open Design AMR · Design Agent</span>
-      <h2 class='amr-band-title'>The world&rsquo;s top Agents and LLMs, powering Open Design</h2>
-      <p class='amr-band-lead'>Top up once and reach GPT, Claude, Gemini, DeepSeek and more. AMR auto-routes each step to the right frontier model — billed by real token usage, with your wallet balance and request log in one console.</p>
-      <ul class='amr-band-chips' aria-label='Open Design AMR · Design Agent'>
-        <li class='amr-band-chip'><span class='amr-band-chip-dot' aria-hidden='true'></span>20+ flagship models</li>
-        <li class='amr-band-chip'><span class='amr-band-chip-dot' aria-hidden='true'></span>Zero setup</li>
-        <li class='amr-band-chip'><span class='amr-band-chip-dot' aria-hidden='true'></span>SOTA Harness For Design</li>
-        <li class='amr-band-chip'><span class='amr-band-chip-dot' aria-hidden='true'></span>Real token-based billing</li>
-      </ul>
-      <ul class='amr-band-logos' aria-label='Built-in frontier models'>
-        <li><img class='amr-band-logo' src='./assets/agents/openai.svg' alt='OpenAI' title='OpenAI' width='26' height='26' loading='lazy' /></li>
-        <li><img class='amr-band-logo' src='./assets/agents/anthropic.svg' alt='Anthropic' title='Anthropic' width='26' height='26' loading='lazy' /></li>
-        <li><img class='amr-band-logo' src='./assets/agents/gemini.svg' alt='Google Gemini' title='Google Gemini' width='26' height='26' loading='lazy' /></li>
-        <li><img class='amr-band-logo' src='./assets/agents/deepseek.svg' alt='DeepSeek' title='DeepSeek' width='26' height='26' loading='lazy' /></li>
-        <li><img class='amr-band-logo' src='./assets/agents/zhipu.svg' alt='Zhipu GLM' title='Zhipu GLM' width='26' height='26' loading='lazy' /></li>
-        <li><img class='amr-band-logo' src='./assets/agents/moonshot.svg' alt='Moonshot Kimi' title='Moonshot Kimi' width='26' height='26' loading='lazy' /></li>
-        <li><img class='amr-band-logo' src='./assets/agents/qwen.svg' alt='Qwen' title='Qwen' width='26' height='26' loading='lazy' /></li>
-        <li><img class='amr-band-logo' src='./assets/agents/minimax.svg' alt='MiniMax' title='MiniMax' width='26' height='26' loading='lazy' /></li>
-        <li><img class='amr-band-logo' src='./assets/agents/xiaomi.svg' alt='Xiaomi MiMo' title='Xiaomi MiMo' width='26' height='26' loading='lazy' /></li>
-        <li><img class='amr-band-logo' src='./assets/agents/xai.svg' alt='xAI' title='xAI' width='26' height='26' loading='lazy' /></li>
-        <li class='amr-band-more' aria-label='and more'>&hellip;</li>
-      </ul>
-      <div class='amr-band-actions'>
-        <a class='nav-cta amr-band-cta' href='https://open-design.ai/amr/'>Explore AMR</a>
-      </div>
-    </div>
-  </div>
-</section>
-
 <section class='cta' id='contact' data-od-id='cta'>
   <div class='container'>
     <div class='sec-rule'>
@@ -2852,7 +2696,7 @@ footer {
     <div class='newsletter-card' data-reveal>
       <div class='newsletter-copy'>
         <span class='label'>Stay updated</span>
-        <h2 class='newsletter-title'>The Open Design newsletter</h2>
+        <h2 class='newsletter-title'>The Clean Design newsletter</h2>
         <p class='lead'>New templates, design-system drops, ambassador work, and product updates — straight to your inbox.</p>
       </div>
       <form class='newsletter-form' data-newsletter-form data-source='landing' data-success='You’re in. Watch your inbox.' data-error='Something went wrong. Try again.'>
@@ -2865,10 +2709,10 @@ footer {
 </section>
 
 <!-- ====== NEWSLETTER POPUP (hidden until JS shows it) ====== -->
-<aside class='newsletter-popup' data-newsletter-popup hidden role='dialog' aria-label='The Open Design newsletter'>
+<aside class='newsletter-popup' data-newsletter-popup hidden role='dialog' aria-label='The Clean Design newsletter'>
   <button class='newsletter-popup__close' type='button' data-newsletter-dismiss aria-label='Close'>×</button>
   <span class='label'>Stay updated</span>
-  <h3 class='newsletter-popup__title'>The Open Design newsletter</h3>
+  <h3 class='newsletter-popup__title'>The Clean Design newsletter</h3>
   <p class='newsletter-popup__lead'>New templates, design-system drops, ambassador work, and product updates — straight to your inbox.</p>
   <form class='newsletter-form' data-newsletter-form data-source='landing' data-success='You’re in. Watch your inbox.' data-error='Something went wrong. Try again.'>
     <input class='newsletter-input' type='email' name='email' required autocomplete='email' placeholder='you@studio.com' aria-label='you@studio.com' data-newsletter-email />
@@ -2883,7 +2727,7 @@ footer {
       <div class='foot-brand'>
         <a href='#top' class='brand'>
           <span class='brand-mark'>Ø</span>
-          <span>Open Design</span>
+          <span>Clean Design</span>
         </a>
         <p style='margin-top:18px;'>The open-source alternative to Claude Design. Built on the shoulders of <a class='inline-link' href='https://github.com/alchaincyf/huashu-design' target='_blank' rel='noreferrer noopener'>huashu-design</a>, <a class='inline-link' href='https://github.com/op7418/guizang-ppt-skill' target='_blank' rel='noreferrer noopener'>guizang-ppt</a>, <a class='inline-link' href='https://github.com/multica-ai/multica' target='_blank' rel='noreferrer noopener'>multica-ai</a>, and <a class='inline-link' href='https://github.com/OpenCoworkAI/open-codesign' target='_blank' rel='noreferrer noopener'>open-codesign</a>.</p>
         <a class='foot-cta' href='https://github.com/nexu-io/open-design/releases' target='_blank' rel='noreferrer noopener'>Download desktop<span class='meta'>macOS · v0.3.0</span></a>
@@ -2926,7 +2770,7 @@ footer {
   </div>
     </div>
     <div class='foot-bottom'>
-      <span><span class='pulse'></span>● <b style='color:var(--ink);'>Open Design</b> · Apache-2.0 · 2026 / Vol. 01 / Issue Nº 26</span>
+      <span><span class='pulse'></span>● <b style='color:var(--ink);'>Clean Design</b> · Apache-2.0 · 2026 / Vol. 01 / Issue Nº 26</span>
       <span class='right'>
         <span>Berlin / Open / Earth</span>
         <span>52.5200° N · 13.4050° E</span>

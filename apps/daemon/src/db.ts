@@ -126,7 +126,6 @@ function migrate(db: SqliteDb): void {
       session_mode TEXT,
       run_context_json TEXT,
       applied_plugin_snapshot_json TEXT,
-      telemetry_finalized_at INTEGER,
       started_at INTEGER,
       ended_at INTEGER,
       position INTEGER NOT NULL,
@@ -188,49 +187,6 @@ function migrate(db: SqliteDb): void {
     CREATE INDEX IF NOT EXISTS idx_tabs_project
       ON tabs(project_id, position);
 
-    CREATE TABLE IF NOT EXISTS routines (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      prompt TEXT NOT NULL,
-      schedule_kind TEXT NOT NULL,
-      schedule_value TEXT NOT NULL,
-      schedule_json TEXT,
-      project_mode TEXT NOT NULL,
-      project_id TEXT,
-      skill_id TEXT,
-      agent_id TEXT,
-      context_json TEXT,
-      enabled INTEGER NOT NULL DEFAULT 1,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS routine_runs (
-      id TEXT PRIMARY KEY,
-      routine_id TEXT NOT NULL,
-      trigger TEXT NOT NULL,
-      status TEXT NOT NULL,
-      project_id TEXT NOT NULL,
-      conversation_id TEXT NOT NULL,
-      agent_run_id TEXT NOT NULL,
-      started_at INTEGER NOT NULL,
-      completed_at INTEGER,
-      summary TEXT,
-      error TEXT,
-      error_code TEXT,
-      FOREIGN KEY(routine_id) REFERENCES routines(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS routine_schedule_claims (
-      routine_id TEXT NOT NULL,
-      slot_at INTEGER NOT NULL,
-      claimed_at INTEGER NOT NULL,
-      PRIMARY KEY(routine_id, slot_at),
-      FOREIGN KEY(routine_id) REFERENCES routines(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_routine_runs_routine
-      ON routine_runs(routine_id, started_at DESC);
   `);
   // Forward-compatible column add for databases created before metadata_json.
   // SQLite has no IF NOT EXISTS for ALTER, so we check pragma_table_info.
@@ -288,14 +244,6 @@ function migrate(db: SqliteDb): void {
   if (!messageCols.some((c: DbRow) => c.name === 'applied_plugin_snapshot_json')) {
     db.exec(`ALTER TABLE messages ADD COLUMN applied_plugin_snapshot_json TEXT`);
   }
-  if (!messageCols.some((c: DbRow) => c.name === 'telemetry_finalized_at')) {
-    db.exec(`ALTER TABLE messages ADD COLUMN telemetry_finalized_at INTEGER`);
-  }
-  const routineRunCols = db.prepare(`PRAGMA table_info(routine_runs)`).all() as DbRow[];
-  if (!routineRunCols.some((c: DbRow) => c.name === 'error_code')) {
-    db.exec(`ALTER TABLE routine_runs ADD COLUMN error_code TEXT`);
-  }
-
   const previewCommentCols = db.prepare(`PRAGMA table_info(preview_comments)`).all() as DbRow[];
   if (!previewCommentCols.some((c: DbRow) => c.name === 'selection_kind')) {
     db.exec(`ALTER TABLE preview_comments ADD COLUMN selection_kind TEXT`);
@@ -316,18 +264,6 @@ function migrate(db: SqliteDb): void {
     db.exec(`ALTER TABLE preview_comments ADD COLUMN slide_index INTEGER`);
   }
   migratePreviewCommentsSlideKey(db);
-  // schedule_json holds the full RoutineSchedule object (kind discriminator
-  // plus kind-specific fields like time/timezone/weekday). The legacy
-  // schedule_kind/schedule_value columns are kept populated for query
-  // convenience and as a fallback when reading rows written before this
-  // column existed.
-  const routineCols = db.prepare(`PRAGMA table_info(routines)`).all() as DbRow[];
-  if (routineCols.length > 0 && !routineCols.some((c: DbRow) => c.name === 'schedule_json')) {
-    db.exec(`ALTER TABLE routines ADD COLUMN schedule_json TEXT`);
-  }
-  if (routineCols.length > 0 && !routineCols.some((c: DbRow) => c.name === 'context_json')) {
-    db.exec(`ALTER TABLE routines ADD COLUMN context_json TEXT`);
-  }
   const agentSessionCols = db.prepare(`PRAGMA table_info(agent_sessions)`).all() as DbRow[];
   if (agentSessionCols.length > 0 && !agentSessionCols.some((c: DbRow) => c.name === 'stable_prompt_hash')) {
     db.exec(`ALTER TABLE agent_sessions ADD COLUMN stable_prompt_hash TEXT`);
@@ -1364,10 +1300,6 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
               produced_files_json = ?, trace_object_files_json = ?, feedback_json = ?,
               pre_turn_file_names_json = ?,
               session_mode = ?, run_context_json = ?, applied_plugin_snapshot_json = ?,
-              telemetry_finalized_at = CASE
-                WHEN ? THEN COALESCE(telemetry_finalized_at, ?)
-                ELSE telemetry_finalized_at
-              END,
               started_at = ?, ended_at = ?
         WHERE id = ?`,
     ).run(
@@ -1389,8 +1321,6 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
       normalizeMessageSessionModeForStorage(m.sessionMode),
       m.runContext ? JSON.stringify(m.runContext) : null,
       m.appliedPluginSnapshot ? JSON.stringify(m.appliedPluginSnapshot) : null,
-      m.telemetryFinalized === true ? 1 : 0,
-      now,
       m.startedAt ?? null,
       m.endedAt ?? null,
       m.id,
@@ -1405,12 +1335,11 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
     const createdAt = typeof m.createdAt === 'number' && Number.isFinite(m.createdAt)
       ? m.createdAt
       : now;
-    // 25 values: id, conversation_id, role, content, agent_id, agent_name,
+    // 24 values: id, conversation_id, role, content, agent_id, agent_name,
     // run_id, run_status, result_delivery_state, last_run_event_id, events_json, attachments_json,
     // comment_attachments_json, produced_files_json, trace_object_files_json,
     // feedback_json, pre_turn_file_names_json, session_mode, run_context_json,
-    // applied_plugin_snapshot_json, telemetry_finalized_at, started_at,
-    // ended_at, position, created_at.
+    // applied_plugin_snapshot_json, started_at, ended_at, position, created_at.
     db.prepare(
       `INSERT INTO messages
          (id, conversation_id, role, content, agent_id, agent_name,
@@ -1418,8 +1347,8 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
           attachments_json, comment_attachments_json, produced_files_json,
           trace_object_files_json, feedback_json, pre_turn_file_names_json,
           session_mode, run_context_json, applied_plugin_snapshot_json,
-          telemetry_finalized_at, started_at, ended_at, position, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          started_at, ended_at, position, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       m.id,
       conversationId,
@@ -1441,7 +1370,6 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
       normalizeMessageSessionModeForStorage(m.sessionMode),
       m.runContext ? JSON.stringify(m.runContext) : null,
       m.appliedPluginSnapshot ? JSON.stringify(m.appliedPluginSnapshot) : null,
-      m.telemetryFinalized === true ? now : null,
       m.startedAt ?? null,
       m.endedAt ?? null,
       position,
@@ -1475,27 +1403,6 @@ export function upsertMessage(db: SqliteDb, conversationId: string, m: DbRow) {
     )
     .get(m.id) as DbRow | undefined;
   return row ? normalizeMessage(row) : null;
-}
-
-export function getMessageTelemetryFinalizationState(db: SqliteDb, messageId: string) {
-  const row = db
-    .prepare(
-      `SELECT telemetry_finalized_at AS telemetryFinalizedAt
-         FROM messages
-        WHERE id = ?`,
-    )
-    .get(messageId) as DbRow | undefined;
-  if (!row) {
-    return {
-      exists: false,
-      finalizedAt: null,
-    };
-  }
-  return {
-    exists: true,
-    finalizedAt:
-      typeof row.telemetryFinalizedAt === 'number' ? row.telemetryFinalizedAt : null,
-  };
 }
 
 export function appendMessageStatusEvent(db: SqliteDb, messageId: string, event: DbRow) {
@@ -1884,253 +1791,6 @@ function parseJsonOrUndef(s: unknown): any {
   } catch {
     return undefined;
   }
-}
-
-// ---------- routines ----------
-
-const ROUTINE_COLS = `id, name, prompt,
-  schedule_kind AS scheduleKind, schedule_value AS scheduleValue,
-  schedule_json AS scheduleJson,
-  project_mode AS projectMode, project_id AS projectId,
-  skill_id AS skillId, agent_id AS agentId,
-  context_json AS contextJson,
-  enabled, created_at AS createdAt, updated_at AS updatedAt`;
-
-const ROUTINE_RUN_COLS = `id, routine_id AS routineId, trigger, status,
-  project_id AS projectId, conversation_id AS conversationId,
-  agent_run_id AS agentRunId, started_at AS startedAt,
-  completed_at AS completedAt, summary, error, error_code AS errorCode`;
-
-export function listRoutines(db: SqliteDb) {
-  return (db
-    .prepare(`SELECT ${ROUTINE_COLS} FROM routines ORDER BY created_at ASC`)
-    .all() as DbRow[])
-    .map(normalizeRoutine);
-}
-
-export function getRoutine(db: SqliteDb, id: string) {
-  const r = db
-    .prepare(`SELECT ${ROUTINE_COLS} FROM routines WHERE id = ?`)
-    .get(id) as DbRow | undefined;
-  return r ? normalizeRoutine(r) : null;
-}
-
-export function insertRoutine(db: SqliteDb, r: DbRow) {
-  db.prepare(
-    `INSERT INTO routines
-       (id, name, prompt, schedule_kind, schedule_value, schedule_json,
-        project_mode, project_id, skill_id, agent_id, context_json, enabled,
-        created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    r.id,
-    r.name,
-    r.prompt,
-    r.scheduleKind,
-    r.scheduleValue,
-    r.scheduleJson ?? null,
-    r.projectMode,
-    r.projectId ?? null,
-    r.skillId ?? null,
-    r.agentId ?? null,
-    r.contextJson ?? null,
-    r.enabled ? 1 : 0,
-    r.createdAt,
-    r.updatedAt,
-  );
-  return getRoutine(db, r.id);
-}
-
-export function updateRoutine(db: SqliteDb, id: string, patch: DbRow) {
-  const existing = getRoutine(db, id);
-  if (!existing) return null;
-  const merged = {
-    ...existing,
-    ...patch,
-    updatedAt: typeof patch.updatedAt === 'number' ? patch.updatedAt : Date.now(),
-  };
-  db.prepare(
-    `UPDATE routines
-        SET name = ?, prompt = ?,
-            schedule_kind = ?, schedule_value = ?, schedule_json = ?,
-            project_mode = ?, project_id = ?,
-            skill_id = ?, agent_id = ?, context_json = ?,
-            enabled = ?, updated_at = ?
-      WHERE id = ?`,
-  ).run(
-    merged.name,
-    merged.prompt,
-    merged.scheduleKind,
-    merged.scheduleValue,
-    merged.scheduleJson ?? null,
-    merged.projectMode,
-    merged.projectId ?? null,
-    merged.skillId ?? null,
-    merged.agentId ?? null,
-    merged.contextJson ?? null,
-    merged.enabled ? 1 : 0,
-    merged.updatedAt,
-    id,
-  );
-  return getRoutine(db, id);
-}
-
-export function deleteRoutine(db: SqliteDb, id: string): boolean {
-  const result = db.prepare(`DELETE FROM routines WHERE id = ?`).run(id);
-  return result.changes > 0;
-}
-
-function normalizeRoutine(row: DbRow) {
-  return {
-    id: row.id,
-    name: row.name,
-    prompt: row.prompt,
-    scheduleKind: row.scheduleKind,
-    scheduleValue: row.scheduleValue,
-    scheduleJson: row.scheduleJson ?? null,
-    projectMode: row.projectMode,
-    projectId: row.projectId ?? null,
-    skillId: row.skillId ?? null,
-    agentId: row.agentId ?? null,
-    contextJson: row.contextJson ?? null,
-    enabled: Number(row.enabled) === 1,
-    createdAt: Number(row.createdAt),
-    updatedAt: Number(row.updatedAt),
-  };
-}
-
-export function listRoutineRuns(db: SqliteDb, routineId: string, limit = 20) {
-  return (db
-    .prepare(
-      `SELECT ${ROUTINE_RUN_COLS}
-         FROM routine_runs
-        WHERE routine_id = ?
-        ORDER BY started_at DESC
-        LIMIT ?`,
-    )
-    .all(routineId, limit) as DbRow[])
-    .map(normalizeRoutineRun);
-}
-
-export function getLatestRoutineRun(db: SqliteDb, routineId: string) {
-  const r = db
-    .prepare(
-      `SELECT ${ROUTINE_RUN_COLS}
-         FROM routine_runs
-        WHERE routine_id = ?
-        ORDER BY started_at DESC
-        LIMIT 1`,
-    )
-    .get(routineId) as DbRow | undefined;
-  return r ? normalizeRoutineRun(r) : null;
-}
-
-export function getRoutineRun(db: SqliteDb, id: string) {
-  const r = db
-    .prepare(`SELECT ${ROUTINE_RUN_COLS} FROM routine_runs WHERE id = ?`)
-    .get(id) as DbRow | undefined;
-  return r ? normalizeRoutineRun(r) : null;
-}
-
-export function insertRoutineRun(db: SqliteDb, r: DbRow) {
-  db.prepare(
-    `INSERT INTO routine_runs
-       (id, routine_id, trigger, status, project_id, conversation_id,
-        agent_run_id, started_at, completed_at, summary, error, error_code)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    r.id,
-    r.routineId,
-    r.trigger,
-    r.status,
-    r.projectId,
-    r.conversationId,
-    r.agentRunId,
-    r.startedAt,
-    r.completedAt ?? null,
-    r.summary ?? null,
-    r.error ?? null,
-    r.errorCode ?? null,
-  );
-  return getRoutineRun(db, r.id);
-}
-
-export function insertScheduledRoutineRun(db: SqliteDb, r: DbRow, slotAt: number) {
-  const insertClaim = db.prepare(
-    `INSERT OR IGNORE INTO routine_schedule_claims
-       (routine_id, slot_at, claimed_at)
-     VALUES (?, ?, ?)`,
-  );
-  const insertRun = db.prepare(
-    `INSERT INTO routine_runs
-       (id, routine_id, trigger, status, project_id, conversation_id,
-        agent_run_id, started_at, completed_at, summary, error, error_code)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  );
-  const tx = db.transaction(() => {
-    const claim = insertClaim.run(r.routineId, slotAt, Date.now());
-    if (claim.changes === 0) return false;
-    insertRun.run(
-      r.id,
-      r.routineId,
-      r.trigger,
-      r.status,
-      r.projectId,
-      r.conversationId,
-      r.agentRunId,
-      r.startedAt,
-      r.completedAt ?? null,
-      r.summary ?? null,
-      r.error ?? null,
-      r.errorCode ?? null,
-    );
-    return true;
-  });
-  if (!tx()) return null;
-  return getRoutineRun(db, r.id);
-}
-
-export function updateRoutineRun(db: SqliteDb, id: string, patch: DbRow) {
-  const existing = getRoutineRun(db, id);
-  if (!existing) return null;
-  const merged = {
-    ...existing,
-    ...patch,
-  };
-  db.prepare(
-    `UPDATE routine_runs
-        SET status = ?, project_id = ?, conversation_id = ?, agent_run_id = ?,
-            completed_at = ?, summary = ?, error = ?, error_code = ?
-      WHERE id = ?`,
-  ).run(
-    merged.status,
-    merged.projectId,
-    merged.conversationId,
-    merged.agentRunId,
-    merged.completedAt ?? null,
-    merged.summary ?? null,
-    merged.error ?? null,
-    merged.errorCode ?? null,
-    id,
-  );
-  return getRoutineRun(db, id);
-}
-
-function normalizeRoutineRun(row: DbRow) {
-  return {
-    id: row.id,
-    routineId: row.routineId,
-    trigger: row.trigger,
-    status: row.status,
-    projectId: row.projectId,
-    conversationId: row.conversationId,
-    agentRunId: row.agentRunId,
-    startedAt: Number(row.startedAt),
-    completedAt: row.completedAt == null ? null : Number(row.completedAt),
-    summary: row.summary ?? null,
-    error: row.error ?? null,
-    errorCode: row.errorCode ?? null,
-  };
 }
 
 // ---------- tabs ----------

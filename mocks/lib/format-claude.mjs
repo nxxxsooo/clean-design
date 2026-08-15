@@ -1,4 +1,4 @@
-// OD-faithful claude-stream-json renderer. Matches OD's
+// Clean Design claude-stream-json renderer. Matches the daemon's
 // `claude-stream.ts:createClaudeStreamHandler` parser.
 //
 // Each tool call lives in its own assistant message wrapper (the
@@ -6,7 +6,6 @@
 // semantics).
 
 import { writeFile } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -14,7 +13,7 @@ export async function renderAsClaude(events, opts = {}) {
   const emit = opts.emit ?? (s => process.stdout.write(s));
   const maxSleep = opts.maxSleepMs ?? 3000;
   const meta = events.find(e => e.type === 'meta');
-  const sessionId = opts.sessionId ?? randomUUID();
+  const sessionId = opts.sessionId ?? 'mock-claude-session';
 
   emit(JSON.stringify({
     type: 'system',
@@ -27,6 +26,7 @@ export async function renderAsClaude(events, opts = {}) {
   for (const e of events) if (e.type === 'tool_result') results.set(e.obs_id, e);
 
   let lastT = 0;
+  let assistantMessageCount = 0;
   for (const e of events) {
     if (e.type === 'meta' || e.type === 'stdout' || e.type === 'tool_result') continue;
     const t = typeof e.t_ms === 'number' ? e.t_ms : undefined;
@@ -37,7 +37,8 @@ export async function renderAsClaude(events, opts = {}) {
     }
     if (e.type === 'tool_call') {
       const result = results.get(e.obs_id);
-      const messageId = `msg_${randomUUID().replace(/-/g, '').slice(0, 24)}`;
+      assistantMessageCount += 1;
+      const messageId = `mock-msg-${assistantMessageCount}`;
       emit(JSON.stringify({
         type: 'assistant',
         message: {
@@ -62,7 +63,8 @@ export async function renderAsClaude(events, opts = {}) {
         },
       }) + '\n');
     } else if (e.type === 'report') {
-      const messageId = `msg_${randomUUID().replace(/-/g, '').slice(0, 24)}`;
+      assistantMessageCount += 1;
+      const messageId = `mock-msg-${assistantMessageCount}`;
       emit(JSON.stringify({
         type: 'assistant',
         message: {

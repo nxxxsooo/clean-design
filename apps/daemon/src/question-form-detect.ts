@@ -6,7 +6,7 @@
 // forbids `apps/daemon` importing `apps/web/src`, so the mirror is deliberate —
 // keep it in sync, or promote a shared parser into `packages/contracts` if the
 // two drift. Kept as a daemon-internal module so every daemon consumer (the
-// missing-artifacts guard, awaiting-input status, and run analytics) shares ONE
+// missing-artifacts guard and awaiting-input status) shares ONE
 // renderable-form check instead of each re-deriving a naive open-tag regex.
 
 // Canonical open tag plus the `<ask-question>` alias. Matching only the open

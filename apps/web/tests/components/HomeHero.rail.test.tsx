@@ -492,17 +492,17 @@ describe('HomeHero intent rail', () => {
     expect(trigger.className).toContain('is-pending');
   });
 
-  it('shows plugin authoring with the starter shortcuts after More opens', () => {
+  it('shows import and template shortcuts after More opens', () => {
     renderHero();
     fireEvent.click(screen.getByTestId('home-hero-shortcuts-trigger'));
-    const createPluginGroup = screen
-      .getByTestId('home-hero-rail-create-plugin')
+    const shortcutGroup = screen
+      .getByTestId('home-hero-rail-figma')
       .closest('[data-rail-group]');
 
-    expect(createPluginGroup?.getAttribute('data-rail-group')).toBe('migrate');
+    expect(shortcutGroup?.getAttribute('data-rail-group')).toBe('migrate');
     for (const id of ['figma', 'template']) {
       expect(screen.getByTestId(`home-hero-rail-${id}`).closest('[data-rail-group]'))
-        .toBe(createPluginGroup);
+        .toBe(shortcutGroup);
     }
     expect(screen.queryByTestId('home-hero-rail-folder')).toBeNull();
   });
@@ -515,7 +515,6 @@ describe('HomeHero intent rail', () => {
   });
 
   it('migration chips carry the right action discriminator', () => {
-    expect(findChip('create-plugin')?.action).toMatchObject({ kind: 'create-plugin' });
     expect(findChip('figma')?.action).toMatchObject({ kind: 'apply-figma-migration' });
     expect(findChip('folder')).toBeUndefined();
     expect(findChip('template')?.action).toMatchObject({ kind: 'open-template-picker' });

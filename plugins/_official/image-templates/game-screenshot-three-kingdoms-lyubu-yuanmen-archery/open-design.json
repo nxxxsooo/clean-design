@@ -72,8 +72,7 @@
     "scenario": "image",
     "surface": "image",
     "preview": {
-      "type": "image",
-      "poster": "https://raw.githubusercontent.com/nexu-io/open-design/main/assets/prompt-templates/image/game-screenshot-three-kingdoms-lyubu-yuanmen-archery.jpg"
+      "type": "image"
     },
     "useCase": {
       "query": {

@@ -19,23 +19,6 @@ import {
   localizeSkillDescription,
   localizeSkillName,
 } from '../i18n/content';
-import { useAnalytics } from '../analytics/provider';
-import {
-  trackChatPanelClick,
-  trackComposerBarClick,
-  trackComposerSessionModeClick,
-  trackContextLinkResult,
-  trackDesignToolboxClick,
-  trackFigmaHelpModalSurfaceView,
-  trackFileUploadResult,
-  trackProjectReferenceModalSurfaceView,
-} from '../analytics/events';
-import type {
-  ComposerBarClickProps,
-  DesignToolboxClickProps,
-} from '@open-design/contracts/analytics';
-import { sessionModeToTracking } from '@open-design/contracts/analytics';
-import { deriveUploadCohort } from '../analytics/upload-tracking';
 import { projectRawUrl, uploadProjectFiles, openFolderDialog, fetchRecentLinkedDirs, pushRecentLinkedDir, dirExists, applyLibraryAsset, fetchLibraryAssetElementHtml } from "../providers/registry";
 import { WorkingDirPicker } from './WorkingDirPicker';
 import { duplicatePluginAsProject, patchProject } from "../state/projects";
@@ -45,7 +28,6 @@ import type { AppConfig, ChatAttachment, ChatCommentAttachment, Project, Project
 import type {
   ContextItem,
   AppliedPluginSnapshot,
-  ChatAnalyticsEntryFrom,
   ChatSessionMode,
   InstalledPluginRecord,
   PluginSourceKind,
@@ -55,7 +37,7 @@ import type {
 } from '@open-design/contracts';
 import { buildVisualAnnotationAttachment, commentTargetDisplayName } from '../comments';
 import { Icon, type IconName } from "./Icon";
-import { ComposerPlusMenu, PLUS_SUBMENU_RESOURCE_KIND } from './ComposerPlusMenu';
+import { ComposerPlusMenu } from './ComposerPlusMenu';
 import { LibraryPicker } from './LibraryPicker';
 import { FigmaImportModal } from './FigmaImportModal';
 import { FigmaHelpModal } from './FigmaHelpModal';
@@ -302,7 +284,6 @@ interface Props {
 // Imperative handle so ancestors (e.g. example chips in ChatPane) can
 // push text into the composer without owning its draft state.
 export interface ChatComposerDraftOptions {
-  entryFrom?: ChatAnalyticsEntryFrom;
   sessionMode?: ChatSessionMode;
 }
 
@@ -354,10 +335,6 @@ export interface ChatSendMeta {
   // for this run only is composed with the extra skill bodies, without
   // touching the project's persistent `skillId`.
   skillIds?: string[];
-  /** Overrides the run_created / run_finished `entry_from` analytics prop for
-   *  this send (e.g. 'mark' when the turn is sent from the Mark draw overlay).
-   *  Behavior never depends on it; it only shapes PostHog props. */
-  entryFrom?: ChatAnalyticsEntryFrom;
   /** One-shot run mode override for seeded follow-ups before parent state catches up. */
   sessionMode?: ChatSessionMode;
 }
@@ -422,7 +399,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     ref
   ) {
     const { locale, t } = useI18n();
-    const analytics = useAnalytics();
     const activeFileContext =
       projectMetadata?.importedFrom === 'folder' && activeProjectFileName
         ? activeProjectFileName
@@ -461,10 +437,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     const [projectReferenceOpen, setProjectReferenceOpen] = useState(false);
     const [stagedVisualComments, setStagedVisualComments] = useState<ChatCommentAttachment[]>([]);
     const streamingAnnotationSendPendingRef = useRef(false);
-    // Remembers the entry_from that the deferred streaming send must carry once
-    // it flushes. The Mark draw-overlay tags 'mark' synchronously; without this
-    // the flush effect would report the run as the default composer entry.
-    const streamingAnnotationSendEntryFromRef = useRef<ChatSendMeta['entryFrom']>(undefined);
     const [streamingAnnotationSendPending, setStreamingAnnotationSendPendingState] = useState(false);
     // Skills the user has @-mentioned for this turn. We dedupe on id and
     // strip the chip when the user removes the corresponding `@<skill>`
@@ -560,11 +532,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     const applyDesignToolboxActionRef = useRef<(action: DesignToolboxAction) => void>(() => {});
     // Same latest-closure trick for picking a skill by id from the next-step card.
     const applyDesignToolboxSkillByIdRef = useRef<(skillId: string) => void>(() => {});
-    // Best-effort entry_from carried from a guided Next-step action: the card
-    // only seeds the composer, so the tag is stashed here and consumed by the
-    // next `sendComposedTurn` (then cleared). An explicit meta.entryFrom always
-    // wins over this pending value.
-    const pendingEntryFromRef = useRef<ChatAnalyticsEntryFrom | null>(null);
     const petEnabled = Boolean(onAdoptPet && onTogglePet);
     const [recentDirs, setRecentDirs] = useState<string[]>([]);
     useEffect(() => {
@@ -892,7 +859,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
       ref,
       () => ({
         setDraft: (text: string, options?: ChatComposerDraftOptions) => {
-          pendingEntryFromRef.current = options?.entryFrom ?? null;
           pendingSessionModeRef.current = options?.sessionMode ?? null;
           setDraft(text);
           editorRef.current?.setText(text);
@@ -940,11 +906,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
         applyDesignToolboxAction: (id: DesignToolboxActionId) => {
           const action = getDesignToolboxAction(id);
           if (!action) return;
-          pendingEntryFromRef.current = 'next_step';
           applyDesignToolboxActionRef.current(action);
         },
         applyDesignToolboxSkill: (skillId: string) => {
-          pendingEntryFromRef.current = 'next_step';
           applyDesignToolboxSkillByIdRef.current(skillId);
         },
         openDesignToolbox: () => {
@@ -956,7 +920,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     );
 
     function reset() {
-      pendingEntryFromRef.current = null;
       pendingSessionModeRef.current = null;
       const linkedWorkspaceContexts = stagedWorkspaceContexts.filter((item) => (
         Boolean(item.absolutePath?.trim()) && Boolean(workspaceLinkedDirAdds[item.id])
@@ -1029,27 +992,21 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
 
     function finishComposedSend(
       outcome: ChatSendOutcome | Promise<ChatSendOutcome>,
-      pendingMetadata?: { entryFrom: ChatSendMeta['entryFrom'] | null; sessionMode: ChatSessionMode | null },
+      pendingSessionMode?: ChatSessionMode | null,
     ) {
       void Promise.resolve(outcome).then(
         (result) => {
           if (result === 'restore-draft') {
-            if (pendingMetadata?.entryFrom && !pendingEntryFromRef.current) {
-              pendingEntryFromRef.current = pendingMetadata.entryFrom;
-            }
-            if (pendingMetadata?.sessionMode && !pendingSessionModeRef.current) {
-              pendingSessionModeRef.current = pendingMetadata.sessionMode;
+            if (pendingSessionMode && !pendingSessionModeRef.current) {
+              pendingSessionModeRef.current = pendingSessionMode;
             }
             return;
           }
           reset();
         },
         () => {
-          if (pendingMetadata?.entryFrom && !pendingEntryFromRef.current) {
-            pendingEntryFromRef.current = pendingMetadata.entryFrom;
-          }
-          if (pendingMetadata?.sessionMode && !pendingSessionModeRef.current) {
-            pendingSessionModeRef.current = pendingMetadata.sessionMode;
+          if (pendingSessionMode && !pendingSessionModeRef.current) {
+            pendingSessionModeRef.current = pendingSessionMode;
           }
         },
       );
@@ -1074,22 +1031,17 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
               ...attachments,
             ]
           : attachments;
-      // Apply pending Next-step metadata if the caller didn't set its own
-      // fields, then clear it so it only colors the immediate next send.
-      const pendingEntryFrom = pendingEntryFromRef.current;
       const pendingSessionMode = pendingSessionModeRef.current;
-      pendingEntryFromRef.current = null;
       pendingSessionModeRef.current = null;
       const effectiveMetaShape: ChatSendMeta = {
         ...(meta ?? {}),
-        ...(pendingEntryFrom && !meta?.entryFrom ? { entryFrom: pendingEntryFrom } : {}),
         ...(pendingSessionMode && !meta?.sessionMode ? { sessionMode: pendingSessionMode } : {}),
       };
       const effectiveMeta =
         Object.keys(effectiveMetaShape).length > 0 ? effectiveMetaShape : undefined;
       finishComposedSend(
         onSend(prompt, nextAttachments, nextCommentAttachments, effectiveMeta),
-        { entryFrom: pendingEntryFrom, sessionMode: pendingSessionMode },
+        pendingSessionMode,
       );
       return true;
     }
@@ -1218,29 +1170,11 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
         } satisfies WorkspaceContextItem;
       });
       const trackedByDir = await addLinkedDirs(items.map((item) => workspaceContextLinkedDir(item) ?? ''));
-      if (trackedByDir === false) {
-        trackContextLinkResult(analytics.track, {
-          page_name: 'chat_panel',
-          area: 'chat_composer',
-          context_kind: 'project',
-          result: 'failed',
-          count: items.length,
-          ...(projectId ? { project_id: projectId } : {}),
-        });
-        return;
-      }
+      if (trackedByDir === false) return;
       for (const item of items) {
         appendWorkspacePrompt(item);
       }
       setProjectReferenceOpen(false);
-      trackContextLinkResult(analytics.track, {
-        page_name: 'chat_panel',
-        area: 'chat_composer',
-        context_kind: 'project',
-        result: 'success',
-        count: items.length,
-        ...(projectId ? { project_id: projectId } : {}),
-      });
       const trackedAdds: Record<string, TrackedWorkspaceLinkedDir> = {};
       for (const item of items) {
         const path = workspaceContextLinkedDir(item);
@@ -1254,27 +1188,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
 
     async function handleLinkLocalCodeContext() {
       const selected = await openFolderDialog();
-      if (!selected) {
-        trackContextLinkResult(analytics.track, {
-          page_name: 'chat_panel',
-          area: 'chat_composer',
-          context_kind: 'local_code',
-          result: 'cancelled',
-          ...(projectId ? { project_id: projectId } : {}),
-        });
-        return;
-      }
+      if (!selected) return;
       const trackedLinkedDir = await addLinkedDir(selected);
-      if (trackedLinkedDir === false) {
-        trackContextLinkResult(analytics.track, {
-          page_name: 'chat_panel',
-          area: 'chat_composer',
-          context_kind: 'local_code',
-          result: 'failed',
-          ...(projectId ? { project_id: projectId } : {}),
-        });
-        return;
-      }
+      if (trackedLinkedDir === false) return;
       const label = selected.split(/[/\\]/).filter(Boolean).pop() || selected;
       const item: WorkspaceContextItem = {
         id: `local-code:${selected}`,
@@ -1287,14 +1203,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
       if (trackedLinkedDir) {
         setWorkspaceLinkedDirAdds((current) => ({ ...current, [item.id]: trackedLinkedDir }));
       }
-      trackContextLinkResult(analytics.track, {
-        page_name: 'chat_panel',
-        area: 'chat_composer',
-        context_kind: 'local_code',
-        result: 'success',
-        count: 1,
-        ...(projectId ? { project_id: projectId } : {}),
-      });
     }
 
     async function insertSkillMention(skill: SkillSummary) {
@@ -1334,43 +1242,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     function applyDesignToolboxDraft(prompt: string) {
       replaceEditorDraft(prompt);
       editorRef.current?.focus();
-    }
-
-    // Fills the fixed page/area/project context for the rest of the composer
-    // bottom bar (plus menu, design-system / working-dir switch, agent
-    // selector, context-chip removal).
-    const trackComposerBar = (
-      fields: Omit<ComposerBarClickProps, 'page_name' | 'area' | 'project_id'>,
-    ) => {
-      trackComposerBarClick(analytics.track, {
-        page_name: 'chat_panel',
-        area: 'chat_composer',
-        ...(projectId ? { project_id: projectId } : {}),
-        ...fields,
-      });
-    };
-
-    // Fills the fixed page/area/project context so toolbox call sites only
-    // pass the event-specific fields (element + ids).
-    const trackDesignToolbox = (
-      fields: Omit<DesignToolboxClickProps, 'page_name' | 'area' | 'project_id'>,
-    ) => {
-      trackDesignToolboxClick(analytics.track, {
-        page_name: 'chat_panel',
-        area: 'chat_composer',
-        ...(projectId ? { project_id: projectId } : {}),
-        ...fields,
-      });
-    };
-
-    // Every toolbox resource carries a common `kind` + `id`, and the tracking
-    // enum mirrors `DesignToolboxResourceKind` exactly, so this is a direct
-    // projection.
-    function designToolboxResourceTracking(resource: DesignToolboxResource): {
-      resource_kind: NonNullable<DesignToolboxClickProps['resource_kind']>;
-      resource_id: string;
-    } {
-      return { resource_kind: resource.kind, resource_id: resource.id };
     }
 
     function applyDesignToolboxAction(action: DesignToolboxAction) {
@@ -1446,7 +1317,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     }
 
     function removeStagedSkill(id: string) {
-      trackComposerBar({ element: 'context_remove', resource_kind: 'skill', resource_id: id });
       const skill = stagedSkills.find((s) => s.id === id) ?? null;
       setStagedSkills((prev) => prev.filter((s) => s.id !== id));
       const labels = [id, skill?.name ?? ''];
@@ -1491,7 +1361,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     }
 
     async function removeWorkspaceContext(id: string) {
-      trackComposerBar({ element: 'context_remove', resource_kind: 'workspace', resource_id: id });
       const workspaceItem = selectedWorkspaceContexts.find((item) => item.id === id) ?? null;
       const trackedLinkedDir = workspaceLinkedDirAdds[id] ?? null;
       if (trackedLinkedDir && !(await removeTrackedWorkspaceLinkedDir(id, trackedLinkedDir))) {
@@ -1528,11 +1397,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
       if (!id) return;
       setUploading(true);
       setUploadError(null);
-      // Cohort math is identical to the Design Files Upload button; see
-      // `analytics/upload-tracking.ts`. v2 doc fires one
-      // file_upload_result per surface so this path reports
-      // `page_name='chat_panel'` / `area='chat_composer'`.
-      const cohort = deriveUploadCohort(files);
       const orderStart = reserveAttachmentOrders(files.length);
       try {
         const result = await uploadProjectFiles(id, files);
@@ -1552,25 +1416,9 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
           );
           console.warn('Some attachments failed to upload', result.failed);
         }
-        trackFileUploadResult(analytics.track, {
-          page_name: 'chat_panel',
-          area: 'chat_composer',
-          project_id: id,
-          ...cohort,
-          result: partial ? 'failed' : 'success',
-          ...(partial && result.error ? { error_code: result.error } : {}),
-        });
       } catch (err) {
         const detail = err instanceof Error ? err.message : String(err);
         setUploadError(`Attachment upload failed (${detail}).`);
-        trackFileUploadResult(analytics.track, {
-          page_name: 'chat_panel',
-          area: 'chat_composer',
-          project_id: id,
-          ...cohort,
-          result: 'failed',
-          error_code: detail,
-        });
       } finally {
         setUploading(false);
       }
@@ -1772,9 +1620,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
               const prompt = [draft.trim(), detail.note].filter(Boolean).join('\n');
               const attachments = sortChatAttachmentsByOrder([...staged, ...uploaded]);
               const nextCommentAttachments = currentCommentAttachments(visualAttachment ? [visualAttachment] : []);
-              // Mark draw-overlay → run: tag entry_from='mark' so the dashboard
-              // separates annotation-driven runs from plain composer sends.
-              sendComposedTurn(prompt, attachments, nextCommentAttachments, { ...queueMeta(currentRunContextMeta()), entryFrom: 'mark' });
+              sendComposedTurn(prompt, attachments, nextCommentAttachments, queueMeta(currentRunContextMeta()));
               ack({ ok: true });
               return;
             }
@@ -1782,10 +1628,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
             if (detail.action === 'send') {
               if (streaming) {
                 appendAnnotationToComposer();
-                // Carry entry_from='mark' through the deferred send so the
-                // flush effect below reports the run as a Mark annotation
-                // rather than the default composer entry.
-                streamingAnnotationSendEntryFromRef.current = 'mark';
                 setStreamingAnnotationSendPending(true);
                 ack({ ok: true });
                 return;
@@ -1798,9 +1640,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
               const prompt = [draft.trim(), detail.note].filter(Boolean).join('\n');
               const attachments = sortChatAttachmentsByOrder([...staged, ...uploaded]);
               const nextCommentAttachments = currentCommentAttachments(visualAttachment ? [visualAttachment] : []);
-              // Mark draw-overlay → run: tag entry_from='mark' so the dashboard
-              // separates annotation-driven runs from plain composer sends.
-              sendComposedTurn(prompt, attachments, nextCommentAttachments, { ...currentRunContextMeta(), entryFrom: 'mark' });
+              sendComposedTurn(prompt, attachments, nextCommentAttachments, currentRunContextMeta());
               ack({ ok: true });
               return;
             }
@@ -1843,13 +1683,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
       // handler writes draftRef synchronously, so the ref is authoritative even
       // if this effect's render closure predates the last accumulation.
       const prompt = draftRef.current.trim();
-      // Consume the entry_from captured when the send was deferred (Mark
-      // draw-overlay sets 'mark'); clear it so a later plain send is unaffected.
-      const pendingEntryFrom = streamingAnnotationSendEntryFromRef.current;
-      streamingAnnotationSendEntryFromRef.current = undefined;
       const baseMeta = currentRunContextMeta();
-      const meta = pendingEntryFrom ? { ...baseMeta, entryFrom: pendingEntryFrom } : baseMeta;
-      sendComposedTurn(prompt, staged, currentCommentAttachments(), meta);
+      sendComposedTurn(prompt, staged, currentCommentAttachments(), baseMeta);
     }, [
       commentAttachments,
       draft,
@@ -2158,7 +1993,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
     }
 
     function removeStaged(p: string) {
-      trackComposerBar({ element: 'context_remove', resource_kind: 'attachment', resource_id: p });
       setStaged((s) => s.filter((a) => a.path !== p));
       setStagedVisualComments((current) => current.filter((attachment) => attachment.screenshotPath !== p));
       // Strip the `@<path>` token from the draft and push the result back into
@@ -2212,7 +2046,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
           ? {
               ...(contextMeta ?? {}),
               sessionMode: placeholderScenario.sessionMode,
-              entryFrom: contextMeta?.entryFrom ?? 'next_step',
             }
           : contextMeta;
         sendComposedTurn(placeholderPrompt, [], [], placeholderMeta);
@@ -2529,98 +2362,39 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
               triggerTestId="chat-plus-trigger"
               placementPreference="up"
               onOpen={() => {
-                trackComposerBar({ element: 'plus_menu_open' });
                 setComposerEngaged(true);
-              }}
-              onSubmenuOpen={(submenu) => {
-                // The toolbox flyout tracks its own open (design_toolbox_open).
-                if (submenu === 'toolbox') return;
-                trackComposerBar({
-                  element: 'plus_submenu_open',
-                  resource_kind: PLUS_SUBMENU_RESOURCE_KIND[submenu],
-                });
-              }}
-              onSearchUsed={(submenu) => {
-                trackComposerBar({
-                  element: 'plus_search',
-                  resource_kind: PLUS_SUBMENU_RESOURCE_KIND[submenu],
-                });
               }}
               plugins={pluginsForComposer}
               onPickPlugin={(record) => {
-                trackComposerBar({
-                  element: 'plus_pick',
-                  resource_kind: 'plugin',
-                  resource_id: record.id,
-                });
                 void insertPluginMention(record);
               }}
               onAddPlugin={() => {
-                trackComposerBar({ element: 'plus_add', resource_kind: 'plugin' });
                 onBrowsePlugins?.();
               }}
               skills={skills}
               onPickSkill={(skill) => {
-                trackComposerBar({
-                  element: 'plus_pick',
-                  resource_kind: 'skill',
-                  resource_id: skill.id,
-                });
                 void insertSkillMention(skill);
               }}
               onAttachFiles={() => {
-                trackChatPanelClick(analytics.track, {
-                  page_name: 'chat_panel',
-                  area: 'chat_panel',
-                  element: 'attachment',
-                });
                 fileInputRef.current?.click();
               }}
               onReferenceProject={() => {
-                trackComposerBar({ element: 'plus_pick', resource_kind: 'workspace', resource_id: 'reference-project' });
-                trackProjectReferenceModalSurfaceView(analytics.track, {
-                  page_name: 'chat_panel',
-                  area: 'project_reference_modal',
-                  ...(projectId ? { project_id: projectId } : {}),
-                });
                 setProjectReferenceOpen(true);
               }}
               onLinkLocalCode={() => {
-                trackComposerBar({ element: 'plus_pick', resource_kind: 'workspace', resource_id: 'local-code' });
                 void handleLinkLocalCodeContext();
               }}
               attachLoading={uploading}
               onSelectFromLibrary={() => {
-                trackChatPanelClick(analytics.track, {
-                  page_name: 'chat_panel',
-                  area: 'chat_panel',
-                  element: 'library',
-                });
                 setLibraryPickerOpen(true);
               }}
               onImportFigma={projectId ? () => {
-                trackChatPanelClick(analytics.track, {
-                  page_name: 'chat_panel',
-                  area: 'chat_panel',
-                  element: 'figma_import',
-                });
                 setFigmaModalOpen(true);
               } : undefined}
               onShowFigmaHelp={() => {
-                trackChatPanelClick(analytics.track, {
-                  page_name: 'chat_panel',
-                  area: 'chat_panel',
-                  element: 'figma_help',
-                });
-                trackFigmaHelpModalSurfaceView(analytics.track, {
-                  page_name: 'chat_panel',
-                  area: 'figma_help_modal',
-                  ...(projectId ? { project_id: projectId } : {}),
-                });
                 setFigmaHelpOpen(true);
               }}
               onOpenDesignSystems={projectId && designSystemPicker ? () => {
-                trackComposerBar({ element: 'design_system_open' });
                 openDesignSystemPicker();
               } : undefined}
               toolboxLabel={t('chat.designToolbox.title')}
@@ -2633,29 +2407,15 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                   activeSkillIds={stagedSkills.map((skill) => skill.id)}
                   activePluginId={activeAppliedPlugin?.pluginId ?? pinnedPluginId ?? null}
                   activeFilePaths={staged.map((item) => item.path)}
-                  onOpened={() => trackDesignToolbox({ element: 'design_toolbox_open' })}
                   onPickAction={(action) => {
-                    trackDesignToolbox({
-                      element: 'design_toolbox_action',
-                      toolbox_action_id: action.id,
-                    });
                     applyDesignToolboxAction(action);
                     close();
                   }}
                   onPickSkill={(skill) => {
-                    trackDesignToolbox({
-                      element: 'design_toolbox_resource',
-                      resource_kind: 'skill',
-                      resource_id: skill.id,
-                    });
                     applyDesignToolboxSkill(skill);
                     close();
                   }}
                   onPickResource={(resource) => {
-                    trackDesignToolbox({
-                      element: 'design_toolbox_resource',
-                      ...designToolboxResourceTracking(resource),
-                    });
                     applyDesignToolboxResource(resource);
                     close();
                   }}
@@ -2684,29 +2444,15 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                     activeSkillIds={stagedSkills.map((skill) => skill.id)}
                     activePluginId={activeAppliedPlugin?.pluginId ?? pinnedPluginId ?? null}
                     activeFilePaths={staged.map((item) => item.path)}
-                    onOpened={() => trackDesignToolbox({ element: 'design_toolbox_open' })}
                     onPickAction={(action) => {
-                      trackDesignToolbox({
-                        element: 'design_toolbox_action',
-                        toolbox_action_id: action.id,
-                      });
                       applyDesignToolboxAction(action);
                       setDesignToolboxOpen(false);
                     }}
                     onPickSkill={(skill) => {
-                      trackDesignToolbox({
-                        element: 'design_toolbox_resource',
-                        resource_kind: 'skill',
-                        resource_id: skill.id,
-                      });
                       applyDesignToolboxSkill(skill);
                       setDesignToolboxOpen(false);
                     }}
                     onPickResource={(resource) => {
-                      trackDesignToolbox({
-                        element: 'design_toolbox_resource',
-                        ...designToolboxResourceTracking(resource),
-                      });
                       applyDesignToolboxResource(resource);
                       setDesignToolboxOpen(false);
                     }}
@@ -2719,19 +2465,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
             {footerAccessory}
             <SessionModeToggle
               mode={sessionMode}
-              onChange={(next) => {
-                if (next !== sessionMode) {
-                  trackComposerSessionModeClick(analytics.track, {
-                    page_name: 'chat_panel',
-                    area: 'chat_composer',
-                    element: 'session_mode_toggle',
-                    mode_before: sessionModeToTracking(sessionMode),
-                    mode_after: sessionModeToTracking(next),
-                    project_id: projectId ?? undefined,
-                  });
-                }
-                onSessionModeChange?.(next);
-              }}
+              onChange={(next) => onSessionModeChange?.(next)}
             />
             {showStopButton ? (
               <button
@@ -2752,11 +2486,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
                 className="composer-send od-tooltip"
                 data-testid="chat-send"
                 onClick={() => {
-                  trackChatPanelClick(analytics.track, {
-                    page_name: 'chat_panel',
-                    area: 'chat_panel',
-                    element: 'send',
-                  });
                   void submit();
                 }}
                 disabled={sendDisabled || !hasComposerPayload}
@@ -2779,18 +2508,12 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
               recentDirs={recentDirs}
               onOpen={() => void checkWorkingDir()}
               onPickDirectory={() => {
-                // Fire on the click itself (intent), matching the home
-                // composer's working_dir* elements so one dashboard counts the
-                // action across both surfaces.
-                trackComposerBar({ element: 'working_dir' });
                 void handlePickWorkingDir();
               }}
               onSelectRecent={(dir) => {
-                trackComposerBar({ element: 'working_dir_recent' });
                 void setWorkingDirFolder(dir);
               }}
               onClear={() => {
-                trackComposerBar({ element: 'working_dir_clear' });
                 void clearWorkingDir();
               }}
             />
@@ -2850,16 +2573,6 @@ export const ChatComposer = forwardRef<ChatComposerHandle, Props>(
           <ProjectReferenceModal
             currentProjectId={projectId}
             onClose={() => {
-              // Only the dismiss paths (X / backdrop / Escape / Cancel) land
-              // here — a confirmed pick closes via handleReferenceProjects,
-              // which reports 'success' / 'failed'.
-              trackContextLinkResult(analytics.track, {
-                page_name: 'chat_panel',
-                area: 'chat_composer',
-                context_kind: 'project',
-                result: 'cancelled',
-                ...(projectId ? { project_id: projectId } : {}),
-              });
               setProjectReferenceOpen(false);
             }}
             onSelect={(items) => void handleReferenceProjects(items)}
@@ -3526,7 +3239,6 @@ function DesignToolboxPanel({
   onPickAction,
   onPickSkill,
   onPickResource,
-  onOpened,
 }: {
   actions: DesignToolboxAction[];
   skills: SkillSummary[];
@@ -3538,15 +3250,9 @@ function DesignToolboxPanel({
   onPickAction: (action: DesignToolboxAction) => void;
   onPickSkill: (skill: SkillSummary) => void;
   onPickResource: (resource: DesignToolboxResource) => void;
-  onOpened?: () => void;
 }) {
   const { locale, t } = useI18n();
   const [query, setQuery] = useState('');
-  // Fire once when the toolbox panel mounts (i.e. the user opened it).
-  useEffect(() => {
-    onOpened?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const activeSkillSet = useMemo(() => new Set(activeSkillIds), [activeSkillIds]);
   const activeFileSet = useMemo(() => new Set(activeFilePaths), [activeFilePaths]);
   const resources = useMemo(

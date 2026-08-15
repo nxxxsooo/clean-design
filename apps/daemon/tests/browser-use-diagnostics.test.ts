@@ -22,10 +22,10 @@ afterEach(async () => {
 });
 
 describe('browser use diagnostics', () => {
-  it('detects Browser Use prompts from the Open Design Browser menu', () => {
+  it('detects Browser Use prompts from the Clean Design Browser menu', () => {
     expect(isBrowserUseRequested('hello')).toBe(false);
     expect(isBrowserUseRequested('@agent-browser\n\nBrowser tab context:')).toBe(true);
-    expect(isBrowserUseRequested('Use the selected Open Design Browser tab as the bound target.')).toBe(true);
+    expect(isBrowserUseRequested('Use the selected Clean Design Browser tab as the bound target.')).toBe(true);
   });
 
   it('returns a missing-registry snapshot without reading socket contents', () => {
@@ -91,7 +91,7 @@ describe('browser use diagnostics', () => {
   it('leaves non-Codex browser requests outside this Codex-specific state', () => {
     expect(buildBrowserUseRunState({
       requested: true,
-      agentId: 'amr',
+      agentId: 'claude',
       diagnostics: collectBrowserUseDiscoveryFacts({
         registryPath: join(tempDir, 'missing'),
       }),

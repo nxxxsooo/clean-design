@@ -4,7 +4,7 @@ import { openNewProjectModal as openNewProjectModalFromProjects } from '@/playwr
 import type { Page } from '@playwright/test';
 import { T } from '@/timeouts';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 test.describe.configure({ timeout: T.xlong });
 
@@ -23,8 +23,6 @@ test.beforeEach(async ({ page }) => {
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: {},
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
@@ -42,8 +40,6 @@ test.beforeEach(async ({ page }) => {
           skillId: null,
           designSystemId: null,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
         },
       },
     });

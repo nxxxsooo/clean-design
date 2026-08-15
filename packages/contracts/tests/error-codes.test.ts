@@ -15,4 +15,5 @@ describe('shared API error codes', () => {
     const code: ApiErrorCode = 'AGENT_RUNTIME_DEF_INVALID';
     expect(code).toBe('AGENT_RUNTIME_DEF_INVALID');
   });
+
 });

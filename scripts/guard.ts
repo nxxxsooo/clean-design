@@ -54,6 +54,7 @@ const residualSkippedDirectories = new Set([
   ".task",
   ".tmp",
   ".vite",
+  ".worktrees",
   "dist",
   "node_modules",
   "out",
@@ -65,9 +66,7 @@ const residualAllowedExactPaths = new Set([
   "packages/agui-adapter/esbuild.config.mjs",
   "packages/contracts/esbuild.config.mjs",
   "packages/diagnostics/esbuild.config.mjs",
-  "packages/download/esbuild.config.mjs",
   "packages/host/esbuild.config.mjs",
-  "packages/launcher-proto/esbuild.config.mjs",
   "packages/metatool/esbuild.config.mjs",
   "packages/platform/esbuild.config.mjs",
   "packages/plugin-runtime/esbuild.config.mjs",
@@ -129,9 +128,8 @@ const residualAllowedPathPrefixes = [
   // (Jane-xiaoer/claude-skill-web-clone). Global skill assets staged into the
   // project cwd for direct `node scripts/...` execution by the agent.
   "skills/web-clone/scripts/",
-  // Replay-based mock CLIs that impersonate local agent CLIs
-  // (opencode/claude/codex/gemini/cursor-agent + ACP family). Need to
-  // be directly executable via Node so `child_process.spawn` from test
+  // Replay-based mock CLIs that impersonate retained local agent CLIs. They
+  // need to be directly executable via Node so `child_process.spawn` from test
   // harnesses and PATH-overlay shells work without any transform step.
   // `mocks/scripts/` holds the maintainer-facing helpers (manifest math,
   // fetch from R2) which are also pure-node single-file modules — same
@@ -139,16 +137,6 @@ const residualAllowedPathPrefixes = [
   "mocks/lib/",
   "mocks/mock-agent.mjs",
   "mocks/scripts/",
-  // OD Clipper - a standalone Chrome MV3 extension subproject (not a pnpm
-  // workspace package, no build step). It ships hand-written browser-loadable
-  // JavaScript (service worker, content script, popup) the same way as the
-  // web notifications service worker; it must not be retypecast to TypeScript.
-  "clipper/",
-  // OD Figma Import - a standalone Figma plugin subproject (no build step,
-  // not a pnpm workspace package). Figma plugins load hand-written
-  // browser-loadable JavaScript (`code.js` sandbox + `ui.html`); same
-  // precedent as the clipper, and it must not be retypecast to TypeScript.
-  "figma-plugin/",
   "test-results/",
   "vendor/",
 ];
@@ -415,6 +403,33 @@ async function checkPackageDependencySpecs(): Promise<boolean> {
   console.log(
     `Package dependency spec check passed: ${stats.manifests} package.json files, ${stats.exact} exact specs, ${stats.workspace} workspace:* specs.`,
   );
+  return true;
+}
+
+async function checkReleaseVersionParity(): Promise<boolean> {
+  const manifests = await Promise.all(
+    ["package.json", "apps/packaged/package.json"].map(async (repositoryPath) => ({
+      repositoryPath,
+      manifest: JSON.parse(await readFile(path.join(repoRoot, repositoryPath), "utf8")) as {
+        version?: unknown;
+      },
+    })),
+  );
+  const versions = manifests.map(({ manifest }) => manifest.version);
+
+  if (versions.some((version) => typeof version !== "string" || version.length === 0)) {
+    console.error("Release version check failed: root and packaged manifests must declare versions.");
+    return false;
+  }
+  if (new Set(versions).size !== 1) {
+    console.error("Release version check failed:");
+    for (const { manifest, repositoryPath } of manifests) {
+      console.error(`- ${repositoryPath}: ${String(manifest.version)}`);
+    }
+    return false;
+  }
+
+  console.log(`Release version check passed: root and packaged app are ${String(versions[0])}.`);
   return true;
 }
 
@@ -926,8 +941,6 @@ const toolsRootAllowlist = new Map<string, "directory" | "file">([
   ["AGENTS.md", "file"],
   ["dev", "directory"],
   ["pack", "directory"],
-  ["release", "directory"],
-  ["serve", "directory"],
 ]);
 
 async function checkToolsLayout(): Promise<boolean> {
@@ -941,7 +954,7 @@ async function checkToolsLayout(): Promise<boolean> {
     const repositoryPath = `tools/${entry.name}${entry.isDirectory() ? "/" : ""}`;
 
     if (expected == null) {
-      violations.push(`${repositoryPath} -> tools/ top-level entries are allowlisted; expected only AGENTS.md, dev/, pack/, release/, and serve/`);
+      violations.push(`${repositoryPath} -> tools/ top-level entries are allowlisted; expected only AGENTS.md, dev/, and pack/`);
       continue;
     }
 
@@ -1241,6 +1254,9 @@ async function checkCiTopology(): Promise<boolean> {
     ...validatePlaywrightSuiteTopology(),
     ...[
       "run: node --experimental-strip-types scripts/scopes.ts github-output",
+      "pull-requests: read",
+      'OD_E2E_VITEST_MAX_WORKERS: "2"',
+      'OD_PLAYWRIGHT_WORKERS: "1"',
       "ci_mode: ${{ steps.detect.outputs.ci_mode }}",
       "ui_p0_validation_required: ${{ steps.detect.outputs.ui_p0_validation_required }}",
       "run_ui_p0: ${{ steps.detect.outputs.run_ui_p0 }}",
@@ -1249,7 +1265,6 @@ async function checkCiTopology(): Promise<boolean> {
       "include: ${{ fromJSON(needs.scopes.outputs.ui_p0_matrix) }}",
       "include: ${{ fromJSON(needs.scopes.outputs.visual_matrix) }}",
       "needs.scopes.outputs.run_ui_p0 == 'true'",
-      "pnpm -C e2e exec tsx scripts/playwright.ts run-ui-group critical-extras",
       "pnpm -C e2e exec tsx scripts/playwright.ts run-ui-group ${{ matrix.shard }}",
     ]
       .filter((needle) => !ciWorkflow.includes(needle))
@@ -1269,6 +1284,7 @@ async function checkCiTopology(): Promise<boolean> {
 const checks: GuardCheck[] = [
   { name: "residual JavaScript", run: checkResidualJavaScript },
   { name: "package dependency specs", run: checkPackageDependencySpecs },
+  { name: "release version parity", run: checkReleaseVersionParity },
   { name: "product neutrality", run: checkProductNeutrality },
   { name: "cross-app imports", run: checkCrossAppImports },
   { name: "@ts-nocheck import resolution", run: checkTsNocheckImports },

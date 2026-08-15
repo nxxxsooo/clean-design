@@ -2,12 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildDaemonTranscript,
-  DAEMON_RUN_FINISHED_EVENT,
   latestUserPromptFromHistory,
   reattachDaemonRun,
   sanitizePriorAssistantTurnForTranscript,
   streamViaDaemon,
-  type DaemonRunFinishedEventDetail,
 } from '../../src/providers/daemon';
 import { streamMessageOpenAI } from '../../src/providers/openai-compatible';
 import { parseSseFrame } from '../../src/providers/sse';
@@ -68,79 +66,6 @@ describe('streamViaDaemon', () => {
     expect(body.message).toContain('pre-consent brief');
     expect(body.message).toContain('post-consent revision');
     expect(body.currentPrompt).toBe('post-consent revision');
-  });
-
-  it('publishes an authoritative successful run with an artifact to the app gate', async () => {
-    const handlers = createDaemonHandlers();
-    const eventTarget = new EventTarget();
-    const published: DaemonRunFinishedEventDetail[] = [];
-    eventTarget.addEventListener(DAEMON_RUN_FINISHED_EVENT, (event) => {
-      published.push((event as CustomEvent<DaemonRunFinishedEventDetail>).detail);
-    });
-    vi.stubGlobal('window', eventTarget);
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url === '/api/runs') return jsonResponse({ runId: 'run-artifact-success' });
-      if (url === '/api/runs/run-artifact-success/events') {
-        return sseResponse(
-          'event: end\ndata: {"code":0,"status":"succeeded","artifactCount":2}\n\n',
-        );
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    }));
-
-    await streamViaDaemon({
-      agentId: 'mock',
-      history: [{ id: '1', role: 'user', content: 'make a design' }],
-      systemPrompt: '',
-      signal: new AbortController().signal,
-      handlers,
-      projectId: 'project-1',
-      conversationId: 'conversation-1',
-    });
-
-    expect(published).toEqual([{
-      runId: 'run-artifact-success',
-      projectId: 'project-1',
-      conversationId: 'conversation-1',
-      result: 'success',
-      artifactCount: 2,
-    }]);
-  });
-
-  it.each([
-    ['no artifact', '{"code":0,"status":"succeeded","artifactCount":0}'],
-    ['failed', '{"code":1,"status":"failed","artifactCount":1}'],
-    ['canceled', '{"code":null,"signal":"SIGTERM","status":"canceled","artifactCount":1}'],
-    ['implicit success', '{"code":0,"artifactCount":1}'],
-  ])('does not publish a run-finished upgrade event for %s', async (_label, payload) => {
-    const handlers = createDaemonHandlers();
-    const eventTarget = new EventTarget();
-    const published: DaemonRunFinishedEventDetail[] = [];
-    eventTarget.addEventListener(DAEMON_RUN_FINISHED_EVENT, (event) => {
-      published.push((event as CustomEvent<DaemonRunFinishedEventDetail>).detail);
-    });
-    vi.stubGlobal('window', eventTarget);
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url === '/api/runs') return jsonResponse({ runId: 'run-not-eligible' });
-      if (url === '/api/runs/run-not-eligible/events') {
-        return sseResponse(`event: end\ndata: ${payload}\n\n`);
-      }
-      throw new Error(`unexpected fetch ${url}`);
-    }));
-
-    await streamViaDaemon({
-      agentId: 'mock',
-      history: [{ id: '1', role: 'user', content: 'make a design' }],
-      systemPrompt: '',
-      signal: new AbortController().signal,
-      handlers,
-      projectId: 'project-1',
-      conversationId: 'conversation-1',
-    });
-
-    expect(published).toEqual([]);
   });
 
   it('does not surface an error when a still-running same-run retry later succeeds', async () => {
@@ -1009,46 +934,6 @@ describe('streamViaDaemon', () => {
     expect(handlers.onDone).not.toHaveBeenCalled();
   });
 
-  it('preserves structured AMR SSE error codes and action details', async () => {
-    const handlers = createDaemonHandlers();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn()
-        .mockResolvedValueOnce(jsonResponse({ runId: 'run-1' }))
-        .mockResolvedValueOnce(
-          sseResponse(
-            [
-              'event: error',
-              'data: {"message":"AMR balance unavailable","error":{"code":"AMR_INSUFFICIENT_BALANCE","message":"AMR balance unavailable","details":{"kind":"amr_account","action":"recharge","actionUrl":"https://open-design.ai/amr/wallet"}}}',
-              '',
-              '',
-            ].join('\n'),
-          ),
-        ),
-    );
-
-    await streamViaDaemon({
-      agentId: 'amr',
-      history: [{ id: '1', role: 'user', content: 'hello' }],
-      systemPrompt: '',
-      signal: new AbortController().signal,
-      handlers,
-    });
-
-    expect(handlers.onError).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'AMR balance unavailable',
-        code: 'AMR_INSUFFICIENT_BALANCE',
-        details: {
-          kind: 'amr_account',
-          action: 'recharge',
-          actionUrl: 'https://open-design.ai/amr/wallet',
-        },
-      }),
-    );
-    expect(handlers.onDone).not.toHaveBeenCalled();
-  });
-
   it('renders structured OpenCode session errors without JSON-RPC wrapper text', async () => {
     const handlers = createDaemonHandlers();
     vi.stubGlobal(
@@ -1071,7 +956,7 @@ describe('streamViaDaemon', () => {
                     statusCode: 404,
                     retryable: false,
                     url: 'https://example.invalid/v1/chat/completions',
-                    suggestion: 'Check the configured AMR Link URL or model route.',
+                    suggestion: 'Check the configured provider URL or model route.',
                   },
                 },
               })}`,
@@ -1083,7 +968,7 @@ describe('streamViaDaemon', () => {
     );
 
     await streamViaDaemon({
-      agentId: 'amr',
+      agentId: 'opencode',
       history: [{ id: '1', role: 'user', content: 'hello' }],
       systemPrompt: '',
       signal: new AbortController().signal,
@@ -1129,7 +1014,6 @@ describe('streamViaDaemon', () => {
                     message,
                     marker: '## user',
                     retryable: true,
-                    promoted_by: 'open_design_acp',
                   },
                 },
               })}`,
@@ -1141,7 +1025,7 @@ describe('streamViaDaemon', () => {
     );
 
     await streamViaDaemon({
-      agentId: 'amr',
+      agentId: 'opencode',
       history: [{ id: '1', role: 'user', content: 'hello' }],
       systemPrompt: '',
       signal: new AbortController().signal,
@@ -1196,7 +1080,7 @@ describe('streamViaDaemon', () => {
                     message: 'Provider returned error',
                     statusCode: 503,
                     retryable: true,
-                    url: 'https://amr-link.open-design.ai/v1/chat/completions',
+                    url: 'https://provider.example.invalid/v1/chat/completions',
                     suggestion: 'Retry later or switch to another model.',
                     responseBodyPreview,
                   },
@@ -1210,7 +1094,7 @@ describe('streamViaDaemon', () => {
     );
 
     await streamViaDaemon({
-      agentId: 'amr',
+      agentId: 'opencode',
       history: [{ id: '1', role: 'user', content: 'hello' }],
       systemPrompt: '',
       signal: new AbortController().signal,
@@ -1234,12 +1118,12 @@ describe('streamViaDaemon', () => {
     expect(message).not.toContain('opencode event stream');
     expect(message).not.toContain('opencode session error');
     expect(message).not.toContain('json-rpc id 4');
-    expect(message).not.toContain('https://amr-link.open-design.ai');
+    expect(message).not.toContain('https://provider.example.invalid');
   });
 
   it('treats an explicit succeeded status with a SIGTERM exit as a successful run', async () => {
-    // ACP agents that don't shut down on stdin.end() (e.g. Devin for Terminal)
-    // are SIGTERM'd by the daemon after a clean prompt completion. The end
+    // Some subprocesses are SIGTERM'd by the daemon after a clean prompt
+    // completion. The end
     // event still declares `status: 'succeeded'`, and the chat must trust
     // that authoritative success even though `signal === 'SIGTERM'` would
     // otherwise look like a failure to the exit-code/signal safety net.
@@ -1373,7 +1257,7 @@ describe('streamViaDaemon', () => {
     expect(handlers.onDone).not.toHaveBeenCalled();
   });
 
-  it('suppresses AMR exit code 130 lifecycle noise from the chat error surface', async () => {
+  it('suppresses OpenCode exit code 130 lifecycle noise from the chat error surface', async () => {
     const handlers = createDaemonHandlers();
     const onRunStatus = vi.fn();
     vi.stubGlobal(
@@ -1399,7 +1283,7 @@ describe('streamViaDaemon', () => {
     );
 
     await streamViaDaemon({
-      agentId: 'amr',
+      agentId: 'opencode',
       history: [{ id: '1', role: 'user', content: 'hello' }],
       systemPrompt: '',
       signal: new AbortController().signal,
@@ -1412,7 +1296,7 @@ describe('streamViaDaemon', () => {
     expect(handlers.onDone).toHaveBeenCalledWith('');
   });
 
-  it('cleans AMR/OpenCode bootstrap stderr from fallback errors', async () => {
+  it('cleans OpenCode bootstrap stderr from fallback errors', async () => {
     const handlers = createDaemonHandlers();
     vi.stubGlobal(
       'fetch',
@@ -1421,9 +1305,6 @@ describe('streamViaDaemon', () => {
         .mockResolvedValueOnce(
           sseResponse(
             [
-              'event: stderr',
-              'data: {"chunk":"AMR run id: arun_7edd8e97efd5a5ffe5737280224ca8bd\\n"}',
-              '',
               'event: stderr',
               'data: {"chunk":"Performing one time database migration, may take a few minutes...\\n"}',
               '',
@@ -1446,7 +1327,7 @@ describe('streamViaDaemon', () => {
     );
 
     await streamViaDaemon({
-      agentId: 'amr',
+      agentId: 'opencode',
       history: [{ id: '1', role: 'user', content: 'hello' }],
       systemPrompt: '',
       signal: new AbortController().signal,
@@ -1462,7 +1343,7 @@ describe('streamViaDaemon', () => {
     expect(handlers.onDone).not.toHaveBeenCalled();
   });
 
-  it('keeps real AMR/OpenCode stderr errors after removing bootstrap lines', async () => {
+  it('keeps real OpenCode stderr errors after removing bootstrap lines', async () => {
     const handlers = createDaemonHandlers();
     vi.stubGlobal(
       'fetch',
@@ -1487,7 +1368,7 @@ describe('streamViaDaemon', () => {
     );
 
     await streamViaDaemon({
-      agentId: 'amr',
+      agentId: 'opencode',
       history: [{ id: '1', role: 'user', content: 'hello' }],
       systemPrompt: '',
       signal: new AbortController().signal,
@@ -1534,7 +1415,7 @@ describe('streamViaDaemon', () => {
     );
 
     await streamViaDaemon({
-      agentId: 'amr',
+      agentId: 'opencode',
       history: [{ id: '1', role: 'user', content: 'hello' }],
       systemPrompt: '',
       signal: new AbortController().signal,
@@ -1569,7 +1450,7 @@ describe('streamViaDaemon', () => {
     );
 
     await streamViaDaemon({
-      agentId: 'amr',
+      agentId: 'opencode',
       history: [{ id: '1', role: 'user', content: 'hello' }],
       systemPrompt: '',
       signal: new AbortController().signal,
@@ -1584,8 +1465,8 @@ describe('streamViaDaemon', () => {
   it('still surfaces an error when the end event has a signal but no status field', async () => {
     // Same regression as above for the signal arm of the safety net. Without
     // explicit `status: 'succeeded'` from the server, a SIGTERM-style signal
-    // exit must keep producing an error banner — only the explicit ACP
-    // success path is allowed to bypass.
+    // exit must keep producing an error banner; only an explicit server
+    // success declaration is allowed to bypass it.
     const handlers = createDaemonHandlers();
     vi.stubGlobal(
       'fetch',
@@ -2086,7 +1967,7 @@ describe('streamViaDaemon', () => {
     });
   });
 
-  it('maps transient ACP progress labels to hidden running status events', async () => {
+  it('maps transient transport progress labels to running status events', async () => {
     const handlers = createDaemonHandlers();
     vi.stubGlobal('fetch', vi.fn()
       .mockResolvedValueOnce(jsonResponse({ runId: 'run-1' }))

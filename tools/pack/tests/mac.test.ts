@@ -28,7 +28,6 @@ async function pathExists(path: string): Promise<boolean> {
 
 function makeConfig(root: string, overrides: Partial<ToolPackConfig> = {}): ToolPackConfig {
   return {
-    containerized: false,
     electronBuilderCliPath: "/x/electron-builder/cli.js",
     electronDistPath: "/x/electron/dist",
     electronVersion: "41.3.0",
@@ -54,7 +53,6 @@ function makeConfig(root: string, overrides: Partial<ToolPackConfig> = {}): Tool
       cacheRoot: join(root, ".tmp", "tools-pack", "cache"),
       toolPackRoot: join(root, ".tmp", "tools-pack"),
     },
-    silent: true,
     signed: false,
     to: "app",
     webOutputMode: "standalone",
@@ -308,7 +306,7 @@ describe("createMacElectronRebuildOptions", () => {
       const appRoot = join(root, "assembled", "app");
 
       expect(createMacElectronRebuildOptions(config, appRoot)).toMatchObject({
-        arch: process.arch,
+        arch: "arm64",
         buildFromSource: false,
         buildPath: appRoot,
         electronVersion: "41.3.0",
@@ -366,7 +364,7 @@ describe("writeLaunchPackagedConfig", () => {
     try {
       const config = makeConfig(root, { namespace: "release-beta", portable: true });
       const appPath = join(root, "Clean Design.app");
-      const embeddedConfigPath = join(appPath, "Contents", "Resources", "open-design-config.json");
+      const embeddedConfigPath = join(appPath, "Contents", "Resources", "clean-design-config.json");
       await mkdir(dirname(embeddedConfigPath), { recursive: true });
       await writeFile(
         embeddedConfigPath,
@@ -387,7 +385,7 @@ describe("writeLaunchPackagedConfig", () => {
       const launchConfig = JSON.parse(await readFile(launchConfigPath, "utf8")) as Record<string, unknown>;
       const embeddedConfig = JSON.parse(await readFile(embeddedConfigPath, "utf8")) as Record<string, unknown>;
 
-      expect(launchConfigPath).toBe(join(config.roots.runtime.namespaceRoot, "runtime", "open-design-config.json"));
+      expect(launchConfigPath).toBe(join(config.roots.runtime.namespaceRoot, "runtime", "clean-design-config.json"));
       expect(launchConfig).toMatchObject({
         appVersion: "0.5.1-beta.2",
         namespace: "release-beta",

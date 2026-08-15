@@ -15,8 +15,6 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { hasOdCard } from '@open-design/contracts';
-import { useAnalytics } from '../analytics/provider';
-import { trackChatPanelClick, trackMessageQueueClick, trackRunFailedToastSurfaceView } from '../analytics/events';
 import { useT } from '../i18n';
 import { startersForProduct, type ProductType } from '../onboarding/recommendation';
 import { starterCopyFor } from '../onboarding/starter-copy';
@@ -40,7 +38,6 @@ import type {
   RunContextSelection,
   WorkspaceContextItem,
 } from '@open-design/contracts';
-import type { TrackingProjectKind } from '@open-design/contracts/analytics';
 import {
   DESIGN_SYSTEM_WORKSPACE_DISPLAY_DESCRIPTION,
   DESIGN_SYSTEM_WORKSPACE_DISPLAY_TITLE,
@@ -66,13 +63,24 @@ import {
 } from './ChatComposer';
 import type { PlaceholderScenario } from './home-hero/placeholderScenarios';
 import { listDesignArtifactCandidates } from './design-files/designArtifacts';
-import type { PluginFolderAgentAction } from './design-files/pluginFolderActions';
 import { Icon, type IconName } from './Icon';
 import { repoConnectCopy } from './design-system-github-evidence';
 import { isRenderableSketchJson, SketchPreview } from './SketchPreview';
 import type { SettingsSection } from './SettingsDialog';
 
 type TranslateFn = (key: keyof Dict, vars?: Record<string, string | number>) => string;
+
+type ChatProjectKind =
+  | 'slide_deck'
+  | 'prototype'
+  | 'web_clone'
+  | 'wireframe'
+  | 'mobile'
+  | 'live_artifact'
+  | 'document'
+  | 'image'
+  | 'video'
+  | 'hyperframes';
 
 // Featured starter prompts shown on the empty chat. Clicking one fills
 // the composer (does not auto-send) so users can tweak before sending.
@@ -449,11 +457,7 @@ interface Props {
   projectId: string | null;
   sessionMode?: ChatSessionMode;
   onSessionModeChange?: (mode: ChatSessionMode) => void;
-  // Analytics-only — forwarded to AssistantMessage so the feedback
-  // events know which project surface the rating applies to. Optional
-  // (defaults to null/'prototype') so unit tests can mount ChatPane
-  // without project context.
-  projectKindForTracking?: TrackingProjectKind | null;
+  projectKind?: ChatProjectKind | null;
   projectFiles: ProjectFile[];
   activeProjectFileName?: string | null;
   hasActiveDesignSystem?: boolean;
@@ -494,17 +498,6 @@ interface Props {
   onRequestOpenFile?: (name: string) => void;
   onRequestPluginDetails?: (pluginId: string) => void;
   onRequestDesignSystemDetails?: (system: DesignSystemSummary) => void;
-  onRequestPluginFolderAgentAction?: (
-    relativePath: string,
-    action: PluginFolderAgentAction,
-  ) => Promise<{ message?: string; url?: string } | void> | { message?: string; url?: string } | void;
-  activePluginActionPaths?: Set<string>;
-  hiddenPluginActionPaths?: Set<string>;
-  // "Share to Clean Design" button on each completed assistant message —
-  // wired by ProjectView to handleSend with the bundled
-  // `od-share-to-community` scenario's trigger prompt.
-  onShareToOpenDesign?: (assistantMessageId: string) => void;
-  shareToOpenDesignBusyMessageId?: string | null;
   forceStreamingMessageIds?: Set<string>;
   // Live-only streaming tool-input partials keyed by tool-use id. Threaded to
   // AssistantMessage so an in-flight Write/Edit can render its code in real
@@ -742,8 +735,6 @@ function hasVisibleBrandAssistantEvent(event: NonNullable<ChatMessage['events']>
     case 'tool_use':
     case 'live_artifact':
     case 'live_artifact_refresh':
-    case 'plugin_candidate':
-      return true;
     case 'tool_result':
       return false;
     case 'raw':
@@ -767,7 +758,7 @@ export function ChatPane({
   projectId,
   sessionMode = 'design',
   onSessionModeChange,
-  projectKindForTracking = null,
+  projectKind = null,
   projectFiles,
   activeProjectFileName = null,
   hasActiveDesignSystem = false,
@@ -791,11 +782,6 @@ export function ChatPane({
   onRequestOpenFile,
   onRequestPluginDetails,
   onRequestDesignSystemDetails,
-  onRequestPluginFolderAgentAction,
-  activePluginActionPaths,
-  hiddenPluginActionPaths,
-  onShareToOpenDesign,
-  shareToOpenDesignBusyMessageId,
   forceStreamingMessageIds,
   liveToolInput,
   initialDraft,
@@ -874,7 +860,6 @@ export function ChatPane({
   config,
 }: Props) {
   const t = useT();
-  const analytics = useAnalytics();
   const displayMessages = useMemo(
     () => messages.filter((message) => !shouldHideEmptyBrandAssistantMessage(message, projectMetadata)),
     [messages, projectMetadata],
@@ -887,7 +872,6 @@ export function ChatPane({
   const composerLayerRef = useRef<HTMLDivElement | null>(null);
   const queuedSendStripRef = useRef<HTMLDivElement | null>(null);
   const didInitialScrollRef = useRef(false);
-  const runFailedToastSurfaceKeysRef = useRef<Set<string>>(new Set());
   // Tracks whether the user is glued close enough to the bottom that
   // streamed content should auto-follow. Distinct from the jump-button
   // state below, which uses a wider threshold (120px) so the affordance
@@ -921,7 +905,6 @@ export function ChatPane({
     onBrandBrowserAssistConfirm,
     onArtifactShare,
     onForkFromMessage,
-    onShareToOpenDesign,
     onNextStepAiOptimize: onContinueBrandEnrichment,
     onNextStepContinueExtraction: onContinueBrandExtraction,
     onNextStepContinueAiExtraction: onContinueBrandAgentExtraction,
@@ -935,7 +918,6 @@ export function ChatPane({
     onBrandBrowserAssistConfirm,
     onArtifactShare,
     onForkFromMessage,
-    onShareToOpenDesign,
     onNextStepAiOptimize: onContinueBrandEnrichment,
     onNextStepContinueExtraction: onContinueBrandExtraction,
     onNextStepContinueAiExtraction: onContinueBrandAgentExtraction,
@@ -957,7 +939,6 @@ export function ChatPane({
       onSessionModeChange?.(options.sessionMode);
     }
     composerRef.current?.setDraft(prompt, {
-      entryFrom: 'next_step',
       sessionMode: options?.sessionMode,
     });
   }, [onSessionModeChange, sessionMode]);
@@ -1110,11 +1091,9 @@ export function ChatPane({
         retryAssistant.agentId,
       )
     : null;
-  const runFailureUi = rawRunFailureUi && ['authorize', 'recharge', 'upgrade'].includes(rawRunFailureUi.primaryAction)
-    ? { ...rawRunFailureUi, primaryAction: 'retry' as const, secondaryRetry: false, showSwitchCard: false }
-    : rawRunFailureUi
-      ? { ...rawRunFailureUi, showSwitchCard: false }
-      : null;
+  const runFailureUi = rawRunFailureUi
+    ? { ...rawRunFailureUi, showSwitchCard: false }
+    : null;
   // Offer Continue (resume) when the failed run is resumable AND the active
   // agent still matches the agent that produced it. The daemon stores a
   // resumable session per (conversation, agent); after an agent switch the new
@@ -1123,8 +1102,8 @@ export function ChatPane({
   // here: because the daemon persists the resumable session, the plain Retry
   // path (which re-sends the original prompt) would itself silently resume that
   // session and double the work. So every ChatPane surface must offer Continue
-  // for a resumable failure — `onResumeRun` when wired (primary chat, carries
-  // the resume_continue analytics), otherwise a plain `onSend` of the canonical
+  // for a resumable failure — `onResumeRun` when wired, otherwise a plain
+  // `onSend` of the canonical
   // continue prompt (resumes the session without re-sending the original turn).
   const canResumeFailedRun =
     !!retryAssistant?.resumable &&
@@ -1201,38 +1180,6 @@ export function ChatPane({
         canResumeFailedRun),
   );
   const showErrorActions = showByokRecoveryCta || runFailureHasAction;
-  useEffect(() => {
-    if (!displayError || !failedRunErrorEvent?.code || !retryAssistant) return;
-    const key = [
-      projectId ?? '',
-      activeConversationId ?? '',
-      retryAssistant.id,
-      retryAssistant.runId ?? '',
-      failedRunErrorEvent.code,
-    ].join(':');
-    if (runFailedToastSurfaceKeysRef.current.has(key)) return;
-    runFailedToastSurfaceKeysRef.current.add(key);
-
-    trackRunFailedToastSurfaceView(analytics.track, {
-      page_name: 'chat_panel',
-      area: 'chat_panel',
-      element: 'run_failed_toast',
-      error_code: failedRunErrorEvent.code,
-      project_id: projectId ?? '',
-      project_kind: projectKindForTracking,
-      conversation_id: activeConversationId,
-      assistant_message_id: retryAssistant.id,
-      run_id: retryAssistant.runId ?? null,
-    });
-  }, [
-    activeConversationId,
-    analytics.track,
-    displayError,
-    failedRunErrorEvent?.code,
-    projectId,
-    projectKindForTracking,
-    retryAssistant,
-  ]);
   const importedFolderArtifacts = useMemo(
     () =>
       projectMetadata?.importedFrom === 'folder'
@@ -2000,17 +1947,7 @@ export function ChatPane({
             aria-haspopup="menu"
             aria-expanded={showConvList}
             onClick={() => {
-              setShowConvList((v) => {
-                const next = !v;
-                if (next) {
-                  trackChatPanelClick(analytics.track, {
-                    page_name: 'chat_panel',
-                    area: 'chat_panel',
-                    element: 'history',
-                  });
-                }
-                return next;
-              });
+              setShowConvList((v) => !v);
             }}
           >
             <Icon name="comment" size={16} />
@@ -2036,11 +1973,6 @@ export function ChatPane({
                     disabled={newConversationDisabled}
                     onClick={() => {
                       if (newConversationDisabled) return;
-                      trackChatPanelClick(analytics.track, {
-                        page_name: 'chat_panel',
-                        area: 'chat_panel',
-                        element: 'new_chat',
-                      });
                       onNewConversation();
                       setShowConvList(false);
                     }}
@@ -2155,11 +2087,6 @@ export function ChatPane({
                             className="chat-example"
                             style={{ animationDelay: `${i * 70}ms` }}
                             onClick={() => {
-                              trackChatPanelClick(analytics.track, {
-                                page_name: 'chat_panel',
-                                area: 'chat_panel',
-                                element: 'template_card',
-                              });
                               composerRef.current?.setDraft(ex.prompt);
                             }}
                             title={t('chat.fillInputTitle')}
@@ -2215,7 +2142,7 @@ export function ChatPane({
                 streaming={streaming}
                 liveToolInput={liveToolInput}
                 projectId={projectId}
-                projectKindForTracking={projectKindForTracking}
+                projectKind={projectKind}
                 activeConversationId={activeConversationId}
                 activeConversationKey={activeConversationId ?? 'no-conversation'}
                 projectFiles={projectFiles}
@@ -2225,11 +2152,6 @@ export function ChatPane({
                 onRequestOpenFile={onRequestOpenFile}
                 onRequestPluginDetails={onRequestPluginDetails}
                 onRequestDesignSystemDetails={onRequestDesignSystemDetails}
-                onRequestPluginFolderAgentAction={onRequestPluginFolderAgentAction}
-                activePluginActionPaths={activePluginActionPaths}
-                hiddenPluginActionPaths={hiddenPluginActionPaths}
-                onShareToOpenDesign={onShareToOpenDesign}
-                shareToOpenDesignBusyMessageId={shareToOpenDesignBusyMessageId}
                 forceStreamingMessageIds={forceStreamingMessageIds}
                 lastAssistantId={lastAssistantId}
                 firstUserMessageId={firstUserMessageId}
@@ -2421,37 +2343,16 @@ export function ChatPane({
             items={queuedItems}
             editingId={editingQueuedSendId}
             onEdit={(item) => {
-              trackMessageQueueClick(analytics.track, {
-                page_name: 'chat_panel',
-                area: 'message_queue',
-                element: 'edit',
-                project_id: projectId ?? '',
-                queue_length: queuedItems.length,
-              });
               restoreQueuedSendToComposer(item);
             }}
             onRemove={onRemoveQueuedSend
               ? (id) => {
-                  trackMessageQueueClick(analytics.track, {
-                    page_name: 'chat_panel',
-                    area: 'message_queue',
-                    element: 'delete',
-                    project_id: projectId ?? '',
-                    queue_length: queuedItems.length,
-                  });
                   onRemoveQueuedSend(id);
                 }
               : undefined}
             onReorder={onReorderQueuedSends}
             onSendNow={onSendQueuedNow
               ? (id) => {
-                  trackMessageQueueClick(analytics.track, {
-                    page_name: 'chat_panel',
-                    area: 'message_queue',
-                    element: 'send_now',
-                    project_id: projectId ?? '',
-                    queue_length: queuedItems.length,
-                  });
                   onSendQueuedNow(id);
                 }
               : undefined}
@@ -2497,7 +2398,6 @@ interface AssistantCallbacks {
   onBrandBrowserAssistConfirm: BrandBrowserAssistConfirm | undefined;
   onArtifactShare: ((fileName: string) => void) | undefined;
   onForkFromMessage: ((message: ChatMessage) => void) | undefined;
-  onShareToOpenDesign: ((assistantMessageId: string) => void) | undefined;
   onNextStepAiOptimize: (() => void) | undefined;
   onNextStepContinueExtraction: (() => void) | undefined;
   onNextStepContinueAiExtraction: (() => void) | undefined;
@@ -2534,7 +2434,7 @@ function ChatRows({
   streaming,
   liveToolInput,
   projectId,
-  projectKindForTracking,
+  projectKind,
   activeConversationId,
   activeConversationKey,
   projectFiles,
@@ -2544,11 +2444,6 @@ function ChatRows({
   onRequestOpenFile,
   onRequestPluginDetails,
   onRequestDesignSystemDetails,
-  onRequestPluginFolderAgentAction,
-  activePluginActionPaths,
-  hiddenPluginActionPaths,
-  onShareToOpenDesign,
-  shareToOpenDesignBusyMessageId,
   forceStreamingMessageIds,
   lastAssistantId,
   firstUserMessageId,
@@ -2590,7 +2485,7 @@ function ChatRows({
   streaming: boolean;
   liveToolInput?: Record<string, { name: string; text: string; seq?: number }>;
   projectId: string | null;
-  projectKindForTracking: TrackingProjectKind | null;
+  projectKind: ChatProjectKind | null;
   activeConversationId: string | null;
   activeConversationKey: string;
   projectFiles: ProjectFile[];
@@ -2602,11 +2497,6 @@ function ChatRows({
   onRequestOpenFile?: (name: string) => void;
   onRequestPluginDetails?: (pluginId: string) => void;
   onRequestDesignSystemDetails?: (system: DesignSystemSummary) => void;
-  onRequestPluginFolderAgentAction?: (relativePath: string, action: PluginFolderAgentAction) => void;
-  activePluginActionPaths?: Set<string>;
-  hiddenPluginActionPaths?: Set<string>;
-  onShareToOpenDesign?: (assistantMessageId: string) => void;
-  shareToOpenDesignBusyMessageId?: string | null;
   forceStreamingMessageIds?: Set<string>;
   lastAssistantId: string | undefined;
   firstUserMessageId: string | undefined;
@@ -2715,22 +2605,13 @@ function ChatRows({
         showConversationTodoCard={m.id === conversationTodoAnchorMessageId}
         conversationTodoInput={conversationTodoInput}
         projectId={projectId}
-        projectKind={projectKindForTracking}
+        projectKind={projectKind}
         conversationId={activeConversationId}
         projectFiles={projectFiles}
         projectMetadata={projectMetadata}
         projectFileNames={projectFileNames}
         projectResolvedDir={projectResolvedDir}
         onRequestOpenFile={onRequestOpenFile}
-        onRequestPluginFolderAgentAction={onRequestPluginFolderAgentAction}
-        activePluginActionPaths={activePluginActionPaths}
-        hiddenPluginActionPaths={hiddenPluginActionPaths}
-        onShareToOpenDesign={
-          onShareToOpenDesign
-            ? () => assistantCallbacksRef.current.onShareToOpenDesign?.(m.id)
-            : undefined
-        }
-        shareToOpenDesignBusy={shareToOpenDesignBusyMessageId === m.id}
         isLast={m.id === lastAssistantId}
         errorCardOwnerId={errorCardOwnerId}
         nextUserContent={nextUserContentByAssistantId.get(m.id)}

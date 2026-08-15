@@ -289,7 +289,7 @@ describe('listSkills', () => {
     expect(skill.body).toContain('--remote-debugging-port=9223');
     expect(skill.body).toContain('Chrome crashed before CDP became available');
     expect(skill.body).toContain('command -v agent-browser');
-    expect(skill.body).toContain('Open Design Smoke Path');
+    expect(skill.body).toContain('Clean Design Smoke Path');
     expect(skill.body).toContain('`daemon-cli.mjs browser snapshot`');
     expect(skill.body).toContain('misinterpreted as daemon startup');
     expect(skill.body).toContain('trap cleanup_agent_browser EXIT INT TERM');

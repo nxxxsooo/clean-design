@@ -7,73 +7,57 @@ import {
 } from '../../src/utils/agentLabels';
 
 describe('agentDisplayName', () => {
-  it('returns the canonical label for known agent ids', () => {
+  it('returns canonical labels for the five public local runtimes', () => {
     expect(agentDisplayName('claude')).toBe('Claude');
     expect(agentDisplayName('codex')).toBe('Codex');
-    expect(agentDisplayName('cursor-agent')).toBe('Cursor');
+    expect(agentDisplayName('opencode')).toBe('OpenCode');
+    expect(agentDisplayName('pi')).toBe('Pi');
+    expect(agentDisplayName('antigravity')).toBe('Antigravity');
   });
 
-  it('resolves common aliases like "claude code" and "qodercli"', () => {
+  it('resolves supported aliases and executable paths', () => {
     expect(agentDisplayName('Claude Code')).toBe('Claude');
-    expect(agentDisplayName('qodercli')).toBe('Qoder');
+    expect(agentDisplayName('agy')).toBe('Antigravity');
+    expect(agentDisplayName('/opt/bin/opencode')).toBe('OpenCode');
   });
 
-  it('matches embedded substrings such as cursor-agent in a longer path', () => {
-    expect(agentDisplayName('/opt/bin/cursor-agent')).toBe('Cursor');
-  });
-
-  it('falls back to a trimmed name when the id is unknown but the fallback is safe', () => {
+  it('falls back to a trimmed safe name for an unknown runtime', () => {
     expect(agentDisplayName('unknown-id', '  My Bot  ')).toBe('My Bot');
   });
 
-  it('rejects path-like id and fallback so unknown filesystem hints do not leak', () => {
+  it('rejects path-like unknown names', () => {
     expect(agentDisplayName('/opt/unknown/runner', 'C:\\Tools\\runner.exe')).toBeNull();
   });
 
   it('returns null when both id and fallback are missing', () => {
     expect(agentDisplayName(undefined, null)).toBeNull();
   });
-
-  it('resolves "kiro cli" and "kiro-cli" aliases to Kiro', () => {
-    expect(agentDisplayName('kiro cli')).toBe('Kiro');
-    expect(agentDisplayName('kiro-cli')).toBe('Kiro');
-  });
 });
 
 describe('exactAgentDisplayName', () => {
-  it('returns the label only when the exact normalized key is a known agent', () => {
-    expect(exactAgentDisplayName('Qoder CLI')).toBe('Qoder');
-    expect(exactAgentDisplayName('qodercli.cmd')).toBe('Qoder');
-    expect(exactAgentDisplayName('cursor-agent-fork')).toBeNull();
+  it('matches supported normalized ids only', () => {
+    expect(exactAgentDisplayName('Claude Code')).toBe('Claude');
+    expect(exactAgentDisplayName('agy')).toBe('Antigravity');
+    expect(exactAgentDisplayName('opencode-fork')).toBeNull();
   });
 
   it('returns null for empty or nullish input', () => {
     expect(exactAgentDisplayName(null)).toBeNull();
     expect(exactAgentDisplayName('')).toBeNull();
   });
-
-  it('returns "Kiro" for exact id "kiro"', () => {
-    expect(exactAgentDisplayName('kiro')).toBe('Kiro');
-    expect(exactAgentDisplayName('Kiro')).toBe('Kiro');
-  });
-
-  it('resolves kiro-related aliases through exactAgentDisplayName (consistent with Qoder CLI)', () => {
-    expect(exactAgentDisplayName('kiro cli')).toBe('Kiro');
-    expect(exactAgentDisplayName('kiro-cli')).toBe('Kiro');
-  });
 });
 
 describe('agentModelDisplayName', () => {
-  it('omits the model when it is undefined or the literal "default"', () => {
+  it('omits an undefined or default model', () => {
     expect(agentModelDisplayName('claude', 'Claude Code', undefined)).toBe('Claude');
     expect(agentModelDisplayName('claude', 'Claude Code', 'default')).toBe('Claude');
   });
 
-  it('joins the agent label and model with a middle dot', () => {
-    expect(agentModelDisplayName('codex', null, 'gpt-5.4')).toBe('Codex · gpt-5.4');
+  it('joins a supported runtime and explicit model', () => {
+    expect(agentModelDisplayName('codex', null, 'gpt-5.6')).toBe('Codex · gpt-5.6');
   });
 
-  it('returns just the model id when no agent label can be derived', () => {
+  it('returns just the model id when no runtime label can be derived', () => {
     expect(agentModelDisplayName(null, null, 'sonnet-4-6')).toBe('sonnet-4-6');
   });
 });

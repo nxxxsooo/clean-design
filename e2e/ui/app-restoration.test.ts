@@ -13,7 +13,7 @@ import { automatedUiScenarios } from '@/playwright/resources';
 import type { UiScenario } from '@/playwright/resources';
 import { T } from '@/timeouts';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 const ACTIVE_ARTIFACT_PREVIEW_SELECTOR = '[data-testid="artifact-preview-frame"]:visible, [data-testid="artifact-preview-frame-url-load"]:visible, [data-testid="artifact-preview-frame-srcdoc"]:visible, [data-testid="live-artifact-preview-frame"]:visible';
 
 test.describe.configure({ timeout: process.env.CI ? 90_000 : 60_000 });
@@ -46,8 +46,6 @@ test.beforeEach(async ({ page }) => {
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: {},
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
@@ -65,8 +63,6 @@ test.beforeEach(async ({ page }) => {
           skillId: null,
           designSystemId: null,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
         },
       },
     });
@@ -286,7 +282,7 @@ test('[P0] switching between projects restores each project workspace to its las
   await expect(tabBySuffix(page, 'beta-secondary.png')).toHaveAttribute('aria-selected', 'false');
 });
 
-test('[P0] @critical visiting an uploaded design file route restores its tab and file workspace surface', async ({ page }) => {
+test('[P0] visiting an uploaded design file route restores its tab and file workspace surface', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -476,7 +472,7 @@ test('[P0] returning from an artifact file route to the project root keeps the a
   await expect(artifactTab).toHaveAttribute('aria-selected', 'true');
 });
 
-test('[P0] @critical returning from an older conversation route to the project root keeps the composer available while the route is selected', async ({ page }) => {
+test('[P0] returning from an older conversation route to the project root keeps the composer available while the route is selected', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -553,7 +549,7 @@ test('[P0] @critical returning from an older conversation route to the project r
   await expect(page.getByTestId('chat-composer')).toBeVisible();
 });
 
-test('[P0] @critical switching between conversations keeps the composer usable while navigating history', async ({ page }) => {
+test('[P0] switching between conversations keeps the composer usable while navigating history', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -749,7 +745,7 @@ test('[P0] @critical reloading an older conversation route keeps the composer vi
   await expect(reloadedHistoryList.locator('.chat-conv-item').filter({ hasText: firstPrompt }).first()).toBeVisible();
 });
 
-test('[P0] @critical switching between conversations keeps staged attachments UI available', async ({ page }) => {
+test('[P0] switching between conversations keeps staged attachments UI available', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -861,7 +857,7 @@ test('[P0] @critical switching between conversations keeps staged attachments UI
   await expect(page.locator('.msg.user .user-text').filter({ hasText: secondPrompt }).first()).toBeVisible();
 });
 
-test('[P0] @critical reloading an older conversation route keeps the composer available after staging attachments', async ({ page }) => {
+test('[P0] reloading an older conversation route keeps the composer available after staging attachments', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -947,7 +943,7 @@ test('[P0] @critical reloading an older conversation route keeps the composer av
   await expect(page.getByTestId('chat-composer')).toBeVisible();
 });
 
-test('[P0] @critical reloading the project keeps the latest conversation selected in history', async ({ page }) => {
+test('[P0] reloading the project keeps the latest conversation selected in history', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -1033,7 +1029,7 @@ test('[P0] @critical reloading the project keeps the latest conversation selecte
   await expect(historyList.locator('.chat-conv-item')).toHaveCount(2);
 });
 
-test('[P0] @critical deleting the active conversation selects the remaining conversation in history', async ({ page }) => {
+test('[P0] deleting the active conversation selects the remaining conversation in history', async ({ page }) => {
   page.on('dialog', async (dialog: Dialog) => {
     await dialog.accept();
   });
@@ -2568,8 +2564,6 @@ test('[P1] completed background run sends the configured desktop notification', 
           designSystemId: null,
           onboardingCompleted: true,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
           notifications: notificationsConfig,
         }),
       );
@@ -2723,8 +2717,6 @@ test('[P1] failed foreground run still sends the configured desktop notification
           designSystemId: null,
           onboardingCompleted: true,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
           notifications: notificationsConfig,
         }),
       );
@@ -3436,8 +3428,6 @@ async function routeAppConfig(page: Page, override: Record<string, unknown>) {
           skillId: null,
           designSystemId: null,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
           ...override,
         },
       },
@@ -3609,13 +3599,13 @@ async function expectWorkspaceReady(page: Page) {
 async function sendPrompt(page: Page, prompt: string) {
   const input = page.getByTestId('chat-composer-input');
   const sendButton = page.getByTestId('chat-send');
-  await expect(input).toBeVisible({ timeout: 3_000 });
+  await expect(input).toBeVisible({ timeout: T.medium });
   await input.click();
   await input.fill(prompt);
-  await expect(input).toHaveText(prompt, { timeout: 1500 });
-  await expect(sendButton).toBeEnabled({ timeout: 1500 });
+  await expect(input).toHaveText(prompt, { timeout: T.medium });
+  await expect(sendButton).toBeEnabled({ timeout: T.medium });
   await Promise.all([
-    page.waitForResponse(isCreateRunResponse, { timeout: 5_000 }),
+    page.waitForResponse(isCreateRunResponse, { timeout: T.long }),
     sendButton.evaluate((button: HTMLButtonElement) => button.click()),
   ]);
 }
@@ -3910,13 +3900,8 @@ async function createProjectNameOnly(
 async function gotoEntryHome(page: Page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await waitForLoadingToClear(page);
-  const privacyDialog = page.getByRole('dialog').filter({ hasText: 'Help us improve Open Design' });
-  if (await privacyDialog.isVisible()) {
-    await privacyDialog.getByRole('button', { name: /I get it|not now|got it|don't share/i }).click();
-    await expect(privacyDialog).toHaveCount(0);
-  }
-  await expect(page.getByTestId('home-hero')).toBeVisible();
-  await expect(page.getByTestId('home-hero-input')).toBeVisible();
+  await expect(page.getByTestId('home-hero')).toBeVisible({ timeout: T.long });
+  await expect(page.getByTestId('home-hero-input')).toBeVisible({ timeout: T.long });
 }
 
 async function openNewProjectModal(page: Page) {

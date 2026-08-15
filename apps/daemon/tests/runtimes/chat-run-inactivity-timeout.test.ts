@@ -1,11 +1,9 @@
 /**
  * Per-agent inactivity-timeout resolution (#2467).
  *
- * The chat-run inactivity watchdog defaults to 10 minutes. Some agents
- * (GitHub Copilot CLI) genuinely stay silent for longer than that on
- * heavy deck-generation turns — the model is still working but emits
- * no stdout, so the watchdog used to kill the run as `stalled` even
- * though the agent was healthy.
+ * The chat-run inactivity watchdog defaults to 10 minutes. Runtime defs
+ * can advertise a larger timeout for CLIs that legitimately stay silent
+ * during long generation turns.
  *
  * Runtime defs can now advertise a recommended `inactivityTimeoutMs`,
  * and the resolver merges it under the env override:
@@ -18,10 +16,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   assertValidRuntimeDefInactivityTimeoutMs,
-  resolveAcpStageTimeoutMs,
   resolveChatRunInactivityTimeoutMs,
 } from '../../src/server.js';
-import { copilotAgentDef } from '../../src/runtimes/defs/copilot.js';
 
 const ENV_KEY = 'OD_CHAT_RUN_INACTIVITY_TIMEOUT_MS';
 const TEN_MINUTES_MS = 10 * 60 * 1000;
@@ -139,46 +135,6 @@ describe('resolveChatRunInactivityTimeoutMs', () => {
   });
 });
 
-describe('resolveAcpStageTimeoutMs', () => {
-  const originalEnv = process.env.OD_ACP_STAGE_TIMEOUT_MS;
-
-  afterEach(() => {
-    if (originalEnv === undefined) {
-      delete process.env.OD_ACP_STAGE_TIMEOUT_MS;
-    } else {
-      process.env.OD_ACP_STAGE_TIMEOUT_MS = originalEnv;
-    }
-  });
-
-  it('leaves the ACP session default untouched when no env override or def hint is set', () => {
-    delete process.env.OD_ACP_STAGE_TIMEOUT_MS;
-    expect(resolveAcpStageTimeoutMs()).toBeUndefined();
-  });
-
-  it('uses the runtime inactivity hint when the ACP env override is unset', () => {
-    delete process.env.OD_ACP_STAGE_TIMEOUT_MS;
-    expect(resolveAcpStageTimeoutMs(THIRTY_MINUTES_MS)).toBe(THIRTY_MINUTES_MS);
-  });
-
-  it('lets the ACP env override take precedence over the runtime inactivity hint', () => {
-    process.env.OD_ACP_STAGE_TIMEOUT_MS = '900000';
-    expect(resolveAcpStageTimeoutMs(THIRTY_MINUTES_MS)).toBe(900_000);
-  });
-
-  it('throws on an invalid runtime inactivity hint so ACP and chat watchdog config cannot drift silently', () => {
-    delete process.env.OD_ACP_STAGE_TIMEOUT_MS;
-    expect(() => resolveAcpStageTimeoutMs(Number.NaN)).toThrow(
-      /RuntimeAgentDef\.inactivityTimeoutMs/,
-    );
-  });
-});
-
-describe('copilotAgentDef.inactivityTimeoutMs', () => {
-  it('ships a 30-minute inactivity hint so Copilot silent-thinking phases do not trip the default watchdog (#2467)', () => {
-    expect(copilotAgentDef.inactivityTimeoutMs).toBe(THIRTY_MINUTES_MS);
-  });
-});
-
 describe('assertValidRuntimeDefInactivityTimeoutMs (#2579 fast-fail at def-select time)', () => {
   // Reviewer-correctness fix (#2579 non-blocking, round 3): the
   // strict checked-in-config check must run *immediately* after the
@@ -194,7 +150,7 @@ describe('assertValidRuntimeDefInactivityTimeoutMs (#2579 fast-fail at def-selec
     expect(() => assertValidRuntimeDefInactivityTimeoutMs(undefined)).not.toThrow();
   });
 
-  it('returns silently for a valid non-negative integer (e.g. Copilot 30 min)', () => {
+  it('returns silently for a valid non-negative integer', () => {
     expect(() => assertValidRuntimeDefInactivityTimeoutMs(THIRTY_MINUTES_MS)).not.toThrow();
     expect(() => assertValidRuntimeDefInactivityTimeoutMs(0)).not.toThrow();
   });

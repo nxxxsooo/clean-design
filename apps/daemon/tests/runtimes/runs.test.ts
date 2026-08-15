@@ -161,7 +161,7 @@ describe('chat run service shutdown', () => {
       expect(child.signals).toEqual(['SIGTERM']);
     });
 
-    it('uses ACP abort before falling back to process signals', async () => {
+    it('uses runtime-session abort before falling back to process signals', async () => {
       vi.useFakeTimers();
       vi.stubEnv('PI_ABORT_GRACE_MS', '30');
       const runs = createRuns();
@@ -176,7 +176,7 @@ describe('chat run service shutdown', () => {
       const run = runs.create();
       run.status = 'running';
       (run as any).child = child;
-      (run as any).acpSession = { abort };
+      (run as any).rpcSession = { abort };
 
       const cancelPromise = runs.cancel(run);
 
@@ -459,14 +459,14 @@ describe('chat run service shutdown', () => {
     expect(run.status).toBe('canceled');
   });
 
-  it('uses adapter abort before process signals for ACP-style runs', async () => {
+  it('uses runtime-session abort before process signals during shutdown', async () => {
     const runs = createRuns();
     const child = new FakeChildProcess({ closeOn: 'SIGTERM' });
     const abort = vi.fn();
     const run = runs.create();
     run.status = 'running';
     (run as any).child = child;
-    (run as any).acpSession = { abort };
+    (run as any).rpcSession = { abort };
 
     await runs.shutdownActive({ graceMs: 10 });
 
@@ -733,13 +733,13 @@ describe('run event log persistence', () => {
     runs.emit(run, 'diagnostic', {
       type: 'native_session_recovery',
       nativeSessionRecovery: {
-        agentId: 'amr',
+        agentId: 'claude',
         state: 'resumed',
-        acquisition: 'acp-session-load',
-        continuation: 'acp-session-load',
+        acquisition: 'cli-session-load',
+        continuation: 'cli-session-load',
         handle: {
           present: true,
-          kind: 'acp-session-handle',
+          kind: 'cli-session-handle',
           display: null,
           sha256: 'b'.repeat(64),
           redacted: true,
@@ -767,7 +767,7 @@ describe('run event log persistence', () => {
       data: {
         type: 'native_session_recovery',
         nativeSessionRecovery: {
-          agentId: 'amr',
+          agentId: 'claude',
           state: 'resumed',
           handle: { display: null, redacted: true },
         },
@@ -805,7 +805,7 @@ describe('run event log persistence', () => {
   it('does not re-open the event log stream for events emitted after the run finished (FD-leak guard)', () => {
     // finish() closes the per-run events.jsonl write stream and nulls it. The
     // stream is opened lazily on emit, so an event emitted AFTER finish (a late
-    // async child-close diagnostic, a trailing tool callback, telemetry) would
+    // async child-close diagnostic or a trailing tool callback) would
     // re-open a NEW write stream that finish() — guarded against re-running on a
     // terminal run — never closes. Each such late emit then leaks one file
     // descriptor; over a long-lived daemon this exhausts the fd table and

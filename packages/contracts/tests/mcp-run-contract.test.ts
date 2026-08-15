@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { type McpRunCreateRequest } from '../src/api/chat';
+import { type ChatRequest, type McpRunCreateRequest } from '../src/api/chat';
+
+describe('ChatRequest contract', () => {
+  it('carries design-system enrichment as an execution signal', () => {
+    const request = {
+      agentId: 'claude',
+      message: 'Refine this design system',
+      designSystemEnrichment: true,
+    } satisfies ChatRequest;
+
+    expect(request.designSystemEnrichment).toBe(true);
+  });
+});
 
 describe('McpRunCreateRequest contract', () => {
   it('accepts projectId-only shape (typed callers need no cast)', () => {

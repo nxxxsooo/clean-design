@@ -11,7 +11,6 @@
  */
 import type { AgentEvent, ChatCommentAttachment, ChatMessage } from '../types';
 import type {
-  ChatAnalyticsHints,
   ChatRunCreateResponse,
   ChatRunListResponse,
   ChatRunStatus,
@@ -291,16 +290,12 @@ export interface DaemonStreamOptions {
   appliedPluginSnapshotId?: string | null;
   mediaExecution?: MediaExecutionPolicy;
   titleGeneration?: { enabled?: boolean };
+  designSystemEnrichment?: boolean;
   locale?: string;
   initialLastEventId?: string | null;
   onRunCreated?: (runId: string) => void;
   onRunStatus?: (status: ChatRunStatus) => void;
   onRunEventId?: (eventId: string) => void;
-  // v2 analytics context propagated to run_created / run_finished.
-  // Optional; the daemon only consumes these to shape PostHog props
-  // (page_name / area / entry_from / DS context). Behavior never
-  // depends on them.
-  analyticsHints?: ChatAnalyticsHints;
 }
 
 export interface DaemonReattachOptions {
@@ -313,40 +308,9 @@ export interface DaemonReattachOptions {
   initialLastEventId?: string | null;
   onRunStatus?: (status: ChatRunStatus) => void;
   onRunEventId?: (eventId: string) => void;
-  /** Publish a current-run success outcome to the app-level upgrade gate. */
-  publishRunFinishedEvent?: boolean;
 }
 
 export const RUNS_CHANGED_EVENT = 'clean-design:runs-changed';
-export const DAEMON_RUN_FINISHED_EVENT = 'clean-design:daemon-run-finished';
-
-export interface DaemonRunFinishedEventDetail {
-  runId: string;
-  projectId: string;
-  conversationId: string;
-  result: 'success';
-  artifactCount: number;
-}
-
-export function publishDaemonRunFinishedEvent(
-  detail: DaemonRunFinishedEventDetail,
-): void {
-  if (
-    typeof window === 'undefined'
-    || !detail.runId.trim()
-    || !detail.projectId.trim()
-    || !detail.conversationId.trim()
-    || detail.result !== 'success'
-    || !Number.isFinite(detail.artifactCount)
-    || detail.artifactCount <= 0
-  ) {
-    return;
-  }
-  window.dispatchEvent(new CustomEvent<DaemonRunFinishedEventDetail>(
-    DAEMON_RUN_FINISHED_EVENT,
-    { detail },
-  ));
-}
 
 export const GENERIC_DAEMON_DISCONNECT_MESSAGE =
   'daemon stream disconnected before run completed';
@@ -399,7 +363,6 @@ function shouldSuppressLifecycleExitFallback(
   stderrTail: string,
 ): boolean {
   if (exitCode !== 130 || exitSignal) return false;
-  if (agentId === 'amr') return true;
   const normalizedStderr = stderrTail.toLowerCase();
   return (
     normalizedStderr.includes('opencode server listening') ||
@@ -407,7 +370,7 @@ function shouldSuppressLifecycleExitFallback(
   );
 }
 
-const AMR_OPENCODE_INCOMPLETE_MESSAGE =
+const OPENCODE_INCOMPLETE_MESSAGE =
   'Clean Design started, but the run did not complete. Please retry or check the run details for the session stream error.';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -578,16 +541,15 @@ function formatLegacyOpenCodeSessionError(text: string): string | null {
   });
 }
 
-function isAmrOpenCodeExitFallback(agentId: string | undefined, stderr: string): boolean {
-  if (agentId === 'amr' || agentId === 'opencode') return true;
+function isOpenCodeExitFallback(agentId: string | undefined, stderr: string): boolean {
+  if (agentId === 'opencode') return true;
   const normalized = stderr.toLowerCase();
   return normalized.includes('opencode server listening') || normalized.includes('opencode session error:');
 }
 
-function isAmrOpenCodeBootstrapLine(line: string): boolean {
+function isOpenCodeBootstrapLine(line: string): boolean {
   const trimmed = line.trim();
   return (
-    /^AMR run id:\s*\S+/i.test(trimmed) ||
     /^Performing one time database migration/i.test(trimmed) ||
     /^sqlite-migration:done$/i.test(trimmed) ||
     /^Database migration complete\.?$/i.test(trimmed) ||
@@ -596,11 +558,11 @@ function isAmrOpenCodeBootstrapLine(line: string): boolean {
   );
 }
 
-function cleanAmrOpenCodeStderrFallback(agentId: string | undefined, stderr: string): string {
-  if (!isAmrOpenCodeExitFallback(agentId, stderr)) return stderr.trim();
+function cleanOpenCodeStderrFallback(agentId: string | undefined, stderr: string): string {
+  if (!isOpenCodeExitFallback(agentId, stderr)) return stderr.trim();
   return stderr
     .split(/\r?\n/)
-    .filter((line) => line.trim() && !isAmrOpenCodeBootstrapLine(line))
+    .filter((line) => line.trim() && !isOpenCodeBootstrapLine(line))
     .join('\n')
     .trim();
 }
@@ -635,7 +597,7 @@ export async function streamViaDaemon({
   onRunCreated,
   onRunStatus,
   onRunEventId,
-  analyticsHints,
+  designSystemEnrichment,
 }: DaemonStreamOptions): Promise<void> {
   const emitRunStatus = (status: ChatRunStatus) => {
     onRunStatus?.(status);
@@ -669,7 +631,7 @@ export async function streamViaDaemon({
     ...(research ? { research } : {}),
     ...(mediaExecution ? { mediaExecution } : {}),
     ...(titleGeneration?.enabled ? { titleGeneration: { enabled: true } } : {}),
-    ...(analyticsHints ? { analyticsHints } : {}),
+    ...(designSystemEnrichment ? { designSystemEnrichment: true } : {}),
   };
   const body = JSON.stringify(request);
 
@@ -705,7 +667,6 @@ export async function streamViaDaemon({
       onRunEventId,
       projectId,
       conversationId,
-      publishRunFinishedEvent: true,
     });
   } catch (err) {
     if ((err as Error).name === 'AbortError') return;
@@ -811,7 +772,6 @@ async function consumeDaemonRun({
   onRunEventId,
   projectId,
   conversationId,
-  publishRunFinishedEvent,
 }: DaemonReattachOptions & { agentId?: string }): Promise<void> {
   let acc = '';
   let stderrBuf = '';
@@ -1060,10 +1020,8 @@ async function consumeDaemonRun({
     // Trust the server's authoritative success declaration. When the server
     // explicitly sets `status: 'succeeded'` (either in the SSE end payload
     // or via the fallback run-status fetch), the run completed cleanly even
-    // if the underlying process exited via a signal — some agents (e.g.
-    // ACP agents like Devin for Terminal) intentionally exit via SIGTERM
-    // after a clean prompt completion because they don't shut down on
-    // `stdin.end()`. The signal/non-zero-code safety net is bypassed only
+    // if the underlying process exited via a signal. The
+    // signal/non-zero-code safety net is bypassed only
     // for that explicit declaration; a missing/invalid `status` from a
     // compatible or older daemon still falls back to `endStatus =
     // 'succeeded'` for the run-status surface but must keep the safety net
@@ -1088,11 +1046,11 @@ async function consumeDaemonRun({
         handlers.onDone(acc);
         return;
       }
-      const cleanedStderr = cleanAmrOpenCodeStderrFallback(agentId, stderrBuf);
+      const cleanedStderr = cleanOpenCodeStderrFallback(agentId, stderrBuf);
       const formattedOpenCodeError = formatLegacyOpenCodeSessionError(cleanedStderr);
       const tail = (formattedOpenCodeError ?? cleanedStderr).trim().slice(-400);
       const fallbackTail =
-        tail || (isAmrOpenCodeExitFallback(agentId, stderrBuf) ? AMR_OPENCODE_INCOMPLETE_MESSAGE : '');
+        tail || (isOpenCodeExitFallback(agentId, stderrBuf) ? OPENCODE_INCOMPLETE_MESSAGE : '');
       handlers.onError(
         markErrorRunFailure(
           markErrorResumable(
@@ -1103,23 +1061,6 @@ async function consumeDaemonRun({
         ),
       );
       return;
-    }
-    if (
-      publishRunFinishedEvent
-      && Boolean(projectId?.trim())
-      && Boolean(conversationId?.trim())
-      && serverDeclaredSuccess
-      && endStatus === 'succeeded'
-      && resolvedArtifactCount !== undefined
-      && resolvedArtifactCount > 0
-    ) {
-      publishDaemonRunFinishedEvent({
-        runId,
-        projectId: projectId!,
-        conversationId: conversationId!,
-        result: 'success',
-        artifactCount: resolvedArtifactCount,
-      });
     }
     handlers.onDone(acc);
   } finally {

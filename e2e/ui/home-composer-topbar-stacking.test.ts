@@ -14,7 +14,7 @@ import { T } from '@/timeouts';
 
 test.describe.configure({ timeout: T.xlong });
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 const HOME_CONFIG = {
   mode: 'daemon',
@@ -26,8 +26,6 @@ const HOME_CONFIG = {
   designSystemId: null,
   onboardingCompleted: true,
   agentModels: { codex: { model: 'default' } },
-  privacyDecisionAt: 1,
-  telemetry: { metrics: false, content: false, artifactManifest: false },
 };
 
 test.beforeEach(async ({ page }) => {

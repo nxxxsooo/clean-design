@@ -3,7 +3,7 @@
   "version": "0.15.1",
   "private": true,
   "type": "module",
-  "description": "Shared pure TypeScript contracts for the Open Design web/daemon boundary.",
+  "description": "Shared pure TypeScript contracts for the Clean Design web/daemon boundary.",
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "files": [
@@ -17,14 +17,6 @@
     "./api/connectionTest": {
       "types": "./dist/api/connectionTest.d.ts",
       "default": "./dist/api/connectionTest.mjs"
-    },
-    "./api/amrWallet": {
-      "types": "./dist/api/amrWallet.d.ts",
-      "default": "./dist/api/amrWallet.mjs"
-    },
-    "./api/orbit": {
-      "types": "./dist/api/orbit.d.ts",
-      "default": "./dist/api/orbit.mjs"
     },
     "./api/finalize": {
       "types": "./dist/api/finalize.d.ts",
@@ -65,10 +57,6 @@
     "./critique": {
       "types": "./dist/critique.d.ts",
       "default": "./dist/critique.mjs"
-    },
-    "./analytics": {
-      "types": "./dist/analytics/index.d.ts",
-      "default": "./dist/analytics/index.mjs"
     }
   },
   "scripts": {
@@ -77,7 +65,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.tests.json --noEmit"
   },
   "dependencies": {
-    "@open-design/release": "workspace:*",
     "zod": "3.25.76"
   },
   "devDependencies": {

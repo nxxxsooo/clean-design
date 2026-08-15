@@ -1,7 +1,6 @@
 import type { AgentInfo } from '../types';
-
-const HIDDEN_LOCAL_CLI_AGENT_IDS = new Set(['amr', 'byok-opencode']);
+import { isCleanDesignPublicAgent } from '@open-design/contracts';
 
 export function isVisibleLocalCliAgent(agent: Pick<AgentInfo, 'id'>): boolean {
-  return !HIDDEN_LOCAL_CLI_AGENT_IDS.has(agent.id);
+  return isCleanDesignPublicAgent(agent);
 }

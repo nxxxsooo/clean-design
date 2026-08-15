@@ -90,7 +90,7 @@ Before creating files, decide whether the user actually wants a live artifact or
    - Use escaped `html_template_v1` interpolation only. Raw/unescaped HTML interpolation is not allowed.
 
 5. **Register or update through daemon wrappers**
-   - Use the Open Design daemon wrapper commands via `"$OD_NODE_BIN" "$OD_BIN"` instead of raw `curl`, bare `node`, or bare `od`:
+   - Use the Clean Design daemon wrapper commands via `"$OD_NODE_BIN" "$OD_BIN"` instead of raw `curl`, bare `node`, or bare `od`:
 
      ```bash
      "$OD_NODE_BIN" "$OD_BIN" tools live-artifacts create --input artifact.json

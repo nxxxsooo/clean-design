@@ -1,7 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-
-import { trackPreviewRunStatusSurfaceView } from '../analytics/events';
-import { useAnalytics } from '../analytics/provider';
+import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../i18n';
 import {
   latestPreviewRunStatus,
@@ -16,7 +13,6 @@ import styles from './PreviewRunStatusBar.module.css';
 const SUCCESS_EXIT_MS = 140;
 
 interface Props {
-  projectId: string;
   conversationId?: string | null;
   messages: readonly ChatMessage[];
 }
@@ -43,12 +39,10 @@ function statusLabelKey(status: PreviewRunStatus):
 
 /** Lightweight run feedback embedded directly in the preview canvas. */
 export function PreviewRunStatusBar({
-  projectId,
   conversationId,
   messages,
 }: Props) {
   const { t } = useI18n();
-  const analytics = useAnalytics();
   const [now, setNow] = useState(() => Date.now());
   const current = useMemo(
     () => {
@@ -63,7 +57,6 @@ export function PreviewRunStatusBar({
   );
   const [lastVisible, setLastVisible] = useState<PreviewRunStatus | null>(current);
   const [leaving, setLeaving] = useState(false);
-  const exposureRef = useRef<string | null>(null);
 
   const currentKey = current
     ? `${current.message.id}:${current.phase}:${current.message.resultDeliveryState ?? ''}`
@@ -104,24 +97,6 @@ export function PreviewRunStatusBar({
       window.clearTimeout(expire);
     };
   }, [currentKey, current]);
-
-  useEffect(() => {
-    if (!current || leaving || exposureRef.current === currentKey) return;
-    exposureRef.current = currentKey;
-    trackPreviewRunStatusSurfaceView(analytics.track, {
-      page_name: 'file_manager',
-      area: 'preview_run_status',
-      element: 'run_status_bar',
-      status: current.phase,
-      ...(current.message.resultDeliveryState
-        ? { delivery_state: current.message.resultDeliveryState }
-        : {}),
-      project_id: projectId,
-      conversation_id: conversationId ?? null,
-      assistant_message_id: current.message.id,
-      ...(current.message.runId ? { run_id: current.message.runId } : {}),
-    });
-  }, [analytics.track, conversationId, current, currentKey, leaving, projectId]);
 
   const displayed = current ?? lastVisible;
   if (!displayed) return null;

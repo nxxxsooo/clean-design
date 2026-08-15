@@ -63,8 +63,8 @@ describe('daemonAgentPayloadToPersistedAgentEvent — diagnostic', () => {
   it('persists safe structured runtime diagnostics', () => {
     const persisted = daemonAgentPayloadToPersistedAgentEvent({
       type: 'diagnostic',
-      name: 'acp_artifact_text_suppression',
-      source: 'acp-json-rpc',
+      name: 'artifact_text_suppression',
+      source: 'json-event-stream',
       elapsedMs: 1234,
       reason: 'artifact_echo',
       suppressedChars: 4096,
@@ -82,8 +82,8 @@ describe('daemonAgentPayloadToPersistedAgentEvent — diagnostic', () => {
 
     expect(persisted).toMatchObject({
       kind: 'diagnostic',
-      name: 'acp_artifact_text_suppression',
-      source: 'acp-json-rpc',
+      name: 'artifact_text_suppression',
+      source: 'json-event-stream',
       elapsedMs: 1234,
       reason: 'artifact_echo',
       suppressedChars: 4096,
@@ -101,28 +101,7 @@ describe('daemonAgentPayloadToPersistedAgentEvent — diagnostic', () => {
   });
 });
 
-describe('daemonAgentPayloadToPersistedAgentEvent — transient ACP status labels', () => {
-  // Regression for PR #5145 review: transient ACP protocol-internal status
-  // labels (waiting_for_first_output, tool_call, tool_call_update,
-  // session_update) carry no user-visible detail. The live web translator
-  // normalizes them to 'running', but the daemon must also suppress them at
-  // persistence time so history replay doesn't render empty expandable rows
-  // in the assistant process panel.
-  it.each([
-    ['waiting_for_first_output'],
-    ['tool_call'],
-    ['tool_call_update'],
-    ['session_update'],
-  ])('returns null for transient status %s', (label) => {
-    expect(
-      persist({
-        type: 'status',
-        label,
-        detail: 'should be dropped',
-      }),
-    ).toBeNull();
-  });
-
+describe('daemonAgentPayloadToPersistedAgentEvent — visible status labels', () => {
   it('persists a visible model status with model as detail', () => {
     const persisted = persist({
       type: 'status',

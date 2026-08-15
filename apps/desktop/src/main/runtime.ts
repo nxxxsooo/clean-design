@@ -30,7 +30,6 @@ import { renderDeckSlides } from "./deck-capture.js";
 import { openValidatedDirectory } from "./open-path.js";
 import { exportArtifact as exportArtifactFromHtml } from "./artifact-export.js";
 import { createElectronPdfTarget, exportPdfFromHtml, savePrintReadyDocumentAsPdf } from "./pdf-export.js";
-import { SPLASH_VIDEO_DATA_URL } from "./splash-video.js";
 import { RendererCrashLoopBreaker } from "./renderer-crash-loop.js";
 import type { PrintReadyPdfOptions } from "./pdf-export.js";
 import type { DesktopCredentialVault } from './credential-vault.js';
@@ -245,12 +244,10 @@ export function isRendererFailureHttpStatus(httpResponseCode: number): boolean {
 
 const PENDING_POLL_MS = 120;
 const RUNNING_POLL_MS = 2000;
-// Minimum time the light splash window stays on screen before we reveal the main
-// window. It is sized to outlast the ~1.7s clip so the brand animation always
-// plays through. The splash is shown immediately and in parallel with the
-// daemon/web boot (see the packaged entry), so this time overlaps startup rather
-// than adding to it; the <video> holds on its final frame (it does not loop)
-// while the runtime finishes coming up. See `createSplashWindow`.
+// Minimum time the splash stays on screen before we reveal the main window. It
+// is sized to let the ~1.4s construction animation settle into the final mark.
+// The splash is shown immediately and in parallel with daemon/web boot (see the
+// packaged entry), so this time overlaps startup rather than adding to it.
 const MIN_SPLASH_MS = 2000;
 // While the splash is up, the real web app loads in a hidden main window. We
 // reveal it only once the web bundle reports it has actually mounted (it sets
@@ -824,11 +821,11 @@ const MAC_WINDOW_CHROME_CSS = `
   }
 `;
 
-// Light-background startup splash shown while the web runtime boots. It plays
-// the brand intro clip once and then holds on its final settled logo frame until
-// the main window is ready. The clip is embedded as a base64 data URL so it
-// renders identically in dev and in packaged builds (see `splash-video.ts`).
-function createPendingHtml(): string {
+// Dependency-free startup surface shown while the local runtimes boot. The
+// animation is inline SVG + CSS so packaged startup does not wait for a video
+// decoder or carry a duplicate binary/base64 asset. It settles into the final
+// brand mark while the truthful boot stage continues to update below it.
+export function createPendingHtml(): string {
   const start = splashStagePayload("starting");
   const initialPct = Math.max(0, Math.min(100, Math.round((start.step / start.total) * 100)));
   return `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
@@ -837,9 +834,12 @@ function createPendingHtml(): string {
     <meta charset="utf-8" />
     <title>Clean Design</title>
     <style>
+      :root {
+        color-scheme: dark;
+      }
       html,
       body {
-        background: #f2f4f5;
+        background: #171614;
         height: 100%;
         margin: 0;
         overflow: hidden;
@@ -847,19 +847,83 @@ function createPendingHtml(): string {
       body {
         align-items: center;
         display: flex;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
         justify-content: center;
       }
-      video {
-        background: #f2f4f5;
-        height: auto;
-        max-height: 100%;
-        max-width: 100%;
-        width: auto;
+      .splash-brand {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        margin-top: -38px;
+        user-select: none;
+      }
+      .splash-canvas {
+        height: 250px;
+        overflow: visible;
+        width: 440px;
+      }
+      .guide {
+        animation: guide-draw 920ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        fill: none;
+        opacity: 0;
+        stroke: #66615a;
+        stroke-dasharray: 92;
+        stroke-dashoffset: 92;
+        stroke-width: 1;
+      }
+      .guide-delay { animation-delay: 90ms; }
+      .corner {
+        animation: corner-build 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        fill: none;
+        stroke: #8b857c;
+        stroke-width: 1.25;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      .corner-a { animation-delay: 250ms; }
+      .corner-b { animation-delay: 340ms; }
+      .mark-shell {
+        animation: shell-arrive 560ms cubic-bezier(0.16, 1, 0.3, 1) 520ms both;
+        fill: #23211e;
+        stroke: #383530;
+        stroke-width: 1;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      .mark-c {
+        animation: mark-draw 620ms cubic-bezier(0.65, 0, 0.35, 1) 650ms both;
+        fill: none;
+        stroke: #f2efe9;
+        stroke-dasharray: 220;
+        stroke-dashoffset: 220;
+        stroke-linecap: square;
+        stroke-width: 20;
+      }
+      .mark-node {
+        animation: node-place 620ms cubic-bezier(0.16, 1, 0.3, 1) 760ms both;
+        fill: #f45b3a;
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      .wordmark {
+        animation: wordmark-arrive 520ms cubic-bezier(0.22, 1, 0.36, 1) 980ms both;
+        color: #f2efe9;
+        font-size: 21px;
+        font-weight: 560;
+        letter-spacing: -0.025em;
+        margin-top: -22px;
+      }
+      .wordmark-rule {
+        animation: rule-arrive 420ms cubic-bezier(0.22, 1, 0.36, 1) 1080ms both;
+        background: #f45b3a;
+        height: 2px;
+        margin-top: 13px;
+        transform-origin: left;
+        width: 18px;
       }
       .boot-stage {
         bottom: 56px;
-        color: #7a838a;
-        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #918b82;
         font-size: 13px;
         left: 0;
         letter-spacing: 0.02em;
@@ -874,12 +938,12 @@ function createPendingHtml(): string {
         transition-duration: 140ms;
       }
       .boot-stage-step {
-        color: #9aa2a8;
+        color: #625e58;
         font-variant-numeric: tabular-nums;
         margin-right: 7px;
       }
       .boot-progress {
-        background: rgba(122, 131, 138, 0.18);
+        background: #2e2b27;
         border-radius: 999px;
         bottom: 84px;
         height: 3px;
@@ -890,7 +954,7 @@ function createPendingHtml(): string {
         width: 200px;
       }
       .boot-progress-fill {
-        background: #7a838a;
+        background: #f45b3a;
         border-radius: 999px;
         height: 100%;
         transition: width 320ms cubic-bezier(0.23, 1, 0.32, 1);
@@ -905,17 +969,67 @@ function createPendingHtml(): string {
         0%, 60%, 100% { opacity: 0.25; }
         30% { opacity: 1; }
       }
+      @keyframes guide-draw {
+        0% { opacity: 0; stroke-dashoffset: 92; }
+        28% { opacity: 0.58; }
+        72% { opacity: 0.34; stroke-dashoffset: 0; }
+        100% { opacity: 0.12; stroke-dashoffset: 0; }
+      }
+      @keyframes corner-build {
+        0% { opacity: 0; transform: scale(1.18); }
+        100% { opacity: 0.55; transform: scale(1); }
+      }
+      @keyframes shell-arrive {
+        0% { opacity: 0; transform: scale(0.88); }
+        100% { opacity: 1; transform: scale(1); }
+      }
+      @keyframes mark-draw {
+        to { stroke-dashoffset: 0; }
+      }
+      @keyframes node-place {
+        0% { opacity: 0; transform: translate(34px, -24px) scale(0.45); }
+        72% { opacity: 1; transform: translate(0, 0) scale(1.08); }
+        100% { opacity: 1; transform: translate(0, 0) scale(1); }
+      }
+      @keyframes wordmark-arrive {
+        0% { opacity: 0; transform: translateY(7px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes rule-arrive {
+        0% { opacity: 0; transform: scaleX(0); }
+        100% { opacity: 1; transform: scaleX(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .guide,
+        .corner,
+        .mark-shell,
+        .mark-c,
+        .mark-node,
+        .wordmark,
+        .wordmark-rule,
+        .boot-dots .dot {
+          animation: none;
+        }
+        .guide { opacity: 0.12; stroke-dashoffset: 0; }
+        .corner { opacity: 0.55; }
+        .mark-c { stroke-dashoffset: 0; }
+      }
     </style>
   </head>
   <body>
-    <video
-      id="splash"
-      autoplay
-      muted
-      playsinline
-      disablepictureinpicture
-      src="${SPLASH_VIDEO_DATA_URL}"
-    ></video>
+    <div class="splash-brand" aria-label="Clean Design is starting">
+      <svg class="splash-canvas" viewBox="0 0 440 250" role="img" aria-hidden="true">
+        <path class="guide" d="M74 125H366 M220 36V214" />
+        <path class="guide guide-delay" d="M118 70H322 M118 180H322" />
+        <path class="corner corner-a" d="M128 96V72H152 M288 72H312V96" />
+        <path class="corner corner-b" d="M128 154V178H152 M288 178H312V154" />
+        <rect class="mark-shell" x="157" y="62" width="126" height="126" rx="34" />
+        <path class="mark-c" d="M245 96 A43 43 0 1 0 245 154" />
+        <rect class="mark-node" x="241" y="116" width="25" height="25" rx="7" />
+      </svg>
+      <div class="wordmark">Clean Design</div>
+      <div class="wordmark-rule" aria-hidden="true"></div>
+    </div>
     <div class="boot-progress" aria-hidden="true">
       <div class="boot-progress-fill" id="boot-progress-fill" data-pct="${initialPct}" style="width: ${initialPct}%;"></div>
     </div>
@@ -923,17 +1037,6 @@ function createPendingHtml(): string {
       <span class="boot-stage-step" id="boot-stage-step">${start.step}/${start.total}</span><span id="boot-stage-text">${start.label}</span><span class="boot-dots" aria-hidden="true"><span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></span>
     </div>
     <script>
-      (function () {
-        var video = document.getElementById("splash");
-        if (!video) return;
-        var play = function () {
-          var attempt = video.play();
-          if (attempt && typeof attempt.catch === "function") attempt.catch(function () {});
-        };
-        video.addEventListener("loadedmetadata", function () { video.currentTime = 0; });
-        video.addEventListener("loadeddata", play);
-        play();
-      })();
       // Accepts the structured { step, total, label } payload (and tolerates a
       // bare label string for back-compat). The step counter + progress bar give
       // a slow cold boot a sense of how far along it is; the bar only ever grows
@@ -1379,7 +1482,7 @@ export type SplashWindowHandle = {
 };
 
 /**
- * Create and immediately show the light brand-splash window. The packaged entry
+ * Create and immediately show the dark brand-splash window. The packaged entry
  * calls this BEFORE awaiting the daemon/web sidecars so the animation masks the
  * whole cold boot (no black no-window gap); the desktop runtime then adopts it
  * via `DesktopRuntimeOptions.splashWindow` + `splashStartedAt` and closes it
@@ -1387,11 +1490,15 @@ export type SplashWindowHandle = {
  * + matching size so the reveal swap reads as a single window, never a flash.
  */
 export function createSplashWindow(): SplashWindowHandle {
+  // The splash is the first visible window on a cold start. Apply the branded
+  // Dock icon before constructing it so macOS never exposes Electron's default
+  // atom icon while the real workspace is still booting.
+  applyDockIcon();
   // Stamp creation time at the instant the window appears (see SplashWindowHandle).
   const startedAt = Date.now();
   const splash = new BrowserWindow({
     autoHideMenuBar: true,
-    backgroundColor: "#f2f4f5",
+    backgroundColor: "#171614",
     frame: false,
     height: 900,
     resizable: false,
@@ -2025,7 +2132,7 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
   let ticking = false;
   // Bounds the reload loop when the renderer crashes deterministically (a
   // GPU/V8 CHECK, a corrupt profile): without it a wedged device reloads →
-  // crashes → reloads forever, staying blank and flooding telemetry (one
+  // crashes → reloads forever, staying blank and flooding diagnostics (one
   // 0.14.0 machine logged 26k renderer-crash events in a day). When it opens we
   // park on a recoverable error screen and re-arm after a quiet cooldown.
   const rendererCrashLoop = new RendererCrashLoopBreaker();

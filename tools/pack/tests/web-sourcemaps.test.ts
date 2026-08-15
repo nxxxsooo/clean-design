@@ -22,7 +22,6 @@ afterEach(async () => {
 function fakeConfig(workspaceRoot: string): ToolPackConfig {
   return {
     appVersion: "0.0.0-test",
-    containerized: false,
     electronBuilderCliPath: "/dev/null",
     electronDistPath: "/dev/null",
     electronVersion: "0.0.0",
@@ -49,7 +48,6 @@ function fakeConfig(workspaceRoot: string): ToolPackConfig {
       toolPackRoot: join(workspaceRoot, "tools-pack"),
     },
     signed: false,
-    silent: true,
     to: "all",
     webOutputMode: "standalone",
     workspaceRoot,

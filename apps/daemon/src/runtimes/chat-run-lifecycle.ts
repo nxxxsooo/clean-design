@@ -45,20 +45,12 @@ export function classifyChatRunCloseStatus(params: {
   cancelRequested: boolean;
   code: number | null;
   signal: NodeJS.Signals | string | null;
-  acpCleanCompletion: boolean;
   artifactQuietShutdownRequested: boolean;
   turnCompletedCleanly: boolean;
   artifactProducedThisRun: boolean;
 }): 'canceled' | 'succeeded' | 'failed' {
   if (params.cancelRequested) return 'canceled';
   if (params.code === 0) return 'succeeded';
-  const acpForcedShutdown =
-    params.acpCleanCompletion &&
-    (
-      (params.code === null && params.signal === 'SIGTERM') ||
-      (params.code === 130 && params.signal === null)
-    );
-  if (acpForcedShutdown) return 'succeeded';
   const artifactQuietShutdown =
     params.artifactQuietShutdownRequested &&
     params.code === null &&
@@ -124,20 +116,7 @@ export function resolveChatRunShutdownGraceMs() {
   return Math.max(0, Math.floor(raw));
 }
 
-export function resolveAcpStageTimeoutMs(agentDefault?: number): number | undefined {
-  assertValidRuntimeDefInactivityTimeoutMs(agentDefault);
-  const raw = Number(process.env.OD_ACP_STAGE_TIMEOUT_MS);
-  if (Number.isFinite(raw)) {
-    return Math.min(MAX_CHAT_RUN_INACTIVITY_TIMEOUT_MS, Math.max(0, Math.floor(raw)));
-  }
-  if (agentDefault !== undefined) {
-    return Math.min(MAX_CHAT_RUN_INACTIVITY_TIMEOUT_MS, agentDefault);
-  }
-  return undefined;
-}
-
 type GeminiJsonEventStreamEvent = Record<string, unknown>;
-type BufferedStdoutChunk = { text: string; receivedAt: number };
 
 function parseGeminiJsonEventStreamEvents(text: string): GeminiJsonEventStreamEvent[] | null {
   const lines = text
@@ -184,57 +163,8 @@ function isGeminiJsonEventStream(events: GeminiJsonEventStreamEvent[] | null): b
   });
 }
 
-function geminiJsonEventStreamHasVisibleAssistantText(
-  events: GeminiJsonEventStreamEvent[] | null,
-): boolean {
-  if (!events) return false;
-  return events.some((event) => (
-    event.type === 'message' &&
-    event.role === 'assistant' &&
-    typeof event.content === 'string' &&
-    event.content.length > 0
-  ));
-}
-
 export function looksLikeGeminiJsonEventStream(text: string): boolean {
   return isGeminiJsonEventStream(parseGeminiJsonEventStreamEvents(text));
-}
-
-export function bufferedAntigravityGeminiFirstTokenAt(
-  chunks: readonly BufferedStdoutChunk[],
-): number | null {
-  if (chunks.length === 0) return null;
-  const text = chunks.map((chunk) => chunk.text).join('');
-  const events = parseGeminiJsonEventStreamEvents(text);
-  if (!isGeminiJsonEventStream(events)) return null;
-  if (!geminiJsonEventStreamHasVisibleAssistantText(events)) return null;
-
-  let offset = 0;
-  for (const line of text.split(/(\r?\n)/u)) {
-    const nextOffset = offset + line.length;
-    if (line.length > 0 && line.trim().length > 0) {
-      try {
-        const event = JSON.parse(line) as GeminiJsonEventStreamEvent;
-        if (
-          event?.type === 'message' &&
-          event.role === 'assistant' &&
-          typeof event.content === 'string' &&
-          event.content.length > 0
-        ) {
-          let consumed = 0;
-          for (const chunk of chunks) {
-            consumed += chunk.text.length;
-            if (consumed >= nextOffset) return chunk.receivedAt;
-          }
-          return chunks.at(-1)?.receivedAt ?? null;
-        }
-      } catch {
-        return null;
-      }
-    }
-    offset = nextOffset;
-  }
-  return null;
 }
 
 /**

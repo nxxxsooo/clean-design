@@ -318,9 +318,9 @@ describe('App media provider sync flows', () => {
   it('filters removed service agents before rendering the workspace', async () => {
     mockedFetchAgentsStream.mockResolvedValue([
       {
-        id: 'amr',
-        name: 'AMR',
-        bin: 'vela',
+        id: 'hosted-service',
+        name: 'Hosted service',
+        bin: 'hosted-service',
         available: true,
         version: '1.0.0',
         models: [],

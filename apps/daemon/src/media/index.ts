@@ -1782,7 +1782,7 @@ async function renderVolcengineImage(ctx: MediaContext, credentials: ProviderCon
 async function renderGrokImage(ctx: MediaContext, credentials: ProviderConfig): Promise<RenderResult> {
   if (!credentials.apiKey) {
     throw new Error(
-      'no xAI credentials — sign in with your SuperGrok subscription (in OD or via `hermes auth add xai-oauth`), set XAI_API_KEY, or configure a key in Settings',
+      'no xAI credentials — connect your SuperGrok subscription in Clean Design, set XAI_API_KEY, or configure a key in Settings',
     );
   }
   const baseUrl = (credentials.baseUrl || 'https://api.x.ai/v1').replace(/\/$/, '');
@@ -2457,7 +2457,7 @@ async function renderLeonardoImage(ctx: MediaContext, credentials: ProviderConfi
 async function renderGrokVideo(ctx: MediaContext, credentials: ProviderConfig, onProgress?: ProgressFn): Promise<RenderResult> {
   if (!credentials.apiKey) {
     throw new Error(
-      'no xAI credentials — sign in with your SuperGrok subscription (in OD or via `hermes auth add xai-oauth`), set XAI_API_KEY, or configure a key in Settings',
+      'no xAI credentials — connect your SuperGrok subscription in Clean Design, set XAI_API_KEY, or configure a key in Settings',
     );
   }
   const baseUrl = (credentials.baseUrl || 'https://api.x.ai/v1').replace(/\/$/, '');
@@ -2622,7 +2622,7 @@ const XAI_TTS_DEFAULT_LANGUAGE = 'en';
 async function renderXAITTS(ctx: MediaContext, credentials: ProviderConfig): Promise<RenderResult> {
   if (!credentials.apiKey) {
     throw new Error(
-      'no xAI credentials — sign in with your SuperGrok subscription (in OD or via `hermes auth add xai-oauth`), set XAI_API_KEY, or configure a key in Settings',
+      'no xAI credentials — connect your SuperGrok subscription in Clean Design, set XAI_API_KEY, or configure a key in Settings',
     );
   }
   const baseUrl = (credentials.baseUrl || XAI_TTS_DEFAULT_BASE_URL).replace(
@@ -4029,7 +4029,7 @@ async function renderHyperFramesViaCli(ctx: MediaContext, projectDir: string, on
     'The agent must write index.html (with window.__timelines registration) before dispatch.',
   );
 
-  const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'open-design-hf-'));
+  const tmpRoot = await mkdtemp(path.join(os.tmpdir(), 'clean-design-hf-'));
   const tmpOutput = path.join(tmpRoot, 'render.mp4');
   try {
     // Pin --workers 1 to keep memory bounded (each worker is a Chrome

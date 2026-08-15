@@ -384,7 +384,7 @@ describe('composeSystemPrompt', () => {
     });
 
     it('prioritizes question forms over native tool calls when clarifying', () => {
-      const prompt = composeSystemPrompt({ agentId: 'amr' });
+      const prompt = composeSystemPrompt({ agentId: 'claude' });
       expect(prompt).toContain('## Clarifying questions mid-conversation');
       expect(prompt).toContain('`<question-form>` is assistant text for the Clean Design UI, not a native tool call');
       expect(prompt).toContain(
@@ -400,7 +400,7 @@ describe('composeSystemPrompt', () => {
     });
 
     it('does not pin filesystem artifact handoff in plain API mode', () => {
-      const prompt = composeSystemPrompt({ agentId: 'deepseek', streamFormat: 'plain' });
+      const prompt = composeSystemPrompt({ agentId: 'byok-opencode', streamFormat: 'plain' });
       expect(prompt).not.toContain('## Filesystem handoff');
     });
 

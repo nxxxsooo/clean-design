@@ -34,11 +34,9 @@ import {
   mergeProxyAwareEnv,
   resolveSystemProxyEnv,
 } from '@open-design/platform';
-import { attachAcpSession } from './agent-protocol/index.js';
 import { attachPiRpcSession } from './agent-protocol/index.js';
 import { createClaudeStreamHandler } from './runtimes/claude-stream.js';
 import { diagnoseClaudeCliFailure } from './claude-diagnostics.js';
-import { createCopilotStreamHandler } from './copilot-stream.js';
 import { createJsonEventStreamHandler } from './runtimes/json-event-stream.js';
 import { agentCliEnvForAgent, validateAgentCliEnv } from './app-config.js';
 import {
@@ -46,7 +44,7 @@ import {
   antigravityQuotaGuidance,
   classifyAgentAuthFailure,
   classifyAgentServiceFailure,
-  cursorAuthGuidance,
+  genericAgentAuthGuidance,
   probeAgentAuthStatus,
 } from './runtimes/auth.js';
 import { loadMmdRouteLaunchEnv } from './runtimes/mmd-routes.js';
@@ -59,6 +57,7 @@ import {
 import { aihubmixHeaders } from './integrations/aihubmix.js';
 import type { AgentCliEnvPrefs } from './app-config.js';
 import type { RuntimeAgentDef } from './runtimes/types.js';
+import { isCleanDesignPublicAgent } from '@open-design/contracts';
 import { preparePromptFileForAgent, type PreparedPromptFile } from './runtimes/prompt-file.js';
 import { configuredAllowedInternalHosts } from './origin-validation.js';
 import {
@@ -658,7 +657,7 @@ function codexExecutableGuidance(
   ) {
     return '';
   }
-  return ` Configured Codex path failed: ${configuredOverridePath}. Open Design also detected a PATH Codex CLI at ${pathResolvedPath}. Update CODEX_BIN or clear the custom path to use the detected binary.`;
+  return ` Configured Codex path failed: ${configuredOverridePath}. Clean Design also detected a PATH Codex CLI at ${pathResolvedPath}. Update CODEX_BIN or clear the custom path to use the detected binary.`;
 }
 
 function codexExecutableFallbackSuccessDetail(
@@ -1946,9 +1945,8 @@ function openCodeProviderConnectivityDetail(output: string): string | null {
 
 interface AgentSpawnHandle {
   child: ReturnType<typeof spawn>;
-  acpSession?: {
+  rpcSession?: {
     hasFatalError?: () => boolean;
-    completedSuccessfully?: () => boolean;
   } | null;
 }
 
@@ -1958,14 +1956,11 @@ function attachAgentStreamHandlers(
   prompt: string,
   cwd: string,
   model: string | undefined,
-  modelEnv: Record<string, string | undefined>,
-  liveModelScope: string | null,
   send: (event: string, payload: unknown) => void,
   appendRawStdout?: (chunk: string) => void,
 ): AgentSpawnHandle {
-  let acpSession: {
+  let rpcSession: {
     hasFatalError?: () => boolean;
-    completedSuccessfully?: () => boolean;
   } | null = null;
   child.stdout?.setEncoding('utf8');
   child.stderr?.setEncoding('utf8');
@@ -1984,30 +1979,14 @@ function attachAgentStreamHandlers(
       claude.feed(chunk);
     });
     child.on('close', () => claude.flush());
-  } else if (def.streamFormat === 'copilot-stream-json') {
-    const copilot = createCopilotStreamHandler((ev: unknown) => send('agent', ev));
-    child.stdout?.on('data', (chunk: string) => copilot.feed(chunk));
-    child.on('close', () => copilot.flush());
   } else if (def.streamFormat === 'pi-rpc') {
-    acpSession = attachPiRpcSession({
+    rpcSession = attachPiRpcSession({
       child,
       prompt,
       cwd,
       model: model ?? null,
       send,
       imagePaths: [],
-    });
-  } else if (def.streamFormat === 'acp-json-rpc') {
-    acpSession = attachAcpSession({
-      child,
-      prompt,
-      cwd,
-      // Same substitution as the chat-run path in server.ts: omitted models can
-      // resolve to a concrete fallback, while an explicit 'default' is preserved
-      // so ACP runtimes can use their upstream configured default.
-      model: resolveModelForAgent(def as never, model ?? null, modelEnv, liveModelScope),
-      mcpServers: [],
-      send,
     });
   } else if (def.streamFormat === 'json-event-stream') {
     const handler = createJsonEventStreamHandler(
@@ -2035,7 +2014,7 @@ function attachAgentStreamHandlers(
     child.stdout?.on('data', (chunk: string) => send('stdout', { chunk }));
   }
   child.stderr?.on('data', (chunk: string) => send('stderr', { chunk }));
-  return { child, acpSession };
+  return { child, rpcSession };
 }
 
 type AgentChild = ReturnType<typeof spawn>;
@@ -2071,7 +2050,7 @@ function runQuietCommand(command: string, args: string[], cwd: string): Promise<
 async function prepareOpenCodeConnectionTestCwd(tempDir: string): Promise<void> {
   await fsp.writeFile(
     path.join(tempDir, 'README.md'),
-    'Open Design OpenCode connection test.\n',
+    'Clean Design OpenCode connection test.\n',
     'utf8',
   );
   try {
@@ -2100,7 +2079,7 @@ async function testAgentConnectionInternal(
       ? input.model.trim()
       : 'default';
   const def = getAgentDef(input.agentId);
-  if (!def) {
+  if (!def || !isCleanDesignPublicAgent(def)) {
     return {
       ok: false,
       kind: 'agent_not_installed',
@@ -2206,14 +2185,8 @@ async function testAgentConnectionInternal(
       );
     }
     console.log(`[test:agent] ${def.name} → ok in ${(latencyMs / 1000).toFixed(1)}s`);
-    // resultFromChildExit can route ACP forced shutdown (code === null,
-    // signal === 'SIGTERM' + acpCleanCompletion) through this success
-    // helper. Hard-coding `exitCode: 0` would silently overwrite the
-    // SIGTERM signal and violate the raw code/signal contract in
-    // packages/contracts/src/api/connectionTest.ts. Pass through the
-    // real `winner.code` / `winner.signal` when the caller has them and
-    // only synthesize `exitCode: 0` when no exit context is available
-    // (theoretical text-without-exit path).
+    // Preserve the real exit context when it exists and only synthesize a
+    // clean exit for the theoretical text-without-exit path.
     return {
       ok: true,
       kind: 'success',
@@ -2243,7 +2216,7 @@ async function testAgentConnectionInternal(
         latencyMs,
         model,
         agentName: def.name,
-        detail: auth.message ?? cursorAuthGuidance(),
+        detail: auth.message ?? genericAgentAuthGuidance(def.name),
         diagnostics: buildDiagnostics(),
       };
     }
@@ -2308,9 +2281,7 @@ async function testAgentConnectionInternal(
   };
 
   try {
-    if (input.agentId === 'opencode' || input.agentId === 'mimo') {
-      if (input.agentId === 'opencode') await prepareOpenCodeConnectionTestCwd(tempDir);
-    }
+    if (input.agentId === 'opencode') await prepareOpenCodeConnectionTestCwd(tempDir);
     let args: string[];
     try {
       promptFile = await preparePromptFileForAgent(def, SMOKE_PROMPT, 'connection-test');
@@ -2331,10 +2302,10 @@ async function testAgentConnectionInternal(
       // fail on unrelated user-installed OpenCode plugins. `opencode run
       // --pure` keeps the smoke test isolated while regular chat runs retain
       // the user's full plugin environment.
-      if ((input.agentId === 'opencode' || input.agentId === 'mimo') && !args.includes('--pure')) {
+      if (input.agentId === 'opencode' && !args.includes('--pure')) {
         args.push('--pure');
       }
-      if ((input.agentId === 'opencode' || input.agentId === 'mimo') && !args.includes('--title')) {
+      if (input.agentId === 'opencode' && !args.includes('--title')) {
         args.push('--title', 'Connection test');
       }
     } catch (err) {
@@ -2353,8 +2324,7 @@ async function testAgentConnectionInternal(
         diagnostics: buildDiagnostics(),
       };
     }
-    const stdinMode =
-      def.promptViaStdin || def.streamFormat === 'acp-json-rpc' ? 'pipe' : 'ignore';
+    const stdinMode = def.promptViaStdin ? 'pipe' : 'ignore';
     const baseEnv = spawnEnvForAgent(
       input.agentId,
       {
@@ -2405,7 +2375,7 @@ async function testAgentConnectionInternal(
         latencyMs: Date.now() - start,
         model,
         agentName: def.name,
-        detail: auth.message ?? cursorAuthGuidance(),
+        detail: auth.message ?? genericAgentAuthGuidance(def.name),
         diagnostics: buildDiagnostics(probeOverrides),
       };
     }
@@ -2438,14 +2408,12 @@ async function testAgentConnectionInternal(
       });
     });
 
-    const { acpSession } = attachAgentStreamHandlers(
+    const { rpcSession } = attachAgentStreamHandlers(
       def,
       child,
       SMOKE_PROMPT,
       tempDir,
       model,
-      env,
-      liveModelScope,
       sink.send,
       sink.appendRawStdout,
     );
@@ -2500,28 +2468,6 @@ async function testAgentConnectionInternal(
       const parsedClaudeResultText =
         claudeReportedSuccess ? claudeResult.resultText.trim() : '';
       const visibleText = buffered || parsedClaudeResultText;
-      // ACP agents that don't shut down on stdin.end() are terminated after a
-      // clean prompt completion. Depending on the ACP bridge, this can surface
-      // either as SIGTERM or as a normal code 130 teardown. For those exact
-      // forced-shutdown shapes we trust the ACP-level success signal so
-      // connection tests don't report `agent_spawn_failed` despite a healthy
-      // assistant response (see #1265 / #1286).
-      //
-      // Scope the override narrowly: only the known daemon-triggered ACP
-      // teardown shapes plus `acpCleanCompletion` count as a clean forced
-      // shutdown. Any other post-response process failure (code 1, SIGKILL,
-      // SIGSEGV, etc.) still falls through to `agent_spawn_failed`, preserving
-      // the existing connection-test failure behavior for genuine
-      // post-response problems.
-      const acpCleanCompletion =
-        typeof acpSession?.completedSuccessfully === 'function' &&
-        acpSession.completedSuccessfully();
-      const acpForcedShutdown =
-        acpCleanCompletion &&
-        (
-          (winner.code === null && winner.signal === 'SIGTERM') ||
-          (winner.code === 130 && winner.signal === null)
-        );
       const claudeCompletedTurn =
         claudeLateExitOne &&
         claudeReportedSuccess &&
@@ -2532,7 +2478,7 @@ async function testAgentConnectionInternal(
           )
         );
       const exitedCleanly =
-        (winner.code === 0 && !winner.signal) || acpForcedShutdown || claudeCompletedTurn;
+        (winner.code === 0 && !winner.signal) || claudeCompletedTurn;
       if (visibleText) {
         const rawSample = truncateSample(visibleText);
         const exitInfo = { code: winner.code, signal: winner.signal };
@@ -2543,7 +2489,7 @@ async function testAgentConnectionInternal(
       }
       const stderrTail = sink.getStderrTail().trim();
       const rawStdoutTail = sink.getRawStdoutTail().trim();
-      if ((input.agentId === 'opencode' || input.agentId === 'mimo') && exitedCleanly && rawStdoutTail) {
+      if (input.agentId === 'opencode' && exitedCleanly && rawStdoutTail) {
         const recoveredText = extractOpenCodeTextFromRawStdout(rawStdoutTail).trim();
         if (recoveredText) {
           return resultFromAgentText(recoveredText, {
@@ -2625,7 +2571,7 @@ async function testAgentConnectionInternal(
         // UPSTREAM_UNAVAILABLE or a non-clean exit with no recognizable
         // signal falls through to the generic exit-detail path below.
       }
-      const acpFatal = Boolean(acpSession?.hasFatalError?.());
+      const rpcFatal = Boolean(rpcSession?.hasFatalError?.());
       const rawDetail = [
         winner.code != null ? `exit ${winner.code}` : null,
         winner.signal ? `signal ${winner.signal}` : null,
@@ -2666,7 +2612,7 @@ async function testAgentConnectionInternal(
           latencyMs,
           model,
           agentName: def.name,
-          detail: auth.message ?? cursorAuthGuidance(),
+          detail: auth.message ?? genericAgentAuthGuidance(def.name),
           diagnostics: buildDiagnostics({
             phase: 'connection_smoke_test',
             exitCode: winner.code,
@@ -2717,7 +2663,7 @@ async function testAgentConnectionInternal(
       );
       return {
         ok: false,
-        kind: acpFatal || !exitedCleanly ? 'agent_spawn_failed' : 'unknown',
+        kind: rpcFatal || !exitedCleanly ? 'agent_spawn_failed' : 'unknown',
         latencyMs,
         model,
         agentName: def.name,

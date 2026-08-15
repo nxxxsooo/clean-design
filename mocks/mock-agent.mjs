@@ -1,54 +1,88 @@
 #!/usr/bin/env node
 /**
- * mock-agent.mjs — pretends to be one of OD's supported agent CLIs
- * (claude / opencode / codex / deepseek / qwen / grok) by streaming a
- * pre-recorded session in that CLI's native stdout protocol. Zero LLM
- * tokens.
- *
- * Usage (driven by the wrappers in bin/, not directly):
- *   ./mock-agent.mjs --as opencode [--no-delay] [--report-file <path>]
- *
- * Recording selection — see lib/recording-picker.mjs. The wrappers
- * announce the picked trace id on stderr.
- *
- * Trace data: ./recordings/<trace-id>.jsonl (anonymized exports from
- * Langfuse). Index: ./recordings/index.json.
+ * Deterministic local stand-in for Clean Design's five supported agent CLIs.
+ * Wrappers in mocks/bin select the native stdout protocol. No network,
+ * credentials, hosted recordings, or model tokens are involved.
  */
 
-import { pickRecording, readRecording } from './lib/recording-picker.mjs';
-import { renderAsOpencode }    from './lib/format-opencode.mjs';
-import { renderAsCodex }       from './lib/format-codex.mjs';
-import { renderAsClaude }      from './lib/format-claude.mjs';
-import { renderAsGemini }      from './lib/format-gemini.mjs';
-import { renderAsCursorAgent } from './lib/format-cursor-agent.mjs';
-import { renderAsKimi }        from './lib/format-kimi.mjs';
-import { renderAsPlain }       from './lib/format-plain.mjs';
-import { runAcpServer }        from './lib/format-acp.mjs';
+import { renderAsClaude } from './lib/format-claude.mjs';
+import { renderAsCodex } from './lib/format-codex.mjs';
+import { renderAsOpencode } from './lib/format-opencode.mjs';
+import { renderAsPlain } from './lib/format-plain.mjs';
+import { runPiRpcMock } from './lib/format-pi.mjs';
+
+const SUPPORTED_AGENTS = new Set([
+  'claude',
+  'codex',
+  'opencode',
+  'antigravity',
+  'pi',
+]);
 
 function parseArgs(argv) {
-  const opts = { as: null, noDelay: false, reportFile: null, positionals: [] };
-  const flagsWithValue = new Set(['--as', '--agent', '--report-file', '-p', '--output-format', '--model', '-r']);
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--as' || a === '--agent') { opts.as = argv[++i]; continue; }
-    if (a === '--no-delay')              { opts.noDelay = true; continue; }
-    if (a === '--report-file')           { opts.reportFile = argv[++i]; continue; }
-    if (flagsWithValue.has(a))           { i++; continue; }
-    if (a.startsWith('-')) continue;     // Unknown flag — silently skip (model/permission flags etc.)
-    // Anything left is a positional argument.
-    opts.positionals.push(a);
+  const opts = { as: null, noDelay: false, reportFile: null, passthrough: [] };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--as') {
+      opts.as = argv[i + 1] ?? null;
+      i += 1;
+    } else if (arg === '--no-delay') {
+      opts.noDelay = true;
+    } else if (arg === '--report-file') {
+      opts.reportFile = argv[i + 1] ?? null;
+      i += 1;
+    } else {
+      opts.passthrough.push(arg);
+    }
   }
-  if (process.env.OD_MOCKS_NO_DELAY === '1') opts.noDelay = true;
-  // Fall through to REPORT_FILE env when --report-file wasn't supplied.
-  // Some harnesses (e.g. the agent-pr-explore orchestrator) set
-  // REPORT_FILE as env but expect the agent to write there
-  // autonomously — real opencode/claude do via their Write tool, but
-  // the mock needs to project the recording's final assistant text to
-  // that path so the harness sees a report.
+  if (process.env.CLEAN_DESIGN_MOCK_NO_DELAY === '1' || process.env.OD_MOCKS_NO_DELAY === '1') {
+    opts.noDelay = true;
+  }
   if (!opts.reportFile && process.env.REPORT_FILE) {
     opts.reportFile = process.env.REPORT_FILE;
   }
   return opts;
+}
+
+function emitProbeResult(agent, args) {
+  if (args.includes('--version')) {
+    process.stdout.write(`clean-design-${agent}-mock 1.0.0\n`);
+    return true;
+  }
+
+  if (agent === 'claude' && args.includes('--help')) {
+    process.stdout.write('--include-partial-messages\n--add-dir\n');
+    return true;
+  }
+
+  if (agent === 'claude' && args[0] === 'auth' && args[1] === 'status') {
+    process.stdout.write('authenticated\n');
+    return true;
+  }
+
+  if (agent === 'codex' && args[0] === 'login' && args[1] === 'status') {
+    process.stdout.write('authenticated\n');
+    return true;
+  }
+
+  if (agent === 'codex' && args[0] === 'debug' && args[1] === 'models') {
+    process.stdout.write(`${JSON.stringify({
+      models: [{ slug: 'mock-model', display_name: 'Mock model' }],
+    })}\n`);
+    return true;
+  }
+
+  if (agent === 'opencode' && args[0] === 'models') {
+    process.stdout.write('mock/mock-model\n');
+    return true;
+  }
+
+  if (agent === 'pi' && args.includes('--list-models')) {
+    process.stdout.write('Provider Model\nmock mock-model\n');
+    return true;
+  }
+
+  return false;
 }
 
 function failUsage(message) {
@@ -58,89 +92,91 @@ function failUsage(message) {
 
 async function readStdinIfPiped() {
   if (process.stdin.isTTY) return '';
-  return new Promise(resolve => {
-    let acc = '';
-    process.stdin.setEncoding('utf-8');
-    process.stdin.on('data', c => { acc += c; });
-    process.stdin.on('end',  () => resolve(acc));
-    process.stdin.on('error', () => resolve(acc));
-    // Safety timeout in case the parent never closes stdin (PTY).
-    setTimeout(() => resolve(acc), 1500);
+  return new Promise((resolve) => {
+    let input = '';
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve(input);
+    };
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (chunk) => { input += chunk; });
+    process.stdin.on('end', finish);
+    process.stdin.on('error', finish);
+    setTimeout(finish, 1500).unref();
   });
+}
+
+function fixtureEvents(agent) {
+  const response = process.env.CLEAN_DESIGN_MOCK_RESPONSE
+    ?? `Mock ${agent} response.`;
+  return [
+    {
+      type: 'meta',
+      agent,
+      model: `mock/${agent}`,
+      total_tokens: 1,
+      duration_ms: 1,
+    },
+    {
+      type: 'tool_call',
+      obs_id: 'mock-tool-1',
+      name: 'Read',
+      input: { file_path: 'DESIGN.md' },
+      t_ms: 0,
+    },
+    {
+      type: 'tool_result',
+      obs_id: 'mock-tool-1',
+      status: 'success',
+      output: 'Deterministic mock file content.',
+      t_ms: 0,
+    },
+    { type: 'report', content: response, t_ms: 0 },
+  ];
 }
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
   if (!opts.as) {
-    failUsage(
-      '--as <agent> required\n' +
-      '  supported: opencode | claude | amp | codex | gemini | cursor-agent |\n' +
-      '             deepseek | qwen | grok | plain |\n' +
-      '             kimi                                         (stream-json)\n' +
-      '             devin | hermes | kilo | kiro | vibe          (ACP)\n',
-    );
+    failUsage('--as <agent> required; supported: claude | codex | opencode | antigravity | pi');
+  }
+  if (!SUPPORTED_AGENTS.has(opts.as)) {
+    failUsage(`unknown agent "${opts.as}"`);
   }
 
-  // Modern Kimi rejects the old `kimi acp ...` launch shape; keep the
-  // shared mock aligned so adapter regressions fail fast in tests.
-  if (opts.as === 'kimi' && opts.positionals.length > 0) {
-    failUsage(`too many arguments: ${opts.positionals.join(' ')}`);
+  if (emitProbeResult(opts.as, opts.passthrough)) return;
+
+  if (opts.as === 'pi') {
+    await runPiRpcMock({
+      reportFile: opts.reportFile,
+      responseText: process.env.CLEAN_DESIGN_MOCK_RESPONSE ?? 'Mock pi response.',
+    });
+    return;
   }
 
-  // ACP agents read JSON-RPC messages off stdin one line at a time, so the
-  // bulk-prompt buffering logic below doesn't apply — pickRecording sees no
-  // prompt for hash-mode (use OD_MOCKS_TRACE or _POOL instead).
-  const ACP_AGENTS = new Set(['devin', 'hermes', 'kilo', 'kiro', 'vibe']);
-  const isAcp = ACP_AGENTS.has(opts.as);
-  const prompt = isAcp ? '' : await readStdinIfPiped();
-  const picked = await pickRecording({ prompt });
-  if (!picked) {
-    process.stderr.write(
-      'mock-agent: no recordings on disk yet.\n' +
-      'The recording corpus is hosted on Cloudflare R2 (see mocks/manifest.json)\n' +
-      'and is fetched on demand. Run:\n' +
-      '\n' +
-      '  bash mocks/scripts/fetch-recordings.sh             # all 179 (~30s, 4.5MB)\n' +
-      '  bash mocks/scripts/fetch-recordings.sh --agent claude   # subset\n' +
-      '\n' +
-      'Or set OD_MOCKS_RECORDINGS_DIR if you stashed them elsewhere.\n',
-    );
-    process.exit(3);
-  }
-
-  process.stderr.write(
-    `[mock-${opts.as}] picked ${picked.traceId.slice(0, 8)}… via ${picked.method}` +
-    (picked.pool ? ` (pool="${picked.pool}")` : '') +
-    '\n',
-  );
-
-  const events = await readRecording(picked.path);
+  await readStdinIfPiped();
+  const events = fixtureEvents(opts.as);
   const renderOpts = { noDelay: opts.noDelay, reportFile: opts.reportFile };
 
   switch (opts.as) {
-    case 'opencode':     await renderAsOpencode(events, renderOpts);    break;
-    case 'codex':        await renderAsCodex(events, renderOpts);       break;
     case 'claude':
-    case 'amp':          await renderAsClaude(events, renderOpts);      break;
-    case 'gemini':       await renderAsGemini(events, renderOpts);      break;
-    case 'cursor-agent': await renderAsCursorAgent(events, renderOpts); break;
-    case 'deepseek':
-    case 'qwen':
-    case 'grok':
-    case 'plain':        await renderAsPlain(events, renderOpts);       break;
-    case 'kimi':         await renderAsKimi(events, renderOpts);        break;
-    // ACP family — JSON-RPC server over stdio.
-    case 'devin':
-    case 'hermes':
-    case 'kilo':
-    case 'kiro':
-    case 'vibe':         await runAcpServer(events, renderOpts);        break;
-    default:
-      failUsage(`unknown agent "${opts.as}"`);
+      await renderAsClaude(events, renderOpts);
+      break;
+    case 'codex':
+      await renderAsCodex(events, renderOpts);
+      break;
+    case 'opencode':
+      await renderAsOpencode(events, renderOpts);
+      break;
+    case 'antigravity':
+      await renderAsPlain(events, renderOpts);
+      break;
   }
 }
 
-main().catch(err => {
-  process.stderr.write(`mock-agent: ${err.message}\n`);
+main().catch((error) => {
+  process.stderr.write(`mock-agent: ${error instanceof Error ? error.message : String(error)}\n`);
   process.exit(1);
 });

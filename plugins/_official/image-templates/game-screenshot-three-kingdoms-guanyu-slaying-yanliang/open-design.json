@@ -73,8 +73,7 @@
     "scenario": "image",
     "surface": "image",
     "preview": {
-      "type": "image",
-      "poster": "https://raw.githubusercontent.com/nexu-io/open-design/main/assets/prompt-templates/image/game-screenshot-three-kingdoms-guanyu-slaying-yanliang.jpg"
+      "type": "image"
     },
     "useCase": {
       "query": {

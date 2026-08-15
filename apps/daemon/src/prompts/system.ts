@@ -537,7 +537,7 @@ const FILESYSTEM_HANDOFF_OVERRIDE = `
 
 ## Filesystem handoff
 
-This run uses Open Design's filesystem execution profile. Project files are the source of truth for generated artifacts.
+This run uses Clean Design's filesystem execution profile. Project files are the source of truth for generated artifacts.
 
 Normal rhythm for artifact work:
 1. Start with a short ordinary assistant message or compact \`<od-card>\` that states the locked direction.
@@ -882,9 +882,8 @@ export function composeSystemPrompt({
           ]
         : [PROMPT_INJECTION_RESISTANCE, '\n\n---\n\n'];
   // The slim charter's plan step is deliberately generic ("use your runtime's
-  // plan/todo tool, else a numbered list") so it works on codex / opencode /
-  // ACP agents that have no such tool. Claude-family runs (streamFormat
-  // 'claude-stream-json': claude, codebuddy, amp) are the only ones with a
+  // plan/todo tool, else a numbered list") so it works across retained
+  // runtimes. Claude stream runs are the ones with a
   // `TodoWrite` tool the host renders as a live Todos card — name the concrete
   // tool + its UI benefit here, for that family only.
   if (isSlimCharterHead && streamFormat === 'claude-stream-json') {
@@ -904,7 +903,7 @@ export function composeSystemPrompt({
 
   // API/BYOK mode (streamFormat === 'plain'): mirrors the same fix from
   // `@open-design/contracts`'s composer. The daemon hits this path for
-  // any plain-stream adapter (e.g. DeepSeek), so without pinning the
+  // any plain-stream adapter, so without pinning the
   // override above DISCOVERY_AND_PHILOSOPHY here too, those daemon
   // agents still emit the `<todo-list>` / `[读取 X]` pseudo-tool
   // markup described in #313. Keep the wording byte-identical to the

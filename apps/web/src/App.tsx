@@ -1,18 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
-import { useAnalytics } from './analytics/provider';
-import {
-  trackFileUploadResult,
-  trackProjectCreateResult,
-} from './analytics/events';
-import { deriveUploadCohort } from './analytics/upload-tracking';
-import { setPendingDesignSystemCreateEntry } from './analytics/ds-create-entry';
-import { detectClientType } from './analytics/identity';
-import {
-  projectKindFromMetadataToTracking,
-  fidelityToTracking,
-} from '@open-design/contracts/analytics';
+import { detectOpenDesignHostClientType } from '@open-design/host';
 import type { ChatSessionMode, RunContextSelection } from '@open-design/contracts';
 import { DEFAULT_UNSELECTED_SCENARIO_PLUGIN_ID } from '@open-design/contracts';
 import { EntryView } from './components/EntryView';
@@ -44,6 +33,7 @@ import {
   daemonIsLive,
   fetchAppVersionInfo,
   fetchAgentsStream,
+  fetchByokRuntimeReadiness,
   fetchDesignSystems,
   fetchDesignTemplates,
   fetchPromptTemplates,
@@ -189,25 +179,9 @@ export function resolveSettingsCloseConfig(
 const CANONICAL_AGENT_ORDER = [
   'claude',
   'codex',
-  'devin',
-  'gemini',
-  'opencode',
-  'hermes',
-  'trae-cli',
-  'grok-build',
-  'kimi',
-  'cursor-agent',
-  'qwen',
-  'qoder',
-  'copilot',
-  'pi',
-  'kiro',
-  'kilo',
-  'vibe',
-  'deepseek',
-  'aider',
   'antigravity',
-  'reasonix',
+  'opencode',
+  'pi',
 ] as const;
 
 const CANONICAL_AGENT_ORDER_INDEX = new Map<string, number>(
@@ -270,7 +244,7 @@ export function App() {
 function AppInner() {
   const { t } = useI18n();
   const iframeKeepAlivePool = useIframeKeepAlivePool();
-  const clientType = useMemo(() => detectClientType(), []);
+  const clientType = detectOpenDesignHostClientType();
   useModalWindowDragGuard();
   // Stable shell marker used by UI automation and packaged startup checks.
   useEffect(() => {
@@ -296,6 +270,7 @@ function AppInner() {
   const [settingsInitialSection, setSettingsInitialSection] = useState<SettingsSection>('execution');
   const [daemonLive, setDaemonLive] = useState(false);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const [byokRuntimeAvailable, setByokRuntimeAvailable] = useState(false);
   const agentStreamRequestSeqRef = useRef(0);
   const agentFocusRefreshLastRunRef = useRef(Date.now());
   const [providerModelsCache, setProviderModelsCache] = useState<
@@ -357,7 +332,6 @@ function AppInner() {
   // with a freshly picked first-available agent.
   const [daemonConfigLoaded, setDaemonConfigLoaded] = useState(false);
   const route = useRoute();
-  const analytics = useAnalytics();
 
   const beginAgentStreamRequest = useCallback(() => {
     agentStreamRequestSeqRef.current += 1;
@@ -367,12 +341,6 @@ function AppInner() {
   const isCurrentAgentStreamRequest = useCallback((requestId: number) => {
     return agentStreamRequestSeqRef.current === requestId;
   }, []);
-
-  // v2 schema removed the standalone `app_launch` event; the initial
-  // page_view fires from each top-level page surface (home / projects /
-  // automations / plugins / design_systems / integrations) instead.
-  // `detectClientType` still feeds analytics identity via the provider.
-  void detectClientType;
 
   const rememberLocalProject = useCallback((projectId: string) => {
     pendingLocalProjectIdsRef.current.add(projectId);
@@ -503,8 +471,13 @@ function AppInner() {
         setProjectsLoading(false);
         setPromptTemplatesLoading(false);
         setDaemonConfigLoaded(true);
+        setByokRuntimeAvailable(false);
         return;
       }
+
+      void fetchByokRuntimeReadiness().then((readiness) => {
+        if (!cancelled) setByokRuntimeAvailable(readiness.available);
+      });
 
       const agentRequestId = beginAgentStreamRequest();
       void fetchAgentsStream({
@@ -669,12 +642,17 @@ function AppInner() {
   //
   useEffect(() => {
     if (!daemonConfigLoaded || agentsLoading) return;
-    if (config.agentId) return;
     const firstAvailable = agents.find((a) => a.available);
-    if (!firstAvailable) return;
+    const selectedAgentIsPublic = config.agentId != null
+      && agents.some((agent) => agent.id === config.agentId);
+    if (selectedAgentIsPublic) return;
     setConfig((prev) => {
-      if (prev.agentId) return prev;
-      const next: AppConfig = { ...prev, agentId: firstAvailable.id };
+      const previousAgentIsPublic = prev.agentId != null
+        && agents.some((agent) => agent.id === prev.agentId);
+      if (previousAgentIsPublic) return prev;
+      const nextAgentId = firstAvailable?.id ?? null;
+      if (prev.agentId === nextAgentId) return prev;
+      const next: AppConfig = { ...prev, agentId: nextAgentId };
       saveConfig(next);
       void syncConfigToDaemon(next);
       return next;
@@ -866,13 +844,14 @@ function AppInner() {
 
   const handleAgentChange = useCallback(
     (agentId: string) => {
+      if (!agents.some((agent) => agent.id === agentId)) return;
       const next = { ...latestPersistedConfigRef.current, agentId };
       latestPersistedConfigRef.current = next;
       saveConfig(next);
       void syncConfigToDaemon(next);
       setConfig(next);
     },
-    [],
+    [agents],
   );
 
   const handleAgentModelChange = useCallback(
@@ -943,6 +922,9 @@ function AppInner() {
       }
       const agentRequestId = beginAgentStreamRequest();
       setAgentsLoading(true);
+      void fetchByokRuntimeReadiness().then((readiness) => {
+        setByokRuntimeAvailable(readiness.available);
+      });
       try {
         const next = await fetchAgentsStream({
           onAgent: (agent) => {
@@ -1017,10 +999,6 @@ function AppInner() {
       (input.metadata?.promptTemplate?.prompt?.trim() || undefined);
 
       const metadata = mergeLinkedDirsIntoMetadata(input.metadata, input.linkedDirs);
-      const kind = metadata?.kind ?? null;
-      const fidelity = fidelityToTracking(metadata?.fidelity ?? null);
-      const creationSource: 'blank' | 'template' | 'zip' | 'folder' =
-        kind === 'template' ? 'template' : 'blank';
       let result;
       try {
         result = await createProject({
@@ -1037,43 +1015,9 @@ function AppInner() {
           ...(input.pluginInputs ? { pluginInputs: input.pluginInputs } : {}),
         });
       } catch (err) {
-        const errorCode =
-          err instanceof Error && err.message.trim()
-            ? err.message
-            : 'CREATE_REQUEST_FAILED';
-        trackProjectCreateResult(
-          analytics.track,
-          {
-            page_name: 'home',
-            area: 'new_project',
-            project_source: 'create_button',
-            project_id: null,
-            project_kind: projectKindFromMetadataToTracking(metadata),
-            fidelity,
-            result: 'failed',
-            error_code: errorCode,
-          },
-          { requestId: input.requestId },
-        );
         throw err;
       }
       if (!result) {
-        trackProjectCreateResult(
-          analytics.track,
-          {
-            page_name: 'home',
-            area: 'new_project',
-            project_source: 'create_button',
-            project_id: null,
-            project_kind: projectKindFromMetadataToTracking(metadata),
-            fidelity,
-            ...(input.pluginId ? { plugin_id: input.pluginId } : {}),
-            ...(input.pluginType ? { plugin_type: input.pluginType } : {}),
-            result: 'failed',
-            error_code: 'CREATE_REQUEST_FAILED',
-          },
-          { requestId: input.requestId },
-        );
         return false;
       }
       const pendingFiles = Array.isArray(input.pendingFiles)
@@ -1115,44 +1059,15 @@ function AppInner() {
       }
       let firstMessageAttachments: ChatAttachment[] = [];
       if (!workingDirHandoffFailed && pendingFiles.length > 0) {
-        // Home composer attaches stay client-side until submit lands a
-        // project; the actual upload happens here. v2 doc wants one
-        // file_upload_result per surface — `page_name='home'` /
-        // `area='chat_composer'` so it's distinguishable from the
-        // file_manager Upload button and the chat_panel composer.
-        const cohort = deriveUploadCohort(pendingFiles);
+        // Home composer attachments stay client-side until submit lands a
+        // project; upload them only after the final working directory exists.
         const uploadResult = await uploadProjectFiles(result.project.id, pendingFiles);
         firstMessageAttachments = uploadResult.uploaded;
         const partial = uploadResult.failed.length > 0;
         if (partial) {
           console.warn('Some Home attachments failed to upload', uploadResult.failed);
         }
-        trackFileUploadResult(analytics.track, {
-          page_name: 'home',
-          area: 'chat_composer',
-          project_id: result.project.id,
-          ...cohort,
-          result: partial ? 'failed' : 'success',
-          ...(partial && uploadResult.error
-            ? { error_code: uploadResult.error }
-            : {}),
-        });
       }
-      trackProjectCreateResult(
-        analytics.track,
-        {
-          page_name: 'home',
-          area: 'new_project',
-          project_source: 'create_button',
-          project_id: result.project.id,
-          project_kind: projectKindFromMetadataToTracking(metadata),
-          fidelity,
-          ...(input.pluginId ? { plugin_id: input.pluginId } : {}),
-          ...(input.pluginType ? { plugin_type: input.pluginType } : {}),
-          result: 'success',
-        },
-        { requestId: input.requestId },
-      );
       // PluginLoopHome flow: the user already typed (or accepted) the
       // first message on Home. Mark this project so ProjectView fires
       // sendMessage(pendingPrompt) once on mount instead of just
@@ -1215,7 +1130,7 @@ function AppInner() {
       navigate(projectRoute);
       return true;
     },
-    [analytics.track, rememberLocalProject],
+    [rememberLocalProject],
   );
 
   const handleCreateProjectFromDesignSystem = useCallback(
@@ -1814,6 +1729,7 @@ function AppInner() {
         designTemplates={designTemplates}
         designSystems={designSystems}
         daemonLive={daemonLive}
+        byokRuntimeAvailable={byokRuntimeAvailable}
         onModeChange={handleModeChange}
         onAgentChange={handleAgentChange}
         onAgentModelChange={handleAgentModelChange}
@@ -1879,7 +1795,6 @@ function AppInner() {
         onProjectsRefresh={refreshProjectsStrict}
         onChangeDefaultDesignSystem={handleChangeDefaultDesignSystem}
         onCreateDesignSystem={() => {
-          setPendingDesignSystemCreateEntry('design_systems_page');
           navigate({ kind: 'design-system-create' });
         }}
         onOpenDesignSystem={(id: string) => navigate({ kind: 'design-system-detail', designSystemId: id })}

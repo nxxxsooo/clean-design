@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolveRepoRoot(__dirname);
 const screenshotDir = path.join(os.tmpdir(), 'open-design-e2e-screenshots');
 
-export const STORAGE_KEY = 'open-design:config';
+export const STORAGE_KEY = 'clean-design:config';
 
 export type DesktopStatus = {
   pid?: number;

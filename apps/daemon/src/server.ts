@@ -11,8 +11,9 @@ import express from 'express';
 import multer from 'multer';
 import JSZip from 'jszip';
 import {
-  isCleanDesignDisabledAgent,
   isCleanDesignDisabledApiPath,
+  isCleanDesignInternalAgent,
+  isCleanDesignPublicAgent,
 } from '@open-design/contracts';
 import { resolveCredentialReferencesInValue } from './credential-memory.js';
 import {
@@ -26,7 +27,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import net from 'node:net';
-import { executionProfileFromStreamFormat, PLUGIN_SHARE_ACTION_PLUGIN_IDS } from '@open-design/contracts';
+import { executionProfileFromStreamFormat } from '@open-design/contracts';
 import { isTodoWriteToolName, stopReasonIsTruncation, todoItemsFromTodoWriteInput } from '@open-design/contracts';
 import {
   composeSystemPrompt,
@@ -36,7 +37,6 @@ import {
   extractUserAuthoredSignalText,
   resolveExclusiveSurface,
 } from './prompts/system.js';
-import { emittedRenderableQuestionForm } from './question-form-detect.js';
 import { resolveProjectRoot } from './project-root.js';
 import {
   resolveDaemonCliPath,
@@ -105,10 +105,8 @@ import {
   writePromptAndEndStdin,
   applyClaudeStreamJsonRunBookkeeping,
   assertValidRuntimeDefInactivityTimeoutMs,
-  bufferedAntigravityGeminiFirstTokenAt,
   classifyChatRunCloseStatus,
   looksLikeGeminiJsonEventStream,
-  resolveAcpStageTimeoutMs,
   resolveActiveInactivityTimeoutMs,
   resolveChatRunArtifactQuietPeriodMs,
   resolveChatRunInactivityTimeoutMs,
@@ -127,16 +125,12 @@ import {
 import {
   createRunSideEffectLedger,
   foldEventIntoRunSideEffectLedger,
-  resolveRunProjectKindForAnalytics,
-  retryFinalResultForRunStatus,
   runArtifactCountForRun,
   runDesignSystemCreatedForRun,
   runPreviewModuleCountForRun,
-  runRetryEventsForAnalytics,
   runSideEffectsForRun,
-  scanRunEventsForFinishedProps,
   scanRunEventsForRetrySideEffects,
-} from './runtimes/run-lifecycle-analytics.js';
+} from './runtimes/run-state.js';
 export {
   composeLiveInstructionPrompt,
   formatDesignFilesWorkspaceHint,
@@ -158,10 +152,8 @@ export {
 export {
   applyClaudeStreamJsonRunBookkeeping,
   assertValidRuntimeDefInactivityTimeoutMs,
-  bufferedAntigravityGeminiFirstTokenAt,
   classifyChatRunCloseStatus,
   looksLikeGeminiJsonEventStream,
-  resolveAcpStageTimeoutMs,
   resolveActiveInactivityTimeoutMs,
   resolveChatRunArtifactQuietPeriodMs,
   resolveChatRunInactivityTimeoutMs,
@@ -174,19 +166,12 @@ export {
   persistRunEventToAssistantMessage,
   pinAssistantMessageOnRunCreate,
 } from './runtimes/chat-run-messages.js';
-export {
-  resolveRunProjectKindForAnalytics as __forTestResolveRunProjectKindForAnalytics,
-  retryFinalResultForRunStatus as __forTestRetryFinalResultForRunStatus,
-  runRetryEventsForAnalytics as __forTestRunRetryEventsForAnalytics,
-  scanRunEventsForFinishedProps as __forTestScanRunEventsForFinishedProps,
-  scanRunEventsForRetrySideEffects as __forTestScanRunEventsForRetrySideEffects,
-} from './runtimes/run-lifecycle-analytics.js';
+export { scanRunEventsForRetrySideEffects as __forTestScanRunEventsForRetrySideEffects } from './runtimes/run-state.js';
 
 export { resolveProjectRoot };
 import { createCommandInvocation } from '@open-design/platform';
 import { SIDECAR_ENV } from '@open-design/sidecar-proto';
 import {
-  buildLiveArtifactsMcpServersForAgent,
   checkPromptArgvBudget,
   checkWindowsCmdShimCommandLineBudget,
   checkWindowsDirectExeCommandLineBudget,
@@ -293,32 +278,22 @@ import {
   applyDiffReviewDecisionToCwd,
   applyPlugin,
   defaultBundledRoot,
-  dismissSkillPluginCandidate,
-  doctorPlugin,
   FIRST_PARTY_ATOMS,
-  generateSkillPluginDraft,
   getInstalledPlugin,
   getSnapshot,
-  installFromLocalFolder,
-  installPlugin,
   isDiffReviewSurfaceId,
-  listSkillPluginCandidates,
   listInstalledPlugins,
   listIterationsForRun,
   MissingInputError,
   pluginPromptBlock,
   pruneExpiredSnapshots,
-  readPluginLockfile,
   registerBuiltInAtomWorkers,
   registerBundledPlugins,
   registryRootsForDataDir,
   restoreProjectSnapshotLink,
-  resolvePluginSnapshot,
   runPipelineForRun,
-  isSafePluginId,
   runStageWithRegistry,
   startSnapshotGc,
-  uninstallPlugin,
 } from './plugins/index.js';
 import {
   composeMemoryBody,
@@ -327,7 +302,6 @@ import {
   readMemoryConfig,
 } from './memory.js';
 import { runAutoExtractionCleanup } from './memory-cleanup.js';
-import { attachAcpSession } from './agent-protocol/index.js';
 import { attachPiRpcSession } from './agent-protocol/index.js';
 import { createClaudeStreamHandler } from './runtimes/claude-stream.js';
 import { createAgentTitleMarkerStripper } from './title-marker.js';
@@ -347,30 +321,26 @@ import {
   type SkillCritiquePolicy,
 } from './critique/rollout.js';
 import { narrowProjectCritiqueOverride } from './critique/spawn-inputs.js';
-import { createCopilotStreamHandler } from './copilot-stream.js';
 import { createJsonEventStreamHandler } from './runtimes/json-event-stream.js';
 import {
   antigravityAuthGuidance,
   antigravityQuotaGuidance,
   classifyAgentAuthFailure,
   classifyAgentServiceFailure,
-  cursorAuthGuidance,
+  genericAgentAuthGuidance,
 } from './runtimes/auth.js';
 import { readOpenCodeServiceFailure } from './runtimes/opencode-log.js';
-import { createQoderStreamHandler } from './runtimes/qoder-stream.js';
 import { subscribe as subscribeFileEvents } from './project-watchers.js';
 import { importFigmaFromBytes } from './figma/figma-import.js';
 import { renderDesignSystemPreview } from './design-systems/preview.js';
 import { renderDesignSystemShowcase } from './design-systems/showcase.js';
 import { createChatRunService } from './runtimes/runs.js';
-import {
-  createRunLifecycleTracer,
-  runLifecycleMarkersForStreamEvent,
-} from './run-lifecycle-tracer.js';
 import { deriveRunErrorCode, runResultFromStatus } from './run-result.js';
 import { classifyRunFailure, isResumableFailure } from './run-failure-classification.js';
 import { decideSafeRunRetry } from './run-retry-policy.js';
-import { scanRunEventsForUsageAnalytics } from './run-analytics-observability.js';
+import {
+  scanRunEventsForUsage,
+} from './run-usage.js';
 import {
   createRunArtifactBaselines,
   diffRunArtifacts,
@@ -381,11 +351,6 @@ import {
   snapshotAiHtmlVersionsForRun,
 } from './run-html-version-snapshots.js';
 import { reconcileDurableRunTerminals } from './runtimes/run-terminal-reconciliation.js';
-import {
-  agentIdToTracking,
-  modelIdForTracking,
-} from '@open-design/contracts/analytics';
-
 import {
   mergeNoProxyWithLoopbackDefaults,
   redactSecrets,
@@ -531,7 +496,7 @@ import { registerDaemonRoutes } from './routes/daemon.js';
 import { registerGenuiRoutes } from './routes/genui.js';
 import { registerDesignSystemRoutes } from './routes/design-systems.js';
 import { registerPluginAssetRoutes } from './routes/plugins/assets.js';
-import { registerPluginRoutes, registerProjectPluginRoutes } from './routes/plugins/index.js';
+import { registerPluginRoutes } from './routes/plugins/index.js';
 import { registerXaiRoutes } from './routes/xai.js';
 import { registerLiveArtifactRoutes } from './routes/live-artifact.js';
 import { registerDesignSystemToolRoutes } from './routes/design-system-tool.js';
@@ -552,8 +517,6 @@ import {
   rewriteSkillAssetUrls,
 } from './routes/static-resource.js';
 export { rewriteSkillAssetUrls } from './routes/static-resource.js';
-import { createPluginInstallationHelpers, normalizeProjectPluginFolderPath, resolveProjectChildDirectory } from './services/plugin-installation.js';
-import { createPluginShareTaskStore } from './services/plugin-share-tasks.js';
 import { getRouteRegistrationInventory, installRouteRegistrationGuard } from './route-registration-guard.js';
 import { assertServerContextSatisfiesRoutes } from './route-context-contract.js';
 import { CHAT_TOOL_ENDPOINTS, CHAT_TOOL_OPERATIONS, toolTokenRegistry } from './tool-tokens.js';
@@ -572,20 +535,9 @@ import {
 } from './library-tokens.js';
 import { listLibraryTokenOrigins } from './library-store.js';
 import { apiTokenFromEnv, isApiAuthDisabled, isApiTokenMiddlewareEnabled } from './api-token-auth.js';
-import { execCommandViaLoginShell } from './services/login-shell.js';
 import {
-  PLUGIN_SHARE_ACTION_LABELS,
-  USER_PLUGIN_SOURCE_KINDS,
-  copyPluginFolderForProjectContext,
-  detectSkillPluginCandidateOnRunSuccess,
-  ensureGhReady,
-  githubRepoNameFromPluginName,
-  hasGeneratedPluginArtifacts,
-  isPluginAuthoringRun,
-  normalizePluginShareAction,
   reconcileAssistantMessageOnRunEnd,
   renderPluginBriefTemplate,
-  renderPluginSharePrompt,
 } from './plugins/share-helpers.js';
 import { sanitizeArchiveFilename } from './projects/archive-filename.js';
 import {
@@ -613,7 +565,6 @@ const DAEMON_RESOURCE_ROOT = resolveDaemonResourceRoot({
   safeBases: [
     PROJECT_ROOT,
     resolveProcessResourcesPath(),
-    process.env.OD_INSTALLATION_DIR,
   ],
 });
 // Built web app lives in `out/` — that's where Next.js writes the static
@@ -687,7 +638,6 @@ const RUNTIME_DATA_DIR = resolveDataDir(process.env.OD_DATA_DIR, PROJECT_ROOT, {
 });
 const SANDBOX_RUNTIME = resolveSandboxRuntimeConfig(SANDBOX_MODE_ENABLED, RUNTIME_DATA_DIR);
 ensureSandboxRuntimeDirs(SANDBOX_RUNTIME);
-const PLUGIN_LOCKFILE_PATH = path.join(RUNTIME_DATA_DIR, 'od-plugin-lock.json');
 // Canonical (realpath-resolved) form of RUNTIME_DATA_DIR for the few callers
 // that compare it against a user-supplied realpath() result. On macOS, /var
 // is a symlink to /private/var, so an import realpath lands in /private/var
@@ -867,7 +817,7 @@ const critiqueCfg = loadCritiqueConfigFromEnv();
 // Per-run baselines of the project's artifact files, captured before the agent
 // runs and diffed at run-finish to derive `artifact_count` agent-agnostically
 // (see `run-artifact-fs.ts`). Keyed by run id because the run-start scope and
-// the run-finished analytics scope are different closures. The registry also
+// the run-finalization scope are different closures. The registry also
 // flags runs that overlapped another run in the same cwd as `contended`; those
 // must not trust the whole-tree diff (it would cross-attribute writes) and fall
 // back to the per-run tool-stream count.
@@ -961,7 +911,7 @@ export function createAgentRuntimeToolPrompt(
     '',
     `- Daemon URL: \`${daemonUrl}\` (also available as \`OD_DAEMON_URL\`).`,
     '- `OD_NODE_BIN` is the absolute path to the Node-compatible runtime that started the daemon; packaged desktop installs provide this even when the user has no system `node` on PATH.',
-    '- `OD_BIN` is the absolute path to the Open Design CLI script. On POSIX shells run wrappers with `"$OD_NODE_BIN" "$OD_BIN" tools ...`; do not call bare `od`, which may resolve to the system octal-dump command on Unix-like systems.',
+    '- `OD_BIN` is the absolute path to the Clean Design CLI script. On POSIX shells run wrappers with `"$OD_NODE_BIN" "$OD_BIN" tools ...`; do not call bare `od`, which may resolve to the system octal-dump command on Unix-like systems.',
     '- On PowerShell use `& $env:OD_NODE_BIN $env:OD_BIN tools ...`; on cmd.exe use `"%OD_NODE_BIN%" "%OD_BIN%" tools ...`.',
     tokenLine,
     '- Prefer project wrapper commands through `OD_NODE_BIN` + `OD_BIN` over raw HTTP. The wrappers read these environment values automatically.',
@@ -1025,8 +975,7 @@ const TERMINAL_RUN_STATUSES = new Set(['succeeded', 'failed', 'canceled']);
 
 // Fold per-run work-completeness signals off the agent event stream (#1247 /
 // #1060). Invoked for EVERY agent event via the single emitAgentEvent choke
-// point, so it covers every runtime (Claude stream, qoder, pi-rpc, ACP, …), not
-// just Claude:
+// point, so it covers every retained runtime, not just Claude:
 //   - the most recent TodoWrite snapshot's `todos` become run.lastTodoSnapshot,
 //     so finish() can judge whether declared work was left unfinished;
 //   - a turn-terminal event cut off by max_tokens sets run.truncatedMidTurn, so
@@ -1329,7 +1278,7 @@ function rewriteKnownAgentStreamError(agentId, message, failureText = '') {
   if (
     /bufio\.scanner:\s*token too long/i.test(combined) &&
     /opencode/i.test(combined) &&
-    (agentId === 'opencode' || agentId === 'mimo' || /json-rpc id \d+/i.test(combined))
+    agentId === 'opencode'
   ) {
     return 'The run failed due to an unknown upstream streaming error. Please retry.';
   }
@@ -1370,29 +1319,12 @@ const importUpload = multer({
   limits: { fileSize: 100 * 1024 * 1024 },
 });
 
-const PLUGIN_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
-const pluginUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: PLUGIN_UPLOAD_MAX_BYTES,
-    files: 500,
-    fieldSize: 2 * 1024 * 1024,
-  },
-});
-
 // Figma `.fig` import — memory storage so the offline decoder gets the raw
 // bytes without a temp-file round-trip. The decoder unzips + kiwi-decodes
 // in-process and writes the snapshot under the project cwd.
 const figmaUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 200 * 1024 * 1024 },  // community kits run large
-});
-
-const pluginShareTaskStore = createPluginShareTaskStore({
-  randomUUID,
-  execCommandViaLoginShell,
-  OD_NODE_BIN,
-  OD_BIN,
 });
 
 // Project-scoped multi-file upload. Lands files directly in the project
@@ -1897,13 +1829,6 @@ export async function startServer({
   } catch {
     // best-effort: a fresh db with no library_tokens is fine
   }
-  const pluginInstallation = createPluginInstallationHelpers({
-    db,
-    installFromLocalFolder,
-    PLUGIN_REGISTRY_ROOTS,
-    PLUGIN_LOCKFILE_PATH,
-    PLUGIN_UPLOAD_MAX_BYTES,
-  });
   const mediaTaskStore = createMediaTaskStore(db);
   const {
     authorizeToolRequest,
@@ -2599,141 +2524,8 @@ export async function startServer({
     PLUGIN_PREVIEWS_DIR,
     applyBakedPreviews,
     assembleExample,
-    pluginUpload,
-    pluginInstallation,
-    sendMulterError,
-    decodeMultipartFilename,
     loadPluginRegistryView,
     requireLocalDaemonRequest,
-    getProject,
-    sendApiError,
-    isLocalSameOrigin,
-    resolvedPortRef,
-    pluginShareTaskStore,
-    installOrUpgradePlugin: async (req, res, mode) => {
-      const body = req.body && typeof req.body === 'object' ? req.body : {};
-      const id = req.params.id;
-      let source = '';
-      let marketplaceResolution = null;
-      if (mode === 'upgrade') {
-        const policy = body.policy === 'pinned' ? 'pinned' : 'latest';
-        const plugin = getInstalledPlugin(db, id);
-        if (!plugin) return res.status(404).json({ error: { code: 'plugin-not-found', message: `No installed plugin with id "${id}".`, data: { id } } });
-        if (plugin.sourceKind === 'bundled') return res.status(409).json({ error: { code: 'bundled-plugin', message: `Plugin "${id}" was shipped bundled with the daemon and upgrades only via daemon-image upgrade. The bundled boot walker re-registers bundled plugins on every boot.`, data: { id, sourceKind: plugin.sourceKind } } });
-        source = plugin.source;
-        if (policy === 'latest' && plugin.sourceMarketplaceEntryName) {
-          const { resolvePluginInMarketplaces } = await import('./plugins/marketplaces.js');
-          marketplaceResolution = resolvePluginInMarketplaces(db, plugin.sourceMarketplaceEntryName);
-          if (marketplaceResolution) source = marketplaceResolution.source;
-        }
-        if (!source) return res.status(409).json({ error: { code: 'missing-source', message: `Plugin "${id}" has no recorded install source — cannot upgrade. Reinstall via 'od plugin install --source <...>' to set one.`, data: { id } } });
-      } else {
-        source = typeof body.source === 'string' ? body.source : '';
-        if (!source) return res.status(400).json({ error: 'source is required' });
-        const looksAbsolute = source.startsWith('/') || source.startsWith('./') || source.startsWith('~');
-        const looksGithub = source.startsWith('github:');
-        const looksHttps = /^https:\/\//i.test(source);
-        if (!looksAbsolute && !looksGithub && !looksHttps) {
-          const { resolvePluginInMarketplaces } = await import('./plugins/marketplaces.js');
-          let lookupName = source;
-          const lockfile = await readPluginLockfile(PLUGIN_LOCKFILE_PATH);
-          const locked = lockfile.plugins[source];
-          if (locked?.version && !source.includes('@')) lookupName = `${source}@${locked.version}`;
-          const resolved = resolvePluginInMarketplaces(db, lookupName);
-          if (!resolved) return res.status(404).json({ error: { code: 'plugin-not-found', message: `No marketplace plugin named "${source}". Add a marketplace via 'od marketplace add <url>' or pass a github: / https:// / local source.`, data: { name: source } } });
-          marketplaceResolution = resolved;
-          source = resolved.source;
-        }
-      }
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.flushHeaders?.();
-      const writeEvent = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      if (mode === 'upgrade') writeEvent('progress', { kind: 'progress', phase: 'resolving', message: `Upgrading ${id} from ${source} (policy=${body.policy === 'pinned' ? 'pinned' : 'latest'})` });
-      try {
-        const basePlugin = mode === 'upgrade' ? getInstalledPlugin(db, id) : null;
-        for await (const ev of installPlugin(db, {
-          source,
-          roots: PLUGIN_REGISTRY_ROOTS,
-          ...(mode === 'upgrade' ? { eventKind: 'upgraded' } : {}),
-          sourceMarketplaceId: marketplaceResolution?.marketplaceId ?? basePlugin?.sourceMarketplaceId,
-          sourceMarketplaceEntryName: marketplaceResolution?.pluginName ?? basePlugin?.sourceMarketplaceEntryName,
-          sourceMarketplaceEntryVersion: marketplaceResolution?.pluginVersion ?? basePlugin?.sourceMarketplaceEntryVersion,
-          marketplaceTrust: marketplaceResolution?.marketplaceTrust ?? basePlugin?.marketplaceTrust,
-          resolvedSource: marketplaceResolution?.source ?? basePlugin?.resolvedSource,
-          resolvedRef: marketplaceResolution?.ref ?? basePlugin?.resolvedRef,
-          manifestDigest: marketplaceResolution?.manifestDigest ?? basePlugin?.manifestDigest,
-          archiveIntegrity: marketplaceResolution?.archiveIntegrity ?? basePlugin?.archiveIntegrity,
-          lockfilePath: PLUGIN_LOCKFILE_PATH,
-        })) {
-          writeEvent(ev.kind, ev);
-          if (ev.kind === 'success' || ev.kind === 'error') break;
-        }
-      } catch (err) {
-        writeEvent('error', { kind: 'error', message: String(err), warnings: [] });
-      } finally {
-        res.end();
-      }
-    },
-    handleShareProject: async (req, res) => {
-      try {
-        const sourcePlugin = getInstalledPlugin(db, req.params.id);
-        if (!sourcePlugin) return sendApiError(res, 404, 'NOT_FOUND', 'plugin not found');
-        if (!USER_PLUGIN_SOURCE_KINDS.has(sourcePlugin.sourceKind)) return res.status(409).json({ ok: false, code: 'plugin-not-shareable', message: 'Only user-installed plugins can start a share project.' });
-        const body = req.body && typeof req.body === 'object' ? req.body : {};
-        const action = normalizePluginShareAction(body.action);
-        if (!action) return sendApiError(res, 400, 'BAD_REQUEST', 'action must be publish-github or contribute-open-design');
-        const actionPluginId = PLUGIN_SHARE_ACTION_PLUGIN_IDS[action];
-        const actionPlugin = getInstalledPlugin(db, actionPluginId);
-        if (!actionPlugin) return res.status(409).json({ ok: false, code: 'share-action-plugin-missing', message: `The bundled action plugin "${actionPluginId}" is not installed. Restart the daemon so bundled plugins are registered.` });
-        const now = Date.now(); const id = randomId(); const cid = randomId(); const sourceSlug = githubRepoNameFromPluginName(sourcePlugin.id); const stagedPath = `plugin-source/${sourceSlug}`; const prompt = renderPluginSharePrompt({ action, sourcePlugin, stagedPath }); const metadata = { kind: 'prototype' }; const projectRoot = await ensureProject(PROJECTS_DIR, id, metadata); await copyPluginFolderForProjectContext(sourcePlugin.fsPath, path.join(projectRoot, 'plugin-source', sourceSlug));
-        insertProject(db, { id, name: `${PLUGIN_SHARE_ACTION_LABELS[action]}: ${sourcePlugin.title || sourcePlugin.id}`, skillId: null, designSystemId: null, pendingPrompt: prompt, metadata, createdAt: now, updatedAt: now });
-        insertConversation(db, { id: cid, projectId: id, title: null, createdAt: now, updatedAt: now });
-        const registry = await loadPluginRegistryView(); const resolved = resolvePluginSnapshot({ db, body: { pluginId: actionPluginId, pluginInputs: { source_plugin_id: sourcePlugin.id, source_plugin_title: sourcePlugin.title || sourcePlugin.id, source_plugin_version: sourcePlugin.version, source_plugin_path: sourcePlugin.fsPath, plugin_context_path: stagedPath }, locale: typeof body.locale === 'string' ? body.locale : undefined }, projectId: id, conversationId: cid, registry });
-        if (resolved && !resolved.ok) return res.status(resolved.status).json(resolved.body);
-        const project = getProject(db, id); if (!project) return sendApiError(res, 500, 'INTERNAL_ERROR', 'created project could not be loaded');
-        res.json({ ok: true, project, conversationId: cid, ...(resolved?.ok ? { appliedPluginSnapshotId: resolved.snapshotId } : {}), actionPluginId, sourcePluginId: sourcePlugin.id, stagedPath, prompt, message: `Created a ${PLUGIN_SHARE_ACTION_LABELS[action]} task for ${sourcePlugin.title || sourcePlugin.id}.` });
-      } catch (err) { res.status(400).json({ ok: false, message: String(err?.message || err) }); }
-    },
-    handlePluginTrust: async (req, res) => {
-      try {
-        const plugin = getInstalledPlugin(db, req.params.id); if (!plugin) return res.status(404).json({ error: 'plugin not found' });
-        const body = req.body && typeof req.body === 'object' ? req.body : {}; const action = body.action === 'revoke' ? 'revoke' : 'grant';
-        const { validateCapabilityList, grantCapabilities, revokeCapabilities } = await import('./plugins/trust.js');
-        const { accepted, rejected } = validateCapabilityList(body.capabilities);
-        if (rejected.length > 0) return res.status(400).json({ error: { code: 'invalid-capability', message: `Capability validation failed: ${rejected.map((r) => r.capability).join(', ')}`, data: { rejected } } });
-        if (accepted.length === 0) return res.status(400).json({ error: { code: 'no-capabilities', message: 'capabilities[] is required and must contain at least one entry' } });
-        const next = action === 'revoke' ? revokeCapabilities({ db, pluginId: req.params.id, capabilities: accepted }) : grantCapabilities({ db, pluginId: req.params.id, capabilities: accepted });
-        const updated = getInstalledPlugin(db, req.params.id);
-        try { const { recordPluginEvent } = await import('./plugins/events.js'); recordPluginEvent({ kind: 'plugin.trust-changed', pluginId: req.params.id, details: { action, capabilities: accepted, total: next.length } }); } catch {}
-        res.status(action === 'grant' ? 201 : 200).json({ ok: true, id: req.params.id, action, capabilitiesGranted: next, plugin: updated });
-      } catch (err) { res.status(500).json({ error: String(err) }); }
-    },
-    handlePluginStats: async (res) => {
-      try { const { pluginInventoryStats, snapshotInventoryStats } = await import('./plugins/stats.js'); const installed = listInstalledPlugins(db); const inventoryRows = db.prepare(`SELECT status, project_id, run_id, applied_at FROM applied_plugin_snapshots`).all(); res.json({ plugins: pluginInventoryStats(installed), snapshots: snapshotInventoryStats(inventoryRows), generatedAt: Date.now() }); } catch (err) { res.status(500).json({ error: String(err) }); }
-    },
-    handleAppliedPluginExport: async (req, res) => {
-      try { const body = req.body && typeof req.body === 'object' ? req.body : {}; const target = body.target === 'od' || body.target === 'claude-plugin' || body.target === 'agent-skill' ? body.target : null; if (!target) return res.status(400).json({ error: 'target must be one of: od, claude-plugin, agent-skill' }); const outDir = typeof body.outDir === 'string' && body.outDir.length > 0 ? body.outDir : null; if (!outDir) return res.status(400).json({ error: 'outDir is required' }); const { exportPlugin, ExportError } = await import('./plugins/export.js'); try { const result = await exportPlugin({ db, target, outDir, ...(typeof body.snapshotId === 'string' ? { snapshotId: body.snapshotId } : {}), ...(typeof body.projectId === 'string' ? { projectId: body.projectId } : {}) }); res.json({ ok: true, ...result }); } catch (err) { if (err instanceof ExportError) return res.status(404).json({ error: err.message }); throw err; } } catch (err) { res.status(500).json({ error: String(err) }); }
-    },
-    handleProjectInstallFolder: async (req, res) => {
-      try { const project = getProject(db, req.params.id); if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found'); const body = req.body && typeof req.body === 'object' ? req.body : {}; const relativePath = normalizeProjectPluginFolderPath(body.path); const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata); const folder = await resolveProjectChildDirectory(projectRoot, relativePath); const warnings = []; const log = []; let plugin = null; let message = 'Install finished.'; for await (const ev of installPlugin(db, { source: folder, roots: PLUGIN_REGISTRY_ROOTS })) { if (ev.message) log.push(ev.message); if (Array.isArray(ev.warnings)) warnings.splice(0, warnings.length, ...ev.warnings); if (ev.kind === 'success') { plugin = ev.plugin; message = `Installed ${ev.plugin.title}.`; break; } if (ev.kind === 'error') { message = ev.message; break; } } res.status(plugin ? 200 : 400).json({ ok: Boolean(plugin), plugin, warnings, message, log }); } catch (err) { const code = err && err.code; const status = code === 'ENOENT' || code === 'ENOTDIR' ? 404 : 400; sendApiError(res, status, status === 404 ? 'PLUGIN_FOLDER_NOT_FOUND' : 'BAD_REQUEST', String(err?.message || err)); }
-    },
-    handleProjectPluginCli: async (req, res, action) => {
-      try { const project = getProject(db, req.params.id); if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found'); const body = req.body && typeof req.body === 'object' ? req.body : {}; const relativePath = normalizeProjectPluginFolderPath(body.path); const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata); const folder = await resolveProjectChildDirectory(projectRoot, relativePath); const subcommand = action === 'publish-github' ? 'publish-repo' : 'open-design-pr'; const timeout = action === 'publish-github' ? 240_000 : 300_000; const result = await execCommandViaLoginShell(OD_NODE_BIN, [OD_BIN, 'plugin', subcommand, folder, '--json'], { timeout }); const payload = result.stdout ? JSON.parse(result.stdout) : null; if (!result.ok || !payload?.ok) return res.status(500).json({ ok: false, code: payload?.error?.label || (action === 'publish-github' ? 'publish-repo-failed' : 'open-design-pr-failed'), message: payload?.error?.stderr || payload?.error?.stdout || (action === 'publish-github' ? 'GitHub repo publish failed.' : 'Open Design PR creation failed.'), log: payload?.steps?.map((step) => step.stderr || step.stdout || step.command).filter(Boolean) ?? [result.stderr || result.stdout || `${subcommand} failed`] }); res.json({ ok: true, message: action === 'publish-github' ? (payload.repoUrl ? `Published plugin to ${payload.repoUrl}.` : 'Published plugin to GitHub.') : (payload.prUrl ? `Opened Open Design PR flow at ${payload.prUrl}.` : 'Opened Open Design PR flow.'), ...(payload.repoUrl ? { url: payload.repoUrl } : {}), ...(payload.prUrl ? { url: payload.prUrl } : {}), log: payload.steps?.map((step) => step.stderr || step.stdout || step.command).filter(Boolean) ?? [] }); } catch (err) { res.status(400).json({ ok: false, message: String(err?.message || err), log: [] }); }
-    },
-    handleCandidateDraft: async (req, res) => {
-      if (!isLocalSameOrigin(req, resolvedPort)) return res.status(403).json({ error: 'cross-origin request rejected' });
-      try { const project = getProject(db, req.params.id); if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found'); const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata); const result = await generateSkillPluginDraft(db, projectRoot, req.params.id, req.params.candidateId); if (!result) return sendApiError(res, 404, 'NOT_FOUND', 'plugin candidate not found'); res.status(result.ok ? 200 : 422).json(result); } catch (err) { res.status(400).json({ ok: false, message: String(err?.message || err) }); }
-    },
-    handleCandidateShareTask: async (req, res) => {
-      if (!isLocalSameOrigin(req, resolvedPort)) return res.status(403).json({ error: 'cross-origin request rejected' });
-      try { const project = getProject(db, req.params.id); if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found'); const body = req.body && typeof req.body === 'object' ? req.body : {}; const action = body.action === 'publish-github' || body.action === 'contribute-open-design' ? body.action : null; if (!action) return sendApiError(res, 400, 'BAD_REQUEST', 'plugin share action is required'); const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata); const draft = await generateSkillPluginDraft(db, projectRoot, req.params.id, req.params.candidateId); if (!draft) return sendApiError(res, 404, 'NOT_FOUND', 'plugin candidate not found'); if (!draft.validation.ok) return res.status(422).json({ ok: false, code: 'plugin-draft-invalid', message: 'Generated plugin draft is invalid.', draft }); const task = pluginShareTaskStore.createAndStart(req.params.id, { action, path: draft.draftPath }, draft.folder); res.status(202).json({ taskId: task.id, action, path: draft.draftPath, status: task.status, startedAt: task.startedAt, draft }); } catch (err) { res.status(400).json({ ok: false, message: String(err?.message || err) }); }
-    },
-    handleProjectShareTask: async (req, res) => {
-      if (!isLocalSameOrigin(req, resolvedPort)) return res.status(403).json({ error: 'cross-origin request rejected' });
-      try { const project = getProject(db, req.params.id); if (!project) return sendApiError(res, 404, 'PROJECT_NOT_FOUND', 'project not found'); const body = req.body && typeof req.body === 'object' ? req.body : {}; const action: PluginShareAction | null = body.action === 'publish-github' || body.action === 'contribute-open-design' ? body.action : null; if (!action) return sendApiError(res, 400, 'BAD_REQUEST', 'plugin share action is required'); const relativePath = normalizeProjectPluginFolderPath(body.path); const projectRoot = resolveProjectDir(PROJECTS_DIR, req.params.id, project.metadata); const folder = await resolveProjectChildDirectory(projectRoot, relativePath); const task = pluginShareTaskStore.createAndStart(req.params.id, { action, path: relativePath }, folder); res.status(202).json({ taskId: task.id, action, path: relativePath, status: task.status, startedAt: task.startedAt }); } catch (err) { const code = err && err.code; const status = code === 'ENOENT' || code === 'ENOTDIR' ? 404 : 400; sendApiError(res, status, status === 404 ? 'PLUGIN_FOLDER_NOT_FOUND' : 'BAD_REQUEST', String(err?.message || err)); }
-    },
   };
 
   // Plan §3.A1: shared helper used by every endpoint that has to resolve
@@ -2809,29 +2601,18 @@ export async function startServer({
 
   registerPluginRoutes(app, {
     db,
-    paths: { PROJECTS_DIR, PLUGIN_REGISTRY_ROOTS, PLUGIN_LOCKFILE_PATH },
+    paths: { PROJECTS_DIR },
     ids: idDeps,
     projectStore: projectStoreDeps,
     conversations: conversationDeps,
     plugins: {
       listInstalledPlugins,
       getInstalledPlugin,
-      installPlugin,
-      isSafePluginId,
-      uninstallPlugin,
-      installFromLocalFolder,
       applyPlugin,
-      doctorPlugin,
       getSnapshot,
       pruneExpiredSnapshots,
-      readPluginLockfile,
-      resolvePluginSnapshot,
       MissingInputError,
       pluginPromptBlock,
-      listSkillPluginCandidates,
-      dismissSkillPluginCandidate,
-      generateSkillPluginDraft,
-      FIRST_PARTY_ATOMS,
     },
     helpers: pluginRouteHelpers,
   });
@@ -2854,34 +2635,6 @@ export async function startServer({
     paths: { PROJECTS_DIR },
   });
 
-  registerProjectPluginRoutes(app, {
-    db,
-    paths: { PROJECTS_DIR, PLUGIN_REGISTRY_ROOTS, PLUGIN_LOCKFILE_PATH },
-    ids: idDeps,
-    projectStore: projectStoreDeps,
-    conversations: conversationDeps,
-    plugins: {
-      listInstalledPlugins,
-      getInstalledPlugin,
-      installPlugin,
-      isSafePluginId,
-      uninstallPlugin,
-      installFromLocalFolder,
-      applyPlugin,
-      doctorPlugin,
-      getSnapshot,
-      pruneExpiredSnapshots,
-      readPluginLockfile,
-      resolvePluginSnapshot,
-      MissingInputError,
-      pluginPromptBlock,
-      listSkillPluginCandidates,
-      dismissSkillPluginCandidate,
-      generateSkillPluginDraft,
-      FIRST_PARTY_ATOMS,
-    },
-    helpers: pluginRouteHelpers,
-  });
   registerProjectUploadRoutes(app, {
     db,
     http: httpDeps,
@@ -3348,8 +3101,8 @@ export async function startServer({
     // the spawn path routes runs through runOrchestrator(...) only when the
     // SAME flag is true, so prompt and orchestrator stay in lockstep.
     //
-    // Non-plain adapters (claude-stream-json, copilot-stream-json,
-    // json-event-stream, acp-json-rpc, pi-rpc) emit their own wrapper
+    // Non-plain adapters (claude-stream-json, json-event-stream, pi-rpc)
+    // emit their own wrapper
     // protocol; the v1 critique parser only understands plain stdout. The
     // spawn path falls through to legacy generation for those, so the
     // panel addendum has to be suppressed here too: otherwise the model
@@ -3574,7 +3327,7 @@ export async function startServer({
     });
     void Promise.all([runs.wait(run), pipelineDone])
       .then(() => {
-        const tokensUsed = scanRunEventsForUsageAnalytics(run.events, null, 0).total_tokens ?? null;
+        const tokensUsed = scanRunEventsForUsage(run.events, null, 0).total_tokens ?? null;
         if (tokensUsed === null) return;
         dbHandle.prepare(
           'UPDATE run_devloop_iterations SET tokens_used = ? WHERE run_id = ?',
@@ -3586,8 +3339,6 @@ export async function startServer({
   };
 
   const startChatRun = async (chatBody, run) => {
-    const lifecycle = createRunLifecycleTracer(run);
-    lifecycle.mark('chat_run_started');
     /** @type {Partial<ChatRequest> & { imagePaths?: string[] }} */
     chatBody = chatBody || {};
     const {
@@ -3615,7 +3366,6 @@ export async function startServer({
       byokProvider,
       byokMediaDefaults,
     } = chatBody;
-    lifecycle.mark('prompt_build_start');
     if (typeof projectId === 'string' && projectId) run.projectId = projectId;
     if (typeof conversationId === 'string' && conversationId)
       run.conversationId = conversationId;
@@ -3638,15 +3388,17 @@ export async function startServer({
         ? normalizeConversationSessionMode(sessionMode)
         : normalizeConversationSessionMode(conversationSession?.sessionMode);
     const def = getAgentDef(agentId);
-    if (typeof agentId === 'string' && isCleanDesignDisabledAgent(agentId)) {
-      return design.runs.fail(run, 'AGENT_UNAVAILABLE', `agent disabled: ${agentId}`);
-    }
     if (!def)
       return design.runs.fail(
         run,
         'AGENT_UNAVAILABLE',
         `unknown agent: ${agentId}`,
       );
+    const isInternalByokRequest =
+      isCleanDesignInternalAgent(def.id) && def.id === 'byok-opencode';
+    if (!isCleanDesignPublicAgent(def) && !isInternalByokRequest) {
+      return design.runs.fail(run, 'AGENT_UNAVAILABLE', `agent unavailable: ${agentId}`);
+    }
     if (!def.bin)
       return design.runs.fail(run, 'AGENT_UNAVAILABLE', 'agent has no binary');
     const byokOpenCodeProvider = def.id === 'byok-opencode'
@@ -3970,8 +3722,8 @@ export async function startServer({
       }
     }
     // Resolve the agent's effective working directory once and use it
-    // everywhere the agent could read it (buildArgs runtimeContext, spawn
-    // cwd, ACP session new). Falling back to PROJECT_ROOT — rather than
+    // everywhere the agent could read it (buildArgs runtimeContext and spawn
+    // cwd). Falling back to PROJECT_ROOT — rather than
     // letting `spawn` inherit the daemon process cwd — is what makes the
     // absolute-path fallback in the skill preamble actually in-cwd for
     // no-project runs (packaged daemons / service launches do not start
@@ -4116,9 +3868,7 @@ export async function startServer({
     // prompt-composition skipTranscript choice, the buildArgs flags, and the
     // create-turn persistence below.
     const agentSupportsSessionResume =
-      def.resumesSessionViaCli === true ||
-      def.streamFormat === 'pi-rpc' ||
-      def.resumesSessionViaAcpLoad === true;
+      def.resumesSessionViaCli === true || def.streamFormat === 'pi-rpc';
     // Capture-style adapters (codex) mint their OWN session id and report it on
     // the stream; the daemon captures it here and persists THAT as the resume
     // handle instead of `agentResumeCtx.newSessionId` (which such CLIs ignore).
@@ -4128,9 +3878,8 @@ export async function startServer({
     // --- Model resolution hoisted above the resume-identity guard ---
     // The guard (and the persisted `agent_sessions.model`) must key off the
     // model identity actually requested for this turn. Explicit `default` is
-    // kept as a real identity because ACP runtimes can leave model selection to
-    // the upstream session's own configured default; omitted models may still
-    // resolve to an available fallback below.
+    // kept as a real identity so the selected CLI can use its configured
+    // default; omitted models may still resolve to an available fallback below.
     let configuredAgentEnv = {};
     try {
       const appConfig = await readAppConfig(RUNTIME_DATA_DIR);
@@ -4320,30 +4069,13 @@ export async function startServer({
         ? `\n\n${promptImagePaths.map((p) => `@${p}`).join(' ')}`
         : '',
     ].join('');
-    lifecycle.mark('prompt_build_end');
-    lifecycle.mark('launch_preflight_start');
     // (model resolution is hoisted above the resume guard)
     const executionProfile = executionProfileFromStreamFormat(def.streamFormat);
-    // Accumulates the agent's visible text this run so the close handler can
-    // tell whether the turn ended on a clarifying question form. The
-    // `od-plugin-authoring` plugin's turn-1 flow is to emit a
-    // `<question-form>` collecting the plugin brief, then STOP and wait for
-    // the user to answer (see the `discovery-question-form` atom in
-    // `plugins/scaffold.ts`). That turn legitimately closes with `code === 0`
-    // and no `generated-plugin/` artifacts yet, so the missing-artifacts
-    // guard must not treat it as a failure. We buffer the streamed text
-    // rather than read the persisted message because the assistant message
-    // row may not be wired up at close time. The buffer is capped because a
-    // discovery form streams near the top of the turn; we only need enough to
-    // validate the first complete form block (see
-    // `emittedRenderableQuestionForm`).
-    const CLARIFYING_QUESTION_BUFFER_CAP = 256 * 1024;
-    let clarifyingQuestionText = '';
     let visibleAssistantText = '';
     // Reply text handed to the background memory extractor at child-close.
     // Captures the GUARDED, visible reply from BOTH channels a run can emit on:
-    // structured agents' `agent` `text_delta` (Claude/Codex/Gemini/Copilot/ACP/
-    // qoder/pi-rpc) and the plain/BYOK/antigravity family's `stdout` chunks. So
+    // structured agents' `agent` `text_delta` and the plain/Antigravity
+    // family's `stdout` chunks. So
     // every agent family contributes its actual reply, and none leak raw
     // transport frames (system:init, stream_event, hooks). Kept separate from
     // `visibleAssistantText` so the filesystem empty-output guard that reads
@@ -4356,28 +4088,6 @@ export async function startServer({
     // covers realistic artifact-bearing runs while bounding per-run memory.
     const PLAIN_ARTIFACT_STDOUT_CAP = 8 * 1024 * 1024;
     const send = (event, data) => {
-      const lifecycleMarkers = runLifecycleMarkersForStreamEvent(event, data);
-      if (lifecycleMarkers.firstModelEventType) {
-        lifecycle.markFirstModelEvent(lifecycleMarkers.firstModelEventType);
-      }
-      if (lifecycleMarkers.firstVisibleOutput) {
-        lifecycle.mark('first_visible_output');
-      }
-      if (lifecycleMarkers.firstArtifactWrite) {
-        lifecycle.mark('first_artifact_write');
-      }
-      if (
-        event === 'agent' &&
-        data &&
-        data.type === 'text_delta' &&
-        typeof data.delta === 'string' &&
-        clarifyingQuestionText.length < CLARIFYING_QUESTION_BUFFER_CAP
-      ) {
-        clarifyingQuestionText = (clarifyingQuestionText + data.delta).slice(
-          0,
-          CLARIFYING_QUESTION_BUFFER_CAP,
-        );
-      }
       if (
         event === 'agent' &&
         data &&
@@ -4422,33 +4132,6 @@ export async function startServer({
       }
       persistRunEventToAssistantMessage(db, run, event, data);
       design.runs.emit(run, event, data);
-    };
-    const retryAnalyticsBase = (decision, failure, errorCode) => {
-      const runProjectKind = resolveRunProjectKindForAnalytics({
-        hintProjectKind: null,
-        projectMetadata: projectRecord?.metadata,
-      });
-      const isDesignSystemRun =
-        runProjectKind === 'design_system' ||
-        (typeof designSystemId === 'string' && designSystemId.length > 0);
-      return {
-        page_name: isDesignSystemRun ? 'design_system_project' : 'chat_panel',
-        area: isDesignSystemRun ? 'design_system_generation' : 'chat_panel',
-        project_id: typeof projectId === 'string' ? projectId : run.projectId,
-        conversation_id:
-          typeof conversationId === 'string' ? conversationId : run.conversationId ?? null,
-        run_id: run.id,
-        retry_of_run_id: run.id,
-        retry_attempt_index: decision.retryAttemptIndex,
-        retry_max_attempts: decision.retryMaxAttempts,
-        retry_strategy: decision.retryStrategy,
-        agent_provider_id: agentIdToTracking(agentId),
-        model_id: modelIdForTracking(safeModel ?? model),
-        ...(failure?.failure_category ? { failure_category: failure.failure_category } : {}),
-        ...(failure?.failure_detail ? { failure_detail: failure.failure_detail } : {}),
-        ...(failure?.failure_stage ? { failure_stage: failure.failure_stage } : {}),
-        ...(errorCode ? { error_code: errorCode } : {}),
-      };
     };
     const destroyChildStdio = (child) => {
       // Best-effort cleanup of stdio streams on a child process we're about
@@ -4507,7 +4190,7 @@ export async function startServer({
       run.updatedAt = Date.now();
       run.child = null;
       run.processGroupId = null;
-      run.acpSession = null;
+      run.rpcSession = null;
       run.exitCode = null;
       run.signal = null;
       run.error = null;
@@ -4520,10 +4203,6 @@ export async function startServer({
       // this reset, a clean-but-empty attempt 1 would vouch for a crashed
       // attempt 2, classifying the run 'succeeded' off a stale flag.
       run.turnCompletedCleanly = false;
-      lifecycle.resetForAttempt(run.retryAttemptCount ?? 0);
-      run.lifecycleTimings = {
-        startRequestedAt: run.lifecycleTimings?.startRequestedAt ?? run.createdAt,
-      };
     };
     const spawnRetryAttempt = () => {
       void startChatRun(chatBody, run).catch((err) => {
@@ -4534,12 +4213,8 @@ export async function startServer({
           createSseErrorPayload('AGENT_EXECUTION_FAILED', message),
         );
         // Route the retried-start failure through the same finalizer as child
-        // close/error so it emits terminal retry telemetry (run_retry_finished
-        // with retry_result: 'failed') and sets run.retryFinalResult, instead
-        // of finishing directly and leaving run_finished to report the fallback
-        // retry_final_result: 'not_attempted'. retryAttemptCount is already 1
-        // here, so decideSafeRunRetry suppresses with attempt_limit_reached and
-        // cannot trigger another restart loop.
+        // close/error. retryAttemptCount is already 1 here, so the retry policy
+        // suppresses another restart loop with attempt_limit_reached.
         finishWithRetryDecision('failed', 1, null);
       });
     };
@@ -4561,52 +4236,6 @@ export async function startServer({
         spawnRetryAttempt();
       }, wait);
     };
-    const finalizeRetryTelemetry = (status, decision, failure, errorCode) => {
-      const attemptCount = run.retryAttemptCount ?? 0;
-      const result = runResultFromStatus(status);
-      if (attemptCount <= 0 && result !== 'failed') {
-        run.retryFinalResult = 'not_attempted';
-        run.retrySuppressedReason = undefined;
-        return;
-      }
-      const retryResult =
-        attemptCount > 0
-          ? result === 'success'
-            ? 'success'
-            : result === 'failed'
-              ? 'failed'
-              : 'suppressed'
-          : 'suppressed';
-      const retrySuppressedReason =
-        retryResult === 'suppressed'
-          ? run.cancelRequested
-            ? 'cancel_requested'
-            : decision?.retrySuppressedReason
-          : undefined;
-      const eventDecision =
-        attemptCount > 0
-          ? { ...decision, retryAttemptIndex: attemptCount }
-          : decision;
-      // A successful retry has no current failure classification or error code.
-      // Fall back to the failure that caused attempt 0 to be retried so success
-      // recovery can still be attributed by root cause. Failed/suppressed retry
-      // events retain their existing current-attempt semantics.
-      const eventFailure = retryResult === 'success'
-        ? run.retryOriginFailure ?? failure
-        : failure;
-      const eventErrorCode = retryResult === 'success'
-        ? run.retryOriginErrorCode ?? errorCode
-        : errorCode;
-      run.retryFinalResult = retryResult;
-      run.retrySuppressedReason = retrySuppressedReason;
-      design.runs.emit(run, 'run_retry_finished', {
-        ...retryAnalyticsBase(eventDecision, eventFailure, eventErrorCode),
-        retry_result: retryResult,
-        ...(retrySuppressedReason
-          ? { retry_suppressed_reason: retrySuppressedReason }
-          : {}),
-      });
-    };
     let pendingRpcCloseReason = null;
     const markRpcCloseReason = (reason) => {
       pendingRpcCloseReason = reason;
@@ -4619,7 +4248,6 @@ export async function startServer({
       return 'unknown';
     };
     const finishWithRetryDecision = (status, code = null, signal = null) => {
-      lifecycle.mark('finalize_start');
       // Persist the transport-level close mechanism before classifying this
       // attempt. Runtime fatal/stream signals are only known in the close
       // handler, and the retry classifier reads this diagnostic to distinguish
@@ -4666,19 +4294,7 @@ export async function startServer({
         sideEffects,
       });
       if (decision.shouldRetry && !design.runs.isTerminal(run.status)) {
-        run.retryOriginalFailure ??= failure ?? undefined;
-        if ((run.retryAttemptCount ?? 0) === 0) {
-          run.retryOriginFailure = failure ? { ...failure } : null;
-          run.retryOriginErrorCode = errorCode ?? null;
-        }
         run.retryAttemptCount = decision.retryAttemptIndex;
-        run.retryFinalResult = undefined;
-        run.retrySuppressedReason = undefined;
-        design.runs.emit(run, 'run_retry_attempted', {
-          ...retryAnalyticsBase(decision, failure, errorCode),
-          retry_reason: decision.retryReason,
-          retry_delay_ms: decision.retryDelayMs,
-        });
         scheduleRetryRestart(decision.retryDelayMs);
         return true;
       }
@@ -4725,7 +4341,7 @@ export async function startServer({
         isResumableFailure(failure);
       run.resumable = resumableFailure;
       // Surface the daemon's failure classification (already computed for
-      // retry-policy + telemetry) on the run so statusBody / the SSE `end` frame
+      // retry policy and status bookkeeping) on the run so statusBody / the SSE `end` frame
       // carry it to the chat, which maps failureDetail -> a specific named
       // failure type + fix. Only meaningful on a failed result.
       run.failureCategory = result === 'failed' ? failure?.failure_category ?? null : null;
@@ -4753,7 +4369,6 @@ export async function startServer({
         });
         publishNativeSessionRecoveryMetadata();
       }
-      finalizeRetryTelemetry(status, decision, failure, errorCode);
       if (executionProfile === 'filesystem' && result === 'success' && visibleAssistantText.trim().length === 0) {
         const fileNames = filesystemWriteFileNamesFromRunEvents(run.events);
         if (fileNames.length > 0) {
@@ -4773,16 +4388,7 @@ export async function startServer({
       design.runs.finish(run, status, code, signal);
       return false;
     };
-    const mcpServers = buildLiveArtifactsMcpServersForAgent(def, {
-      enabled: Boolean(toolTokenGrant?.token),
-      command: process.execPath,
-      argsPrefix: [OD_BIN],
-    });
-
-
-    const runtimeConfigEnvKey = def.id === 'mimo'
-      ? 'MIMOCODE_CONFIG_CONTENT'
-      : def.id === 'opencode' || def.id === 'byok-opencode'
+    const runtimeConfigEnvKey = def.id === 'opencode' || def.id === 'byok-opencode'
         ? 'OPENCODE_CONFIG_CONTENT'
         : null;
     const opencodeConfigContent = runtimeConfigEnvKey
@@ -4793,9 +4399,7 @@ export async function startServer({
       : null;
 
     // Pre-flight the composed prompt against any argv-byte budget the
-    // adapter declared (only DeepSeek TUI today — its CLI doesn't accept
-    // a `-` stdin sentinel, so the prompt has to ride argv). Doing this
-    // before bin resolution means the test harness pins the guard
+    // adapter declared. Doing this before bin resolution means the test harness pins the guard
     // independently of whether the adapter binary happens to be on PATH
     // in the CI environment, and the user gets the actionable
     // adapter-named error even if /api/agents hadn't refreshed yet.
@@ -4989,7 +4593,7 @@ export async function startServer({
     // Second-pass budget check that knows about the Windows `.cmd` shim
     // wrap. The pre-buildArgs `checkPromptArgvBudget` only looks at the
     // raw composed prompt; on Windows an npm-installed adapter resolves
-    // to e.g. `deepseek.cmd`, the spawn path goes through `cmd.exe /d /s
+    // to an npm-installed `.cmd` shim, the spawn path goes through `cmd.exe /d /s
     // /c "<inner>"`, and `quoteForWindowsCmdShim` doubles every embedded
     // `"` plus wraps any whitespace/special-char arg in outer quotes —
     // so a quote-heavy prompt that fit under `maxPromptArgBytes` can
@@ -5016,7 +4620,7 @@ export async function startServer({
     }
 
     // Companion guard for non-shim Windows installs (e.g. a cargo-built
-    // `deepseek.exe` rather than the npm `.cmd` shim). Direct `.exe`
+    // a direct `.exe` rather than an npm `.cmd` shim). Direct `.exe`
     // spawns skip the cmd.exe wrap above, but Node/libuv still composes
     // a CreateProcess `lpCommandLine` by walking each argv element
     // through `quote_cmd_arg`, which escapes every embedded `"` as `\"`
@@ -5228,8 +4832,8 @@ export async function startServer({
         // kill, OOM) is NOT silently reclassified to `succeeded` —
         // only signals from this watchdog branch should be.
         artifactQuietShutdownRequested = true;
-        if (acpSession?.abort) {
-          acpSession.abort();
+        if (rpcSession?.abort) {
+          rpcSession.abort();
         }
         if (child && !child.killed) design.runs.signalChild(run, 'SIGTERM');
         scheduleForcedChildShutdown();
@@ -5269,15 +4873,14 @@ export async function startServer({
       // this run is allowed to recover: classifyRunFailure maps the stall text
       // to a retryable `timeout` at `first_token_wait`, and decideSafeRunRetry
       // permits the same-run retry when no output/tools/artifacts were seen.
-      // Route through the shared finalizer (after surfacing stallPayload) so
-      // the watchdog path gets the same run_retry_attempted/run_retry_finished
-      // telemetry as child close/error — not a bare terminal failure.
+      // Route through the shared finalizer after surfacing stallPayload so the
+      // watchdog uses the same retry decision as child close/error.
       const retried = finishWithRetryDecision('failed', 1, null);
       if (retried) {
         watchdogRetryRestarted = true;
       }
-      if (acpSession?.abort) {
-        acpSession.abort();
+      if (rpcSession?.abort) {
+        rpcSession.abort();
       }
       if (child && !child.killed) design.runs.signalChild(run, 'SIGTERM');
       scheduleForcedChildShutdown();
@@ -5394,7 +4997,7 @@ export async function startServer({
     noteAgentActivity();
 
     let child;
-    let acpSession = null;
+    let rpcSession = null;
     let writePromptToChildStdin = false;
     let spawnedAgentEnv = null;
     let agentStdoutTail = '';
@@ -5409,10 +5012,7 @@ export async function startServer({
     try {
       // Prompt delivery via stdin is now the universal default. This bypasses
       // both the cmd.exe 8KB limit and the CreateProcess 32KB limit.
-      const stdinMode =
-        def.promptViaStdin || def.streamFormat === 'acp-json-rpc'
-          ? 'pipe'
-          : 'ignore';
+      const stdinMode = def.promptViaStdin ? 'pipe' : 'ignore';
       const env = applyAgentLaunchEnv({
         ...agentSpawnEnv,
         ...(mmdRouteLaunchEnv || {}),
@@ -5430,8 +5030,6 @@ export async function startServer({
         args,
         env,
       });
-      lifecycle.mark('launch_preflight_end');
-      lifecycle.mark('process_spawn_start');
       child = spawn(invocation.command, invocation.args, {
         env,
         stdio: [stdinMode, 'pipe', 'pipe'],
@@ -5443,7 +5041,6 @@ export async function startServer({
         // breaks paths containing spaces (issue #315).
         windowsVerbatimArguments: invocation.windowsVerbatimArguments,
       });
-      lifecycle.mark('process_spawned');
       run.child = child;
       run.childPid = typeof child.pid === 'number' ? child.pid : null;
       run.processGroupId =
@@ -5536,8 +5133,8 @@ export async function startServer({
     child.stderr.setEncoding('utf8');
 
     // Reset the inactivity watchdog on every raw stdout byte so that
-    // structured adapters that buffer partial lines (Codex item.completed,
-    // pi-rpc session/prompt, ACP agent messages) and models that spend a
+    // structured adapters that buffer partial lines (Codex item.completed and
+    // pi-rpc session/prompt) and models that spend a
     // long time in non-streamed reasoning still keep the run alive.
     child.stdout.on('data', (chunk) => {
       childStdoutSeen = true;
@@ -5639,8 +5236,7 @@ export async function startServer({
     // Critique Theater branch (M0 dark launch, default disabled).
     // Only plain-stream adapters are routed through runOrchestrator in v1.
     // Adapters that emit structured wrappers (claude-stream-json,
-    // qoder-stream-json, copilot-stream-json, json-event-stream,
-    // acp-json-rpc, pi-rpc) fall
+    // json-event-stream, pi-rpc) fall
     // through to the legacy single-pass code path below with a one-time
     // stderr warning so the parser never sees wrapper bytes. Per-format
     // decoding into the orchestrator is a v2 concern.
@@ -5703,7 +5299,7 @@ export async function startServer({
             // to /api/projects/:id/events) sees it too. Route the
             // project fan-out through emitProjectEvent so empty-sink
             // cleanup and any future broadcast policy (rate limiting,
-            // schema validation, telemetry) apply uniformly across
+            // schema validation and run bookkeeping) apply uniformly across
             // every project emitter (PerishCode P3 on PR #1338).
             send(e.event, e.data);
             if (critiqueProjectIdForBus) {
@@ -5810,25 +5406,18 @@ export async function startServer({
     // close handler runs after cancel() has already flipped cancelRequested,
     // so consulting only the current flag loses the ordering of those events.
     let agentStreamErrorObservedBeforeCancellation = false;
-    let acpFatalErrorObservedBeforeCancellation = false;
+    let rpcFatalErrorObservedBeforeCancellation = false;
     run.runtimeFailureObservedBeforeCancellation = false;
     // Holds buffered plain-text stdout chunks for agents (currently
     // antigravity) where we need to inspect the full output at close
     // time before deciding whether to forward it. The auth-prompt guard
     // in the close handler suppresses the buffer when the output is an
     // OAuth prompt; otherwise the flush below sends the chunks in order.
-    const plaintextStdoutBuffer: BufferedStdoutChunk[] = [];
-    // Arrival time of the first buffered plain-text stdout chunk
-    // (antigravity). First-token timing is stamped from this value only
-    // when the buffer is actually flushed to the client at close time. If
-    // the auth-prompt guard suppresses the buffer (the OAuth login URL is
-    // printed to stdout), no token ever reaches the user, so TTFT must not
-    // be recorded for that failure mode. See PR #3412.
-    let firstBufferedStdoutAt: number | null = null;
+    const plaintextStdoutBuffer: Array<{ text: string }> = [];
     // Tracks whether any stream the run is using actually emitted user-
     // visible content or a deliverable. Only the streams routed through
-    // `sendAgentEvent` contribute to this flag; ACP sessions and plain stdout
-    // streams are covered by their own success/failure paths and the
+    // `sendAgentEvent` contribute to this flag; plain stdout streams are
+    // covered by their own success/failure paths and the
     // empty-output guard below skips them via `trackingSubstantiveOutput`.
     let agentProducedOutput = false;
     let trackingSubstantiveOutput = false;
@@ -5842,51 +5431,6 @@ export async function startServer({
       'text_delta',
       'artifact',
     ]);
-    // First-token timing must reflect when the user actually starts seeing
-    // model output, so only token-producing events qualify. `tool_use` is
-    // deliberately excluded: a run that opens with a Read/Glob/MCP call would
-    // otherwise stamp `firstTokenAt` before any `text_delta` streamed,
-    // making `time_to_first_token_ms` / `spawn_to_first_token_ms` under-report
-    // TTFT for tool-first runs. `thinking_delta` stays in because it is the
-    // first visible model activity the user perceives.
-    const FIRST_TOKEN_AGENT_EVENT_TYPES = new Set([
-      'text_delta',
-      'thinking_delta',
-    ]);
-    const noteFirstTokenAt = (timestamp = Date.now()) => {
-      if (run.lifecycleTimings?.firstTokenAt) return;
-      lifecycle.mark('first_token', timestamp);
-      lifecycle.mark('first_visible_output', timestamp);
-    };
-    // Subsegment markers inside `processSpawnedAt -> firstTokenAt` (#3408 §4).
-    // `cliReadyAt` is the first well-formed adapter output and is stamped for
-    // every runtime family from its own decode choke point: first JSONL line
-    // (claude-stream-json), first decoded stream event (json-event-stream /
-    // qoder / pi-rpc), first non-empty stdout chunk (plain), or first ACP
-    // JSON-RPC message (acp-json-rpc). `sessionInitDoneAt` is only observable
-    // for ACP (the resume/`session/new` ack); for stream/plain families that
-    // gap is folded into `spawn_to_first_token_remainder_ms` rather than
-    // anchored to a fabricated marker. Both are first-write-wins like
-    // `firstTokenAt` so a later chunk cannot move an already-stamped boundary.
-    const noteCliReadyAt = (timestamp = Date.now()) => {
-      if (run.lifecycleTimings?.cliReadyAt) return;
-      run.lifecycleTimings = {
-        ...(run.lifecycleTimings ?? {}),
-        cliReadyAt: timestamp,
-      };
-    };
-    const noteSessionInitDoneAt = (timestamp = Date.now()) => {
-      if (run.lifecycleTimings?.sessionInitDoneAt) return;
-      run.lifecycleTimings = {
-        ...(run.lifecycleTimings ?? {}),
-        sessionInitDoneAt: timestamp,
-      };
-    };
-    const noteFirstTokenFromAgentEvent = (ev) => {
-      if (ev?.type && FIRST_TOKEN_AGENT_EVENT_TYPES.has(ev.type)) {
-        noteFirstTokenAt();
-      }
-    };
 
     // Per-run role-marker guard for non-Claude structured streams (#3247).
     // Claude has its own per-message guards in claude-stream.ts.
@@ -5907,8 +5451,8 @@ export async function startServer({
       return runGuard.feedText(delta);
     }
 
-    // Shared helper for emitting guarded text deltas across all agent
-    // stream handlers (sendAgentEvent, copilot, ACP).
+    // Shared helper for emitting guarded text deltas across agent stream
+    // handlers.
     function emitGuardedTextDelta(delta: string) {
       const safe = guardTextDelta(delta);
       if (safe.length > 0) {
@@ -5936,7 +5480,7 @@ export async function startServer({
     // subprocess will keep generating downstream tokens (including
     // `tool_use` blocks built on the fabricated context) until it exits
     // on its own. We terminate the child immediately so:
-    //   1. Token billing stops at the detection point, not at the
+    //   1. Token accounting stops at the detection point, not at the
     //      model's natural completion of the contaminated response.
     //   2. `tool_use` content blocks emitted AFTER the marker cannot
     //      reach the daemon's tool-call dispatcher. Blocks emitted
@@ -5962,12 +5506,9 @@ export async function startServer({
           { retryable: true },
         ),
       );
-      // ACP sessions (Hermes, Kimi, Devin, Kiro, etc.) need explicit
-      // abort because their I/O is multiplexed and they won't
-      // necessarily exit on child SIGTERM alone.
-      if (acpSession?.abort) {
+      if (rpcSession?.abort) {
         try {
-          acpSession.abort();
+          rpcSession.abort();
         } catch {
           // ignore — best-effort
         }
@@ -5981,9 +5522,8 @@ export async function startServer({
     // whose `old_string` never matches, or a shell assertion against an element
     // that does not exist). Unlike the BYOK proxy path — bounded by
     // MAX_BYOK_TOOL_LOOPS — the autonomous chat agents had no such bound. This
-    // guard observes the normalized tool_use/tool_result events EVERY agent
-    // path emits, so one instance covers Claude, Codex/OpenCode, Copilot, ACP,
-    // … It emits a one-shot `tool_loop` warning, then (in halt mode) terminates
+    // guard observes the normalized tool_use/tool_result events every retained
+    // agent path emits. It emits a one-shot `tool_loop` warning, then terminates
     // the run at a hard ceiling. Mode via OD_TOOL_LOOP_GUARD (halt|warn|off).
     const toolLoopGuard = createToolLoopGuard({ mode: resolveToolLoopMode() });
     let toolLoopAbortFired = false;
@@ -6004,9 +5544,9 @@ export async function startServer({
           { retryable: true },
         ),
       );
-      if (acpSession?.abort) {
+      if (rpcSession?.abort) {
         try {
-          acpSession.abort();
+          rpcSession.abort();
         } catch {
           // ignore — best-effort
         }
@@ -6043,13 +5583,12 @@ export async function startServer({
       }
     }
 
-    // Single choke point for emitting an agent event to the client. EVERY
-    // stream handler (sendAgentEvent, the Claude callback, Copilot, ACP, …)
+    // Single choke point for emitting an agent event to the client. Every
+    // retained stream handler
     // emits through here, never via a bare send('agent', …), so the tool-loop
     // guard sees every runtime's tool activity and no handler can drift out of
     // coverage. observe runs AFTER the send so a `tool_loop` warning/halt
-    // follows the result that triggered it in the stream. (PR #3375 review:
-    // Copilot and ACP bypassed the guard by calling send('agent', …) directly.)
+    // follows the result that triggered it in the stream.
     function emitAgentEvent(ev: any) {
       // Fold work-completeness signals (TodoWrite snapshot / truncation) off the
       // stream BEFORE the send, so run.lastTodoSnapshot / run.truncatedMidTurn are
@@ -6085,7 +5624,7 @@ export async function startServer({
         if (authFailure?.status === 'missing') {
           send('error', createSseErrorPayload(
             'AGENT_AUTH_REQUIRED',
-            authFailure.message ?? cursorAuthGuidance(),
+            authFailure.message ?? genericAgentAuthGuidance(def.name),
             { retryable: true },
           ));
           return;
@@ -6108,8 +5647,7 @@ export async function startServer({
         return;
       }
       // First well-formed decoded stream event = CLI ready for the
-      // json-event-stream / qoder / pi-rpc families (#3408 §4 marker).
-      noteCliReadyAt();
+      // json-event-stream / pi-rpc families (#3408 §4 marker).
       // Capture-style resume: codex reports its own thread id on the
       // `thread.started` status event. Persist the most recent non-empty id we
       // see so the create-turn store (and the resumable-failure store) use the
@@ -6131,15 +5669,13 @@ export async function startServer({
       }
       lastAgentEventPhase = summarizeAgentEventForInactivity(ev);
       noteAgentActivity();
-      // Role-marker guard for qoder / json-event-stream / pi-rpc (#3247).
+      // Role-marker guard for json-event-stream / pi-rpc (#3247).
       if (ev?.type === 'text_delta' && typeof ev.delta === 'string') {
         if (emitTitleFilteredGuardedTextDelta(ev.delta)) {
-          noteFirstTokenAt();
           agentProducedOutput = true;
         }
         return;
       }
-      noteFirstTokenFromAgentEvent(ev);
       if (ev?.type && SUBSTANTIVE_AGENT_EVENT_TYPES.has(ev.type)) {
         agentProducedOutput = true;
       }
@@ -6155,8 +5691,6 @@ export async function startServer({
       const bufferedStdout = plaintextStdoutBuffer.map((chunk) => chunk.text).join('');
       if (!looksLikeGeminiJsonEventStream(bufferedStdout)) return false;
       trackingSubstantiveOutput = true;
-      const firstTokenAt = bufferedAntigravityGeminiFirstTokenAt(plaintextStdoutBuffer);
-      if (firstTokenAt !== null) noteFirstTokenAt(firstTokenAt);
       const handler = createJsonEventStreamHandler('gemini', sendAgentEvent);
       handler.feed(bufferedStdout);
       handler.flush();
@@ -6168,7 +5702,6 @@ export async function startServer({
       const claude = createClaudeStreamHandler((ev) => {
         // First parsed claude-stream-json event = CLI ready (#3408 §4); the
         // init/system line arrives well before the model's first token.
-        noteCliReadyAt();
         if (ev?.type === 'error') {
           // Claude commonly reports its SIGTERM shutdown as an assistant or
           // result error frame. Once cancellation has been requested, that
@@ -6180,11 +5713,10 @@ export async function startServer({
           // now surfaces here as a stream error; the resume-target-missing
           // block in the close handler clears the stale handle and re-runs the
           // turn fresh, so forwarding this error would flash an execution
-          // failure a beat before the invisible recovery. Mirrors the ACP
-          // resume_failed suppression below; the close handler stays the sole
-          // authority on how a resume failure ends.
+          // failure a beat before the invisible recovery. The close handler
+          // stays the sole authority on how a resume failure ends.
           if (
-            (def.resumesSessionViaCli === true || def.resumesSessionViaAcpLoad === true) &&
+            def.resumesSessionViaCli === true &&
             agentResumeCtx.isResuming &&
             !run.resumeAutoReseeded &&
             isAgentResumeFailure(def.id, agentStderrTail, agentStdoutTail)
@@ -6242,12 +5774,10 @@ export async function startServer({
         if (ev?.type === 'text_delta' && typeof ev.delta === 'string') {
           const visibleDelta = titleMarkerStripper.strip(ev.delta);
           if (visibleDelta) {
-            noteFirstTokenAt();
             emitAgentEvent({ ...ev, delta: visibleDelta });
           }
           return;
         }
-        noteFirstTokenFromAgentEvent(ev);
         emitAgentEvent(ev);
         // Claude uses per-message guards (claude-stream.ts) rather than the
         // run-scoped guard above, so its `fabricated_role_marker` events
@@ -6272,32 +5802,12 @@ export async function startServer({
       }, { suppressHtmlArtifactsAfterFileWrite: def.id === 'claude' });
       child.stdout.on('data', (chunk) => claude.feed(chunk));
       child.on('close', () => claude.flush());
-    } else if (def.streamFormat === 'qoder-stream-json') {
-      trackingSubstantiveOutput = true;
-      const qoder = createQoderStreamHandler(sendAgentEvent);
-      child.stdout.on('data', (chunk) => qoder.feed(chunk));
-      child.on('close', () => qoder.flush());
-    } else if (def.streamFormat === 'copilot-stream-json') {
-      const copilot = createCopilotStreamHandler((ev) => {
-        lastAgentEventPhase = summarizeAgentEventForInactivity(ev);
-        noteAgentActivity();
-        if (ev?.type === 'text_delta' && typeof ev.delta === 'string') {
-          if (emitTitleFilteredGuardedTextDelta(ev.delta)) {
-            noteFirstTokenAt();
-          }
-          return;
-        }
-        noteFirstTokenFromAgentEvent(ev);
-        emitAgentEvent(ev);
-      });
-      child.stdout.on('data', (chunk) => copilot.feed(chunk));
-      child.on('close', () => copilot.flush());
     } else if (def.streamFormat === 'pi-rpc') {
       // Route through sendAgentEvent so that pi-rpc's error events
       // (extension_error, auto_retry_end with success=false, and the
       // message_update error delta) set agentStreamError and flip the
-      // run to `failed` on close — same path as qoder-stream-json and
-      // json-event-stream after issue #691. Also enables the
+      // run to `failed` on close — the same path as json-event-stream.
+      // Also enables the
       // substantive-output guard (agentProducedOutput) so a pi run
       // that exits 0 without producing visible content is caught.
       //
@@ -6309,7 +5819,7 @@ export async function startServer({
       //   - 'error' channel → route through the daemon's error path
       //     (createSseErrorPayload + send SSE + set agentStreamError)
       trackingSubstantiveOutput = true;
-      acpSession = attachPiRpcSession({
+      rpcSession = attachPiRpcSession({
         child,
         prompt: composed,
         cwd: effectiveCwd,
@@ -6326,7 +5836,7 @@ export async function startServer({
             flushVisibleAgentStderr();
             agentStreamError = String(payload?.message || 'Pi session error');
             agentStreamErrorObservedBeforeCancellation = true;
-            acpFatalErrorObservedBeforeCancellation = true;
+            rpcFatalErrorObservedBeforeCancellation = true;
             run.runtimeFailureObservedBeforeCancellation = true;
             const piErrorCode = typeof payload?.code === 'string' ? payload.code : null;
             if (piErrorCode) {
@@ -6348,79 +5858,6 @@ export async function startServer({
         },
         imagePaths: def.supportsImagePaths ? agentImagePaths : [],
         uploadRoot: UPLOAD_DIR,
-      });
-    } else if (def.streamFormat === 'acp-json-rpc') {
-      const acpStageTimeoutMs = resolveAcpStageTimeoutMs(def.inactivityTimeoutMs);
-      acpSession = attachAcpSession({
-        child,
-        prompt: composed,
-        cwd: effectiveCwd,
-        model: safeModel,
-        imagePaths: def.supportsImagePaths ? agentImagePaths : [],
-        mcpServers,
-        envFormat: def.acpMcpEnvFormat ?? 'array',
-        executionProfile,
-        // Resume the prior upstream session (drives `session/load`) when the
-        // resume-identity guard says it is safe; otherwise a fresh session/new.
-        ...(def.resumesSessionViaAcpLoad === true && agentResumeCtx.isResuming && agentResumeCtx.resumeSessionId
-          ? { resumeSessionId: agentResumeCtx.resumeSessionId }
-          : {}),
-        onCliReady: () => noteCliReadyAt(),
-        onSessionInit: () => noteSessionInitDoneAt(),
-        send: (event, data) => {
-          if (event === 'error') {
-            if (run.cancelRequested) return;
-            acpFatalErrorObservedBeforeCancellation = true;
-            run.runtimeFailureObservedBeforeCancellation = true;
-          }
-          if (event === 'agent') {
-            lastAgentEventPhase = summarizeAgentEventForInactivity(data);
-          }
-          noteAgentActivity();
-          if (event === 'error') flushVisibleAgentStderr();
-          // Hold back the `resume_failed` error so the same-turn reseed stays
-          // transparent. When this run is resuming an upstream session via
-          // `session/load` and the agent reports that session is gone, the ACP
-          // bridge has already called `fail()` -> `send('error')` for the failed
-          // load. The child-close handler then clears the stale handle and
-          // re-runs this turn fresh (the resume-target-missing block below), so
-          // forwarding this error would flash an execution failure — and trip
-          // clients that treat an SSE `error` as terminal — a beat before the
-          // invisible recovery. Suppress it and leave a diagnostic instead; the
-          // close handler is the sole authority on whether this turn ends in an
-          // error or a transparent reseed. The `resumeAutoReseeded` guard lets a
-          // second resume failure in one run fall through to the explicit
-          // "resend your message" affordance the close handler emits.
-          if (
-            event === 'error' &&
-            def.resumesSessionViaAcpLoad === true &&
-            agentResumeCtx.isResuming &&
-            agentResumeCtx.resumeSessionId &&
-            !run.resumeAutoReseeded &&
-            isAgentResumeFailure(def.id, agentStderrTail, agentStdoutTail)
-          ) {
-            design.runs.emit(run, 'diagnostic', {
-              type: 'agent_resume_failed_suppressed',
-              agent_id: def.id,
-              reason: 'resume_failed',
-              previous_session_id: agentResumeCtx.resumeSessionId ?? null,
-            });
-            return;
-          }
-          if (event === 'agent' && data?.type === 'text_delta' && typeof data.delta === 'string') {
-            if (emitTitleFilteredGuardedTextDelta(data.delta)) {
-              noteFirstTokenAt();
-            }
-            return;
-          }
-          if (event === 'agent') {
-            noteFirstTokenFromAgentEvent(data);
-            emitAgentEvent(data);
-          } else {
-            send(event, data);
-          }
-        },
-        ...(acpStageTimeoutMs !== undefined ? { stageTimeoutMs: acpStageTimeoutMs } : {}),
       });
     } else if (def.streamFormat === 'json-event-stream') {
       // Pipe through sendAgentEvent so the OpenCode `type:'error'` frame
@@ -6446,9 +5883,7 @@ export async function startServer({
       // suppressed OAuth-prompt path never reports a TTFT (PR #3412).
       child.stdout.on('data', (chunk) => {
         noteAgentActivity();
-        const receivedAt = Date.now();
-        if (firstBufferedStdoutAt === null) firstBufferedStdoutAt = receivedAt;
-        plaintextStdoutBuffer.push({ text: String(chunk), receivedAt });
+        plaintextStdoutBuffer.push({ text: String(chunk) });
       });
     } else {
       // Plain / BYOK mode: guard raw stdout chunks (#3247).
@@ -6458,12 +5893,10 @@ export async function startServer({
         // First non-empty stdout chunk = CLI ready for the plain family
         // (#3408 §4 marker). A plain adapter has no structured preamble, so
         // this typically coincides with its first model output.
-        if (text.length > 0) noteCliReadyAt();
         const strippedText = visibleStdoutControlStripper.write(text);
         const visibleText = titleMarkerStripper.strip(strippedText);
         const safe = guardTextDelta(visibleText);
         if (safe.length > 0) {
-          noteFirstTokenAt();
           send('stdout', { chunk: safe });
         }
         if (runGuard.contaminated && !runWarned) {
@@ -6476,9 +5909,9 @@ export async function startServer({
         }
       });
     }
-    // Wire the acpSession onto the run so cancel() can call abort()
-    // instead of raw SIGTERM (applies to pi-rpc and acp-json-rpc).
-    run.acpSession = acpSession;
+    // Wire Pi's RPC session onto the run so cancel() can request a graceful
+    // abort before falling back to process signals.
+    run.rpcSession = rpcSession;
     child.stderr.on('data', (chunk) => {
       noteAgentActivity();
       emitVisibleAgentStderr(chunk);
@@ -6524,18 +5957,12 @@ export async function startServer({
       }
       revokeToolToken('child_exit');
       unregisterChatAgentEventSink();
-      // Resume-target-missing recovery runs BEFORE the generic fatal/stream-error
-      // short-circuits. The signal arrives differently per adapter: codex reports
-      // "no rollout found for thread id" as a stream `error`, while ACP adapters
-      // report a structured `resume_failed` JSON-RPC error that the ACP bridge
-      // turns into a FATAL. Either would otherwise be swallowed by the
-      // `fatal_rpc_error` / `stream_error` paths below and leave the dead session
-      // id stored — so every later turn would retry the same broken resume (#4275
-      // class). Clearing the stale handle here lets the next turn start fresh +
-      // re-seed the full transcript: one cold turn, never a broken conversation.
+      // Resume-target-missing recovery runs before generic stream-error
+      // handling. Otherwise the dead session id would stay stored and every
+      // later turn would retry the same broken resume.
       if (
         !run.cancelRequested &&
-        (def.resumesSessionViaCli === true || def.resumesSessionViaAcpLoad === true) &&
+        def.resumesSessionViaCli === true &&
         agentResumeCtx.isResuming &&
         run.conversationId &&
         isAgentResumeFailure(def.id, agentStderrTail, agentStdoutTail)
@@ -6581,7 +6008,7 @@ export async function startServer({
         ));
         return design.runs.finish(run, 'failed', code ?? 1, signal ?? null);
       }
-      if (acpFatalErrorObservedBeforeCancellation && acpSession?.hasFatalError()) {
+      if (rpcFatalErrorObservedBeforeCancellation && rpcSession?.hasFatalError()) {
         markRpcCloseReason('fatal_rpc_error');
         return finishWithRetryDecision('failed', code ?? 1, signal ?? null);
       }
@@ -6602,7 +6029,7 @@ export async function startServer({
         if (authFailure?.status === 'missing') {
           send('error', createSseErrorPayload(
             'AGENT_AUTH_REQUIRED',
-            authFailure.message ?? cursorAuthGuidance(),
+            authFailure.message ?? genericAgentAuthGuidance(def.name),
             { retryable: true },
           ));
           return finishWithRetryDecision('failed', code ?? 1, signal ?? null);
@@ -6625,22 +6052,8 @@ export async function startServer({
         ));
         return finishWithRetryDecision('failed', code, signal);
       }
-      if (
-        code === 0 &&
-        !run.cancelRequested &&
-        isPluginAuthoringRun(db, run, getSnapshot) &&
-        !(await hasGeneratedPluginArtifacts(cwd)) &&
-        !emittedRenderableQuestionForm(clarifyingQuestionText)
-      ) {
-        send('error', createSseErrorPayload(
-          'AGENT_EXECUTION_FAILED',
-          'Plugin authoring ended before generating the required generated-plugin artifacts.',
-          { retryable: true },
-        ));
-        return finishWithRetryDecision('failed', code, signal);
-      }
       // Plain-stream auth-failure guard: plain adapters (today
-      // antigravity, deepseek's TUI variants) may exit cleanly with
+      // antigravity) may exit cleanly with
       // visible stdout that's actually an auth prompt — agy prints
       // "Authentication required. Please visit the URL to log in:
       // <URL>" + "Error: authentication timed out." rather than
@@ -6730,28 +6143,11 @@ export async function startServer({
         ));
         return finishWithRetryDecision('failed', 0, signal);
       }
-      // ACP agents that don't shut down on stdin.end() (e.g. Devin for
-      // Terminal) are forced to exit via SIGTERM from attachAcpSession after
-      // a clean prompt completion. Without an override, the chat run would
-      // be marked `failed` because `code === 0` fails (code is null on a
-      // signal exit). `completedSuccessfully()` reports whether the ACP
-      // session resolved without a fatal error or abort.
-      //
-      // Scope the override narrowly to the exact forced-shutdown shape this
-      // PR introduces: code is null AND signal is SIGTERM AND the ACP
-      // session reported clean completion. Any other post-response failure
-      // (non-zero exit code, SIGKILL, SIGSEGV, etc.) still propagates as
-      // `failed`, preserving the existing close-status behavior for genuine
-      // post-response process problems.
-      const acpCleanCompletion =
-        typeof acpSession?.completedSuccessfully === 'function' &&
-        acpSession.completedSuccessfully();
       const runArtifactSideEffects = runSideEffectsForRun(run);
       const status = classifyChatRunCloseStatus({
         cancelRequested: !!run.cancelRequested,
         code,
         signal,
-        acpCleanCompletion,
         artifactQuietShutdownRequested,
         turnCompletedCleanly: !!run.turnCompletedCleanly,
         artifactProducedThisRun:
@@ -6871,9 +6267,6 @@ export async function startServer({
       // here — using the first chunk's arrival time, so the OAuth-prompt
       // path (which returns before this flush) never records a TTFT for
       // output the user never saw (PR #3412).
-      if (plaintextStdoutBuffer.length > 0 && firstBufferedStdoutAt !== null) {
-        noteFirstTokenAt(firstBufferedStdoutAt);
-      }
       for (const chunk of plaintextStdoutBuffer) {
         const strippedText = visibleStdoutControlStripper.write(chunk.text);
         const visibleText = titleMarkerStripper.strip(strippedText);
@@ -6977,8 +6370,8 @@ export async function startServer({
       // The session path is discovered by attachPiRpcSession when it
       // processes agent_end; persist it under (conversationId, agentId) so
       // another conversation in the same cwd cannot inherit this history.
-      if (acpSession && typeof acpSession.getLastSessionPath === 'function') {
-        const sessionPath = acpSession.getLastSessionPath();
+      if (rpcSession && typeof rpcSession.getLastSessionPath === 'function') {
+        const sessionPath = rpcSession.getLastSessionPath();
         if (status === 'succeeded' && def.streamFormat === 'pi-rpc') {
           persistCapturedAgentSession(db, {
             conversationId: run.conversationId,
@@ -6997,34 +6390,6 @@ export async function startServer({
           });
           publishNativeSessionRecoveryMetadata();
         }
-      }
-      // ACP session/load adapters report a durable upstream handle
-      // from the ACP session; persist it (under the resume-identity guard) so
-      // the next turn resumes via session/load. A missing handle clears the row
-      // (so a fresh session is opened next turn), mirroring the capture-style
-      // adapters.
-      if (
-        def.resumesSessionViaAcpLoad === true &&
-        status === 'succeeded' &&
-        acpSession &&
-        typeof acpSession.getDurableSessionId === 'function'
-      ) {
-        persistCapturedAgentSession(db, {
-          conversationId: run.conversationId,
-          agentId: def.id,
-          sessionId: acpSession.getDurableSessionId(),
-          stablePromptHash: currentStableHash,
-          model: safeModel ?? null,
-          cwd: effectiveCwd,
-          lastMessageId: run.assistantMessageId ?? null,
-        });
-        run.nativeSessionRecovery = markNativeSessionCaptured({
-          previous: run.nativeSessionRecovery,
-          agentId: def.id,
-          sessionId: acpSession.getDurableSessionId(),
-          resumed: agentResumeCtx.isResuming,
-        });
-        publishNativeSessionRecoveryMetadata();
       }
       if (status === 'succeeded') {
         try {
@@ -7066,11 +6431,8 @@ export async function startServer({
     });
     if (writePromptToChildStdin && child.stdin) {
       const promptInputFormat = def.promptInputFormat ?? 'text';
-      lifecycle.mark('model_call_start');
-      lifecycle.mark('stdin_write_start');
       const markStdinWriteEnd = (err?: Error | null) => {
         if (err) return;
-        lifecycle.mark('stdin_write_end');
       };
       if (promptInputFormat === 'stream-json') {
         // Wrap the prompt as an Anthropic user message and write it as one
@@ -7117,7 +6479,6 @@ export async function startServer({
     chat: { startChatRun },
     lifecycle: { isDaemonShuttingDown: () => daemonShuttingDown },
     plugins: {
-      detectSkillPluginCandidateOnRunSuccess,
       firePipelineForRun,
       loadPluginRegistryView,
       renderPluginBriefTemplate,
@@ -7154,7 +6515,6 @@ export async function startServer({
     nativeDialogs: nativeDialogDeps,
     research: researchDeps,
     plugins: {
-      detectSkillPluginCandidateOnRunSuccess,
       firePipelineForRun,
       loadPluginRegistryView,
       renderPluginBriefTemplate,

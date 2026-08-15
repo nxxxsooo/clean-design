@@ -296,7 +296,7 @@ describe("postinstall script contract", () => {
         dependencies: { "@open-design/contracts": "workspace:*" },
         name: "@open-design/components",
       });
-      writeTarget(sandbox, "packages/download", { name: "@open-design/download" });
+      writeTarget(sandbox, "packages/platform", { name: "@open-design/platform" });
       const invocationLog = writePnpmStub(sandbox);
 
       const result = runFixturePostinstall(sandbox, { OPEN_DESIGN_POSTINSTALL_CONCURRENCY: "2" });
@@ -306,7 +306,7 @@ describe("postinstall script contract", () => {
       const events = readStubEvents(invocationLog);
       expect(eventIndex(events, "done", "packages/release")).toBeLessThan(eventIndex(events, "start", "packages/contracts"));
       expect(eventIndex(events, "done", "packages/contracts")).toBeLessThan(eventIndex(events, "start", "packages/components"));
-      expect(events.filter((event) => event.event === "start").map((event) => event.target)).toContain("packages/download");
+      expect(events.filter((event) => event.event === "start").map((event) => event.target)).toContain("packages/platform");
     } finally {
       rmSync(sandbox, { recursive: true, force: true });
     }

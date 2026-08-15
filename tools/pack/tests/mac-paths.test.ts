@@ -3,12 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { PRODUCT_NAME } from "../src/mac/constants.js";
-import {
-  macAppBundleName,
-  macAppExecutablePath,
-  resolveMacAppOutputDirectoryName,
-  sanitizeNamespace,
-} from "../src/mac/paths.js";
+import { macAppExecutablePath, resolveMacAppOutputDirectoryName, sanitizeNamespace } from "../src/mac/paths.js";
 
 describe("sanitizeNamespace", () => {
   it("keeps alphanumerics, dots, hyphens, and underscores", () => {
@@ -19,13 +14,6 @@ describe("sanitizeNamespace", () => {
     expect(sanitizeNamespace("a/b c")).toBe("a-b-c");
     expect(sanitizeNamespace("a   //  b")).toBe("a-b");
     expect(sanitizeNamespace("中文/ns")).toBe("-ns");
-  });
-});
-
-describe("macAppBundleName", () => {
-  it("formats <PRODUCT_NAME>.<sanitized-namespace>.app", () => {
-    expect(macAppBundleName("release-beta")).toBe(`${PRODUCT_NAME}.release-beta.app`);
-    expect(macAppBundleName("a b/c")).toBe(`${PRODUCT_NAME}.a-b-c.app`);
   });
 });
 
@@ -44,7 +32,7 @@ describe("macAppExecutablePath", () => {
 });
 
 describe("resolveMacAppOutputDirectoryName", () => {
-  it("returns mac-arm64 on arm64 hosts, otherwise mac", () => {
-    expect(resolveMacAppOutputDirectoryName()).toBe(process.arch === "arm64" ? "mac-arm64" : "mac");
+  it("always targets the Apple Silicon builder directory", () => {
+    expect(resolveMacAppOutputDirectoryName()).toBe("mac-arm64");
   });
 });

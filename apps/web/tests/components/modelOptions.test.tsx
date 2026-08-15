@@ -211,7 +211,7 @@ describe('SearchableModelSelect', () => {
         onChange={onChange}
         searchPlaceholder="Search models"
         disabledOptionHint={(option) =>
-          option.enabled === false ? '请升级后使用高级模型' : null
+          option.enabled === false ? '当前供应商未启用此模型' : null
         }
       />,
     );
@@ -221,53 +221,13 @@ describe('SearchableModelSelect', () => {
     const disabledOption = await screen.findByRole('option', { name: /^deepseek-v4-pro$/ });
     expect(disabledOption.hasAttribute('disabled')).toBe(true);
     expect(disabledOption.getAttribute('aria-describedby')).toBeTruthy();
-    expect(disabledOption.textContent).toContain('请升级后使用高级模型');
+    expect(disabledOption.textContent).toContain('当前供应商未启用此模型');
 
     fireEvent.click(disabledOption);
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('renders a lock affordance for disabled options that opens the upgrade destination', async () => {
-    const onChange = vi.fn();
-    const onDisabledOptionUpgrade = vi.fn();
-    render(
-      <SearchableModelSelect
-        models={[
-          { id: 'deepseek-v4-flash', label: 'deepseek-v4-flash', default: true },
-          { id: 'deepseek-v4-pro', label: 'deepseek-v4-pro', enabled: false },
-        ]}
-        value="deepseek-v4-flash"
-        onChange={onChange}
-        searchPlaceholder="Search models"
-        disabledOptionHint={(option) =>
-          option.enabled === false ? 'Upgrade to use' : null
-        }
-        onDisabledOptionUpgrade={onDisabledOptionUpgrade}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('combobox'));
-
-    // The inline hint text is replaced by the lock affordance whose accessible
-    // name (and tooltip) carry the hint.
-    const disabledOption = await screen.findByRole('option', {
-      name: /^deepseek-v4-pro$/,
-    });
-    expect(disabledOption.getAttribute('aria-disabled')).toBe('true');
-
-    const lock = screen.getByTestId('model-option-upgrade-lock');
-    expect(lock.getAttribute('aria-label')).toBe('Upgrade to use');
-    expect(lock.getAttribute('title')).toBe('Upgrade to use');
-
-    fireEvent.click(lock);
-    expect(onDisabledOptionUpgrade).toHaveBeenCalledTimes(1);
-    expect(onDisabledOptionUpgrade).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'deepseek-v4-pro' }),
-    );
-    expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it('keeps upgrade affordances outside the truncating model label', async () => {
+  it('keeps capability badges outside the truncating model label', async () => {
     const longModelLabel = 'gemini-3-flash-preview-with-an-extra-long-provider-suffix';
 
     render(
@@ -285,9 +245,8 @@ describe('SearchableModelSelect', () => {
         onChange={vi.fn()}
         searchPlaceholder="Search models"
         disabledOptionHint={(option) =>
-          option.enabled === false ? 'Upgrade to use' : null
+          option.enabled === false ? 'Unavailable from provider' : null
         }
-        onDisabledOptionUpgrade={vi.fn()}
       />,
     );
 
@@ -300,12 +259,9 @@ describe('SearchableModelSelect', () => {
     const affordances = disabledOption.querySelector(
       '.model-select-searchable__option-affordances',
     );
-    const lock = screen.getByTestId('model-option-upgrade-lock');
     const badge = disabledOption.querySelector('.model-select-searchable__option-badge');
 
     expect(label?.textContent).toBe(longModelLabel);
-    expect(label?.contains(lock)).toBe(false);
-    expect(affordances?.contains(lock)).toBe(true);
     expect(affordances?.contains(badge)).toBe(true);
     expect(disabledOption).toHaveAccessibleName(longModelLabel);
   });

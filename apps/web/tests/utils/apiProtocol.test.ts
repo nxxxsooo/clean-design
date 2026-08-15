@@ -28,19 +28,14 @@ describe('api protocol labels', () => {
   });
 
   it('labels OpenCode-backed BYOK protocol agent ids', () => {
-    expect(agentDisplayName('senseaudio-api')).toBe('SenseAudio API via OpenCode');
+    expect(agentDisplayName('senseaudio-api')).toBe('SenseAudio API');
   });
 
-  it('normalizes Qoder local CLI ids, aliases, and executable paths', () => {
-    expect(agentDisplayName('qoder')).toBe('Qoder');
-    expect(exactAgentDisplayName('qodercli')).toBe('Qoder');
-    expect(exactAgentDisplayName('Qoder CLI')).toBe('Qoder');
-    expect(agentDisplayName('/opt/homebrew/bin/qodercli')).toBe('Qoder');
-    expect(agentDisplayName('C:\\Tools\\qodercli.cmd')).toBe('Qoder');
-  });
-
-  it('includes explicit Qoder models but hides the default model', () => {
-    expect(agentModelDisplayName('qoder', 'Qoder CLI', 'ultimate')).toBe('Qoder · ultimate');
-    expect(agentModelDisplayName('qoder', 'Qoder CLI', 'default')).toBe('Qoder');
+  it('normalizes the Antigravity CLI alias', () => {
+    expect(agentDisplayName('agy')).toBe('Antigravity');
+    expect(exactAgentDisplayName('agy')).toBe('Antigravity');
+    expect(agentModelDisplayName('antigravity', 'agy', 'gemini-3.1-pro')).toBe(
+      'Antigravity · gemini-3.1-pro',
+    );
   });
 });

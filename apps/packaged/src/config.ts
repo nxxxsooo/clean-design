@@ -62,7 +62,7 @@ async function readJsonIfExists(filePath: string): Promise<RawPackagedConfig | n
 }
 
 function resolveDefaultConfigPath(): string {
-  return join(process.resourcesPath, "open-design-config.json");
+  return join(process.resourcesPath, "clean-design-config.json");
 }
 
 async function readRawPackagedConfig(): Promise<RawPackagedConfig> {
@@ -76,7 +76,7 @@ async function readRawPackagedConfig(): Promise<RawPackagedConfig> {
   const electronApp = await loadElectronApp();
   return (
     (await readJsonIfExists(resolveDefaultConfigPath())) ??
-    (await readJsonIfExists(join(electronApp.getAppPath(), "open-design-config.json"))) ??
+    (await readJsonIfExists(join(electronApp.getAppPath(), "clean-design-config.json"))) ??
     {}
   );
 }
@@ -113,14 +113,15 @@ function isTruthyEnv(value: string | undefined): boolean {
   return value === "1" || value === "true" || value === "yes";
 }
 
-function resolvePackagedWebStandaloneRoot(
+export function resolvePackagedWebStandaloneRoot(
   webOutputMode: PackagedWebOutputMode,
   value: string | undefined,
+  resourcesPath: string = process.resourcesPath,
 ): string | null {
   const configured = resolveOptionalPath(value);
   if (configured != null) return configured;
   if (webOutputMode !== "standalone") return null;
-  return join(process.resourcesPath, "open-design-web-standalone");
+  return join(resourcesPath, "clean-design-web-standalone");
 }
 
 async function resolvePackagedRelativeEntry(value: string | undefined): Promise<string | null> {
@@ -143,10 +144,10 @@ export async function readPackagedConfig(): Promise<PackagedConfig> {
     raw.namespaceBaseRoot,
     electronApp.getPath("userData"),
   );
-  const resourceRoot = resolveOptionalPath(raw.resourceRoot) ?? join(process.resourcesPath, "open-design");
+  const resourceRoot = resolveOptionalPath(raw.resourceRoot) ?? join(process.resourcesPath, "clean-design");
   const relativeNodeCommand =
     raw.nodeCommandRelative == null || raw.nodeCommandRelative.length === 0
-      ? join("open-design", "bin", "node")
+      ? join("clean-design", "bin", "node")
       : raw.nodeCommandRelative;
   const nodeCommandCandidate = join(process.resourcesPath, relativeNodeCommand);
   const nodeCommand = (await pathExists(nodeCommandCandidate)) ? nodeCommandCandidate : null;

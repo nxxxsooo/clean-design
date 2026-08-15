@@ -1,76 +1,21 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'vitest';
 import {
-  AGENT_DEFS, aider, antigravity, assert, claude, codex, copilot, cursorAgent, deepseek, devin, detectAgents, grokBuild, join, kilo, kimi, kiro, mkdtempSync, opencode, pi, qoder, qwen, rmSync, spawnEnvForAgent, tmpdir, vibe, writeFileSync, chmodSync,
+  antigravity,
+  assert,
+  chmodSync,
+  claude,
+  codex,
+  join,
+  mkdtempSync,
+  opencode,
+  pi,
+  rmSync,
+  tmpdir,
+  writeFileSync,
 } from './helpers/test-helpers.js';
 import { writeAntigravityModelSelection } from '../../src/runtimes/defs/antigravity.js';
 import { agentCapabilities } from '../../src/runtimes/capabilities.js';
-import type { TestAgentDef } from './helpers/test-helpers.js';
-
-// ---- Cursor Agent --trust capability (issue #4461) -------------------------
-// `--trust` is only honored in `-p`/headless mode and only exists on newer
-// cursor-agent builds. Older installs reject it with "unknown option
-// '--trust'" and exit 1, killing Test and task execution. The flag is gated
-// on the `--help` probe (capabilityFlags) like claude's --add-dir, so the
-// baseline (no probe / probe failed -> caps = {}) must omit it.
-
-test('cursor-agent omits --trust by default until the --help probe confirms support (issue #4461)', () => {
-  // Default state before any capability probe: agentCapabilities has no entry
-  // -> buildArgs gets `caps = {}` -> caps.trust is undefined -> falsy -> no
-  // --trust. This is also the "probe threw" case (timeout, binary missing,
-  // non-zero --help exit), which is exactly the older cursor-agent that
-  // rejects the flag. Omitting it keeps Test working there.
-  agentCapabilities.delete('cursor-agent');
-  const args = cursorAgent.buildArgs(
-    '',
-    [],
-    [],
-    {},
-    { cwd: '/tmp/od-project' },
-  );
-
-  assert.deepEqual(args, [
-    '--print',
-    '--output-format',
-    'stream-json',
-    '--stream-partial-output',
-    '--force',
-    '--workspace',
-    '/tmp/od-project',
-  ]);
-  assert.equal(args.includes('--trust'), false);
-});
-
-test('cursor-agent passes --trust once the --help probe detects it', () => {
-  agentCapabilities.set('cursor-agent', { trust: true });
-  try {
-    const args = cursorAgent.buildArgs(
-      '',
-      [],
-      [],
-      {},
-      { cwd: '/tmp/od-project' },
-    );
-
-    assert.deepEqual(args, [
-      '--print',
-      '--output-format',
-      'stream-json',
-      '--stream-partial-output',
-      '--force',
-      '--trust',
-      '--workspace',
-      '/tmp/od-project',
-    ]);
-  } finally {
-    agentCapabilities.delete('cursor-agent');
-  }
-});
-
-test('cursor-agent declares the --trust capability probe (issue #4461 root cause)', () => {
-  assert.deepEqual(cursorAgent.helpArgs, ['--help']);
-  assert.equal(cursorAgent.capabilityFlags?.['--trust'], 'trust');
-});
 
 test('opencode args keep the documented run/json argv and ignore unsupported reasoning options', () => {
   agentCapabilities.delete('opencode');
@@ -130,117 +75,6 @@ test('opencode passes --dangerously-skip-permissions when the help probe finds i
   } finally {
     agentCapabilities.delete('opencode');
   }
-});
-
-// Copilot reads the prompt from stdin when `-p` is omitted entirely
-// (upstream copilot-cli issue #1046, confirmed working as
-// `echo "..." | copilot --model <id>`). The earlier `-p -` attempt
-// was a dead end because Copilot takes `-` as a literal one-character
-// prompt; omitting `-p` is a separate code path that does delegate to
-// stdin under a non-TTY pipe. Pin `promptViaStdin: true` and the
-// stdin-only argv shape so a future refactor can't silently bring
-// `-p <prompt>` back and reintroduce the Windows ENAMETOOLONG
-// regression (issue #705).
-test('copilot delivers the prompt via stdin (no -p, no prompt body in argv)', () => {
-  const prompt = 'design a landing page';
-  const baseArgs = copilot.buildArgs(prompt, [], [], {});
-  assert.equal(copilot.promptViaStdin, true);
-  assert.ok(
-    !baseArgs.includes('-p'),
-    'copilot argv must not include -p; the prompt rides stdin',
-  );
-  assert.ok(
-    !baseArgs.includes(prompt),
-    'copilot argv must not include the prompt body; it rides stdin',
-  );
-  assert.deepEqual(baseArgs, [
-    '--allow-all-tools',
-    '--output-format',
-    'json',
-  ]);
-});
-
-test('copilot args append model and extra dirs after the base flags without reintroducing -p', () => {
-  const prompt = 'design a landing page';
-  const args = copilot.buildArgs(
-    prompt,
-    [],
-    ['/tmp/od-skills', '/tmp/od-design-systems'],
-    { model: 'claude-sonnet-4.6' },
-  );
-  assert.ok(!args.includes('-p'));
-  assert.ok(!args.includes(prompt));
-  assert.deepEqual(args, [
-    '--allow-all-tools',
-    '--output-format',
-    'json',
-    '--model',
-    'claude-sonnet-4.6',
-    '--add-dir',
-    '/tmp/od-skills',
-    '--add-dir',
-    '/tmp/od-design-systems',
-  ]);
-});
-
-test('copilot drops empty / non-string entries from extraAllowedDirs without reintroducing -p', () => {
-  const prompt = 'design a landing page';
-  const args = copilot.buildArgs(
-    prompt,
-    [],
-    ['', null, '/tmp/od-skills', undefined] as unknown as string[],
-    {},
-  );
-  assert.ok(!args.includes('-p'));
-  // Only the one valid path survives.
-  const addDirIndex = args.indexOf('--add-dir');
-  assert.equal(args[addDirIndex + 1], '/tmp/od-skills');
-  assert.equal(args.filter((a) => a === '--add-dir').length, 1);
-});
-
-// Mirror of the Claude Code 200_000-char synthetic-prompt guard: even
-// when the composed prompt is large enough to blow the Windows
-// CreateProcess command-line cap (~32 KB direct, ~8 KB through a `.cmd`
-// shim), no argv entry must ever carry the prompt body. This is the
-// structural assertion that the issue #705 fix can't quietly regress.
-test('copilot flags promptViaStdin and never embeds the prompt in argv', () => {
-  assert.equal(copilot.promptViaStdin, true);
-
-  const longPrompt = 'x'.repeat(200_000);
-  const args = copilot.buildArgs(longPrompt, [], [], {});
-
-  assert.ok(Array.isArray(args), 'copilot.buildArgs must return argv');
-  assert.equal(
-    args.includes(longPrompt),
-    false,
-    'prompt must not appear in argv',
-  );
-  for (const arg of args) {
-    assert.ok(
-      typeof arg === 'string' && arg.length < 1000,
-      `no argv entry should carry the prompt body (saw length ${arg.length})`,
-    );
-  }
-});
-
-test('kiro args use acp subcommand for json-rpc streaming', () => {
-  const args = kiro.buildArgs('', [], [], {});
-
-  assert.deepEqual(args, ['acp']);
-  assert.equal(kiro.streamFormat, 'acp-json-rpc');
-});
-
-test('devin args use acp subcommand for json-rpc streaming', () => {
-  const args = devin.buildArgs('', [], [], {});
-
-  assert.deepEqual(args, [
-    '--permission-mode',
-    'dangerous',
-    '--respect-workspace-trust',
-    'false',
-    'acp',
-  ]);
-  assert.equal(devin.streamFormat, 'acp-json-rpc');
 });
 
 test('pi args use rpc mode without --no-session and append model/thinking options', () => {
@@ -359,170 +193,6 @@ test('pi args combine model, thinking, and extraAllowedDirs', () => {
     '--append-system-prompt',
     '/tmp/skills',
   ]);
-});
-
-test('qoder entry uses qodercli with stream-json stdin delivery and tier model hints', () => {
-  assert.equal(qoder.name, 'Qoder CLI');
-  assert.equal(qoder.bin, 'qodercli');
-  assert.deepEqual(qoder.versionArgs, ['--version']);
-  assert.equal(qoder.promptViaStdin, true);
-  assert.equal(qoder.streamFormat, 'qoder-stream-json');
-  assert.deepEqual(qoder.fallbackModels.map((m) => m.id), [
-    'default',
-    'lite',
-    'efficient',
-    'auto',
-    'performance',
-    'ultimate',
-  ]);
-});
-
-test('qoder args use non-interactive print mode with cwd, model, and add-dir', () => {
-  const args = qoder.buildArgs(
-    'prompt must not appear in argv',
-    ['/tmp/uploads/logo.png', '/tmp/uploads/hero concept.png'],
-    [
-      '/repo/skills',
-      '',
-      null as unknown as string,
-      './relative-skills',
-      'relative-design-systems',
-      '/repo/design-systems',
-    ],
-    { model: 'performance' },
-    { cwd: '/tmp/od-project' },
-  );
-
-  assert.deepEqual(args, [
-    '-p',
-    '--output-format',
-    'stream-json',
-    '--yolo',
-    '-w',
-    '/tmp/od-project',
-    '--model',
-    'performance',
-    '--add-dir',
-    '/repo/skills',
-    '--add-dir',
-    '/repo/design-systems',
-    '--attachment',
-    '/tmp/uploads/logo.png',
-    '--attachment',
-    '/tmp/uploads/hero concept.png',
-  ]);
-  assert.equal(args.includes('prompt must not appear in argv'), false);
-  assert.equal(args.includes('./relative-skills'), false);
-  assert.equal(args.includes('relative-design-systems'), false);
-});
-
-test('qoder args omit default model and cwd when absent', () => {
-  const args = qoder.buildArgs('', [], [], { model: 'default' }, {});
-
-  assert.deepEqual(args, [
-    '-p',
-    '--output-format',
-    'stream-json',
-    '--yolo',
-  ]);
-  assert.equal(args.includes('--model'), false);
-  assert.equal(args.includes('-w'), false);
-});
-
-test('qoder args omit empty, non-string, and relative add-dir entries', () => {
-  const args = qoder.buildArgs('', [], [
-    '',
-    null as unknown as string,
-    undefined as unknown as string,
-    42 as unknown as string,
-    './skills',
-    'design-systems',
-  ]);
-
-  assert.equal(args.includes('--add-dir'), false);
-});
-
-test('qoder args omit empty, non-string, and relative image attachment entries', () => {
-  const args = qoder.buildArgs('', [
-    '',
-    null as unknown as string,
-    undefined as unknown as string,
-    42 as unknown as string,
-    './uploads/logo.png',
-    'uploads/hero.png',
-    '/tmp/uploads/logo.png',
-  ], []);
-
-  assert.deepEqual(
-    args.filter((arg) => arg === '--attachment').length,
-    1,
-  );
-  assert.ok(args.includes('/tmp/uploads/logo.png'));
-  assert.equal(args.includes('./uploads/logo.png'), false);
-  assert.equal(args.includes('uploads/hero.png'), false);
-});
-
-test('qoder adapter inherits QODER_PERSONAL_ACCESS_TOKEN from daemon env', () => {
-  const env = spawnEnvForAgent('qoder', {
-    QODER_PERSONAL_ACCESS_TOKEN: 'qoder-pat',
-    PATH: '/usr/bin',
-    OD_DAEMON_URL: 'http://127.0.0.1:7456',
-  });
-
-  assert.equal(env.QODER_PERSONAL_ACCESS_TOKEN, 'qoder-pat');
-  assert.equal(env.PATH, '/usr/bin');
-  assert.equal(env.OD_DAEMON_URL, 'http://127.0.0.1:7456');
-});
-
-test('qoder adapter does not define static secret env', () => {
-  assert.equal(
-    (qoder as TestAgentDef & { env?: Record<string, string> }).env?.QODER_PERSONAL_ACCESS_TOKEN,
-    undefined,
-  );
-});
-
-test('detectAgents keeps qoder unavailable with fallback metadata when qodercli is missing', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'od-agents-empty-'));
-  try {
-    process.env.OD_AGENT_HOME = dir;
-    process.env.PATH = dir;
-
-    const agents = await detectAgents();
-    const detected = agents.find((agent) => agent.id === 'qoder');
-
-    assert.ok(detected);
-    assert.equal(detected.available, false);
-    assert.equal(detected.bin, 'qodercli');
-    assert.deepEqual(detected.models.map((m: { id: string }) => m.id), [
-      'default',
-      'lite',
-      'efficient',
-      'auto',
-      'performance',
-      'ultimate',
-    ]);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('qwen args check promptViaStdin, base args, model args and exclude `-` sentinel', () => {
-  assert.equal(qwen.promptViaStdin, true);
-
-  const baseArgs = qwen.buildArgs('', [], [], {}, { cwd: '/tmp/od-project' });
-  assert.deepEqual(baseArgs, ['--yolo']);
-  assert.equal(baseArgs.includes('-'), false);
-
-  const withModel = qwen.buildArgs(
-    '',
-    [],
-    [],
-    { model: 'qwen3-coder-plus' },
-    { cwd: '/tmp/od-project' },
-  );
-
-  assert.deepEqual(withModel, ['--yolo', '--model', 'qwen3-coder-plus']);
-  assert.equal(withModel.includes('-'), false);
 });
 
 // `agy` exposes `-p` (print mode, alias for `--print`) plus `-` as
@@ -674,109 +344,6 @@ test('antigravity persists model selection to agy settings.json', () => {
   }
 });
 
-test('kiro fetchModels falls back to fallbackModels when detection fails', async () => {
-  // fetchModels rejects when the binary doesn't exist; the daemon's
-  // probe() catches this and uses fallbackModels instead.
-  assert.ok(kiro.fetchModels, 'kiro must define fetchModels');
-  const result = await kiro
-    .fetchModels('/nonexistent/kiro-cli', {})
-    .catch(() => null);
-
-  assert.equal(result, null);
-  assert.ok(Array.isArray(kiro.fallbackModels));
-  const fallbackModel = kiro.fallbackModels[0];
-  assert.ok(fallbackModel);
-  assert.equal(fallbackModel.id, 'default');
-});
-
-test('aider args carry the non-TTY suppression flags, deliver the prompt via --message, and gate model behind an explicit selection', () => {
-  // Argv-only delivery: aider does not accept `-` as a stdin sentinel for
-  // either --message or --message-file, so the daemon must guard against
-  // ENAMETOOLONG before spawn. Same pattern as deepseek.
-  assert.equal(aider.promptViaStdin, undefined);
-  assert.equal(aider.maxPromptArgBytes, 30_000);
-  assert.equal(aider.streamFormat, 'plain');
-
-  const baseArgs = aider.buildArgs('hello world', [], [], {}, { cwd: '/tmp/od-project' });
-  assert.deepEqual(baseArgs, [
-    '--yes-always',
-    '--no-pretty',
-    '--no-git',
-    '--no-auto-commits',
-    '--no-suggest-shell-commands',
-    '--no-show-model-warnings',
-    '--message',
-    'hello world',
-  ]);
-
-  // The default sentinel is dropped so the user's aider config / env can
-  // pick the model unconstrained — matches qwen/deepseek behavior.
-  const defaultModelArgs = aider.buildArgs(
-    'hi',
-    [],
-    [],
-    { model: 'default' },
-    { cwd: '/tmp/od-project' },
-  );
-  assert.equal(defaultModelArgs.includes('--model'), false);
-
-  const withModel = aider.buildArgs(
-    'edit foo.ts',
-    [],
-    [],
-    { model: 'deepseek/deepseek-chat' },
-    { cwd: '/tmp/od-project' },
-  );
-  assert.deepEqual(withModel, [
-    '--yes-always',
-    '--no-pretty',
-    '--no-git',
-    '--no-auto-commits',
-    '--no-suggest-shell-commands',
-    '--no-show-model-warnings',
-    '--model',
-    'deepseek/deepseek-chat',
-    '--message',
-    'edit foo.ts',
-  ]);
-});
-
-test('kilo args use acp subcommand for json-rpc streaming', () => {
-  const args = kilo.buildArgs('', [], [], {});
-
-  assert.deepEqual(args, ['acp']);
-  assert.equal(kilo.streamFormat, 'acp-json-rpc');
-});
-
-test('kimi args use ACP so composed prompts do not travel through argv', () => {
-  const args = kimi.buildArgs('design a page', [], [], {});
-
-  assert.deepEqual(args, ['acp']);
-  assert.equal(args.includes('--yolo'), false);
-  assert.equal(kimi.streamFormat, 'acp-json-rpc');
-  assert.equal(kimi.eventParser, undefined);
-  assert.equal(kimi.mcpDiscovery, 'mature-acp');
-  assert.equal(kimi.maxPromptArgBytes, undefined);
-});
-
-test('kimi args leave model selection to the ACP session', () => {
-  const args = kimi.buildArgs('hello', [], [], { model: 'moonshot-v1-32k' });
-
-  assert.deepEqual(args, ['acp']);
-});
-
-test('kilo fetchModels falls back to fallbackModels when detection fails', async () => {
-  assert.ok(kilo.fetchModels, 'kilo must define fetchModels');
-  const result = await kilo.fetchModels('/nonexistent/kilo', {}).catch(() => null);
-
-  assert.equal(result, null);
-  assert.ok(Array.isArray(kilo.fallbackModels));
-  const fallbackModel = kilo.fallbackModels[0];
-  assert.ok(fallbackModel);
-  assert.equal(fallbackModel.id, 'default');
-  assert.equal(kilo.fallbackModels.length, 1);
-});
-
 // ---- reasoning-effort clamp ------------------------------------------------
 // Drives clampCodexReasoning through the public buildArgs surface so the
 // helper stays non-exported. The wire-level `-c model_reasoning_effort="..."`
@@ -839,69 +406,6 @@ test('codex buildArgs omits model_reasoning_effort when reasoning is "default"',
       (a) => typeof a === 'string' && a.startsWith('model_reasoning_effort='),
     ),
     false,
-  );
-});
-
-test('grok-build uses --prompt-file and never embeds the prompt in argv or stdin', () => {
-  const prompt = 'summarize the current page layout';
-  const promptFilePath = '/tmp/od-grok-prompt/prompt.md';
-  const args = grokBuild.buildArgs(
-    prompt,
-    [],
-    [],
-    { model: 'grok-4.3', reasoning: 'high' },
-    { cwd: '/tmp/od-project', promptFilePath },
-  );
-
-  assert.equal(grokBuild.promptViaFile, true);
-  assert.equal(grokBuild.promptViaStdin, false);
-  assert.deepEqual(args, [
-    '--prompt-file',
-    promptFilePath,
-    '--no-plan',
-    '--always-approve',
-    '--model',
-    'grok-4.3',
-  ]);
-  assert.equal(args.includes(prompt), false);
-  assert.equal(args.includes('-'), false);
-  assert.equal(args.includes('-p'), false);
-  assert.equal(args.includes('--single'), false);
-  assert.equal(args.filter((entry) => entry === '--prompt-file').length, 1);
-});
-
-test('grok-build disables plan mode and auto-approves headless tool calls (issue #5507)', () => {
-  const promptFilePath = '/tmp/od-grok-prompt/prompt.md';
-  const args = grokBuild.buildArgs('', [], [], { model: 'grok-build' }, { promptFilePath });
-
-  assert.deepEqual(args.slice(2, 4), ['--no-plan', '--always-approve']);
-});
-
-test('grok-build omits effort for default/build models but keeps it for reasoning models', () => {
-  const promptFilePath = '/tmp/od-grok-prompt/prompt.md';
-  const defaultArgs = grokBuild.buildArgs('', [], [], { model: 'default', reasoning: 'high' }, { promptFilePath });
-  assert.equal(defaultArgs.includes('--effort'), false);
-
-  const buildArgs = grokBuild.buildArgs('', [], [], { model: 'grok-build', reasoning: 'high' }, { promptFilePath });
-  assert.equal(buildArgs.includes('--effort'), false);
-
-  const reasoningArgs = grokBuild.buildArgs('', [], [], { model: 'grok-4.20-reasoning', reasoning: 'high' }, { promptFilePath });
-  assert.deepEqual(reasoningArgs, [
-    '--prompt-file',
-    promptFilePath,
-    '--no-plan',
-    '--always-approve',
-    '--model',
-    'grok-4.20-reasoning',
-    '--effort',
-    'high',
-  ]);
-});
-
-test('grok-build requires a daemon-provided prompt file path', () => {
-  assert.throws(
-    () => grokBuild.buildArgs('hi', [], [], {}, { cwd: '/tmp/od-project' }),
-    /promptFilePath/,
   );
 });
 
@@ -1007,11 +511,9 @@ test('promptInputFormat is a string property (or undefined) on every promptViaSt
   const stdinAgents = [
     { name: 'claude', def: claude, expected: 'stream-json' },
     { name: 'codex', def: codex, expected: undefined },
-    { name: 'copilot', def: copilot, expected: undefined },
-    { name: 'cursor-agent', def: cursorAgent, expected: undefined },
+    { name: 'antigravity', def: antigravity, expected: undefined },
     { name: 'opencode', def: opencode, expected: undefined },
     { name: 'pi', def: pi, expected: undefined },
-    { name: 'qoder', def: qoder, expected: undefined },
   ];
   for (const { name, def, expected } of stdinAgents) {
     assert.equal(

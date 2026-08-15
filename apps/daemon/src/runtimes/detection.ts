@@ -1,5 +1,6 @@
 import { execAgentFile } from './invocation.js';
-import { AGENT_DEFS } from './registry.js';
+import { PUBLIC_AGENT_DEFS } from './registry.js';
+import { byokOpenCodeAgentDef } from './defs/byok-opencode.js';
 import {
   DEFAULT_MODEL_OPTION,
   rememberLiveModels,
@@ -8,13 +9,15 @@ import { applyAgentLaunchEnv, resolveAgentLaunch } from './launch.js';
 import { spawnEnvForAgent } from './env.js';
 import { probeAgentAuthStatus } from './auth.js';
 import { agentCapabilities } from './capabilities.js';
-import { installMetaForAgent } from './metadata.js';
 import {
   buildAuthDiagnostic,
   buildExecutableDiagnostic,
   buildNotInvocableDiagnostic,
   type NotInvocableCause,
 } from './diagnostics.js';
+import type {
+  ByokRuntimeReadinessResponse,
+} from '@open-design/contracts';
 import type {
   AgentDiagnostic,
   DetectedAgent,
@@ -28,25 +31,6 @@ type FetchedRuntimeModels = {
   models: RuntimeModelOption[];
   source: RuntimeModelSource;
 };
-
-export interface DetectedRuntimeVersions {
-  agentCliVersion?: string;
-  runtimeCompanionName?: string;
-  runtimeCompanionVersion?: string;
-}
-
-// Detection already pays the bounded `--version` probe cost used by Settings.
-// Keep the result as daemon-lifetime provenance so run telemetry can name the
-// exact executable family without spawning another process on every turn.
-const detectedRuntimeVersions = new Map<string, DetectedRuntimeVersions>();
-
-export function getDetectedRuntimeVersions(
-  agentId: string | null | undefined,
-): DetectedRuntimeVersions | null {
-  if (!agentId) return null;
-  const remembered = detectedRuntimeVersions.get(agentId);
-  return remembered ? { ...remembered } : null;
-}
 
 function configuredEnvForAgent(
   configuredEnvByAgent: Record<string, Record<string, string>>,
@@ -165,7 +149,6 @@ function unavailableAgent(
     modelsSource: 'fallback',
     available: false,
     ...(diagnostics.length > 0 ? { diagnostics } : {}),
-    ...installMetaForAgent(def.id),
   };
 }
 
@@ -202,7 +185,6 @@ async function probe(
   def: RuntimeAgentDef,
   configuredEnv: Record<string, string> = {},
 ): Promise<DetectedAgent> {
-  detectedRuntimeVersions.delete(def.id);
   // Detection must probe the exact path the runtime will spawn, not just the
   // PATH-visible shim. This is load-bearing for Codex under nvm/fnm/mise:
   // the discovered `codex` entry is often a `#!/usr/bin/env node` wrapper
@@ -248,12 +230,6 @@ async function probe(
     agentCapabilities.set(def.id, caps);
   }
   const authDiagnostic = auth ? buildAuthDiagnostic(def, auth) : null;
-  const runtimeVersions: DetectedRuntimeVersions = {
-    ...(outcome.version ? { agentCliVersion: outcome.version } : {}),
-  };
-  if (Object.keys(runtimeVersions).length > 0) {
-    detectedRuntimeVersions.set(def.id, runtimeVersions);
-  }
   return {
     ...stripFns(def),
     models: modelResult.models,
@@ -268,7 +244,6 @@ async function probe(
         }
       : {}),
     ...(authDiagnostic ? { diagnostics: [authDiagnostic] } : {}),
-    ...installMetaForAgent(def.id),
   };
 }
 
@@ -297,6 +272,8 @@ function stripFns(
     env,
     inactivityTimeoutMs,
     authProbe,
+    installUrl,
+    docsUrl,
     ...rest
   } = def;
   return rest;
@@ -333,17 +310,31 @@ export async function detectAgents(
   configuredEnvByAgent: Record<string, Record<string, string>> = {},
 ) {
   const results = await Promise.all(
-    AGENT_DEFS.map((def) => safeProbe(def, configuredEnvForAgent(configuredEnvByAgent, def.id))),
+    PUBLIC_AGENT_DEFS.map((def) => safeProbe(def, configuredEnvForAgent(configuredEnvByAgent, def.id))),
   );
   // Refresh the validation cache from whatever we just surfaced to the UI
   // so /api/chat can accept any model the user could have just picked,
   // including ones that only showed up after a CLI re-auth.
   for (const [index, agent] of results.entries()) {
-    const def = AGENT_DEFS[index];
+    const def = PUBLIC_AGENT_DEFS[index];
     if (!def) continue;
     rememberDetectedLiveModels(def, configuredEnvForAgent(configuredEnvByAgent, def.id), agent);
   }
   return results;
+}
+
+export async function detectByokRuntimeReadiness(
+  configuredEnvByAgent: Record<string, Record<string, string>> = {},
+): Promise<ByokRuntimeReadinessResponse> {
+  const agent = await safeProbe(
+    byokOpenCodeAgentDef,
+    configuredEnvForAgent(configuredEnvByAgent, byokOpenCodeAgentDef.id),
+  );
+  return {
+    available: agent.available,
+    ...(agent.version ? { version: agent.version } : {}),
+    ...(agent.diagnostics?.length ? { diagnostics: agent.diagnostics } : {}),
+  };
 }
 
 // Streaming variant: yields each agent the moment its probe settles, in
@@ -351,11 +342,11 @@ export async function detectAgents(
 // as soon as it resolves instead of waiting for the slowest CLI. The model
 // validation cache is refreshed per-agent (same effect as the batch path,
 // just incrementally). `detectAgents` keeps the array contract for callers
-// that don't care about incremental delivery (cache warm, analytics, chat).
+// that don't care about incremental delivery (cache warm and chat).
 export async function* detectAgentsStream(
   configuredEnvByAgent: Record<string, Record<string, string>> = {},
 ): AsyncGenerator<DetectedAgent> {
-  const tagged = AGENT_DEFS.map((def, index) =>
+  const tagged = PUBLIC_AGENT_DEFS.map((def, index) =>
     safeProbe(def, configuredEnvForAgent(configuredEnvByAgent, def.id)).then((agent) => {
       rememberDetectedLiveModels(def, configuredEnvForAgent(configuredEnvByAgent, def.id), agent);
       return { index, agent };

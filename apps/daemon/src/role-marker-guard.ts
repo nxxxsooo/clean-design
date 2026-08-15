@@ -4,8 +4,8 @@
  * own output (see #3247 — same class as #2102 / #2464).
  *
  * `createRoleMarkerGuard()` — stateful per-message guard for structured
- * stream handlers that can track message boundaries (Claude, Copilot,
- * Qoder, OpenCode/Codex, Pi, ACP). Returns `{ feedText, contaminated,
+ * stream handlers that can track message boundaries (Claude,
+ * OpenCode/Codex and Pi). Returns `{ feedText, contaminated,
  * warningEvent }`.
  */
 

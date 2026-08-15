@@ -7,8 +7,8 @@
  *
  *   user/plugin model -> isKnownModel | sanitizeCustomModel -> resolveModelForAgent
  *
- * Explicit `model: 'default'` is intentionally preserved: for ACP runtimes,
- * it means "do not send session/set_model; use the upstream default".
+ * Explicit `model: 'default'` is intentionally preserved so runtimes can use
+ * their upstream default without the daemon substituting a fallback model.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -31,7 +31,7 @@ function defWith(fallbackIds: string[]): RuntimeAgentDef {
     versionArgs: ['--version'],
     fallbackModels: fallbackIds.map((id) => ({ id, label: id })),
     buildArgs: () => [],
-    streamFormat: 'acp-json-rpc',
+    streamFormat: 'plain',
   };
 }
 
@@ -69,7 +69,7 @@ describe('resolveModelForAgent', () => {
   });
 
   it('prefers an enabled default remembered model over a disabled first catalog entry', () => {
-    const def = defWithId('amr-disabled-default-test', []);
+    const def = defWithId('disabled-default-test', []);
     const models = [
       { id: 'locked-upgrade-model', label: 'Locked', enabled: false },
       { id: 'enabled-default-model', label: 'Enabled default', enabled: true, default: true },
@@ -84,7 +84,7 @@ describe('resolveModelForAgent', () => {
   });
 
   it('uses the first enabled remembered model when no enabled model is marked default', () => {
-    const def = defWithId('amr-disabled-first-test', []);
+    const def = defWithId('disabled-first-test', []);
     rememberLiveModels(def.id, [
       { id: 'locked-upgrade-model', label: 'Locked', enabled: false },
       { id: 'enabled-model', label: 'Enabled', enabled: true },
@@ -136,37 +136,4 @@ describe('resolveModelForAgent', () => {
     expect(resolveModelForAgent(def, 'default')).toBe('default');
   });
 
-  it('honors defaultModelEnvVar over the hardcoded fallback when no model is set', () => {
-    const def: RuntimeAgentDef = {
-      ...defWith(['gpt-5.4-mini']),
-      defaultModelEnvVar: 'VELA_DEFAULT_MODEL',
-    };
-    expect(
-      resolveModelForAgent(def, null, { VELA_DEFAULT_MODEL: 'gpt-5.5' }),
-    ).toBe('gpt-5.5');
-    expect(
-      resolveModelForAgent(def, 'default', { VELA_DEFAULT_MODEL: 'gpt-5.5' }),
-    ).toBe('default');
-  });
-
-  it('falls back to the static list when defaultModelEnvVar is set but the env var is empty / missing', () => {
-    const def: RuntimeAgentDef = {
-      ...defWith(['gpt-5.4-mini']),
-      defaultModelEnvVar: 'VELA_DEFAULT_MODEL',
-    };
-    expect(resolveModelForAgent(def, null, {})).toBe('gpt-5.4-mini');
-    expect(
-      resolveModelForAgent(def, null, { VELA_DEFAULT_MODEL: '   ' }),
-    ).toBe('gpt-5.4-mini');
-  });
-
-  it('does NOT use the env override when the user already picked a real model', () => {
-    const def: RuntimeAgentDef = {
-      ...defWith(['gpt-5.4-mini']),
-      defaultModelEnvVar: 'VELA_DEFAULT_MODEL',
-    };
-    expect(
-      resolveModelForAgent(def, 'gpt-5.4-fast', { VELA_DEFAULT_MODEL: 'gpt-5.5' }),
-    ).toBe('gpt-5.4-fast');
-  });
 });

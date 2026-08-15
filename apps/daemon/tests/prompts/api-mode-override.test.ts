@@ -9,7 +9,7 @@ import { composeSystemPrompt } from '../../src/prompts/system.js';
  * `composeSystemPrompt`, which got the top-anchored fix first. But the
  * daemon has its own copy at `apps/daemon/src/prompts/system.ts`
  * (invoked by `apps/daemon/src/server.ts:6186-6193` for any agent whose
- * adapter declares `streamFormat: 'plain'` — e.g. DeepSeek). Without
+ * adapter declares `streamFormat: 'plain'`). Without
  * mirroring the same fix here, plain-stream daemon agents still hit the
  * old bottom-appended `## API mode rule`, which sits BELOW
  * DISCOVERY_AND_PHILOSOPHY and therefore loses the precedence war

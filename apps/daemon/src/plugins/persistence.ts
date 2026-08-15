@@ -1,6 +1,5 @@
-// Plugin-system SQLite migrations. Phase 1 shipped installed_plugins,
-// plugin_marketplaces, applied_plugin_snapshots (full §11.4 shape with
-// PB2 expires_at), and ALTER TABLE adds for projects / conversations to
+// Plugin-system SQLite migrations for bundled catalog records and applied
+// snapshots, plus ALTER TABLE adds for projects / conversations to
 // back-reference the applied snapshot. Phase 2A adds run_devloop_iterations
 // (devloop audit + future per-iteration billing) and genui_surfaces
 // (cross-conversation cache, F8 lookup rules).
@@ -42,17 +41,6 @@ export function migratePlugins(db: SqliteDb): void {
 
     CREATE INDEX IF NOT EXISTS idx_installed_plugins_source_kind
       ON installed_plugins(source_kind);
-
-    CREATE TABLE IF NOT EXISTS plugin_marketplaces (
-      id            TEXT PRIMARY KEY,
-      url           TEXT NOT NULL,
-      spec_version  TEXT NOT NULL DEFAULT '1.0.0',
-      version       TEXT NOT NULL DEFAULT '0.0.0',
-      trust         TEXT NOT NULL,
-      manifest_json TEXT NOT NULL,
-      added_at      INTEGER NOT NULL,
-      refreshed_at  INTEGER NOT NULL
-    );
 
     CREATE TABLE IF NOT EXISTS applied_plugin_snapshots (
       id                       TEXT PRIMARY KEY,
@@ -144,39 +132,7 @@ export function migratePlugins(db: SqliteDb): void {
     CREATE INDEX IF NOT EXISTS idx_genui_conv_surface ON genui_surfaces(conversation_id, surface_id);
     CREATE INDEX IF NOT EXISTS idx_genui_run          ON genui_surfaces(run_id);
 
-    CREATE TABLE IF NOT EXISTS skill_plugin_candidates (
-      id                   TEXT PRIMARY KEY,
-      project_id           TEXT NOT NULL,
-      run_id               TEXT,
-      conversation_id      TEXT,
-      assistant_message_id TEXT,
-      fingerprint          TEXT NOT NULL,
-      status               TEXT NOT NULL DEFAULT 'active',
-      title                TEXT NOT NULL,
-      description          TEXT NOT NULL,
-      confidence           REAL NOT NULL,
-      source_refs_json     TEXT NOT NULL,
-      provenance_json      TEXT NOT NULL,
-      draft_path           TEXT,
-      created_at           INTEGER NOT NULL,
-      updated_at           INTEGER NOT NULL,
-      dismissed_at         INTEGER,
-      UNIQUE(project_id, fingerprint),
-      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_skill_plugin_candidates_project
-      ON skill_plugin_candidates(project_id, status, created_at DESC);
   `);
-
-  const marketplaceCols = db.prepare(`PRAGMA table_info(plugin_marketplaces)`).all() as DbRow[];
-  if (!marketplaceCols.some((c) => c['name'] === 'spec_version')) {
-    db.exec(`ALTER TABLE plugin_marketplaces ADD COLUMN spec_version TEXT NOT NULL DEFAULT '1.0.0'`);
-  }
-  if (!marketplaceCols.some((c) => c['name'] === 'version')) {
-    db.exec(`ALTER TABLE plugin_marketplaces ADD COLUMN version TEXT NOT NULL DEFAULT '0.0.0'`);
-  }
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_marketplaces_version ON plugin_marketplaces(version)`);
 
   const installedCols = db.prepare(`PRAGMA table_info(installed_plugins)`).all() as DbRow[];
   for (const [name, ddl] of [

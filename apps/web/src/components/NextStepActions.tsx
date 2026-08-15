@@ -4,8 +4,6 @@ import type { ChatSessionMode } from '@open-design/contracts';
 import { useI18n } from '../i18n';
 import { localizeSkillDescription, localizeSkillName } from '../i18n/content';
 import type { Dict } from '../i18n/types';
-import { useAnalytics } from '../analytics/provider';
-import { trackNextStepActionClick } from '../analytics/events';
 import { Icon, type IconName } from './Icon';
 import {
   DESIGN_TOOLBOX_ACTIONS,
@@ -223,9 +221,6 @@ interface Props {
   skills?: SkillSummary[];
   // Resolved `@skill` names per featured action, shown in the hover detail.
   toolboxSkillNames?: Partial<Record<DesignToolboxActionId, string | null>>;
-  // Contribute the artifact to the Clean Design community gallery.
-  onShareToOpenDesign?: () => void;
-  shareToOpenDesignBusy?: boolean;
   variant?: NextStepActionsVariant;
 }
 
@@ -334,29 +329,16 @@ export function NextStepActions({
   onPickSkill,
   skills = [],
   toolboxSkillNames,
-  onShareToOpenDesign,
-  shareToOpenDesignBusy = false,
   variant = 'default',
 }: Props) {
   const { t, locale } = useI18n();
-  const analytics = useAnalytics();
-  const exposedRef = useRef(false);
-  useEffect(() => {
-    if (exposedRef.current) return;
-    exposedRef.current = true;
-    trackNextStepActionClick(analytics.track, {
-      page_name: 'chat_panel',
-      area: 'next_step',
-      element: 'next_step_exposed',
-    });
-  }, [analytics.track]);
 
   // Three-level cascading hover menu, all portaled to <body> with fixed
   // positioning so the narrow chat column never clips or occludes them:
   //   featured row  → detail card (skill summary)
   //   More          → [Design toolbox, Share]   (level 2)
   //   Design toolbox → search + non-featured actions + global resources (level 3)
-  //   Share          → Share / Download / Contribute (level 3)
+  //   Share          → Share / Download (level 3)
   // A single close timer with hover-intent keeps the whole path open while the
   // cursor travels between levels; entering any panel cancels the pending close.
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -428,54 +410,31 @@ export function NextStepActions({
     [cancelClose],
   );
 
-  const track = useCallback(
-    (element: 'share' | 'toolbox_action' | 'toolbox_more' | 'share_to_open_design', chipId?: string) => {
-      trackNextStepActionClick(analytics.track, {
-        page_name: 'chat_panel',
-        area: 'next_step',
-        element,
-        ...(chipId ? { chip_id: chipId } : {}),
-      });
-    },
-    [analytics.track],
-  );
-
   const handleShare = useCallback(() => {
     if (!fileName || !onShare) return;
-    track('share');
     onShare(fileName);
     closeAll();
-  }, [closeAll, fileName, onShare, track]);
+  }, [closeAll, fileName, onShare]);
 
   const handleDownload = useCallback(() => {
     if (!fileName || !onDownload) return;
-    track('share', 'download');
     onDownload(fileName);
     closeAll();
-  }, [closeAll, fileName, onDownload, track]);
-
-  const handleContribute = useCallback(() => {
-    if (!onShareToOpenDesign || shareToOpenDesignBusy) return;
-    track('share_to_open_design');
-    onShareToOpenDesign();
-    closeAll();
-  }, [closeAll, onShareToOpenDesign, shareToOpenDesignBusy, track]);
+  }, [closeAll, fileName, onDownload]);
 
   const handleToolboxAction = useCallback(
     (id: DesignToolboxActionId) => {
-      track('toolbox_action', id);
       onToolboxAction?.(id);
       closeAll();
     },
-    [closeAll, onToolboxAction, track],
+    [closeAll, onToolboxAction],
   );
   const handlePromptAction = useCallback(
     (action: PromptNextStepAction) => {
-      track('toolbox_action', action.id);
       onPromptAction?.(promptActionPrompt(action, locale));
       closeAll();
     },
-    [closeAll, locale, onPromptAction, track],
+    [closeAll, locale, onPromptAction],
   );
   const resolvedPlanFileName =
     planFileName ?? (variant === 'plan' && isPlanFileName(fileName) ? fileName : null);
@@ -491,7 +450,6 @@ export function NextStepActions({
           ? resolvedArtifactFileName
           : resolvedPlanFileName ?? resolvedArtifactFileName;
       if (!primaryFile) return;
-      track('toolbox_action', action.id);
       onPromptAction?.(
         t(action.promptKey, {
           file: primaryFile,
@@ -504,42 +462,37 @@ export function NextStepActions({
       );
       closeAll();
     },
-    [closeAll, onPromptAction, resolvedArtifactFileName, resolvedPlanFileName, t, track],
+    [closeAll, onPromptAction, resolvedArtifactFileName, resolvedPlanFileName, t],
   );
 
   const handleAiOptimize = useCallback(() => {
     if (aiOptimizeBusy) return;
-    track('toolbox_action', 'brand-ai-optimize');
     onAiOptimize?.();
     closeAll();
-  }, [aiOptimizeBusy, closeAll, onAiOptimize, track]);
+  }, [aiOptimizeBusy, closeAll, onAiOptimize]);
 
   const handleCreateDesign = useCallback(() => {
     if (createDesignBusy) return;
-    track('toolbox_action', 'brand-create-design');
     onCreateDesign?.();
     closeAll();
-  }, [closeAll, createDesignBusy, onCreateDesign, track]);
+  }, [closeAll, createDesignBusy, onCreateDesign]);
 
   const handleCreateDesignSystem = useCallback(() => {
     if (createDesignSystemBusy) return;
-    track('toolbox_action', 'project-create-design-system');
     onCreateDesignSystem?.();
     closeAll();
-  }, [closeAll, createDesignSystemBusy, onCreateDesignSystem, track]);
+  }, [closeAll, createDesignSystemBusy, onCreateDesignSystem]);
 
   const handleContinueAiExtraction = useCallback(() => {
     if (continueAiExtractionBusy) return;
-    track('toolbox_action', 'brand-continue-ai-extraction');
     onContinueAiExtraction?.();
     closeAll();
-  }, [closeAll, continueAiExtractionBusy, onContinueAiExtraction, track]);
+  }, [closeAll, continueAiExtractionBusy, onContinueAiExtraction]);
 
   const handleBrandAction = useCallback(
     (action: BrandExtractionAction) => {
       if (action.id === 'brand-continue-extraction') {
         if (continueExtractionBusy) return;
-        track('toolbox_action', action.id);
         onContinueExtraction?.();
         closeAll();
         return;
@@ -561,17 +514,15 @@ export function NextStepActions({
       handleAiOptimize,
       handleCreateDesign,
       onContinueExtraction,
-      track,
     ],
   );
 
   const handlePickSkill = useCallback(
     (skillId: string) => {
-      track('toolbox_more', skillId);
       onPickSkill?.(skillId);
       closeAll();
     },
-    [closeAll, onPickSkill, track],
+    [closeAll, onPickSkill],
   );
 
   const visibleToolboxActions = useMemo(
@@ -614,11 +565,10 @@ export function NextStepActions({
     return [];
   }, [resolvedArtifactFileName, resolvedPlanFileName]);
 
-  // Share group is available whenever any of its three actions can fire.
+  // Share group is available whenever either local artifact action can fire.
   const canShare = !!(fileName && onShare);
   const canDownload = !!(fileName && onDownload);
-  const canContribute = !!onShareToOpenDesign;
-  const hasShareGroup = canShare || canDownload || canContribute;
+  const hasShareGroup = canShare || canDownload;
   const showCreateDesignSystem = (
     variant === 'default' ||
     variant === 'project-incomplete'
@@ -1005,22 +955,6 @@ export function NextStepActions({
                 >
                   <Icon name="download" size={14} className={styles.toolboxRowIcon} />
                   <span className={styles.toolboxRowTitle}>{t('nextStep.download')}</span>
-                </button>
-              ) : null}
-              {canContribute ? (
-                <button
-                  type="button"
-                  className={styles.flyoutRow}
-                  data-testid="next-step-share-contribute"
-                  disabled={shareToOpenDesignBusy}
-                  onClick={handleContribute}
-                >
-                  <Icon
-                    name={shareToOpenDesignBusy ? 'spinner' : 'globe'}
-                    size={14}
-                    className={shareToOpenDesignBusy ? 'icon-spin' : styles.toolboxRowIcon}
-                  />
-                  <span className={styles.toolboxRowTitle}>{t('nextStep.contribute')}</span>
                 </button>
               ) : null}
             </div>,

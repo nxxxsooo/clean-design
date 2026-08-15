@@ -9,7 +9,7 @@
 // Frontmatter format (matches Claude Code's auto-memory pattern):
 //   ---
 //   name: User role
-//   description: User is a senior FE engineer working on Open Design.
+//   description: User is a senior FE engineer working on Clean Design.
 //   type: user
 //   ---
 //
@@ -391,16 +391,6 @@ function toIsoTime(ms) {
   return new Date(Number.isFinite(ms) ? ms : 0).toISOString();
 }
 
-function extractAutomationRefs(body, label) {
-  const refs = new Set();
-  const re = new RegExp(`^${label}:\\s*([A-Za-z0-9_-]+)\\s*$`, 'gim');
-  let match;
-  while ((match = re.exec(String(body || ''))) !== null) {
-    if (match[1]) refs.add(match[1]);
-  }
-  return Array.from(refs);
-}
-
 export async function buildMemoryTree(dataDir) {
   const entries = await listMemoryEntries(dataDir);
   const byType = new Map();
@@ -428,15 +418,11 @@ export async function buildMemoryTree(dataDir) {
       kind: 'folder',
       type,
       scope: memoryTreeScopeForType(type),
-      sourcePacketIds: [],
-      proposalIds: [],
       createdAt: toIsoTime(folderUpdatedAt),
       updatedAt: toIsoTime(folderUpdatedAt),
       childrenCount: children.length,
     });
     for (const entry of children) {
-      const detail = await readMemoryEntry(dataDir, entry.id);
-      const detailBody = detail?.body ?? '';
       nodes.push({
         id: entry.id,
         parentId: folderId,
@@ -446,8 +432,6 @@ export async function buildMemoryTree(dataDir) {
         kind: 'entry',
         type: entry.type,
         scope: memoryTreeScopeForType(entry.type),
-        sourcePacketIds: extractAutomationRefs(detailBody, 'Source packet'),
-        proposalIds: extractAutomationRefs(detailBody, 'Proposal'),
         createdAt: toIsoTime(entry.updatedAt),
         updatedAt: toIsoTime(entry.updatedAt),
         childrenCount: 0,

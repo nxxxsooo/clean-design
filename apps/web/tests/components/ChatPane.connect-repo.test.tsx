@@ -43,7 +43,7 @@ const projectMetadata: ProjectMetadata = { kind: 'prototype' };
 function renderPane(extra: Partial<React.ComponentProps<typeof ChatPane>>) {
   return render(
     <ChatPane
-      projectKindForTracking="prototype"
+      projectKind="prototype"
       messages={[]}
       streaming={false}
       error={null}
@@ -136,7 +136,7 @@ describe('ChatPane connect-repo CTA', () => {
         {
           id: 'brand-needs-hand',
           role: 'assistant',
-          agentName: 'AMR',
+          agentName: 'OpenCode',
           content: 'The automatic pass needs a hand.',
           events: [{ kind: 'text', text: 'The automatic pass needs a hand.' }],
           runStatus: 'succeeded',
@@ -171,7 +171,7 @@ describe('ChatPane connect-repo CTA', () => {
         {
           id: 'brand-needs-hand',
           role: 'assistant',
-          agentName: 'AMR',
+          agentName: 'OpenCode',
           content: 'The automatic pass needs a hand.',
           events: [{ kind: 'text', text: 'The automatic pass needs a hand.' }],
           runStatus: 'succeeded',
@@ -274,7 +274,7 @@ describe('ChatPane connect-repo CTA', () => {
         {
           id: 'agent-failed',
           role: 'assistant',
-          agentName: 'AMR',
+          agentName: 'OpenCode',
           runStatus: 'failed',
           content: 'Task failed\n\nAgent could not finish extracting the brand.',
           createdAt: 1,

@@ -98,6 +98,8 @@ export type RuntimePromptBudgetError = {
 export type RuntimeAgentDef = {
   id: string;
   name: string;
+  source?: 'built-in' | 'local-profile';
+  baseAgentId?: 'claude' | 'codex' | 'antigravity' | 'opencode' | 'pi';
   bin: string;
   versionArgs: string[];
   fallbackModels: RuntimeModelOption[];
@@ -136,16 +138,13 @@ export type RuntimeAgentDef = {
   reasoningOptions?: RuntimeReasoningOption[];
   supportsImagePaths?: boolean;
   maxPromptArgBytes?: number;
-  mcpDiscovery?: string;
   installUrl?: string;
   docsUrl?: string;
   // When `false`, the Settings model picker hides the "Custom (fill below)"
   // option and the associated free-text input. Use this for agents whose
   // CLI does not actually accept a model id (e.g. `agy` v1.0.3 has no
-  // `--model` flag yet — upstream issue #35 — and the model is chosen
-  // server-side; AMR routes model selection through ACP's
-  // `session/set_model` and rejects free-form ids). Defaults to allowing
-  // custom input (undefined === true) so most adapters keep today's UX.
+  // `--model` flag yet and the model is chosen server-side). Defaults to
+  // allowing custom input (undefined === true) so most adapters keep today's UX.
   supportsCustomModel?: boolean;
   // When `true`, the daemon trusts this adapter's CLI to carry its own
   // multi-turn conversation memory across spawn invocations (today only
@@ -165,38 +164,18 @@ export type RuntimeAgentDef = {
   // `newSessionId` is not passed to the CLI. See server.ts capture-and-store
   // path and `agent-cli-session-resume.md`.
   capturesSessionIdFromStream?: boolean;
-  // ACP-runtime analogue of capture-style resume: the agent talks `acp-json-rpc`
-  // (today only AMR/vela) and supports resuming via `session/load`. The daemon
-  // captures the durable upstream session handle from the ACP session
-  // (`getDurableSessionId()`) and persists THAT, drives `session/load` on a
-  // resume turn, and maps the agent's structured `resume_failed` error onto the
-  // reseed path. Kept distinct from `resumesSessionViaCli` /
-  // `capturesSessionIdFromStream` because the capture + resume transport is the
-  // ACP result, not a `--session-id` flag or a stream `status` event.
-  resumesSessionViaAcpLoad?: boolean;
-  // Optional name of a daemon-process environment variable that overrides
-  // the default model id when the chat run reaches the spawn layer with
-  // null or the synthetic 'default'. Used by adapters whose CLI rejects
-  // 'default' (e.g. AMR / vela) so an operator can swap the hardcoded
-  // fallback without a code change — set the env var on the daemon
-  // process when launching `tools-dev` / `od` daemon. The value must be
-  // present in the daemon's `process.env`; Settings-UI per-agent env
-  // values only reach the spawned child and are NOT consulted here.
-  defaultModelEnvVar?: string;
   // Agent-recommended override for the chat-run inactivity watchdog.
   // The watchdog observes child stdout/stderr/SSE activity, not real
   // CPU progress, so agents whose CLIs go silent for long stretches
-  // during legitimate work (e.g. Copilot's deck-generation thinking
-  // phase from #2467) need a longer ceiling than the 10-minute global
+  // during legitimate work may need a longer ceiling than the 10-minute global
   // default. Operators can still override per-process via
   // `OD_CHAT_RUN_INACTIVITY_TIMEOUT_MS` — that env wins.
   inactivityTimeoutMs?: number;
   // Declarative authentication probe. When set, detection spawns
   // `<bin> <args>` after the version check and classifies the combined
   // stdout/stderr to derive `authStatus`. This replaces the previous
-  // hardcoded "only cursor-agent gets an auth probe" gate: an adapter
-  // opts in by declaring a cheap, side-effect-free status/whoami command
-  // (e.g. cursor-agent `status`). Adapters WITHOUT this field are never
+  // hardcoded agent-specific auth gate: an adapter opts in by declaring a
+  // cheap, side-effect-free status/whoami command. Adapters WITHOUT this field are never
   // actively probed for auth — their auth status is only inferred later
   // from a real chat failure's error text (see classifyAgentServiceFailure).
   authProbe?: {
@@ -210,13 +189,6 @@ export type RuntimeAgentDef = {
     // through to the generic classifier. Defaults to the def id when unset.
     classifierAgentId?: string;
   };
-  // Format for the `env` field in ACP `session/new` → `mcpServers[].env`.
-  // `'array'` (default) emits `[{name, value}]` — used by Hermes, Kimi,
-  // Kilo, Kiro, Vibe, and Devin.  `'map'` emits `{"KEY": "val"}` — used
-  // by reasonix ≥ 1.0 (Go) whose ACP implementation expects the standard
-  // MCP `map[string]string` shape. Leave `undefined` (defaults to 'array')
-  // for all other agents — the existing behavior is unchanged.
-  acpMcpEnvFormat?: 'array' | 'map';
 };
 
 export type DetectedAgent = Omit<

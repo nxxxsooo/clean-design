@@ -24,7 +24,7 @@ import { createSmokeSuite } from '@/vitest/suite';
 
 const HELD_PROMPT = 'Hold the daemon run open until canceled for the send-now smoke';
 const QUEUED_PROMPT = 'Create a deterministic smoke artifact';
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 
 type ProjectResponse = {
   conversationId: string;
@@ -55,9 +55,7 @@ describe('dialog send-now interrupt', () => {
           agentModels: { codex: { model: 'default', reasoning: 'default' } },
           designSystemId: null,
           onboardingCompleted: true,
-          privacyDecisionAt: 1,
           skillId: null,
-          telemetry: { artifactManifest: true, content: false, metrics: false },
         },
         method: 'PUT',
       });
@@ -87,10 +85,8 @@ describe('dialog send-now interrupt', () => {
             skillId: null,
             designSystemId: null,
             onboardingCompleted: true,
-            privacyDecisionAt: 1,
             agentModels: { codex: { model: 'default', reasoning: 'default' } },
             agentCliEnv: { codex: codexEnv },
-            telemetry: { metrics: false, content: false, artifactManifest: true },
           }),
         );
       }, { key: STORAGE_KEY, codexEnv: fakeAgents.codex.env });
@@ -139,20 +135,15 @@ describe('dialog send-now interrupt', () => {
 
 async function expectWorkspaceReady(page: Page) {
   await waitForLoadingToClear(page);
-  const privacyDialog = page.getByRole('region', { name: 'Help us improve Open Design' });
-  if (await privacyDialog.isVisible().catch(() => false)) {
-    await privacyDialog.getByRole('button', { name: /don't share|not now/i }).click();
-    await playwrightExpect(privacyDialog).toHaveCount(0);
-  }
   await playwrightExpect(page).toHaveURL(/\/projects\//);
-  await playwrightExpect(page.getByTestId('chat-composer')).toBeVisible();
-  await playwrightExpect(page.getByTestId('chat-composer-input')).toBeVisible();
-  await playwrightExpect(page.getByTestId('file-workspace')).toBeVisible();
+  await playwrightExpect(page.getByTestId('chat-composer')).toBeVisible({ timeout: T.long });
+  await playwrightExpect(page.getByTestId('chat-composer-input')).toBeVisible({ timeout: T.long });
+  await playwrightExpect(page.getByTestId('file-workspace')).toBeVisible({ timeout: T.long });
 }
 
 async function waitForLoadingToClear(page: Page) {
-  const loading = page.getByText('Loading Open Design…');
-  await loading.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+  const loading = page.getByText(/Loading Clean Design(?:…|\.\.\.)/);
+  await loading.waitFor({ state: 'detached', timeout: T.long }).catch(() => {});
 }
 
 // Send a turn that starts a run immediately (conversation idle). Returns the runId.

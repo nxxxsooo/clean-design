@@ -29,7 +29,6 @@ import {
   type PreviewSharePopoverItem,
   type PreviewView,
 } from '../PreviewModal';
-import { PluginShareMenu } from './PluginShareMenu';
 import { PluginMetaSections } from './PluginMetaSections';
 import { buildPluginUseMenu, pluginUsePrimaryAction } from './pluginUseMenu';
 import type { PluginUseAction } from '../plugins-home/useActions';
@@ -41,7 +40,7 @@ interface Props {
   onDuplicate?: (record: InstalledPluginRecord) => void;
   isApplying?: boolean;
   hideUseAction?: boolean;
-  // Analytics — forwarded to PreviewModal's share popover.
+  // Forwarded to PreviewModal's share popover.
   onSharePopoverItemClick?: (item: PreviewSharePopoverItem) => void;
 }
 
@@ -191,7 +190,6 @@ export function PluginDesignSystemDetail({
             testId: `plugin-details-use-${record.id}`,
             menu: buildPluginUseMenu(record, onUse, t, onDuplicate),
           }}
-      headerExtras={<PluginShareMenu record={record} variant="inline" />}
       onSharePopoverItemClick={onSharePopoverItemClick}
     />
   );

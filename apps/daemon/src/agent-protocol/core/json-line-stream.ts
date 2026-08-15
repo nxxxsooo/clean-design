@@ -1,8 +1,7 @@
 /** @module agent-protocol/core/json-line-stream
  * Streaming JSON-line parser that reassembles pretty-printed and multiline
- * JSON-RPC messages across chunk boundaries. Shared transport used by both the
- * acp/ and pi-rpc/ protocol adapters; this file has no dependencies on any
- * other agent-protocol sibling.
+ * JSON-RPC messages across chunk boundaries. Transport used by the Pi RPC
+ * adapter; this file has no dependencies on any other protocol sibling.
  */
 
 /**
@@ -12,8 +11,7 @@
  * up to 256 lines and 128 kB before abandoning and re-trying the current line
  * as a fresh candidate.
  *
- * Used as the shared ACP transport: both the acp/ and pi-rpc/ adapters call
- * this to decode JSON-RPC frames from a subprocess's stdout.
+ * Used by the Pi RPC transport to decode JSON-RPC frames from stdout.
  *
  * @param onMessage - Called for each successfully parsed JSON value along with
  *   the raw reassembled line string as a second argument.
@@ -83,8 +81,8 @@ export function createJsonLineStream(onMessage: (message: unknown, rawLine: stri
       return;
     }
     if (emit(trimmed)) return;
-    // ACP is line-delimited JSON-RPC, but a few bridges have emitted
-    // pretty-printed JSON during startup. Keep a bounded aggregate so an
+    // Pi RPC is line-delimited JSON-RPC, but tolerate pretty-printed JSON
+    // during startup. Keep a bounded aggregate so an
     // otherwise valid multiline initialize response does not get discarded
     // line-by-line and leave the session stuck in spawn pending.
     if (
@@ -134,7 +132,7 @@ export function createJsonLineStream(onMessage: (message: unknown, rawLine: stri
  * - `'invalid'`    — an irrecoverable syntax error was encountered.
  *
  * @param value - A string candidate to classify, typically one or more
- *   accumulated stdout lines from an ACP subprocess.
+ *   accumulated stdout lines from a Pi RPC subprocess.
  */
 export function classifyJsonCandidate(value: string): 'complete' | 'incomplete' | 'invalid' {
   type Frame =

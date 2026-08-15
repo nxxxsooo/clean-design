@@ -10,7 +10,7 @@ import { T } from '@/timeouts';
 import { automatedUiScenarios } from '@/playwright/resources';
 import type { UiScenario } from '@/playwright/resources';
 
-const STORAGE_KEY = 'open-design:config';
+const STORAGE_KEY = 'clean-design:config';
 const ACTIVE_ARTIFACT_PREVIEW_SELECTOR = '[data-testid="artifact-preview-frame"]:visible, [data-testid="artifact-preview-frame-url-load"]:visible, [data-testid="artifact-preview-frame-srcdoc"]:visible, [data-testid="live-artifact-preview-frame"]:visible';
 const APP_OWNED_SCENARIO_FLOWS = new Set([
   'design-files-upload',
@@ -33,12 +33,6 @@ const CRITICAL_SCENARIO_IDS = new Set([
   'deep-link-preview',
   'file-upload-send',
   'conversation-delete-recovery',
-]);
-const MERGE_EXTRA_SCENARIO_IDS = new Set([
-  'prototype-basic',
-  'deck-basic',
-  'file-mention',
-  'deep-link-preview',
 ]);
 test.describe.configure({ timeout: 45_000 });
 
@@ -70,8 +64,6 @@ test.beforeEach(async ({ page }) => {
         designSystemId: null,
         onboardingCompleted: true,
         agentModels: {},
-        privacyDecisionAt: 1,
-        telemetry: { metrics: false, content: false, artifactManifest: false },
       }),
     );
   }, STORAGE_KEY);
@@ -89,8 +81,6 @@ test.beforeEach(async ({ page }) => {
           skillId: null,
           designSystemId: null,
           agentModels: {},
-          privacyDecisionAt: 1,
-          telemetry: { metrics: false, content: false, artifactManifest: false },
         },
       },
     });
@@ -100,7 +90,7 @@ test.beforeEach(async ({ page }) => {
 for (const entry of automatedUiScenarios().filter(
   (scenario) => !APP_OWNED_SCENARIO_FLOWS.has(scenario.flow ?? ''),
 )) {
-  test(`[${scenarioPriority(entry)}]${criticalScenarioTag(entry)}${mergeExtraScenarioTag(entry)} ${entry.id}: ${entry.title}`, async ({ page }) => {
+  test(`[${scenarioPriority(entry)}]${criticalScenarioTag(entry)} ${entry.id}: ${entry.title}`, async ({ page }) => {
     await routeMockAgents(page);
 
     if (entry.flow === 'example-use-prompt') {
@@ -614,10 +604,6 @@ function scenarioPriority(entry: UiScenario): 'P0' | 'P1' | 'P2' {
 
 function criticalScenarioTag(entry: UiScenario): string {
   return CRITICAL_SCENARIO_IDS.has(entry.id) ? ' @critical' : '';
-}
-
-function mergeExtraScenarioTag(entry: UiScenario): string {
-  return MERGE_EXTRA_SCENARIO_IDS.has(entry.id) ? ' @merge-extra' : '';
 }
 
 async function routeMockSuccessfulRun(page: Page, runId: string) {

@@ -3,7 +3,7 @@
  *
  * Six events, one JSON object per line on stdout, namespaced
  * `critique`. Matches the JSON-line convention `cli.ts` and
- * `mcp-live-artifacts-server.ts` already write so an operator's
+ * the daemon runtime already writes so an operator's
  * existing log pipeline (Loki, Cloudwatch, Datadog, etc.) ingests
  * critique events without a new adapter.
  *

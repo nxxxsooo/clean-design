@@ -17,7 +17,6 @@ export type EntryView =
   | 'home'
   | 'onboarding'
   | 'projects'
-  | 'plugins'
   | 'design-systems'
   | 'library'
   | 'brands';

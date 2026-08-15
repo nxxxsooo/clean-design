@@ -4,16 +4,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { createRef, useState, type ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const trackChatPanelClickMock = vi.hoisted(() => vi.fn());
-
-vi.mock('../../src/analytics/events', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../src/analytics/events')>();
-  return {
-    ...actual,
-    trackChatPanelClick: trackChatPanelClickMock,
-  };
-});
-
 import { ChatComposer, type ChatComposerHandle } from '../../src/components/ChatComposer';
 import { I18nProvider } from '../../src/i18n';
 import type { Locale } from '../../src/i18n/types';
@@ -196,7 +186,6 @@ function projectPatchBodies(): Array<{ metadata?: { linkedDirs?: string[] } }> {
 // every editor-text assertion (it walks the tree and emits real `\n`s).
 
 beforeEach(() => {
-  trackChatPanelClickMock.mockClear();
   plugins = [COMMUNITY_PLUGIN, USER_PLUGIN];
   skills = [SKILL];
   servers = [MCP_SERVER];

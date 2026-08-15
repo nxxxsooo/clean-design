@@ -1,16 +1,12 @@
-// Plan §3.K1 / spec §15.7 — bound-API-token guard.
+// Clean Design bind + bearer guard.
 //
-// Two halves:
-//   1. The daemon refuses to start with OD_BIND_HOST=0.0.0.0 when no
-//      OD_API_TOKEN is set.
-//   2. When OD_API_TOKEN is set, every /api/* request from a non-loopback
-//      peer must carry `Authorization: Bearer <OD_API_TOKEN>`. The
-//      health/readiness/version probes stay open for monitoring.
-//
-// Tests force the bearer-required code path by stamping the env vars
-// before startServer. The daemon listens on 127.0.0.1 throughout (so
-// the "refuse 0.0.0.0 without token" path is exercised by a separate
-// negative case that constructs the start call directly).
+// Upstream Clean Design allowed a public bind as long as OD_API_TOKEN was
+// set (and allowed OD_DISABLE_API_AUTH to waive that). Clean Design binds
+// local services to loopback only, so a non-loopback bind is now refused
+// unconditionally — no token and no escape hatch can widen it. These tests
+// assert that stronger invariant, then cover the bearer middleware that
+// still guards /api/* for non-loopback peers while leaving the
+// health/readiness/version probes open for monitoring.
 
 import type http from 'node:http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -39,16 +35,20 @@ afterEach(async () => {
 });
 
 describe('bound-API-token guard', () => {
-  it('refuses to start with OD_BIND_HOST=0.0.0.0 when OD_API_TOKEN is unset', async () => {
-    delete process.env.OD_API_TOKEN;
+  it('refuses to start on a non-loopback host even when OD_API_TOKEN is set', async () => {
+    process.env.OD_API_TOKEN = 'test-token-abc';
     await expect(startServer({ port: 0, host: '0.0.0.0', returnServer: true }))
-      .rejects.toThrow(/OD_API_TOKEN/);
+      .rejects.toThrow(/only permits loopback daemon binds/);
   });
 
-  it('starts on a public host when OD_API_TOKEN is set', async () => {
+  it('refuses to start on a non-loopback host when OD_API_TOKEN is unset', async () => {
+    delete process.env.OD_API_TOKEN;
+    await expect(startServer({ port: 0, host: '0.0.0.0', returnServer: true }))
+      .rejects.toThrow(/only permits loopback daemon binds/);
+  });
+
+  it('starts on loopback when OD_API_TOKEN is set', async () => {
     process.env.OD_API_TOKEN = 'test-token-abc';
-    // Bind to 127.0.0.1 (loopback) but pretend we crossed the guard
-    // by setting the env var; the assertion is that startup succeeds.
     const started = (await startServer({ port: 0, host: '127.0.0.1', returnServer: true })) as {
       url: string;
       server: http.Server;
@@ -60,15 +60,11 @@ describe('bound-API-token guard', () => {
     expect(baseUrl).toMatch(/^http:\/\/127\.0\.0\.1:/);
   });
 
-  it('starts on a public host without OD_API_TOKEN when OD_DISABLE_API_AUTH=1', async () => {
+  it('does not let OD_DISABLE_API_AUTH widen the bind beyond loopback', async () => {
     delete process.env.OD_API_TOKEN;
     process.env.OD_DISABLE_API_AUTH = '1';
-    const started = (await startServer({ port: 0, host: '0.0.0.0', returnServer: true })) as {
-      server: http.Server;
-      shutdown?: () => Promise<void> | void;
-    };
-    server = started.server;
-    shutdown = started.shutdown;
+    await expect(startServer({ port: 0, host: '0.0.0.0', returnServer: true }))
+      .rejects.toThrow(/only permits loopback daemon binds/);
   });
 });
 

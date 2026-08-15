@@ -7,7 +7,7 @@ describe('userFacingAgentLabel', () => {
     expect(
       userFacingAgentLabel(
         'claude',
-        '/Applications/Open Design Beta.app/Contents/Resources/open-design/bin/claude',
+        '/Applications/Clean Design Beta.app/Contents/Resources/open-design/bin/claude',
       ),
     ).toBe('claude');
   });
@@ -16,16 +16,16 @@ describe('userFacingAgentLabel', () => {
     expect(
       userFacingAgentLabel(
         null,
-        '/Applications/Open Design Beta.app/Contents/Resources/open-design/bin/vela',
+        '/Applications/Clean Design.app/Contents/Resources/clean-design/bin/custom-agent',
       ),
-    ).toBe('vela');
+    ).toBe('custom-agent');
   });
 
   it('strips Windows executable extensions from basename fallbacks', () => {
     expect(
       userFacingAgentLabel(
         '',
-        'C:\\Program Files\\Open Design\\resources\\open-design\\bin\\unknown.exe',
+        'C:\\Program Files\\Clean Design\\resources\\clean-design\\bin\\unknown.exe',
       ),
     ).toBe('unknown');
   });

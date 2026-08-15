@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 /**
- * A run's abnormal exit, carried across launches until its telemetry has been
+ * A run's abnormal exit, carried across launches until it has been handled,
  * acked. Persisting these (rather than holding them only in memory) means a
  * failed report — e.g. the daemon isn't reachable yet — retries on the next
  * launch instead of losing the signal this mechanism exists to catch.
@@ -28,7 +28,7 @@ const MAX_UNREPORTED_CRASHES = 20;
  *
  * A run counts as an abnormal "runtime 闪退" when it `reachedRunning` but never
  * went `clean` — the app was up, then the process died without a graceful
- * shutdown. That class reaches no other telemetry.
+ * shutdown. That class reaches no other consumer.
  */
 export interface DesktopSessionState {
   sessionId: string;
@@ -171,7 +171,7 @@ export function endDesktopSessionCleanly(deps: {
 }
 
 /**
- * Remove one crash from the queue once its telemetry has been acked, so it isn't
+ * Remove one crash from the queue once it has been acknowledged, so it isn't
  * reported again. Keyed by sessionId so acks land independently.
  */
 export function clearReportedCrash(

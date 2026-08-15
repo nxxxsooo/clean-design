@@ -22,7 +22,7 @@ Follow the root `AGENTS.md` and `tools/AGENTS.md` first. This tool owns local pa
 - Public v0.1.0 artifacts use the single `Clean Design` identity and `fun.mjshao.clean-design` bundle ID.
 - Use `--portable` for release artifacts so packaged config does not capture build-machine paths.
 - Pack resources belong under `tools/pack/resources/`.
-- Packaging must not read or forward telemetry, attribution, AMR, hosted-service, or updater environment variables.
+- Packaging must not read or forward telemetry, attribution, hosted-service, or updater environment variables.
 - Browser sourcemaps are removed locally before packaging and are never uploaded.
 
 ## Verification

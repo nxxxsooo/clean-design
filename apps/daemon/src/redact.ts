@@ -1,7 +1,6 @@
-// Lexical secret / PII scrubber for telemetry payloads.
+// Lexical secret / PII scrubber for local diagnostics and exports.
 //
-// Runs before any prompt or assistant text is sent to Langfuse. The
-// patterns here are intentionally conservative: each one matches a
+// The patterns here are intentionally conservative: each one matches a
 // well-defined token shape with extremely low false-positive rate (API
 // keys have a fixed prefix, JWTs have the "header.payload.signature"
 // triple, credit-card matches go through a Luhn check). What this file
@@ -11,12 +10,10 @@
 // problem the daemon can't take on.
 //
 // Output format: every match is replaced by `[REDACTED:<kind>]` so a
-// reviewer reading a Langfuse trace can see exactly which category
-// fired without recovering the original value.
+// diagnostics reader can see which category fired without recovering the
+// original value.
 //
 // References:
-// - Langfuse client-side masking guidance:
-//   https://langfuse.com/docs/observability/features/masking
 // - GitHub token format:
 //   https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-authentication-to-github
 // - AWS access key shape: 'AKIA' + 16 uppercase alphanumerics.
@@ -27,14 +24,8 @@ interface Pattern {
   regex: RegExp;
 }
 
-// Order matters: list specific rules before more general ones. Langfuse
-// keys (`sk-lf-...`) would otherwise be eaten by the generic `sk-...`
-// rule and labeled as a generic OpenAI-style key.
+// Order matters: list specific rules before more general ones.
 const PATTERNS: readonly Pattern[] = [
-  // Langfuse public/secret keys (pk-lf- / sk-lf-). Must run before the
-  // generic sk- rule so the more specific label wins.
-  { name: 'langfuse_key', regex: /\b(?:pk|sk)-lf-[A-Za-z0-9-]{16,}\b/g },
-
   // Anthropic / OpenAI-style keys: 'sk-' + optional sub-prefix + base64-ish.
   // Both vendors plus a long tail of OpenAI-compatible providers (DeepSeek,
   // MiniMax, Together, etc.) ship keys in this shape, so a single rule

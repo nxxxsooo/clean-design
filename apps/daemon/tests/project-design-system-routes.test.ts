@@ -138,7 +138,7 @@ describe('project design system route gates', () => {
     projectsToClean.push(projectId);
 
     const prompt =
-      'Create this project as a complete Open Design design system workspace.';
+      'Create this project as a complete Clean Design design system workspace.';
     const patchResp = await fetch(`${baseUrl}/api/projects/${encodeURIComponent(projectId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -305,7 +305,8 @@ describe('project design system route gates', () => {
     expect(names).toContain('SKILLS.md');
 
     const skills = await zip.file('SKILLS.md')!.async('string');
-    expect(skills).toContain('https://github.com/nexu-io/open-design');
+    expect(skills).toContain('Generated with **Clean Design**');
+    expect(skills).not.toContain('github.com/nexu-io/open-design');
   });
 
   it('returns 404 when downloading a non-user design system archive', async () => {

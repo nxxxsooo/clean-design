@@ -80,8 +80,6 @@ type ManagedSidecarChild = {
 type PackagedDaemonManagedPathEnv = {
   OD_DATA_DIR: string;
   OD_RESOURCE_ROOT: string;
-  /** Channel-root path used by launcher runtime metadata. */
-  OD_INSTALLATION_DIR: string;
 };
 
 function resolveSidecarEntry(packageName: string, exportName: string): string {
@@ -143,7 +141,7 @@ const DAEMON_STATUS_TIMEOUT_MS = 35_000;
 // Windows first launches routinely blow past the 35s POSIX budget: Defender
 // real-time scanning of the freshly-written packaged binaries inflates the
 // daemon cold start (native better-sqlite3 load + first SQLite open/migrate +
-// status-pipe bind) well past 35s. PostHog on the packaged_runtime_failed
+// status-pipe bind) well past 35s. Failure diagnostics for the packaged runtime
 // status-timeout bucket showed ~90% of affected devices DID open the app on a
 // later launch — the daemon was merely slow, not dead — so a wider win32 budget
 // lets that first launch succeed instead of failing to a recovery screen and
@@ -287,14 +285,14 @@ async function retireExistingSidecarEndpoint(ipcPath: string, logPath: string): 
   const pid = typeof status.pid === "number" ? status.pid : null;
   await appendSidecarLifecycleLog(
     logPath,
-    `[open-design packaged] existing sidecar endpoint detected ipc=${ipcPath} pid=${pid ?? "unknown"}; requesting shutdown before relaunch`,
+    `[clean-design packaged] existing sidecar endpoint detected ipc=${ipcPath} pid=${pid ?? "unknown"}; requesting shutdown before relaunch`,
   );
   try {
     await requestJsonIpc(ipcPath, { type: SIDECAR_MESSAGES.SHUTDOWN }, { timeoutMs: 800 });
   } catch (error) {
     await appendSidecarLifecycleLog(
       logPath,
-      `[open-design packaged] existing sidecar shutdown request failed ipc=${ipcPath} error=${error instanceof Error ? error.message : String(error)}`,
+      `[clean-design packaged] existing sidecar shutdown request failed ipc=${ipcPath} error=${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
@@ -302,7 +300,7 @@ async function retireExistingSidecarEndpoint(ipcPath: string, logPath: string): 
     const exited = await waitForProcessExit(pid, 2500);
     await appendSidecarLifecycleLog(
       logPath,
-      `[open-design packaged] existing sidecar endpoint ${exited ? "exited" : "still-running"} ipc=${ipcPath} pid=${pid}`,
+      `[clean-design packaged] existing sidecar endpoint ${exited ? "exited" : "still-running"} ipc=${ipcPath} pid=${pid}`,
     );
   }
 }
@@ -352,7 +350,6 @@ function createPackagedDaemonManagedPathEnv(
   return {
     OD_DATA_DIR: paths.dataRoot,
     OD_RESOURCE_ROOT: paths.resourceRoot,
-    OD_INSTALLATION_DIR: paths.installationRoot,
   };
 }
 
@@ -413,7 +410,6 @@ export function buildPackagedDaemonSpawnEnv(
 
 async function spawnSidecarChild(options: {
   app: AppKey;
-  electronNodeCommand: string | null;
   entryPath: string;
   env: NodeJS.ProcessEnv;
   nodeCommand: string | null;
@@ -437,7 +433,6 @@ async function spawnSidecarChild(options: {
   await retireExistingSidecarEndpoint(ipcPath, logPath);
   const usesElectronAsNode = options.nodeCommand == null;
   const command = options.nodeCommand
-    ?? options.electronNodeCommand
     ?? await resolvePackagedElectronNodeCommand();
   const childEnv = createSidecarLaunchEnv({
     base: options.paths.runtimeRoot,
@@ -494,7 +489,7 @@ export function createPackagedSidecarSpawnOptions(input: {
 
 async function closeManagedChild(child: ManagedSidecarChild): Promise<void> {
   const appendLifecycleLog = async (message: string): Promise<void> => appendSidecarLifecycleLog(child.logPath, message);
-  await appendLifecycleLog(`[open-design packaged] shutdown requested app=${child.app} pid=${child.child.pid ?? "unknown"}`);
+  await appendLifecycleLog(`[clean-design packaged] shutdown requested app=${child.app} pid=${child.child.pid ?? "unknown"}`);
   try {
     await requestJsonIpc(child.ipcPath, { type: SIDECAR_MESSAGES.SHUTDOWN }, { timeoutMs: 1200 });
   } catch {
@@ -502,11 +497,11 @@ async function closeManagedChild(child: ManagedSidecarChild): Promise<void> {
   }
 
   if (!(await waitForProcessExit(child.child.pid, 5000))) {
-    await appendLifecycleLog(`[open-design packaged] shutdown timeout app=${child.app} pid=${child.child.pid ?? "unknown"}; forcing stop`);
+    await appendLifecycleLog(`[clean-design packaged] shutdown timeout app=${child.app} pid=${child.child.pid ?? "unknown"}; forcing stop`);
     await stopProcesses([child.child.pid]);
   }
 
-  await appendLifecycleLog(`[open-design packaged] exited app=${child.app} pid=${child.child.pid ?? "unknown"} code=${child.child.exitCode ?? "unknown"} signal=${child.child.signalCode ?? "none"}`);
+  await appendLifecycleLog(`[clean-design packaged] exited app=${child.app} pid=${child.child.pid ?? "unknown"} code=${child.child.exitCode ?? "unknown"} signal=${child.child.signalCode ?? "none"}`);
   await child.logHandle.close().catch(() => undefined);
 }
 
@@ -517,7 +512,6 @@ export async function startPackagedSidecars(
     appVersion: string | null;
     daemonCliEntry: string | null;
     daemonSidecarEntry: string | null;
-    electronNodeCommand: string | null;
     nodeCommand: string | null;
     /**
      * PR #974 round-5 (lefarcen P2): caller asserts whether a desktop
@@ -565,7 +559,6 @@ export async function startPackagedSidecars(
         legacyDataDir: process.env.OD_LEGACY_DATA_DIR ?? null,
         requireDesktopAuth: options.requireDesktopAuth,
       }),
-      electronNodeCommand: options.electronNodeCommand,
       nodeCommand: options.nodeCommand,
       paths,
       runtime,
@@ -596,7 +589,6 @@ export async function startPackagedSidecars(
         OD_WEB_OUTPUT_MODE: options.webOutputMode,
         PORT: "0",
       },
-      electronNodeCommand: options.electronNodeCommand,
       nodeCommand: options.nodeCommand,
       paths,
       runtime,

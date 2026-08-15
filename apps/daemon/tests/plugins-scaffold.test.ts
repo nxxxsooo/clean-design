@@ -37,9 +37,12 @@ describe('scaffoldPlugin', () => {
     const manifest = JSON.parse(
       await readFile(path.join(result.folder, 'open-design.json'), 'utf8'),
     );
+    expect(manifest).not.toHaveProperty('$schema');
     expect(manifest.name).toBe('sample-plugin');
     expect(manifest.od.taskKind).toBe('new-generation');
     expect(manifest.od.useCase.query).toMatch(/sample plugin/i);
+    const readme = await readFile(path.join(result.folder, 'README.md'), 'utf8');
+    expect(readme).not.toMatch(/marketplace|publish/i);
   });
 
   it('humanises the title from the id when --title is omitted', async () => {

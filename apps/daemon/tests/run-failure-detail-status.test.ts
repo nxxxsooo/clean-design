@@ -9,7 +9,7 @@ import { startServer } from '../src/server.js';
 
 // #895 red spec: the daemon already classifies a failure's fine-grained cause
 // (failure_category / failure_detail — see run-failure-classification.ts) for
-// telemetry and retry policy, but historically kept it daemon-internal. The
+// local diagnostics and retry policy, but historically kept it daemon-internal. The
 // chat can only render specific guidance ("quota exhausted, retrying won't
 // help") if that classification reaches the client, so the run-status response
 // for a *failed* run must surface `failureCategory` / `failureDetail`.
@@ -55,19 +55,11 @@ describe('run-status failure classification', () => {
     binDir = await mkdtemp(path.join(os.tmpdir(), 'od-failure-detail-bin-'));
     const fakeClaude = await writeHardQuotaClaude(binDir, 'claude-hard-quota');
 
-    delete process.env.POSTHOG_KEY;
-    delete process.env.POSTHOG_HOST;
-    delete process.env.LANGFUSE_PUBLIC_KEY;
-    delete process.env.LANGFUSE_SECRET_KEY;
-    delete process.env.LANGFUSE_BASE_URL;
-    delete process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL;
 
     started = (await startServer({ port: 0, returnServer: true })) as StartedServer;
     await putConfig(started.url, {
       agentId: 'claude',
       agentCliEnv: { claude: { CLAUDE_BIN: fakeClaude } },
-      telemetry: { metrics: true, content: false, artifactManifest: false },
-      privacyDecisionAt: Date.now(),
     });
 
     const conversationId = await createConversation(started.url);
@@ -84,12 +76,6 @@ describe('run-status failure classification', () => {
 
 function snapshotEnv(): Record<string, string | undefined> {
   return {
-    LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY,
-    LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
-    LANGFUSE_BASE_URL: process.env.LANGFUSE_BASE_URL,
-    OPEN_DESIGN_TELEMETRY_RELAY_URL: process.env.OPEN_DESIGN_TELEMETRY_RELAY_URL,
-    POSTHOG_KEY: process.env.POSTHOG_KEY,
-    POSTHOG_HOST: process.env.POSTHOG_HOST,
   };
 }
 
@@ -156,9 +142,6 @@ async function sendRunAndWait(url: string, encoded: string): Promise<RunStatus> 
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-od-analytics-device-id': 'failure-detail-test',
-      'x-od-analytics-session-id': 'failure-detail-session',
-      'x-od-analytics-client-type': 'web',
     },
     body: JSON.stringify({
       projectId,

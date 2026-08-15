@@ -161,9 +161,9 @@ const DE_SKILL_COPY: Record<string, LocalizedSkillCopy> = {
   },
   'agent-browser': {
     examplePrompt:
-      'Verifizieren Sie die lokale Open-Design-Vorschau mit agent-browser: starten oder verbinden Sie CDP Chrome, öffnen Sie http://127.0.0.1:17573/, melden Sie Titel, URL, sichtbare Texte und speichern Sie einen Screenshot.',
+      'Verifizieren Sie die lokale Clean-Design-Vorschau mit agent-browser: starten oder verbinden Sie CDP Chrome, öffnen Sie http://127.0.0.1:17573/, melden Sie Titel, URL, sichtbare Texte und speichern Sie einen Screenshot.',
     description:
-      'Browser-Automation für lokale Open-Design-Preview-Validierung. Verbindet sich mit einem geprüften CDP-Chrome-Endpunkt, liest gerenderten Seitenzustand, kann bei Bedarf klicken/tippen und speichert einen Screenshot.',
+      'Browser-Automation für lokale Clean-Design-Preview-Validierung. Verbindet sich mit einem geprüften CDP-Chrome-Endpunkt, liest gerenderten Seitenzustand, kann bei Bedarf klicken/tippen und speichert einen Screenshot.',
   },
   'blog-post': {
     examplePrompt:
