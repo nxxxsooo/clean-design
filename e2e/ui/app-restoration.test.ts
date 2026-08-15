@@ -3599,13 +3599,13 @@ async function expectWorkspaceReady(page: Page) {
 async function sendPrompt(page: Page, prompt: string) {
   const input = page.getByTestId('chat-composer-input');
   const sendButton = page.getByTestId('chat-send');
-  await expect(input).toBeVisible({ timeout: 3_000 });
+  await expect(input).toBeVisible({ timeout: T.medium });
   await input.click();
   await input.fill(prompt);
-  await expect(input).toHaveText(prompt, { timeout: 1500 });
-  await expect(sendButton).toBeEnabled({ timeout: 1500 });
+  await expect(input).toHaveText(prompt, { timeout: T.medium });
+  await expect(sendButton).toBeEnabled({ timeout: T.medium });
   await Promise.all([
-    page.waitForResponse(isCreateRunResponse, { timeout: 5_000 }),
+    page.waitForResponse(isCreateRunResponse, { timeout: T.long }),
     sendButton.evaluate((button: HTMLButtonElement) => button.click()),
   ]);
 }
@@ -3900,13 +3900,8 @@ async function createProjectNameOnly(
 async function gotoEntryHome(page: Page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await waitForLoadingToClear(page);
-  const privacyDialog = page.getByRole('dialog').filter({ hasText: 'Help us improve Open Design' });
-  if (await privacyDialog.isVisible()) {
-    await privacyDialog.getByRole('button', { name: /I get it|not now|got it|don't share/i }).click();
-    await expect(privacyDialog).toHaveCount(0);
-  }
-  await expect(page.getByTestId('home-hero')).toBeVisible();
-  await expect(page.getByTestId('home-hero-input')).toBeVisible();
+  await expect(page.getByTestId('home-hero')).toBeVisible({ timeout: T.long });
+  await expect(page.getByTestId('home-hero-input')).toBeVisible({ timeout: T.long });
 }
 
 async function openNewProjectModal(page: Page) {
