@@ -408,7 +408,7 @@ describe('composeSystemPrompt — metadata.promptTemplate', () => {
     expect(out).toContain('Allowed surfaces for this run: `image`.');
     expect(out).toContain('Allowed models for this run: `gpt-image-2`.');
     expect(out).toContain('### Allowed model IDs (per surface)');
-    expect(out).not.toContain('Open Design-owned media execution is **disabled for this run**');
+    expect(out).not.toContain('Clean Design-owned media execution is **disabled for this run**');
   });
 
   it('renders BYOK media defaults in the media contract', () => {

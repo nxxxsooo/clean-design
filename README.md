@@ -62,11 +62,38 @@ pnpm tools-dev run web
 Build and install the local app with:
 
 ```bash
-pnpm tools-pack mac build --to all
+pnpm tools-pack mac build --to all --portable
 pnpm tools-pack mac install
 ```
 
 Clean Design does not install a global `od` command and does not support silent or headless desktop bootstrap.
+
+## Install a release
+
+Download the Apple Silicon DMG or ZIP and `SHA256SUMS.txt` from the matching
+[GitHub Release](https://github.com/nxxxsooo/clean-design/releases). Verify the
+download before opening it:
+
+```bash
+shasum -a 256 -c SHA256SUMS.txt
+```
+
+For a first installation, open the DMG and copy `Clean Design.app` to
+`/Applications`. To update, quit Clean Design and replace the existing app;
+projects and settings remain in the separate Clean Design application-data
+directory. Clean Design has no automatic updater.
+
+The v0.1.0 build is ad-hoc signed, not Apple-notarized. macOS may quarantine a
+downloaded copy. After verifying that it came from this repository's Release,
+Control-click the app and choose **Open**. If macOS still blocks it, remove the
+quarantine attribute explicitly:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Clean Design.app"
+```
+
+To uninstall the app, quit it and remove `/Applications/Clean Design.app`.
+Removing the app does not silently delete projects or settings.
 
 ## Privacy
 

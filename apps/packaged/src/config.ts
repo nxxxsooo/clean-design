@@ -62,7 +62,7 @@ async function readJsonIfExists(filePath: string): Promise<RawPackagedConfig | n
 }
 
 function resolveDefaultConfigPath(): string {
-  return join(process.resourcesPath, "open-design-config.json");
+  return join(process.resourcesPath, "clean-design-config.json");
 }
 
 async function readRawPackagedConfig(): Promise<RawPackagedConfig> {
@@ -76,7 +76,7 @@ async function readRawPackagedConfig(): Promise<RawPackagedConfig> {
   const electronApp = await loadElectronApp();
   return (
     (await readJsonIfExists(resolveDefaultConfigPath())) ??
-    (await readJsonIfExists(join(electronApp.getAppPath(), "open-design-config.json"))) ??
+    (await readJsonIfExists(join(electronApp.getAppPath(), "clean-design-config.json"))) ??
     {}
   );
 }
@@ -144,10 +144,10 @@ export async function readPackagedConfig(): Promise<PackagedConfig> {
     raw.namespaceBaseRoot,
     electronApp.getPath("userData"),
   );
-  const resourceRoot = resolveOptionalPath(raw.resourceRoot) ?? join(process.resourcesPath, "open-design");
+  const resourceRoot = resolveOptionalPath(raw.resourceRoot) ?? join(process.resourcesPath, "clean-design");
   const relativeNodeCommand =
     raw.nodeCommandRelative == null || raw.nodeCommandRelative.length === 0
-      ? join("open-design", "bin", "node")
+      ? join("clean-design", "bin", "node")
       : raw.nodeCommandRelative;
   const nodeCommandCandidate = join(process.resourcesPath, relativeNodeCommand);
   const nodeCommand = (await pathExists(nodeCommandCandidate)) ? nodeCommandCandidate : null;

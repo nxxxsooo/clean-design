@@ -537,7 +537,7 @@ const FILESYSTEM_HANDOFF_OVERRIDE = `
 
 ## Filesystem handoff
 
-This run uses Open Design's filesystem execution profile. Project files are the source of truth for generated artifacts.
+This run uses Clean Design's filesystem execution profile. Project files are the source of truth for generated artifacts.
 
 Normal rhythm for artifact work:
 1. Start with a short ordinary assistant message or compact \`<od-card>\` that states the locked direction.

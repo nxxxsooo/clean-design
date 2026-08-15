@@ -1,6 +1,6 @@
 // Clean Design bind + bearer guard.
 //
-// Upstream Open Design allowed a public bind as long as OD_API_TOKEN was
+// Upstream Clean Design allowed a public bind as long as OD_API_TOKEN was
 // set (and allowed OD_DISABLE_API_AUTH to waive that). Clean Design binds
 // local services to loopback only, so a non-loopback bind is now refused
 // unconditionally — no token and no escape hatch can widen it. These tests

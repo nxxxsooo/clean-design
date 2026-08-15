@@ -364,7 +364,7 @@ describe("writeLaunchPackagedConfig", () => {
     try {
       const config = makeConfig(root, { namespace: "release-beta", portable: true });
       const appPath = join(root, "Clean Design.app");
-      const embeddedConfigPath = join(appPath, "Contents", "Resources", "open-design-config.json");
+      const embeddedConfigPath = join(appPath, "Contents", "Resources", "clean-design-config.json");
       await mkdir(dirname(embeddedConfigPath), { recursive: true });
       await writeFile(
         embeddedConfigPath,
@@ -385,7 +385,7 @@ describe("writeLaunchPackagedConfig", () => {
       const launchConfig = JSON.parse(await readFile(launchConfigPath, "utf8")) as Record<string, unknown>;
       const embeddedConfig = JSON.parse(await readFile(embeddedConfigPath, "utf8")) as Record<string, unknown>;
 
-      expect(launchConfigPath).toBe(join(config.roots.runtime.namespaceRoot, "runtime", "open-design-config.json"));
+      expect(launchConfigPath).toBe(join(config.roots.runtime.namespaceRoot, "runtime", "clean-design-config.json"));
       expect(launchConfig).toMatchObject({
         appVersion: "0.5.1-beta.2",
         namespace: "release-beta",

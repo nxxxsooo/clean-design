@@ -406,6 +406,33 @@ async function checkPackageDependencySpecs(): Promise<boolean> {
   return true;
 }
 
+async function checkReleaseVersionParity(): Promise<boolean> {
+  const manifests = await Promise.all(
+    ["package.json", "apps/packaged/package.json"].map(async (repositoryPath) => ({
+      repositoryPath,
+      manifest: JSON.parse(await readFile(path.join(repoRoot, repositoryPath), "utf8")) as {
+        version?: unknown;
+      },
+    })),
+  );
+  const versions = manifests.map(({ manifest }) => manifest.version);
+
+  if (versions.some((version) => typeof version !== "string" || version.length === 0)) {
+    console.error("Release version check failed: root and packaged manifests must declare versions.");
+    return false;
+  }
+  if (new Set(versions).size !== 1) {
+    console.error("Release version check failed:");
+    for (const { manifest, repositoryPath } of manifests) {
+      console.error(`- ${repositoryPath}: ${String(manifest.version)}`);
+    }
+    return false;
+  }
+
+  console.log(`Release version check passed: root and packaged app are ${String(versions[0])}.`);
+  return true;
+}
+
 const testLayoutScopedDirectories = ["apps", "packages", "tools"];
 const testLayoutSkippedDirectories = new Set([".next", ".od-data", "dist", "node_modules", "out", "reports", "test-results"]);
 
@@ -1257,6 +1284,7 @@ async function checkCiTopology(): Promise<boolean> {
 const checks: GuardCheck[] = [
   { name: "residual JavaScript", run: checkResidualJavaScript },
   { name: "package dependency specs", run: checkPackageDependencySpecs },
+  { name: "release version parity", run: checkReleaseVersionParity },
   { name: "product neutrality", run: checkProductNeutrality },
   { name: "cross-app imports", run: checkCrossAppImports },
   { name: "@ts-nocheck import resolution", run: checkTsNocheckImports },

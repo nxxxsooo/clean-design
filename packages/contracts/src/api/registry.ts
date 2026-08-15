@@ -44,7 +44,7 @@ export type AgentFixIntent =
   /** Re-run agent detection (the Settings "Rescan" affordance). */
   | { kind: 'rescan' }
   /**
-   * Prompt the user to point Open Design at an explicit binary by writing
+   * Prompt the user to point Clean Design at an explicit binary by writing
    * `envKey` (e.g. `CURSOR_AGENT_BIN`) into `agentCliEnv`. Used when the CLI
    * is installed somewhere PATH detection can't reach.
    */
@@ -118,7 +118,7 @@ export interface AgentInfo {
   /** Public runtime contract inherited by a validated local profile. */
   baseAgentId?: 'claude' | 'codex' | 'antigravity' | 'opencode' | 'pi';
   models?: AgentModelOption[];
-  /** Whether models came from the installed CLI or Open Design's static fallback. */
+  /** Whether models came from the installed CLI or Clean Design's static fallback. */
   modelsSource?: 'live' | 'fallback';
   reasoningOptions?: AgentModelOption[];
   /** HTTPS URL to install or download the CLI (vendor docs, GitHub README, npm). */

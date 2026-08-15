@@ -26,7 +26,7 @@ const RUNTIME_MODULE_PROJECT_ROOT = resolveProjectRootFromNestedModule(
 //
 // Auth/config precedence for Local CLI launches:
 //
-// 1. Provider BYOK is separate. It is used by Open Design's direct provider
+// 1. Provider BYOK is separate. It is used by Clean Design's direct provider
 //    API calls and is not automatically mapped into Local CLI launches.
 // 2. The inherited launch env represents the user's local CLI setup
 //    (OAuth/login files, CLI homes, or user-owned API-key env). Preserve it

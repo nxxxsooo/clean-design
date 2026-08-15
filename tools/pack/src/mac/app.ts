@@ -329,7 +329,7 @@ export async function writeAssembledApp(
         dependencies,
         description: "Clean Design packaged runtime",
         main: "./main.cjs",
-        name: "open-design-packaged-app",
+        name: "clean-design-packaged-app",
         ...(optionalDependencies == null ? {} : { optionalDependencies }),
         private: true,
         productName: identity.productName,

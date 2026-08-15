@@ -40,7 +40,7 @@ export async function seedPackagedAppConfig(config: ToolPackConfig): Promise<voi
 }
 
 export async function writeLaunchPackagedConfig(config: ToolPackConfig, appPath: string): Promise<string> {
-  const embeddedConfigPath = join(appPath, "Contents", "Resources", "open-design-config.json");
+  const embeddedConfigPath = join(appPath, "Contents", "Resources", "clean-design-config.json");
   const raw = (await pathExists(embeddedConfigPath))
     ? JSON.parse(await readFile(embeddedConfigPath, "utf8")) as unknown
     : {};
@@ -48,7 +48,7 @@ export async function writeLaunchPackagedConfig(config: ToolPackConfig, appPath:
     throw new Error(`packaged launch config source must be a JSON object: ${embeddedConfigPath}`);
   }
 
-  const launchConfigPath = join(config.roots.runtime.namespaceRoot, "runtime", "open-design-config.json");
+  const launchConfigPath = join(config.roots.runtime.namespaceRoot, "runtime", "clean-design-config.json");
   await mkdir(dirname(launchConfigPath), { recursive: true });
   await writeFile(
     launchConfigPath,

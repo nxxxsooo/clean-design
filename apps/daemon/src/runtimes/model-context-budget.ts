@@ -75,7 +75,7 @@ function knownModelFamilyContextWindow(modelId: string | null): number | null {
 
 function compactionMarker(omittedMessageBlocks: number): string {
   return [
-    `[Open Design compacted ${omittedMessageBlocks} older transcript message block${omittedMessageBlocks === 1 ? '' : 's'} while rolling over the upstream agent session.`,
+    `[Clean Design compacted ${omittedMessageBlocks} older transcript message block${omittedMessageBlocks === 1 ? '' : 's'} while rolling over the upstream agent session.`,
     'The complete history remains persisted; continue from the retained recent turns.]',
   ].join(' ');
 }

@@ -5503,7 +5503,7 @@ async function runDesignSystemImportLocal(args) {
   od design-systems import-local <path> [--name <name>] [--import-mode <mode>] [--craft <slugs>] [--json] [--daemon-url <url>]
   od design-systems import-local --path <path> [--name <name>] [--json]
 
-Imports a local project directory as an editable Open Design design system.
+Imports a local project directory as an editable Clean Design design system.
 
   <path>                 Local project directory to scan.
   --path <path>          Path alternative for scripts that prefer named flags.
@@ -5534,7 +5534,7 @@ async function runDesignSystemImportGithub(args) {
   od design-systems import-github <url> [--branch <branch>] [--name <name>] [--import-mode <mode>] [--craft <slugs>] [--json] [--daemon-url <url>]
   od design-systems import-github --url <url> [--branch <branch>] [--json]
 
-Imports a public GitHub repository as an editable Open Design design system.
+Imports a public GitHub repository as an editable Clean Design design system.
 
   <url>                  Repository root URL, e.g. https://github.com/acme/design-kit.
   --url <url>            URL alternative for scripts that prefer named flags.
@@ -5645,7 +5645,7 @@ async function runDesignSystemImportShadcn(args) {
     console.log(`Usage:
   od design-systems import-shadcn <reference> [--name <name>] [--import-mode <mode>] [--craft <slugs>] [--json] [--daemon-url <url>]
 
-Imports a shadcn registry item as an Open Design design system.
+Imports a shadcn registry item as an Clean Design design system.
 
   <reference>            "<owner>/<repo>/<item>" (e.g. shadcn/ui/theme-zinc)
                          or an https URL to a registry-item JSON document.

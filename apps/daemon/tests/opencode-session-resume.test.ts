@@ -198,7 +198,7 @@ describe('opencode native session resume', () => {
     expect(runs).toHaveLength(2);
     const [, rollover] = runs as [RunInvocation, RunInvocation];
     expect(rollover.argv).not.toContain('-s');
-    expect(rollover.stdin).toContain('Open Design compacted');
+    expect(rollover.stdin).toContain('Clean Design compacted');
     expect(rollover.stdin).not.toContain('rollover-turn-0');
     expect(rollover.stdin).toContain('rollover-turn-39');
 

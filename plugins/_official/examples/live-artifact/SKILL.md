@@ -1,7 +1,7 @@
 ---
 name: live-artifact
 description: |
-  Create refreshable, auditable Open Design artifacts backed by connector or local data.
+  Create refreshable, auditable Clean Design artifacts backed by connector or local data.
   Trigger when the user asks for live dashboards, refreshable reports, synced views, or reusable data-backed artifacts.
 triggers:
   - "live artifact"
@@ -35,7 +35,7 @@ od:
 
 # Live Artifact Skill
 
-Create an Open Design live artifact: a project-scoped, previewable HTML artifact whose data can later be refreshed without redesigning the presentation.
+Create an Clean Design live artifact: a project-scoped, previewable HTML artifact whose data can later be refreshed without redesigning the presentation.
 
 ## Resource map
 
