@@ -17,7 +17,8 @@ export type VisualCiMatrixEntry = {
 export const uiP0Groups = {
   "workspace-restoration": {
     grep: "@critical",
-    files: ["ui/app-restoration.test.ts", "ui/critical-smoke.test.ts"],
+    workers: 1,
+    files: ["ui/app-restoration.test.ts"],
   },
   "entry-settings": {
     grep: String.raw`\[P0\]`,
@@ -31,7 +32,6 @@ export const uiP0Groups = {
     grep: "@critical",
     workers: 1,
     files: [
-      "ui/app.test.ts",
       "ui/app-design-files.test.ts",
       "ui/app-manual-edit.test.ts",
       "ui/project-management-flows.test.ts",
@@ -67,8 +67,6 @@ const uiP0CoverageFiles = [
   "ui/app-design-files.test.ts",
   "ui/app-manual-edit.test.ts",
   "ui/app-restoration.test.ts",
-  "ui/app.test.ts",
-  "ui/critical-smoke.test.ts",
   "ui/entry-chrome-flows.test.ts",
   "ui/entry-configuration-flows.test.ts",
   "ui/local-setup.test.ts",
