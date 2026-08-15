@@ -60,7 +60,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
         }
       }
     },
-    { scope: 'worker', timeout: 120_000 },
+    { scope: 'worker', timeout: process.env.CI ? 300_000 : 120_000 },
   ],
 
   baseURL: async ({ toolsDev }, use) => {
