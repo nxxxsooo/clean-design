@@ -78,7 +78,7 @@ describe("processCommandExactlyRunsExecutable", () => {
 
   it("compares Windows executable paths case-insensitively", () => {
     expect(processCommandExactlyRunsExecutable(
-      '"C:\\PROGRAM FILES\\OPEN DESIGN\\OPEN DESIGN.EXE"',
+      '"C:\\PROGRAM FILES\\CLEAN DESIGN\\CLEAN DESIGN.EXE"',
       "c:\\Program Files\\Clean Design\\Clean Design.exe",
       "win32",
     )).toBe(true);
