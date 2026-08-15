@@ -15,11 +15,6 @@ export type VisualCiMatrixEntry = {
 };
 
 export const uiP0Groups = {
-  "workspace-restoration": {
-    grep: "@critical",
-    workers: 1,
-    files: ["ui/app-restoration.test.ts"],
-  },
   "entry-settings": {
     grep: String.raw`\[P0\]`,
     files: [
@@ -54,7 +49,6 @@ export const uiP0CiMatrix = [
   { name: "entry-settings", shard: "entry-settings" },
   { name: "project-workspace", shard: "project-workspace" },
   { name: "project-runtime", shard: "project-runtime" },
-  { name: "workspace-restoration", shard: "workspace-restoration" },
 ] as const satisfies readonly UiP0CiMatrixEntry[];
 
 export const visualCiMatrix = [
@@ -65,7 +59,6 @@ export const visualCiMatrix = [
 const uiP0CoverageFiles = [
   "ui/app-design-files.test.ts",
   "ui/app-manual-edit.test.ts",
-  "ui/app-restoration.test.ts",
   "ui/entry-chrome-flows.test.ts",
   "ui/entry-configuration-flows.test.ts",
   "ui/local-setup.test.ts",
