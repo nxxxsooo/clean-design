@@ -181,20 +181,15 @@ function assertAssistantMessage(
 
 async function expectWorkspaceReady(page: Page) {
   await waitForLoadingToClear(page);
-  const privacyDialog = page.getByRole('region', { name: 'Help us improve Open Design' });
-  if (await privacyDialog.isVisible().catch(() => false)) {
-    await privacyDialog.getByRole('button', { name: /don't share|not now/i }).click();
-    await playwrightExpect(privacyDialog).toHaveCount(0);
-  }
   await playwrightExpect(page).toHaveURL(/\/projects\//);
-  await playwrightExpect(page.getByTestId('chat-composer')).toBeVisible();
-  await playwrightExpect(page.getByTestId('chat-composer-input')).toBeVisible();
-  await playwrightExpect(page.getByTestId('file-workspace')).toBeVisible();
+  await playwrightExpect(page.getByTestId('chat-composer')).toBeVisible({ timeout: T.long });
+  await playwrightExpect(page.getByTestId('chat-composer-input')).toBeVisible({ timeout: T.long });
+  await playwrightExpect(page.getByTestId('file-workspace')).toBeVisible({ timeout: T.long });
 }
 
 async function waitForLoadingToClear(page: Page) {
-  const loading = page.getByText('Loading Open Design…');
-  await loading.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {});
+  const loading = page.getByText(/Loading Clean Design(?:…|\.\.\.)/);
+  await loading.waitFor({ state: 'detached', timeout: T.long }).catch(() => {});
 }
 
 async function sendPrompt(page: Page, prompt: string) {

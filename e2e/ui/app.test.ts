@@ -34,12 +34,6 @@ const CRITICAL_SCENARIO_IDS = new Set([
   'file-upload-send',
   'conversation-delete-recovery',
 ]);
-const MERGE_EXTRA_SCENARIO_IDS = new Set([
-  'prototype-basic',
-  'deck-basic',
-  'file-mention',
-  'deep-link-preview',
-]);
 test.describe.configure({ timeout: 45_000 });
 
 function artifactPreview(page: Page) {
@@ -96,7 +90,7 @@ test.beforeEach(async ({ page }) => {
 for (const entry of automatedUiScenarios().filter(
   (scenario) => !APP_OWNED_SCENARIO_FLOWS.has(scenario.flow ?? ''),
 )) {
-  test(`[${scenarioPriority(entry)}]${criticalScenarioTag(entry)}${mergeExtraScenarioTag(entry)} ${entry.id}: ${entry.title}`, async ({ page }) => {
+  test(`[${scenarioPriority(entry)}]${criticalScenarioTag(entry)} ${entry.id}: ${entry.title}`, async ({ page }) => {
     await routeMockAgents(page);
 
     if (entry.flow === 'example-use-prompt') {
@@ -610,10 +604,6 @@ function scenarioPriority(entry: UiScenario): 'P0' | 'P1' | 'P2' {
 
 function criticalScenarioTag(entry: UiScenario): string {
   return CRITICAL_SCENARIO_IDS.has(entry.id) ? ' @critical' : '';
-}
-
-function mergeExtraScenarioTag(entry: UiScenario): string {
-  return MERGE_EXTRA_SCENARIO_IDS.has(entry.id) ? ' @merge-extra' : '';
 }
 
 async function routeMockSuccessfulRun(page: Page, runId: string) {

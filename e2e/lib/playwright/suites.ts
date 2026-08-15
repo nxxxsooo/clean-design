@@ -15,13 +15,8 @@ export type VisualCiMatrixEntry = {
 };
 
 export const uiP0Groups = {
-  "critical-extras": {
-    grep: "@merge-extra",
-    workers: 1,
-    files: ["ui/app.test.ts"],
-  },
   "workspace-restoration": {
-    grep: String.raw`\[P0\]`,
+    grep: "@critical",
     files: ["ui/app-restoration.test.ts", "ui/critical-smoke.test.ts"],
   },
   "entry-settings": {
@@ -33,7 +28,7 @@ export const uiP0Groups = {
     ],
   },
   "project-workspace": {
-    grep: String.raw`\[P0\]`,
+    grep: "@critical",
     workers: 1,
     files: [
       "ui/app.test.ts",

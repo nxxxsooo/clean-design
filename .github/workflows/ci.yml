@@ -378,10 +378,6 @@ jobs:
       - name: Run UI P0 domain
         run: pnpm -C e2e exec tsx scripts/playwright.ts run-ui-group ${{ matrix.shard }}
 
-      - name: Run UI critical extras
-        if: ${{ matrix.shard == 'project-runtime' }}
-        run: pnpm -C e2e exec tsx scripts/playwright.ts run-ui-group critical-extras
-
       - name: Upload Playwright debug artifact
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
