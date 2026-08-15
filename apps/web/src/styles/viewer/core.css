@@ -60,6 +60,59 @@
 .ws-tabs-actions {
   flex: 0 0 auto;
 }
+.ws-pages-menu {
+  position: fixed;
+  z-index: 1600;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: min(420px, calc(100vh - 24px));
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+}
+.ws-pages-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.ws-pages-menu button:hover,
+.ws-pages-menu button:focus-visible,
+.ws-pages-menu button.active {
+  background: var(--bg-subtle);
+}
+.ws-pages-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.ws-pages-menu-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-pages-menu-empty {
+  padding: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
 .ws-body {
   position: relative;
   flex: 1 1 auto;

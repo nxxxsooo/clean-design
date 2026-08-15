@@ -35,7 +35,6 @@ export const uiP0Groups = {
       "ui/app-design-files.test.ts",
       "ui/app-manual-edit.test.ts",
       "ui/project-management-flows.test.ts",
-      "ui/workspace-keyboard-flows.test.ts",
     ],
   },
   "project-runtime": {
@@ -74,7 +73,6 @@ const uiP0CoverageFiles = [
   "ui/real-daemon-run.test.ts",
   "ui/run-failure-recovery.test.ts",
   "ui/settings-local-cli-codex-fallback.test.ts",
-  "ui/workspace-keyboard-flows.test.ts",
 ] as const;
 
 export function getUiP0Group(name: string): UiPlaywrightGroup | undefined {

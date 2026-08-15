@@ -282,7 +282,7 @@ test('[P0] switching between projects restores each project workspace to its las
   await expect(tabBySuffix(page, 'beta-secondary.png')).toHaveAttribute('aria-selected', 'false');
 });
 
-test('[P0] @critical visiting an uploaded design file route restores its tab and file workspace surface', async ({ page }) => {
+test('[P0] visiting an uploaded design file route restores its tab and file workspace surface', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -472,7 +472,7 @@ test('[P0] returning from an artifact file route to the project root keeps the a
   await expect(artifactTab).toHaveAttribute('aria-selected', 'true');
 });
 
-test('[P0] @critical returning from an older conversation route to the project root keeps the composer available while the route is selected', async ({ page }) => {
+test('[P0] returning from an older conversation route to the project root keeps the composer available while the route is selected', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -549,7 +549,7 @@ test('[P0] @critical returning from an older conversation route to the project r
   await expect(page.getByTestId('chat-composer')).toBeVisible();
 });
 
-test('[P0] @critical switching between conversations keeps the composer usable while navigating history', async ({ page }) => {
+test('[P0] switching between conversations keeps the composer usable while navigating history', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -745,7 +745,7 @@ test('[P0] @critical reloading an older conversation route keeps the composer vi
   await expect(reloadedHistoryList.locator('.chat-conv-item').filter({ hasText: firstPrompt }).first()).toBeVisible();
 });
 
-test('[P0] @critical switching between conversations keeps staged attachments UI available', async ({ page }) => {
+test('[P0] switching between conversations keeps staged attachments UI available', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -857,7 +857,7 @@ test('[P0] @critical switching between conversations keeps staged attachments UI
   await expect(page.locator('.msg.user .user-text').filter({ hasText: secondPrompt }).first()).toBeVisible();
 });
 
-test('[P0] @critical reloading an older conversation route keeps the composer available after staging attachments', async ({ page }) => {
+test('[P0] reloading an older conversation route keeps the composer available after staging attachments', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -943,7 +943,7 @@ test('[P0] @critical reloading an older conversation route keeps the composer av
   await expect(page.getByTestId('chat-composer')).toBeVisible();
 });
 
-test('[P0] @critical reloading the project keeps the latest conversation selected in history', async ({ page }) => {
+test('[P0] reloading the project keeps the latest conversation selected in history', async ({ page }) => {
   await page.route('**/api/agents', async (route) => {
     await route.fulfill({
       json: {
@@ -1029,7 +1029,7 @@ test('[P0] @critical reloading the project keeps the latest conversation selecte
   await expect(historyList.locator('.chat-conv-item')).toHaveCount(2);
 });
 
-test('[P0] @critical deleting the active conversation selects the remaining conversation in history', async ({ page }) => {
+test('[P0] deleting the active conversation selects the remaining conversation in history', async ({ page }) => {
   page.on('dialog', async (dialog: Dialog) => {
     await dialog.accept();
   });
