@@ -1,4 +1,4 @@
-# Clean Design
+<h1 align="center">Clean Design</h1>
 
 <p align="center"><a href="../../README.md">English</a> · <b>简体中文</b></p>
 
@@ -6,15 +6,44 @@
   <strong>本地优先的视觉创作工作室，直接使用你已经在用的 AI 工具。</strong>
 </p>
 
+<p align="center">
+  <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/nxxxsooo/clean-design?style=flat-square&labelColor=191816&color=df5d36"></a>
+  <a href="#下载"><img alt="运行平台" src="https://img.shields.io/badge/macOS-Apple%20Silicon-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
+  <a href="../../LICENSE"><img alt="许可证" src="https://img.shields.io/badge/license-Apache--2.0-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
+  <a href="../../PRIVACY.md"><img alt="无需账户" src="https://img.shields.io/badge/account-not%20required-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
+</p>
+
 ![Clean Design 首页](../../docs/assets/launch/clean-design-home.webp)
+
+<p align="center">
+  <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><b>下载 Apple 芯片 Mac 版本 →</b></a>
+</p>
 
 Clean Design 把一句想法变成 Mac 上可继续编辑的视觉项目。你可以使用已有的本地 AI CLI 或自己的模型提供商密钥，在画布上持续打磨，检查项目文件，并导出可移交的完整成果。
 
 - 项目、素材、历史和导出文件都保存在本地
 - 无需 Clean Design 账户、订阅，不含产品遥测和自动更新
-- 支持 Codex、Claude Code、Antigravity（`agy`）、OpenCode 和 Pi
 - BYOK 模型提供商在应用内单独配置
-- 支持原型、演示文稿、文档、设计系统、图像、视频、音频等多种作品
+
+## 使用你自己的智能体
+
+Clean Design 通过你本机已经安装的 CLI 生成内容，不需要额外购买 AI 订阅。
+
+| 运行时 | 检测到的命令 |
+|---|---|
+| Codex | `codex` |
+| Claude Code | `claude` |
+| Antigravity | `agy` |
+| OpenCode | `opencode-cli`，回退到 `opencode` |
+| Pi | `pi` |
+
+更习惯直接用 API 密钥？可以在应用内配置 BYOK 模型提供商。
+
+## 可以做什么
+
+原型 · 演示文稿 · 文档 · 设计系统 · 品牌套件 · 图像 · 视频 · 音频
+
+每一件作品都是磁盘上真实存在的项目：可以在画布上继续编辑，可以按文件检查，也可以导出成完整的移交包。
 
 ## 下载
 

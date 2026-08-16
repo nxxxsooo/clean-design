@@ -1,4 +1,4 @@
-# Clean Design
+<h1 align="center">Clean Design</h1>
 
 <p align="center"><b>English</b> · <a href="docs/i18n/README.zh-CN.md">简体中文</a></p>
 
@@ -6,15 +6,44 @@
   <strong>A local-first visual creation studio powered by the AI tools you already use.</strong>
 </p>
 
+<p align="center">
+  <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/nxxxsooo/clean-design?style=flat-square&labelColor=191816&color=df5d36"></a>
+  <a href="#download"><img alt="Platform" src="https://img.shields.io/badge/macOS-Apple%20Silicon-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
+  <a href="PRIVACY.md"><img alt="No account required" src="https://img.shields.io/badge/account-not%20required-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
+</p>
+
 ![Clean Design home screen](docs/assets/launch/clean-design-home.webp)
+
+<p align="center">
+  <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><b>Download for Apple Silicon Mac →</b></a>
+</p>
 
 Clean Design turns a prompt into an editable visual project on your Mac. Use an existing local AI CLI or your own model-provider key, refine the result on the canvas, inspect its files, and export a portable handoff.
 
 - Local projects, assets, history, and exports
 - No Clean Design account, subscription, telemetry, or automatic updater
-- Codex, Claude Code, Antigravity (`agy`), OpenCode, and Pi
 - BYOK providers configured separately inside the app
-- Prototypes, decks, documents, design systems, images, video, audio, and more
+
+## Bring your own agent
+
+Clean Design generates through a local CLI you already have installed. No additional AI subscription is required.
+
+| Runtime | Detected command |
+|---|---|
+| Codex | `codex` |
+| Claude Code | `claude` |
+| Antigravity | `agy` |
+| OpenCode | `opencode-cli`, falling back to `opencode` |
+| Pi | `pi` |
+
+Prefer an API key instead? Configure a BYOK provider inside the app.
+
+## What you can make
+
+Prototypes · Decks · Documents · Design systems · Brand kits · Images · Video · Audio
+
+Every artifact stays a real project on disk: editable on the canvas, inspectable as files, and exportable as a handoff packet.
 
 ## Download
 
