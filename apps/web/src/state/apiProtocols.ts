@@ -89,10 +89,10 @@ export const SUGGESTED_MODELS_BY_PROTOCOL: Record<ApiProtocol, readonly string[]
     // Anthropic / Gemini / DeepSeek by model name on its side. Listing the
     // headline cross-vendor checkpoints keeps the picker useful without
     // pretending to enumerate the full catalogue — users can type any id
-    // AIHubMix exposes (or fetch the full live list). gpt-5.5 leads as the
+    // AIHubMix exposes (or fetch the full live list). gpt-5.6-sol leads as the
     // default chat model (an OpenAI-family model keeps in-chat generate_image
     // working through the OpenAI tool loop after protocol routing lands).
-    'gpt-5.5',
+    'gpt-5.6-sol',
     'gpt-4o',
     'gpt-4o-mini',
     'claude-opus-4-8',

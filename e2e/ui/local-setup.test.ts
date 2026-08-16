@@ -37,7 +37,7 @@ test('[P0] @critical first local setup selects an allowlisted CLI and persists i
     mode: 'daemon',
     agentId: 'codex',
     agentModels: {
-      codex: { model: 'gpt-5.5' },
+      codex: { model: 'gpt-5.6-sol' },
     },
   });
 
@@ -183,7 +183,7 @@ async function openFirstSetup(page: Page, overrides: Record<string, unknown>) {
       version: '0.80.0',
       models: [
         { id: 'default', label: 'Default' },
-        { id: 'gpt-5.5', label: 'GPT 5.5' },
+        { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol' },
       ],
     },
     {

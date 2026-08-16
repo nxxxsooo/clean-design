@@ -168,7 +168,7 @@ const NANOBANANA_DEFAULT_MODEL = 'gemini-3.1-flash-image-preview';
 const NANOBANANA_DEFAULT_IMAGE_SIZE = '1K';
 const IMAGEROUTER_DEFAULT_BASE_URL = 'https://api.imagerouter.io/v1/openai';
 const CUSTOM_IMAGE_MODEL_ID = 'custom-image';
-const CODEX_IMAGE_ORCHESTRATOR_MODEL = 'gpt-5.5';
+const CODEX_IMAGE_ORCHESTRATOR_MODEL = 'gpt-5.6-sol';
 
 const DEFAULT_OUTPUT_BY_SURFACE = {
   image: 'image.png',
