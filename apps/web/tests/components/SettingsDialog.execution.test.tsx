@@ -2795,18 +2795,17 @@ describe('SettingsDialog media providers interactions', () => {
     expect(names.slice(0, 2)).toEqual(['MiniMax', 'OpenAI']);
   });
 
-  it('renders non-integrated providers in the coming-soon section without input fields', () => {
+  it('does not advertise non-integrated media providers', () => {
     renderSettingsDialog(
       { mode: 'daemon', agentId: 'codex' },
       { initialSection: 'media' },
     );
 
-    // Non-integrated providers (e.g. Fal.ai, Black Forest Labs) are shown in
-    // a separate "Coming soon" disclosure without editable inputs.
     expect(screen.queryByLabelText('Black Forest Labs API key')).toBeNull();
     expect(screen.queryByLabelText('Black Forest Labs Base URL')).toBeNull();
-    expect(document.querySelector('.media-provider-coming-soon')).toBeTruthy();
-    expect(screen.getByText('ComfyUI')).toBeTruthy();
+    expect(document.querySelector('.media-provider-coming-soon')).toBeNull();
+    expect(screen.queryByText('ComfyUI')).toBeNull();
+    expect(screen.queryByText('Coming soon')).toBeNull();
   });
 
   it('renders ElevenLabs as an integrated media provider with enabled inputs', () => {

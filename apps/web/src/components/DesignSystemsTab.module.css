@@ -1,6 +1,6 @@
 /* Master-detail Design systems layout, adapted from the Brand Kit presentation:
    a compact list of systems on the left (scoped to Your systems / Official
-   presets / Enterprise) and a live preview of the selected system on the right.
+   presets) and a live preview of the selected system on the right.
    The page uses a single scroll context (the entry scroll container); the left
    sidebar stays pinned via `position: sticky`. */
 
@@ -70,7 +70,7 @@
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-/* Scope chips — Your systems / Official presets / Enterprise */
+/* Scope chips — Your systems / Official presets */
 .scopes {
   display: flex;
   flex-wrap: wrap;
@@ -114,8 +114,7 @@
   outline-offset: 1px;
 }
 
-.scopeCount,
-.scopeComingSoon {
+.scopeCount {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -134,11 +133,6 @@
 .scopeChipActive .scopeCount {
   background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel));
   color: var(--accent);
-}
-
-.scopeComingSoon {
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
 }
 
 /* Official-presets filters — surface pills + category select */
@@ -1005,20 +999,6 @@
   font-size: 13.5px;
   line-height: 1.55;
   color: var(--text-muted);
-}
-
-.comingSoonBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 11px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  background: var(--bg-subtle);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
 }
 
 @keyframes designSystemsSkeletonSheen {

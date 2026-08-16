@@ -633,48 +633,6 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 6px;
 }
-/*
- * "Coming soon" drawer under the media provider list. We render the
- * roadmap providers as a denser, read-only list rather than the same
- * editable cards as the main list — the user can't actually configure
- * these, so giving them the same visual weight is misleading. The
- * <details>/<summary> is styled by the shared .memory-details-summary
- * rules; only the inner list needs new styles.
- */
-.media-provider-coming-soon {
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-.media-provider-coming-soon[open] {
-  padding-bottom: 12px;
-}
-.media-provider-coming-soon-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-.media-provider-coming-soon-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 0;
-  border-top: 1px solid var(--border-soft, var(--border));
-}
-.media-provider-coming-soon-item:first-child {
-  border-top: 0;
-}
-.media-provider-coming-soon-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
 .media-provider-secret-field {
   position: relative;
   min-width: 0;

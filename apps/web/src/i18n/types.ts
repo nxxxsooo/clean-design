@@ -247,7 +247,6 @@ export interface Dict {
   'settings.onboardingOrgStartup': string;
   'settings.onboardingOrgGrowth': string;
   'settings.onboardingOrgMidMarket': string;
-  'settings.onboardingOrgEnterprise': string;
   'settings.onboardingRolePm': string;
   'settings.onboardingRoleDesigner': string;
   'settings.onboardingRoleEngineer': string;
@@ -435,7 +434,6 @@ export interface Dict {
   'settings.mediaProviderReloadError': string;
   'settings.mediaProviderReloadSuccess': string;
   'settings.mediaProviderLoadError': string;
-  'settings.mediaProviderComingSoonHint': string;
   'settings.about': string;
   'settings.aboutHint': string;
   'settings.appVersion': string;
@@ -1099,7 +1097,6 @@ export interface Dict {
   'skillPluginCandidate.createForMe': string;
   'skillPluginCandidate.contributeToMain': string;
   'skillPluginCandidate.repoDescription': string;
-  'common.comingSoon': string;
   'routines.title': string;
   'routines.subtitle': string;
   'routines.newAutomation': string;
@@ -1184,7 +1181,6 @@ export interface Dict {
   'dsManager.templateSourceAria': string;
   'dsManager.yourSystems': string;
   'dsManager.officialPresets': string;
-  'dsManager.enterprise': string;
   'dsManager.yourTemplates': string;
   'dsManager.yourSystemsAria': string;
   'dsManager.eyebrowDesignSystems': string;
@@ -1217,11 +1213,6 @@ export interface Dict {
   'dsManager.yourTemplatesAria': string;
   'dsManager.emptyTemplates': string;
   'dsManager.templateDescFallback': string;
-  'dsManager.comingSoonBadge': string;
-  'dsManager.enterpriseDsTitle': string;
-  'dsManager.enterpriseDsBody': string;
-  'dsManager.enterpriseTplTitle': string;
-  'dsManager.enterpriseTplBody': string;
   // Settings instructions + MCP forwarding banner
   'settings.instructionsTitle': string;
   'settings.instructionsSubtitle': string;
@@ -1737,7 +1728,6 @@ export interface Dict {
   'chat.runError.sourceExpandAria': string;
   'chat.runError.sourceCollapseAria': string;
   'chat.tabComments': string;
-  'chat.commentsSoon': string;
   'chat.comments.attached': string;
   'chat.comments.emptyAttached': string;
   'chat.comments.saved': string;
@@ -1874,16 +1864,8 @@ export interface Dict {
   'chat.attachTitle': string;
   'chat.addContextTitle': string;
   'chat.attachAria': string;
-  'chat.importTitle': string;
   'chat.importLabel': string;
-  'chat.importComingSoon': string;
-  'chat.importSoon': string;
-  'chat.importFig': string;
   'chat.importGitHub': string;
-  'chat.importWeb': string;
-  'chat.importFolder': string;
-  'chat.importSkills': string;
-  'chat.importProject': string;
   'chat.importDesignSystemHeader': string;
   'chat.importDesignSystemBack': string;
   'chat.importDesignSystemSearch': string;
