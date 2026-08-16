@@ -499,7 +499,7 @@ export const fa: Dict = {
   'homeHero.templatePicker.projectTypes': 'انواع پروژه',
   'homeHero.templatesScrollHint': 'برای کاوش قالب‌های بیشتر به بالا اسکرول کنید',
   'homeHero.templatesCollapse': 'جمع کردن قالب‌ها',
-  'homeHero.subtitlePrefix': 'جایگزین متن‌باز Claude Design.',
+  'homeHero.subtitlePrefix': 'استودیوی ساخت بصری با اولویت اجرای محلی.',
   'homeHero.placeholder': 'آنچه می‌خواهید تولید کنید را توصیف کنید…',
   'homeHero.placeholderActive': 'کوئری نمونه را ویرایش کنید یا کوئری خود را بنویسید…',
   'homeHero.carousel.hint': 'یک فایل پیوست کنید، سیستم طراحی خود را متصل کنید، یا آنچه می‌خواهید بسازید را توصیف کنید',

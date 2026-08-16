@@ -499,7 +499,7 @@ export const pl: Dict = {
   'homeHero.templatePicker.projectTypes': 'Typy projektów',
   'homeHero.templatesScrollHint': 'Przewiń w górę, aby zobaczyć więcej szablonów',
   'homeHero.templatesCollapse': 'Zwiń szablony',
-  'homeHero.subtitlePrefix': 'Otwartoźródłowa alternatywa dla Claude Design.',
+  'homeHero.subtitlePrefix': 'Lokalne studio do tworzenia wizualnego.',
   'homeHero.placeholder': 'Opisz, co chcesz wygenerować…',
   'homeHero.placeholderActive': 'Edytuj przykładowe zapytanie lub napisz własne…',
   'homeHero.carousel.hint': 'Załącz plik, połącz swój design system lub opisz, co chcesz stworzyć',

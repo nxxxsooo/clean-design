@@ -499,7 +499,7 @@ export const fr: Dict = {
   'homeHero.templatePicker.projectTypes': 'Types de projet',
   'homeHero.templatesScrollHint': 'Faites défiler vers le haut pour explorer plus de modèles',
   'homeHero.templatesCollapse': 'Réduire les modèles',
-  'homeHero.subtitlePrefix': 'L’alternative open source à Claude Design.',
+  'homeHero.subtitlePrefix': 'Un studio de création visuelle en local.',
   'homeHero.placeholder': 'Décrivez ce que vous voulez générer…',
   'homeHero.placeholderActive': 'Modifiez la requête d’exemple ou écrivez la vôtre…',
   'homeHero.carousel.hint': 'Joignez un fichier, liez votre design system ou décrivez ce que vous voulez créer',

@@ -492,7 +492,7 @@ export const zhCN: Dict = {
   "homeHero.templatePicker.projectTypes": "项目类型",
   "homeHero.templatesScrollHint": "向上滑动探索更多模板",
   "homeHero.templatesCollapse": "收起模板",
-  "homeHero.subtitlePrefix": "Claude Design 的开源替代方案。",
+  "homeHero.subtitlePrefix": "本地优先的视觉创作工作室。",
   "homeHero.placeholder": "描述你想生成的内容…",
   "homeHero.placeholderActive": "编辑示例请求，或写下你自己的需求…",
   "homeHero.carousel.hint": "上传文件、关联设计系统，或描述你想创作的内容",

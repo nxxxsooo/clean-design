@@ -499,7 +499,7 @@ export const hu: Dict = {
   'homeHero.templatePicker.projectTypes': 'Projekttípusok',
   'homeHero.templatesScrollHint': 'Görgess felfelé további sablonokért',
   'homeHero.templatesCollapse': 'Sablonok összecsukása',
-  'homeHero.subtitlePrefix': 'A nyílt forráskódú Claude Design alternatíva.',
+  'homeHero.subtitlePrefix': 'Helyi működésre épülő vizuális alkotóstúdió.',
   'homeHero.placeholder': 'Írd le, mit szeretnél generálni…',
   'homeHero.placeholderActive': 'Szerkeszd a példalekérdezést, vagy írj sajátot…',
   'homeHero.carousel.hint': 'Csatolj egy fájlt, kapcsold össze a dizájnrendszered, vagy írd le, mit szeretnél készíteni',

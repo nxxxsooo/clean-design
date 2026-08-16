@@ -499,7 +499,7 @@ export const id: Dict = {
   'homeHero.templatePicker.projectTypes': 'Tipe proyek',
   'homeHero.templatesScrollHint': 'Gulir ke atas untuk menjelajahi lebih banyak template',
   'homeHero.templatesCollapse': 'Ciutkan template',
-  'homeHero.subtitlePrefix': 'Alternatif Claude Design yang open-source.',
+  'homeHero.subtitlePrefix': 'Studio kreasi visual yang mengutamakan pemrosesan lokal.',
   'homeHero.placeholder': 'Jelaskan apa yang ingin Anda hasilkan…',
   'homeHero.placeholderActive': 'Edit contoh kueri atau tulis kueri Anda sendiri…',
   'homeHero.carousel.hint': 'Lampirkan file, hubungkan design system, atau jelaskan apa yang ingin kamu buat',
