@@ -57,7 +57,7 @@ Prefer live model discovery for Antigravity, OpenCode, and Pi, with a Default-on
 
 ### The public launch explains the local product with product evidence
 
-The bilingual launch page uses an editorial, left-led asymmetric hero for AI creators. Copy and direct-download actions receive generous space on the left; a real Clean Design product screenshot on the right proves the product without competing with the message. The hero fits the initial viewport, collapses to one column below 768 px, uses restrained motion with reduced-motion support, and does not change the packaged startup animation or in-app Home. The remaining sequence is proof, workflow, artifact gallery, local CLIs and BYOK, local/privacy boundaries, then download and Gatekeeper guidance.
+The bilingual launch page uses the confirmed A hero for AI creators: a centered, vertically stacked composition with the headline, supporting copy, and direct-download actions given full width above a real Clean Design product screenshot. This prevents copy and buttons from being cramped into a narrow left column while keeping the product window legible as evidence. The hero fits the initial viewport, remains a single column below 768 px, uses restrained motion with reduced-motion support, and does not change the packaged startup animation or in-app Home. The remaining sequence is proof, workflow, artifact gallery, local CLIs and BYOK, local/privacy boundaries, then download and Gatekeeper guidance.
 
 ### Publication follows one finite acceptance pass
 

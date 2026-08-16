@@ -58,7 +58,7 @@ The public launch SHALL provide bilingual product guidance, direct Apple Silicon
 
 #### Scenario: Visitor opens the launch page
 - **WHEN** an AI creator visits the Clean Design launch page on desktop or mobile
-- **THEN** the initial viewport presents the product value, a direct download action, and a legible real product view before the remaining local-first workflow and privacy evidence
+- **THEN** the initial viewport presents centered full-width product value and download actions above a legible real product view, before the remaining local-first workflow and privacy evidence
 
 #### Scenario: User downloads version 0.1.0
 - **WHEN** the user follows a release download link
