@@ -60,7 +60,7 @@ OpenSpec contracts before applying it.
 ## Public release
 
 Do not make the repository public or publish a release until every item in
-`RELEASE.md` passes. The public-release gate includes source/history secret
+[docs/project/RELEASE.md](docs/project/RELEASE.md) passes. The public-release gate includes source/history secret
 scanning, license and trademark review, visible-branding review, endpoint and
 affiliate-link removal, network verification, installation smoke tests, and
 artifact inspection.
