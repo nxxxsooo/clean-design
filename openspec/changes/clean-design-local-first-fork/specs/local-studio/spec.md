@@ -45,3 +45,21 @@ The Apple Silicon macOS application SHALL bind local services to loopback, start
 #### Scenario: Application quits
 - **WHEN** the user quits Clean Design
 - **THEN** no Clean Design-owned daemon, web, desktop, or helper process remains running
+
+### Requirement: Model selectors reflect the supported native runtimes
+Clean Design SHALL obtain model choices from the owning supported CLI when discovery is available, preserve a usable Default choice when it is not, and MUST NOT expose explicitly retired model choices or mutate another CLI's settings file as a selection side effect.
+
+#### Scenario: Model picker opens
+- **WHEN** a user opens the model picker for one of the five supported local CLIs
+- **THEN** the picker shows the current discovered or approved fallback choices for that runtime and preserves custom native routing where supported
+
+### Requirement: The public release is direct and verifiable
+The public launch SHALL provide bilingual product guidance, direct Apple Silicon downloads, SHA-256 checksums, Gatekeeper guidance, English and Chinese repository documentation, and a real product screenshot without changing the packaged startup or in-app Home experience.
+
+#### Scenario: Visitor opens the launch page
+- **WHEN** an AI creator visits the Clean Design launch page on desktop or mobile
+- **THEN** the initial viewport presents the product value, a direct download action, and a legible real product view before the remaining local-first workflow and privacy evidence
+
+#### Scenario: User downloads version 0.1.0
+- **WHEN** the user follows a release download link
+- **THEN** the linked DMG or ZIP and published SHA-256 checksum belong to the verified `v0.1.0` release
