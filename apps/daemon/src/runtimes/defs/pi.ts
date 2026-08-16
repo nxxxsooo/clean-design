@@ -27,20 +27,7 @@ export const piAgentDef = {
         return null;
       }
     },
-    // Fallback models — the most commonly used providers/models when
-    // `pi --list-models` fails or times out.
-    fallbackModels: [
-      DEFAULT_MODEL_OPTION,
-      {
-        id: 'anthropic/claude-sonnet-4-5',
-        label: 'Claude Sonnet 4.5 (anthropic)',
-      },
-      { id: 'anthropic/claude-opus-4-5', label: 'Claude Opus 4.5 (anthropic)' },
-      { id: 'openai/gpt-5', label: 'GPT-5 (openai)' },
-      { id: 'openai/o4-mini', label: 'o4-mini (openai)' },
-      { id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro (google)' },
-      { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (google)' },
-    ],
+    fallbackModels: [DEFAULT_MODEL_OPTION],
     // Thinking level presets mapped to pi's --thinking flag.
     reasoningOptions: [
       { id: 'default', label: 'Default' },

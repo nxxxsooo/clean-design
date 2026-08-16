@@ -185,7 +185,7 @@ export interface RunArtifactBaseline {
   cwd: string;
   before: ArtifactSnapshot;
   // True when another run was active in the SAME cwd while this run ran. The
-  // daemon allows overlapping runs (see the antigravity lock in server.ts), and
+  // daemon allows overlapping runs, and
   // a whole-tree snapshot diff cannot tell which concurrent run wrote a file —
   // so a contended run must NOT trust the filesystem diff (the caller falls back
   // to the per-run tool-stream count) to avoid attributing one run's artifacts

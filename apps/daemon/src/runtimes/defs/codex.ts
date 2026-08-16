@@ -2,6 +2,13 @@ import { DEFAULT_MODEL_OPTION, clampCodexReasoning } from './shared.js';
 import type { RuntimeModelOption } from '../types.js';
 import type { RuntimeAgentDef } from '../types.js';
 
+const CODEX_MODEL_IDS = new Set([
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+  'gpt-5.6-luna',
+  'gpt-5.3-codex-spark',
+]);
+
 export function parseCodexDebugModels(stdout: string): RuntimeModelOption[] | null {
   let parsed: unknown;
   try {
@@ -31,7 +38,7 @@ export function parseCodexDebugModels(stdout: string): RuntimeModelOption[] | nu
         : typeof entry.id === 'string'
           ? entry.id.trim()
           : '';
-    if (!id || seen.has(id)) continue;
+    if (!id || !CODEX_MODEL_IDS.has(id) || seen.has(id)) continue;
     seen.add(id);
     const label =
       typeof entry.display_name === 'string' && entry.display_name.trim()
@@ -76,16 +83,10 @@ export const codexAgentDef = {
     },
     fallbackModels: [
       DEFAULT_MODEL_OPTION,
-      { id: 'gpt-5.5', label: 'gpt-5.5' },
-      { id: 'gpt-5.4', label: 'gpt-5.4' },
-      { id: 'gpt-5.4-mini', label: 'gpt-5.4-mini' },
-      { id: 'gpt-5.3-codex', label: 'gpt-5.3-codex' },
-      { id: 'gpt-5.1', label: 'gpt-5.1' },
-      { id: 'gpt-5.1-codex-mini', label: 'gpt-5.1-codex-mini' },
-      { id: 'gpt-5-codex', label: 'gpt-5-codex' },
-      { id: 'gpt-5', label: 'gpt-5' },
-      { id: 'o3', label: 'o3' },
-      { id: 'o4-mini', label: 'o4-mini' },
+      { id: 'gpt-5.6-sol', label: 'gpt-5.6-sol' },
+      { id: 'gpt-5.6-terra', label: 'gpt-5.6-terra' },
+      { id: 'gpt-5.6-luna', label: 'gpt-5.6-luna' },
+      { id: 'gpt-5.3-codex-spark', label: 'gpt-5.3-codex-spark' },
     ],
     reasoningOptions: [
       { id: 'default', label: 'Default' },

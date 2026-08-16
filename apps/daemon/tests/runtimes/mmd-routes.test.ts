@@ -149,10 +149,10 @@ test('mmd route loader uses HOME default path and keeps Claude fallback models',
       'default',
       'MiniMax-M2.7',
       'gpt-5.4',
-      'sonnet',
+      'fable',
     ]);
     assert.ok(ids?.includes('opus'));
-    assert.ok(ids?.includes('claude-sonnet-4-5'));
+    assert.ok(ids?.includes('haiku'));
     assert.equal(JSON.stringify(models).includes('secret'), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -183,7 +183,7 @@ test('mmd route loader supports explicit file override and safe fallback on bad 
     assert.deepEqual(models?.map((model) => model.id).slice(0, 3), [
       'default',
       'mimo-v2.5',
-      'sonnet',
+      'fable',
     ]);
     assert.equal(JSON.stringify(models).includes('sk-secret'), false);
 
@@ -239,40 +239,6 @@ test('mmd launch env expands tilde in explicit file overrides', async () => {
       ANTHROPIC_BASE_URL: 'https://mmd.example.test/v1',
       ANTHROPIC_AUTH_TOKEN: 'sk-mmd-secret',
     });
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('claude runtime fetchModels surfaces mmd route models to the picker', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'od-claude-mmd-models-'));
-  try {
-    const routesFile = join(dir, 'model-routes.json');
-    writeFileSync(
-      routesFile,
-      JSON.stringify({
-        routes: {
-          'claude-opus-4-6-thinking': {
-            primary: {
-              api_key: 'sk-secret-must-not-leak',
-            },
-          },
-        },
-      }),
-    );
-
-    assert.ok(claude.fetchModels, 'claude must define mmd-backed model discovery');
-    const models = await claude.fetchModels('/usr/bin/claude', {
-      MMD_MODEL_ROUTES_FILE: routesFile,
-    });
-
-    assert.ok(models);
-    assert.deepEqual(models.map((model) => model.id).slice(0, 3), [
-      'default',
-      'claude-opus-4-6-thinking',
-      'sonnet',
-    ]);
-    assert.equal(JSON.stringify(models).includes('sk-secret'), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

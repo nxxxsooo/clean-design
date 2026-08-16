@@ -46,7 +46,7 @@
 
 ## 7. Public v0.1.0 Release
 
-- [ ] 7.1 Refresh Claude, Codex, Antigravity, OpenCode, and Pi model choices and focused tests without exposing retired models or writing external CLI settings
+- [x] 7.1 Refresh Claude, Codex, Antigravity, OpenCode, and Pi model choices and focused tests without exposing retired models or writing external CLI settings
 - [ ] 7.2 Implement the bilingual public launch page with the confirmed A hero, real product imagery, direct downloads, English and Chinese README files, and GitHub metadata
 - [ ] 7.3 Build the Apple Silicon DMG and ZIP, generate SHA-256 checksums, and verify packaged title, icon, startup, Home, launch, quit, uninstall, and cleanup behavior
 - [ ] 7.4 Run Node 24 guard, typecheck, affected tests, one real supported generation, one handoff export inspection, and the finite release-boundary audit; repair concrete failures
