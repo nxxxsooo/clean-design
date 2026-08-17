@@ -8,6 +8,8 @@ Clean Design is an Apple Silicon macOS, local-first visual creation studio. Pres
 
 Do not restore accounts, hosted services or collaboration, teams, billing, promotions, news, deployment, external MCP/plugin-host integrations, unused agent transports, coding-agent adapters outside the five-runtime allowlist, automatic updates, telemetry, or global CLI installation.
 
+The single exception is the repository-owned first-party `clean-design` plugin at `.agents/plugins/clean-design/`. Explicit invocation may start one authenticated, namespace-scoped, temporary headless service from an installed Clean Design application. That plugin adds no global CLI, login item, auto-updater, telemetry, or hosted endpoint, and its MCP surface must never expose agent or provider execution, credentials, arbitrary shell commands, arbitrary host paths, project deletion, or overwrite-in-place exports. It is not eligible for hosted plugin directories that require a publicly reachable MCP endpoint.
+
 Keep internal `@open-design/*` package scopes and `OD_*` development variables until a deliberate compatibility migration is approved. User-visible identity is always Clean Design.
 
 ## Active Boundaries
