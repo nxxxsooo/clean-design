@@ -13,7 +13,7 @@
   <a href="../../PRIVACY.md"><img alt="无需账户" src="https://img.shields.io/badge/account-not%20required-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
 </p>
 
-![Clean Design 首页](../../docs/assets/launch/clean-design-home.webp)
+![以编辑设计形式呈现的 Clean Design Mac 应用首页](../../docs/assets/launch/clean-design-readme-hero.webp)
 
 <p align="center">
   <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><b>下载 Apple 芯片 Mac 版本 →</b></a>
@@ -43,6 +43,8 @@ Clean Design 通过你本机已经安装的 CLI 生成内容，不需要额外�
 
 原型 · 演示文稿 · 文档 · 设计系统 · 品牌套件 · 图像 · 视频 · 音频
 
+![Clean Design 可创作的作品类型视觉集合](../../docs/assets/launch/clean-design-artifacts.webp)
+
 每一件作品都是磁盘上真实存在的项目：可以在画布上继续编辑，可以按文件检查，也可以导出成完整的移交包。
 
 ## 下载
@@ -64,6 +66,8 @@ xattr -dr com.apple.quarantine "/Applications/Clean Design.app"
 版本更新需要手动完成：退出 Clean Design 后替换应用即可。项目和设置保存在单独的位置，不会随应用替换而消失。
 
 ## 工作方式
+
+![从描述想法到可编辑画布再到项目移交包的 Clean Design 工作流](../../docs/assets/launch/clean-design-workflow.webp)
 
 ```text
 描述想法 -> 生成 -> 视觉打磨 -> 导出

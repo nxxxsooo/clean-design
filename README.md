@@ -13,7 +13,7 @@
   <a href="PRIVACY.md"><img alt="No account required" src="https://img.shields.io/badge/account-not%20required-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
 </p>
 
-![Clean Design home screen](docs/assets/launch/clean-design-home.webp)
+![Clean Design home screen presented as an editorial Mac app hero](docs/assets/launch/clean-design-readme-hero.webp)
 
 <p align="center">
   <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><b>Download for Apple Silicon Mac →</b></a>
@@ -43,6 +43,8 @@ Prefer an API key instead? Configure a BYOK provider inside the app.
 
 Prototypes · Decks · Documents · Design systems · Brand kits · Images · Video · Audio
 
+![A visual collection of the artifact families Clean Design can create](docs/assets/launch/clean-design-artifacts.webp)
+
 Every artifact stays a real project on disk: editable on the canvas, inspectable as files, and exportable as a handoff packet.
 
 ## Download
@@ -64,6 +66,8 @@ xattr -dr com.apple.quarantine "/Applications/Clean Design.app"
 Updates are manual: quit Clean Design and replace the application. Projects and settings are stored separately and remain in place.
 
 ## How it works
+
+![The Clean Design workflow from prompt to editable canvas to handoff packet](docs/assets/launch/clean-design-workflow.webp)
 
 ```text
 Describe -> generate -> visually refine -> export
