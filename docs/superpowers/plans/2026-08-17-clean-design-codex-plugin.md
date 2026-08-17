@@ -373,7 +373,7 @@ git commit -m "feat: add private service runtime primitives"
 - Consumes: Task 2 protocol contracts and Task 3 private JSON helpers.
 - Produces: `LocalServiceAuthenticator`, `ServiceLeaseRegistry`, live per-lease session keys, private `mcp-secret`, private `service-runtime.json`, and sidecar handshake handlers consumed by Tasks 5, 7, 8, and 9.
 
-- [ ] **Step 1: Write red authentication and lease tests**
+- [x] **Step 1: Write red authentication and lease tests**
 
 Test wrong protocol, expired challenge, altered nonce/proof, replay, timing-safe verification, 16-client capacity, immutable roles, renew/release signatures, expired lease reclamation, and idle eligibility only when no leases/jobs exist.
 
@@ -391,7 +391,7 @@ expect(acquired.lease.role).toBe('mcp');
 expect(() => auth.acquire(/* same challenge */)).toThrow(/AUTH_FAILED/);
 ```
 
-- [ ] **Step 2: Run the red daemon tests**
+- [x] **Step 2: Run the red daemon tests**
 
 Run:
 
@@ -401,7 +401,7 @@ pnpm --filter @open-design/daemon test -- tests/services/local-service-auth.test
 
 Expected: FAIL because the services and messages are not wired.
 
-- [ ] **Step 3: Implement the authenticator**
+- [x] **Step 3: Implement the authenticator**
 
 Expose this exact surface:
 
@@ -422,15 +422,15 @@ export function createLocalServiceAuthenticator(options: {
 
 Derive proofs and session keys with domain-separated HMAC payloads. Consume each challenge once and use `timingSafeEqual` on equal-length buffers.
 
-- [ ] **Step 4: Implement the lease registry**
+- [x] **Step 4: Implement the lease registry**
 
 Expose `acquire`, `renew`, `release`, `reclaimExpired`, `status`, and `isIdleEligible`. Store `{leaseId, role, sessionKey, expiresAt}` in memory only. Capacity overflow throws a stable `SERVICE_CAPACITY` error; role is set at acquire and never accepted from renew/release input.
 
-- [ ] **Step 5: Wire daemon sidecar handshake messages and private files**
+- [x] **Step 5: Wire daemon sidecar handshake messages and private files**
 
 At sidecar startup, create a 32-byte secret, write `mcp-secret` mode `0600`, and after daemon readiness write `service-runtime.json` containing the Task 2 descriptor. Handle the four service messages in `startDaemonSidecar`; include live service counts in STATUS. Keep provider credential registration on the existing desktop-only path.
 
-- [ ] **Step 6: Run focused tests and daemon typecheck**
+- [x] **Step 6: Run focused tests and daemon typecheck**
 
 Run:
 
@@ -441,7 +441,7 @@ pnpm --filter @open-design/daemon typecheck
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the auth/lease slice**
+- [x] **Step 7: Commit the auth/lease slice**
 
 ```bash
 git add apps/daemon/src/services/local-service-auth.ts apps/daemon/src/services/local-service-leases.ts apps/daemon/src/sidecar/server.ts apps/daemon/tests/services apps/daemon/tests/sidecar-server.test.ts
