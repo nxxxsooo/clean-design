@@ -10,7 +10,9 @@
 
 ## Global Constraints
 
-- Run every command with Node 24 and pnpm 10.33.2; verify `node --version` begins with `v24.` before installing or testing.
+- Run every command with Node 24 and pnpm 10.33.2; verify `node --version` begins with `v24.` before installing or testing. The machine default is Node 26.7.0, so prepend the already-installed Homebrew Node 24 to `PATH` for every command in this plan: `export PATH="/opt/homebrew/opt/node@24/bin:$PATH"`. Do not change the repository `engines` pin and do not install a Node version manager.
+- Install the plugin at `.agents/plugins/clean-design/`, not `plugins/clean-design/`. The repository `plugins/` tree is the Clean Design design-system plugin registry: `plugins/AGENTS.md` defines its contract and `apps/daemon/src/plugins/bundled.ts` walks `plugins/_official/**` at daemon startup. Placing an OpenAI-format Codex plugin there would collide with the OD v1 plugin schema.
+- Build the MCP bridge as `packages/codex-plugin/`, not `tools/codex-plugin/`. `checkToolsLayout` in `scripts/guard.ts` allowlists `tools/` to exactly `AGENTS.md`, `dev/`, and `pack/`, and this plan must not weaken that boundary guard. `pnpm-workspace.yaml` already globs `packages/*`.
 - Preserve the exact five-field `SidecarStamp`: `app`, `mode`, `namespace`, `ipc`, and `source`. Rich service state belongs in separate private runtime files.
 - Keep user-visible identity `Clean Design`; retain internal `@open-design/*` scopes and `OD_*` compatibility variables.
 - Bind HTTP only to loopback. Namespace sockets and runtime paths are stable identities; ports are transport details.
@@ -22,7 +24,20 @@
 - Keep source directories source-only and tests in sibling `tests/` directories.
 - Use test-driven development for every behavior change: red test, observed failure, minimal implementation, green focused test, then commit.
 - Preserve unrelated user changes and stage only the files named by the current task.
-- Public plugin directory submission remains out of scope until the repository release gate is separately approved.
+- Public plugin directory submission remains out of scope until the repository release gate is separately approved, and is additionally constrained by the findings in "Official directory submission" below.
+
+## Official directory submission
+
+The user's stated goal is publication to the universal OpenAI plugin directory. The official documentation imposes requirements that the currently approved architecture cannot satisfy as-is.
+
+- A submission may be **skills-only**, **MCP-only**, or **skills plus MCP** per `https://developers.openai.com/plugins/deploy/submission`.
+- Any submission that includes an MCP server must supply a hosted MCP server URL. `https://developers.openai.com/plugins/deploy/app-review` requires that "Your MCP server is hosted on a publicly accessible domain" and that "You are not using a local or testing endpoint". A bundled `stdio` launcher that starts a loopback service on the user's Mac is exactly the excluded case.
+- Submission also requires a verified individual or business identity, **Apps Management** write permission in the owning OpenAI organization, public website/support/privacy/terms URLs, five positive and three negative test cases, starter prompts, and country availability.
+- Consequence: the local-first `stdio` bridge is **not submittable** to the universal directory. Hosting the Clean Design daemon publicly would violate this repository's loopback-only and local-first product contract.
+- Therefore the plan targets two distinct artifacts from one codebase:
+  1. **Local distribution (Tasks 1-14):** the full Skills + local MCP plugin, installed from the repository marketplace. This is the product experience and is unaffected by directory policy.
+  2. **Directory submission (deferred, Task 15):** a **skills-only** listing derived from the same Skill sources, with no MCP server, no local service, and degraded capability. It can guide a user through Clean Design workflows but cannot read, write, preview, render, or export a local workspace.
+- Task 15 is not authorized by this plan. It requires a separate user decision because it changes the plugin's advertised capability surface and requires OpenAI organization identity verification the agent cannot perform.
 
 ---
 
@@ -40,8 +55,8 @@
 | `apps/packaged/src/service-manager.ts` | Connect-lock-recheck daemon singleton and desktop lease ownership |
 | `apps/packaged/src/headless.ts` | Private argument-gated daemon plus render-broker entry without visible windows |
 | `apps/desktop/src/main/render-broker.ts` | One bounded FIFO renderer shared by PDF, slide, image, and handoff requests |
-| `tools/codex-plugin` | MCP v2 stdio server, strict tool definitions, service client, app discovery, launcher, bundle and asset builders |
-| `plugins/clean-design` | Installable Codex manifest, `.mcp.json`, bundled launcher, brand assets, and eight Skills |
+| `packages/codex-plugin` | MCP v2 stdio server, strict tool definitions, service client, app discovery, launcher, bundle and asset builders |
+| `.agents/plugins/clean-design` | Installable Codex manifest, `.mcp.json`, bundled launcher, brand assets, and eight Skills |
 | `.agents/plugins/marketplace.json` | Repository marketplace entry for the `clean-design` plugin |
 | `e2e/specs/codex-plugin` | End-to-end business capability chain |
 | `e2e/tests/codex-plugin` | Startup-storm, security, and evaluation hotspots |
@@ -721,19 +736,19 @@ git commit -m "feat: expose bounded Clean Design MCP profile"
 
 **Files:**
 
-- Create: `tools/codex-plugin/package.json`
-- Create: `tools/codex-plugin/tsconfig.json`
-- Create: `tools/codex-plugin/tsconfig.tests.json`
-- Create: `tools/codex-plugin/vitest.config.ts`
-- Create: `tools/codex-plugin/esbuild.config.mjs`
-- Create: `tools/codex-plugin/src/contracts.ts`
-- Create: `tools/codex-plugin/src/service-client.ts`
-- Create: `tools/codex-plugin/src/tool-definitions.ts`
-- Create: `tools/codex-plugin/src/server.ts`
-- Create: `tools/codex-plugin/src/index.ts`
-- Create: `tools/codex-plugin/tests/service-client.test.ts`
-- Create: `tools/codex-plugin/tests/tool-definitions.test.ts`
-- Create: `tools/codex-plugin/tests/stdio.test.ts`
+- Create: `packages/codex-plugin/package.json`
+- Create: `packages/codex-plugin/tsconfig.json`
+- Create: `packages/codex-plugin/tsconfig.tests.json`
+- Create: `packages/codex-plugin/vitest.config.ts`
+- Create: `packages/codex-plugin/esbuild.config.mjs`
+- Create: `packages/codex-plugin/src/contracts.ts`
+- Create: `packages/codex-plugin/src/service-client.ts`
+- Create: `packages/codex-plugin/src/tool-definitions.ts`
+- Create: `packages/codex-plugin/src/server.ts`
+- Create: `packages/codex-plugin/src/index.ts`
+- Create: `packages/codex-plugin/tests/service-client.test.ts`
+- Create: `packages/codex-plugin/tests/tool-definitions.test.ts`
+- Create: `packages/codex-plugin/tests/stdio.test.ts`
 - Modify: `apps/daemon/package.json`
 - Modify: `pnpm-lock.yaml`
 
@@ -844,7 +859,7 @@ Every tool uses strict Zod input/output schemas, returns `structuredContent` plu
 
 - [ ] **Step 5: Implement stdio lifecycle and deterministic bundling**
 
-`src/index.ts` creates the client, connects `StdioServerTransport`, closes on EOF/SIGINT/SIGTERM, writes diagnostics only to stderr, and never writes non-JSON data to stdout. Bundle to `tools/codex-plugin/dist/launcher.bundle.mjs` with Node 24 target and no absolute source paths.
+`src/index.ts` creates the client, connects `StdioServerTransport`, closes on EOF/SIGINT/SIGTERM, writes diagnostics only to stderr, and never writes non-JSON data to stdout. Bundle to `packages/codex-plugin/dist/launcher.bundle.mjs` with Node 24 target and no absolute source paths.
 
 - [ ] **Step 6: Run bridge tests, typecheck, and build**
 
@@ -856,12 +871,12 @@ pnpm --filter @open-design/codex-plugin typecheck
 pnpm --filter @open-design/codex-plugin build
 ```
 
-Expected: PASS and `tools/codex-plugin/dist/launcher.bundle.mjs` exists.
+Expected: PASS and `packages/codex-plugin/dist/launcher.bundle.mjs` exists.
 
 - [ ] **Step 7: Commit the bridge slice**
 
 ```bash
-git add tools/codex-plugin apps/daemon/package.json pnpm-lock.yaml
+git add packages/codex-plugin apps/daemon/package.json pnpm-lock.yaml
 git commit -m "feat: add Clean Design MCP bridge"
 ```
 
@@ -869,11 +884,11 @@ git commit -m "feat: add Clean Design MCP bridge"
 
 **Files:**
 
-- Create: `tools/codex-plugin/src/app-discovery.ts`
-- Create: `tools/codex-plugin/src/launcher.ts`
-- Create: `tools/codex-plugin/tests/app-discovery.test.ts`
-- Create: `tools/codex-plugin/tests/launcher.test.ts`
-- Modify: `tools/codex-plugin/src/service-client.ts`
+- Create: `packages/codex-plugin/src/app-discovery.ts`
+- Create: `packages/codex-plugin/src/launcher.ts`
+- Create: `packages/codex-plugin/tests/app-discovery.test.ts`
+- Create: `packages/codex-plugin/tests/launcher.test.ts`
+- Modify: `packages/codex-plugin/src/service-client.ts`
 
 **Interfaces:**
 
@@ -944,7 +959,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit app discovery**
 
 ```bash
-git add tools/codex-plugin
+git add packages/codex-plugin
 git commit -m "feat: launch validated Clean Design service"
 ```
 
@@ -1019,20 +1034,20 @@ git commit -m "feat: package private plugin service entry"
 **Files:**
 
 - Create: `.agents/plugins/marketplace.json`
-- Create: `plugins/clean-design/.codex-plugin/plugin.json`
-- Create: `plugins/clean-design/.mcp.json`
-- Create: `plugins/clean-design/README.md`
-- Create: `plugins/clean-design/mcp/launcher.bundle.mjs`
-- Create: `plugins/clean-design/assets/composer-icon.png`
-- Create: `plugins/clean-design/assets/logo.png`
-- Create: `plugins/clean-design/assets/logo-dark.png`
-- Create: `plugins/clean-design/assets/screenshot-create.png`
-- Create: `plugins/clean-design/assets/screenshot-refine.png`
-- Create: `plugins/clean-design/assets/screenshot-export.png`
-- Create: `tools/codex-plugin/scripts/build-plugin-assets.mjs`
-- Create: `tools/codex-plugin/tests/plugin-package.test.ts`
-- Modify: `tools/codex-plugin/package.json`
-- Modify: `tools/codex-plugin/esbuild.config.mjs`
+- Create: `.agents/plugins/clean-design/.codex-plugin/plugin.json`
+- Create: `.agents/plugins/clean-design/.mcp.json`
+- Create: `.agents/plugins/clean-design/README.md`
+- Create: `.agents/plugins/clean-design/mcp/launcher.bundle.mjs`
+- Create: `.agents/plugins/clean-design/assets/composer-icon.png`
+- Create: `.agents/plugins/clean-design/assets/logo.png`
+- Create: `.agents/plugins/clean-design/assets/logo-dark.png`
+- Create: `.agents/plugins/clean-design/assets/screenshot-create.png`
+- Create: `.agents/plugins/clean-design/assets/screenshot-refine.png`
+- Create: `.agents/plugins/clean-design/assets/screenshot-export.png`
+- Create: `packages/codex-plugin/scripts/build-plugin-assets.mjs`
+- Create: `packages/codex-plugin/tests/plugin-package.test.ts`
+- Modify: `packages/codex-plugin/package.json`
+- Modify: `packages/codex-plugin/esbuild.config.mjs`
 - Modify: `pnpm-lock.yaml`
 
 **Interfaces:**
@@ -1046,7 +1061,7 @@ Run from the plugin-creator skill root:
 
 ```bash
 python3 scripts/create_basic_plugin.py clean-design \
-  --path /Users/mingjian/Documents/sync/GitHub/clean-design/plugins \
+  --path /Users/mingjian/Documents/sync/GitHub/clean-design/.agents/plugins \
   --marketplace-path /Users/mingjian/Documents/sync/GitHub/clean-design/.agents/plugins/marketplace.json \
   --marketplace-name clean-design \
   --category Creativity \
@@ -1120,7 +1135,7 @@ Update the scaffolded marketplace entry to this exact policy and category while 
   "name": "clean-design",
   "source": {
     "source": "local",
-    "path": "./plugins/clean-design"
+    "path": "./.agents/plugins/clean-design"
   },
   "policy": {
     "installation": "AVAILABLE",
@@ -1136,7 +1151,7 @@ Pin `sharp: 0.34.5` as a dev dependency of `@open-design/codex-plugin`. The asse
 
 - [ ] **Step 6: Copy the deterministic bridge bundle**
 
-Extend `esbuild.config.mjs` to write the same bundle bytes to `tools/codex-plugin/dist/launcher.bundle.mjs` and `plugins/clean-design/mcp/launcher.bundle.mjs`. Scan output for `/Users/`, the repository absolute path, provider secret names, and source maps; fail the build if found.
+Extend `esbuild.config.mjs` to write the same bundle bytes to `packages/codex-plugin/dist/launcher.bundle.mjs` and `.agents/plugins/clean-design/mcp/launcher.bundle.mjs`. Scan output for `/Users/`, the repository absolute path, provider secret names, and source maps; fail the build if found.
 
 - [ ] **Step 7: Validate the plugin and package test**
 
@@ -1145,7 +1160,7 @@ Run:
 ```bash
 pnpm --filter @open-design/codex-plugin build
 pnpm --filter @open-design/codex-plugin test -- tests/plugin-package.test.ts
-python3 /Users/mingjian/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/clean-design
+python3 /Users/mingjian/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .agents/plugins/clean-design
 ```
 
 Expected: PASS.
@@ -1153,7 +1168,7 @@ Expected: PASS.
 - [ ] **Step 8: Commit the plugin shell and assets**
 
 ```bash
-git add .agents/plugins/marketplace.json plugins/clean-design tools/codex-plugin pnpm-lock.yaml
+git add .agents/plugins/marketplace.json .agents/plugins/clean-design packages/codex-plugin pnpm-lock.yaml
 git commit -m "feat: add Clean Design Codex plugin shell"
 ```
 
@@ -1161,24 +1176,24 @@ git commit -m "feat: add Clean Design Codex plugin shell"
 
 **Files:**
 
-- Create: `plugins/clean-design/skills/clean-design/SKILL.md`
-- Create: `plugins/clean-design/skills/clean-design/agents/openai.yaml`
-- Create: `plugins/clean-design/skills/create-web-prototype/SKILL.md`
-- Create: `plugins/clean-design/skills/create-web-prototype/agents/openai.yaml`
-- Create: `plugins/clean-design/skills/create-presentation/SKILL.md`
-- Create: `plugins/clean-design/skills/create-presentation/agents/openai.yaml`
-- Create: `plugins/clean-design/skills/create-document/SKILL.md`
-- Create: `plugins/clean-design/skills/create-document/agents/openai.yaml`
-- Create: `plugins/clean-design/skills/create-design-system/SKILL.md`
-- Create: `plugins/clean-design/skills/create-design-system/agents/openai.yaml`
-- Create: `plugins/clean-design/skills/create-brand-kit/SKILL.md`
-- Create: `plugins/clean-design/skills/create-brand-kit/agents/openai.yaml`
-- Create: `plugins/clean-design/skills/create-media/SKILL.md`
-- Create: `plugins/clean-design/skills/create-media/agents/openai.yaml`
-- Create: `plugins/clean-design/skills/refine-and-export/SKILL.md`
-- Create: `plugins/clean-design/skills/refine-and-export/agents/openai.yaml`
-- Create: `tools/codex-plugin/tests/skill-package.test.ts`
-- Create: `tools/codex-plugin/tests/fixtures/skill-routing.json`
+- Create: `.agents/plugins/clean-design/skills/clean-design/SKILL.md`
+- Create: `.agents/plugins/clean-design/skills/clean-design/agents/openai.yaml`
+- Create: `.agents/plugins/clean-design/skills/create-web-prototype/SKILL.md`
+- Create: `.agents/plugins/clean-design/skills/create-web-prototype/agents/openai.yaml`
+- Create: `.agents/plugins/clean-design/skills/create-presentation/SKILL.md`
+- Create: `.agents/plugins/clean-design/skills/create-presentation/agents/openai.yaml`
+- Create: `.agents/plugins/clean-design/skills/create-document/SKILL.md`
+- Create: `.agents/plugins/clean-design/skills/create-document/agents/openai.yaml`
+- Create: `.agents/plugins/clean-design/skills/create-design-system/SKILL.md`
+- Create: `.agents/plugins/clean-design/skills/create-design-system/agents/openai.yaml`
+- Create: `.agents/plugins/clean-design/skills/create-brand-kit/SKILL.md`
+- Create: `.agents/plugins/clean-design/skills/create-brand-kit/agents/openai.yaml`
+- Create: `.agents/plugins/clean-design/skills/create-media/SKILL.md`
+- Create: `.agents/plugins/clean-design/skills/create-media/agents/openai.yaml`
+- Create: `.agents/plugins/clean-design/skills/refine-and-export/SKILL.md`
+- Create: `.agents/plugins/clean-design/skills/refine-and-export/agents/openai.yaml`
+- Create: `packages/codex-plugin/tests/skill-package.test.ts`
+- Create: `packages/codex-plugin/tests/fixtures/skill-routing.json`
 
 **Interfaces:**
 
@@ -1244,10 +1259,10 @@ Run:
 
 ```bash
 pnpm --filter @open-design/codex-plugin test -- tests/skill-package.test.ts tests/plugin-package.test.ts
-for skill in plugins/clean-design/skills/*; do
+for skill in .agents/plugins/clean-design/skills/*; do
   python3 /Users/mingjian/.codex/skills/.system/skill-creator/scripts/quick_validate.py "$skill"
 done
-python3 /Users/mingjian/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/clean-design
+python3 /Users/mingjian/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .agents/plugins/clean-design
 ```
 
 Expected: every command PASS.
@@ -1255,7 +1270,7 @@ Expected: every command PASS.
 - [ ] **Step 7: Commit the Skill slice**
 
 ```bash
-git add plugins/clean-design/skills tools/codex-plugin/tests/skill-package.test.ts tools/codex-plugin/tests/fixtures/skill-routing.json
+git add .agents/plugins/clean-design/skills packages/codex-plugin/tests/skill-package.test.ts packages/codex-plugin/tests/fixtures/skill-routing.json
 git commit -m "feat: add Clean Design plugin workflows"
 ```
 
@@ -1379,7 +1394,7 @@ Inspect the app for Clean Design identity, protocol version 1, private argument-
 
 ```bash
 pnpm tools-pack mac install
-python3 /Users/mingjian/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/clean-design
+python3 /Users/mingjian/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .agents/plugins/clean-design
 codex plugin marketplace add /Users/mingjian/Documents/sync/GitHub/clean-design
 codex plugin add clean-design@clean-design
 ```
