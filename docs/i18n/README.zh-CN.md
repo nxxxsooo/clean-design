@@ -27,7 +27,7 @@ Clean Design 把一句想法变成 Mac 上真实存在的视觉项目。你可�
 
 ## 使用你自己的智能体
 
-![五个受支持的本地 AI CLI 进入 Clean Design 画布并导出可移交成果](../../docs/assets/launch/clean-design-agent-workflow-v2.webp)
+![提示进入 Clean Design 画布并导出可移交成果](../../docs/assets/launch/clean-design-workflow.webp)
 
 Clean Design 通过你本机已经安装的 CLI 生成内容，不需要额外注册 Clean Design 账户，也不需要再购买一份 AI 订阅。
 
@@ -43,7 +43,7 @@ Clean Design 通过你本机已经安装的 CLI 生成内容，不需要额外�
 
 ## 不只制作界面
 
-![由原型、演示文稿、文档、设计系统、品牌、图像、视频和音频组成的视觉工作室](../../docs/assets/launch/clean-design-artifact-world-v2.webp)
+![由原型、演示文稿、文档、设计系统、品牌、图像、视频和音频组成的视觉工作室](../../docs/assets/launch/clean-design-artifacts.webp)
 
 **原型 · 演示文稿 · 文档 · 设计系统 · 品牌套件 · 图像 · 视频 · 音频**
 

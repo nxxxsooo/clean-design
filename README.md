@@ -27,7 +27,7 @@ Clean Design turns a prompt into a real visual project on your Mac. Generate wit
 
 ## Bring your own agent
 
-![Five supported local AI CLIs feeding a Clean Design canvas and portable handoff](docs/assets/launch/clean-design-agent-workflow-v2.webp)
+![A prompt flowing into a Clean Design canvas and portable handoff](docs/assets/launch/clean-design-workflow.webp)
 
 Clean Design generates through a local CLI you already have installed. No additional Clean Design account or AI subscription is required.
 
@@ -43,7 +43,7 @@ Prefer an API key instead? Configure a BYOK provider separately inside the app.
 
 ## Make more than screens
 
-![A studio spread representing prototypes, decks, documents, design systems, brands, images, video, and audio](docs/assets/launch/clean-design-artifact-world-v2.webp)
+![A studio spread representing prototypes, decks, documents, design systems, brands, images, video, and audio](docs/assets/launch/clean-design-artifacts.webp)
 
 **Prototypes · Slide decks · Documents · Design systems · Brand kits · Images · Video · Audio**
 

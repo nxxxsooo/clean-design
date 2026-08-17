@@ -12,7 +12,7 @@ Refresh Clean Design's public product story across three existing surfaces:
 2. the standalone product landing at `https://mjshao.fun/clean-design/`;
 3. the portfolio work page at `https://mjshao.fun/work/clean-design`.
 
-The refresh must use one verified product source of truth and one visual family while giving each surface a different reading job. It must replace the current thin or decorative imagery with three newly composed, evidence-backed visuals arranged as the approved three-act sequence:
+The refresh must use one verified product source of truth and one visual family while giving each surface a different reading job. It uses one newly composed product-proof visual and the two user-selected existing masters, arranged as the approved three-act sequence:
 
 1. product proof;
 2. agent workflow;
@@ -201,7 +201,7 @@ English and Simplified Chinese. Structural and factual changes must land togethe
 
 ## Three Core Visuals
 
-All three visuals are newly composed deliverables. Existing images may supply factual source captures, but no existing delivery image is reused unchanged.
+Act I is a newly composed deliverable. Act II and Act III reuse the user-selected `clean-design-workflow.webp` and `clean-design-artifacts.webp` masters without cropping, recoloring, or regeneration.
 
 ### Act I — Product proof
 
@@ -264,8 +264,8 @@ All three visuals are newly composed deliverables. Existing images may supply fa
 Publish versioned delivery files under `docs/assets/launch/`:
 
 - `clean-design-product-proof-v2.webp`;
-- `clean-design-agent-workflow-v2.webp`;
-- `clean-design-artifact-world-v2.webp`.
+- `clean-design-workflow.webp`;
+- `clean-design-artifacts.webp`.
 
 Old public assets remain until no maintained surface references them. They are not deleted in the same change unless repository inspection proves they are otherwise unused.
 
@@ -394,7 +394,7 @@ The portfolio repository keeps production-safe local assets. It does not hotlink
 ## Acceptance Criteria
 
 1. All three public surfaces use the same name, promise, runtime list, release state, privacy boundaries, and primary download path.
-2. All three newly composed visuals appear in the approved three-act order where the surface supports the full story.
+2. The new product-proof visual and the two selected existing masters appear in the approved three-act order where the surface supports the full story.
 3. A ten-second scan answers what the product is, why it differs, and what to do next.
 4. The standalone landing and work page no longer rely on one Home screenshot followed by mostly text-only sections.
 5. Real product and output evidence remains recognizable at delivered width.

@@ -24,6 +24,10 @@
 - Use versioned portfolio asset paths; never replace bytes behind the existing `cover.webp` or `social-preview.jpg` URLs.
 - Keep Clean Design and portfolio commits separate and stage only intended files.
 
+## Post-Implementation Asset Correction
+
+The user subsequently identified the exact Act II and Act III masters in the approved comparison image. Public consumers must use `docs/assets/launch/clean-design-workflow.webp` and `docs/assets/launch/clean-design-artifacts.webp`, not the exploratory `clean-design-agent-workflow-v2.webp` and `clean-design-artifact-world-v2.webp` outputs described in the original tasks below. Portfolio delivery copies use `/clean-design/clean-design-workflow.webp` and `/clean-design/clean-design-artifacts.webp`, preserve each source's native `1774×887` ratio, and set rendered image height to `auto`. This correction supersedes conflicting asset names in Tasks 2-5 while retaining the task history.
+
 ## File Structure
 
 ### Clean Design repository

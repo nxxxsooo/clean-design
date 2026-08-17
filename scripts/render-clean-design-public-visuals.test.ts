@@ -51,16 +51,17 @@ test('artifact world represents every public artifact family without baked label
 });
 
 for (const readme of ['README.md', 'docs/i18n/README.zh-CN.md']) {
-  test(`${readme} uses the three-act v2 visual family`, async () => {
+  test(`${readme} uses the user-selected three-act visual family`, async () => {
     const text = await readFile(new URL(`../${readme}`, import.meta.url), 'utf8');
 
     for (const asset of [
       'clean-design-product-proof-v2.webp',
-      'clean-design-agent-workflow-v2.webp',
-      'clean-design-artifact-world-v2.webp',
+      'clean-design-workflow.webp',
+      'clean-design-artifacts.webp',
     ]) {
       assert.match(text, new RegExp(asset));
     }
+    assert.doesNotMatch(text, /clean-design-(?:agent-workflow|artifact-world)-v2\.webp/);
     assert.doesNotMatch(text, /section-accent\.svg|value-(?:local-default|no-account|agent-key)/);
   });
 }
