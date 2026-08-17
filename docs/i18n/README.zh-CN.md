@@ -16,16 +16,20 @@
 ![以编辑设计形式呈现的 Clean Design Mac 应用首页](../../docs/assets/launch/clean-design-readme-hero.webp)
 
 <p align="center">
-  <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><b>下载 Apple 芯片 Mac 版本 →</b></a>
+  <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><img alt="下载 Apple 芯片 Mac 版本" src="../../docs/assets/readme/download-macos-zh.svg" width="312"></a>
 </p>
 
 Clean Design 把一句想法变成 Mac 上可继续编辑的视觉项目。你可以使用已有的本地 AI CLI 或自己的模型提供商密钥，在画布上持续打磨，检查项目文件，并导出可移交的完整成果。
 
-- 项目、素材、历史和导出文件都保存在本地
-- 无需 Clean Design 账户、订阅，不含产品遥测和自动更新
-- BYOK 模型提供商在应用内单独配置
+<p><img alt="默认本地" src="../../docs/assets/readme/value-local-default-zh.svg" height="24"> 项目、素材、历史和导出文件都保存在本地</p>
+
+<p><img alt="无需账户" src="../../docs/assets/readme/value-no-account-zh.svg" height="24"> 无需 Clean Design 账户、订阅，不含产品遥测和自动更新</p>
+
+<p><img alt="智能体或密钥" src="../../docs/assets/readme/value-agent-key-zh.svg" height="24"> BYOK 模型提供商在应用内单独配置</p>
 
 ## 使用你自己的智能体
+
+<img alt="" src="../../docs/assets/readme/section-accent.svg" width="112">
 
 Clean Design 通过你本机已经安装的 CLI 生成内容，不需要额外购买 AI 订阅。
 
@@ -41,6 +45,8 @@ Clean Design 通过你本机已经安装的 CLI 生成内容，不需要额外�
 
 ## 可以做什么
 
+<img alt="" src="../../docs/assets/readme/section-accent.svg" width="112">
+
 原型 · 演示文稿 · 文档 · 设计系统 · 品牌套件 · 图像 · 视频 · 音频
 
 ![Clean Design 可创作的作品类型视觉集合](../../docs/assets/launch/clean-design-artifacts.webp)
@@ -48,6 +54,8 @@ Clean Design 通过你本机已经安装的 CLI 生成内容，不需要额外�
 每一件作品都是磁盘上真实存在的项目：可以在画布上继续编辑，可以按文件检查，也可以导出成完整的移交包。
 
 ## 下载
+
+<img alt="" src="../../docs/assets/readme/section-accent.svg" width="112">
 
 Clean Design 面向 Apple 芯片 Mac。请从对应的 [GitHub Release](https://github.com/nxxxsooo/clean-design/releases) 下载 DMG 或 ZIP，以及 `SHA256SUMS.txt`。
 
@@ -96,6 +104,8 @@ pnpm tools-pack mac install
 Clean Design 不会安装全局 CLI。
 
 ## 隐私
+
+<img alt="" src="../../docs/assets/readme/section-accent.svg" width="112">
 
 本地服务只监听回环地址，并保留经过认证的本地 IPC 边界。只有在你选择模型提供商、明确调用本地 CLI，或主动请求某项资源时，应用才会产生相应网络请求。详见 [PRIVACY.md](../../PRIVACY.md)。
 

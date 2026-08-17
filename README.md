@@ -16,16 +16,20 @@
 ![Clean Design home screen presented as an editorial Mac app hero](docs/assets/launch/clean-design-readme-hero.webp)
 
 <p align="center">
-  <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><b>Download for Apple Silicon Mac →</b></a>
+  <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><img alt="Download for Apple Silicon Mac" src="docs/assets/readme/download-macos-en.svg" width="360"></a>
 </p>
 
 Clean Design turns a prompt into an editable visual project on your Mac. Use an existing local AI CLI or your own model-provider key, refine the result on the canvas, inspect its files, and export a portable handoff.
 
-- Local projects, assets, history, and exports
-- No Clean Design account, subscription, telemetry, or automatic updater
-- BYOK providers configured separately inside the app
+<p><img alt="Local by default" src="docs/assets/readme/value-local-default-en.svg" height="24"> Local projects, assets, history, and exports</p>
+
+<p><img alt="No account" src="docs/assets/readme/value-no-account-en.svg" height="24"> No Clean Design account, subscription, telemetry, or automatic updater</p>
+
+<p><img alt="Your agent or key" src="docs/assets/readme/value-agent-key-en.svg" height="24"> BYOK providers configured separately inside the app</p>
 
 ## Bring your own agent
+
+<img alt="" src="docs/assets/readme/section-accent.svg" width="112">
 
 Clean Design generates through a local CLI you already have installed. No additional AI subscription is required.
 
@@ -41,6 +45,8 @@ Prefer an API key instead? Configure a BYOK provider inside the app.
 
 ## What you can make
 
+<img alt="" src="docs/assets/readme/section-accent.svg" width="112">
+
 Prototypes · Decks · Documents · Design systems · Brand kits · Images · Video · Audio
 
 ![A visual collection of the artifact families Clean Design can create](docs/assets/launch/clean-design-artifacts.webp)
@@ -48,6 +54,8 @@ Prototypes · Decks · Documents · Design systems · Brand kits · Images · Vi
 Every artifact stays a real project on disk: editable on the canvas, inspectable as files, and exportable as a handoff packet.
 
 ## Download
+
+<img alt="" src="docs/assets/readme/section-accent.svg" width="112">
 
 Clean Design is built for Apple Silicon Macs. Download the DMG or ZIP and `SHA256SUMS.txt` from the matching [GitHub Release](https://github.com/nxxxsooo/clean-design/releases).
 
@@ -96,6 +104,8 @@ pnpm tools-pack mac install
 Clean Design does not install a global CLI.
 
 ## Privacy
+
+<img alt="" src="docs/assets/readme/section-accent.svg" width="112">
 
 The local service binds to loopback and preserves authenticated local IPC boundaries. Network requests occur only for the provider you select, the behavior of a local CLI you invoke, or a resource you explicitly request. See [PRIVACY.md](PRIVACY.md).
 
