@@ -78,7 +78,7 @@ The user's stated goal is publication to the universal OpenAI plugin directory. 
 - Consumes: approved design at `docs/superpowers/specs/2026-08-17-clean-design-codex-plugin-design.md`.
 - Produces: a validated OpenSpec change named `clean-design-codex-plugin` and an explicit repository rule permitting only the first-party local plugin/headless exception.
 
-- [ ] **Step 1: Add a red product-boundary assertion**
+- [x] **Step 1: Add a red product-boundary assertion**
 
 Add a case to `scripts/product-neutrality.test.ts` that reads `AGENTS.md` and the new delta spec, then requires all four phrases: `first-party clean-design plugin`, `no global CLI`, `no agent or provider execution`, and `temporary headless service`. Before the contract files exist, the test must fail on the missing delta path.
 
@@ -100,12 +100,12 @@ test('documents the bounded first-party Codex plugin exception', () => {
 });
 ```
 
-- [ ] **Step 2: Run the red guard test**
+- [x] **Step 2: Run the red guard test**
 
 Run: `node --import tsx --test scripts/product-neutrality.test.ts`
 Expected: FAIL because `docs/project/openspec/changes/clean-design-codex-plugin/specs/local-studio/spec.md` does not exist.
 
-- [ ] **Step 3: Write the OpenSpec artifacts and repository contract**
+- [x] **Step 3: Write the OpenSpec artifacts and repository contract**
 
 Use `.openspec.yaml` with the existing schema:
 
@@ -131,7 +131,7 @@ The product MUST NOT expose hosted services, external plugin hosting, arbitrary 
 
 Update the root Product Contract with the same narrow exception; keep the existing prohibitions for third-party plugin hosts, hosted services, global CLI installation, and silent login-time startup.
 
-- [ ] **Step 4: Validate OpenSpec and guards**
+- [x] **Step 4: Validate OpenSpec and guards**
 
 Run:
 
@@ -144,7 +144,7 @@ node --import tsx --test scripts/product-neutrality.test.ts
 
 Expected: both commands PASS.
 
-- [ ] **Step 5: Commit the contract slice**
+- [x] **Step 5: Commit the contract slice**
 
 ```bash
 git add AGENTS.md scripts/product-neutrality.test.ts docs/project/openspec/changes/clean-design-codex-plugin
@@ -164,7 +164,7 @@ git commit -m "docs: specify Clean Design Codex plugin"
 - Consumes: existing `SIDECAR_MESSAGES`, `DaemonStatusSnapshot`, `SidecarStamp`, and normalizers.
 - Produces: `CLEAN_DESIGN_SERVICE_PROTOCOL_VERSION`, `CLEAN_DESIGN_SERVICE_LIMITS`, `ServiceRuntimeDescriptor`, handshake/lease message types, `ServiceStatusSnapshot`, and normalized daemon messages used by Tasks 4–9.
 
-- [ ] **Step 1: Write red protocol tests**
+- [x] **Step 1: Write red protocol tests**
 
 Add tests that assert the stamp keys remain exactly five, `APP_KEYS.RENDERER` exists, service limits match the approved constants, unknown handshake fields are rejected, and runtime descriptors are not accepted as stamps.
 
@@ -187,12 +187,12 @@ expect(() => normalizeDaemonSidecarMessage({
 })).toThrow(/unsupported fields/);
 ```
 
-- [ ] **Step 2: Run the red protocol suite**
+- [x] **Step 2: Run the red protocol suite**
 
 Run: `pnpm --filter @open-design/sidecar-proto test`
 Expected: FAIL because the service protocol exports and renderer app key do not exist.
 
-- [ ] **Step 3: Add exact protocol constants and types**
+- [x] **Step 3: Add exact protocol constants and types**
 
 Add these public contracts to `packages/sidecar-proto/src/index.ts`:
 
@@ -263,7 +263,7 @@ export type ServiceStatusSnapshot = {
 };
 ```
 
-- [ ] **Step 4: Run protocol tests and typecheck**
+- [x] **Step 4: Run protocol tests and typecheck**
 
 Run:
 
@@ -274,7 +274,7 @@ pnpm --filter @open-design/sidecar-proto typecheck
 
 Expected: PASS; the five-field stamp assertion remains unchanged.
 
-- [ ] **Step 5: Commit the protocol slice**
+- [x] **Step 5: Commit the protocol slice**
 
 ```bash
 git add packages/sidecar-proto
@@ -296,7 +296,7 @@ git commit -m "feat: define local service protocol"
 - Consumes: Node filesystem primitives only; no Clean Design app keys or message names.
 - Produces: `readPrivateJson`, `writePrivateJson`, `acquireStartupLock`, and `StartupLockHandle` for Tasks 4, 5, and 9.
 
-- [ ] **Step 1: Write red private-file and lock tests**
+- [x] **Step 1: Write red private-file and lock tests**
 
 Cover atomic write, mode `0600`, refusal to read group/world-readable secret files, one winner among 32 concurrent lock callers, live-owner refusal, and stale-dead-owner recovery.
 
@@ -308,12 +308,12 @@ expect(handles.filter((result) => result.status === 'fulfilled')).toHaveLength(1
 expect((await stat(secretPath)).mode & 0o777).toBe(0o600);
 ```
 
-- [ ] **Step 2: Run the red sidecar tests**
+- [x] **Step 2: Run the red sidecar tests**
 
 Run: `pnpm --filter @open-design/sidecar test -- private-json.test.ts startup-lock.test.ts`
 Expected: FAIL because the modules do not exist.
 
-- [ ] **Step 3: Implement atomic owner-only JSON files**
+- [x] **Step 3: Implement atomic owner-only JSON files**
 
 Use a sibling temporary file, explicit mode, `fsync`, and rename:
 
@@ -335,11 +335,11 @@ export async function writePrivateJson(path: string, value: unknown): Promise<vo
 
 `readPrivateJson` must `lstat`, reject symlinks/non-files, require `(mode & 0o077) === 0`, cap bytes before parsing, and accept a caller-supplied validator.
 
-- [ ] **Step 4: Implement atomic startup locks**
+- [x] **Step 4: Implement atomic startup locks**
 
 `acquireStartupLock(path, options)` must create a JSON lock with `open(path, 'wx', 0o600)`. On `EEXIST`, read `{pid, createdAt}`, call injected `isOwnerAlive(pid)`, and remove the lock only when the owner is dead and `now - createdAt >= staleAfterMs`. The returned handle exposes an idempotent `release()` that removes only the lock token it created.
 
-- [ ] **Step 5: Run focused tests and typecheck**
+- [x] **Step 5: Run focused tests and typecheck**
 
 Run:
 
@@ -350,7 +350,7 @@ pnpm --filter @open-design/sidecar typecheck
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit the runtime primitive slice**
+- [x] **Step 6: Commit the runtime primitive slice**
 
 ```bash
 git add packages/sidecar
