@@ -94,7 +94,7 @@ find docs/assets/readme -name '*.svg' -print0 | xargs -0 -n1 xmllint --noout
 test "$(find docs/assets/readme -name '*.svg' | wc -l | tr -d ' ')" = 9
 unexpected=$(rg -o '#[0-9A-Fa-f]{6}' docs/assets/readme/*.svg | sed 's/.*://' | tr 'A-F' 'a-f' | sort -u | rg -v '^#(f7f3ed|191816|6d6962|df5d36)$' || true)
 test -z "$unexpected"
-! rg -n '<script|<foreignObject|data:|https?://|url\(|linearGradient|radialGradient|filter=' docs/assets/readme/*.svg
+! rg -n '<script|<foreignObject|data:|(?:href|xlink:href)="https?://|url\(|linearGradient|radialGradient|filter=' docs/assets/readme/*.svg
 ```
 
 Expected: nine valid XML files, only the four approved colors, and no dynamic or remote content.

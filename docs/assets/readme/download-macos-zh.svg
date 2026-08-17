@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="312" height="48" viewBox="0 0 312 48" role="img" aria-label="下载 Apple 芯片 Mac 版本">
+  <rect x="2" y="2" width="310" height="46" rx="10" fill="#191816"/>
+  <rect width="310" height="46" rx="10" fill="#df5d36"/>
+  <text x="137" y="29" fill="#f7f3ed" font-family="PingFang SC, Noto Sans CJK SC, Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle">下载 Apple 芯片 Mac 版本</text>
+  <circle cx="286" cy="23" r="12" fill="#191816"/>
+  <path d="M282 17.5 289 23l-7 5.5M278 23h11" fill="none" stroke="#f7f3ed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="48" viewBox="0 0 360 48" role="img" aria-label="Download for Apple Silicon Mac">
+  <rect x="2" y="2" width="358" height="46" rx="10" fill="#191816"/>
+  <rect width="358" height="46" rx="10" fill="#df5d36"/>
+  <text x="165" y="29" fill="#f7f3ed" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" text-anchor="middle">Download for Apple Silicon Mac</text>
+  <circle cx="334" cy="23" r="12" fill="#191816"/>
+  <path d="M330 17.5 337 23l-7 5.5M326 23h11" fill="none" stroke="#f7f3ed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
