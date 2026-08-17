@@ -20,6 +20,30 @@ const targets = {
     height: 900,
     format: 'webp',
   },
+  'agent-workflow': {
+    source: resolve(repoRoot, 'docs/assets/launch/source/agent-workflow.html'),
+    selector: '[data-export="agent-workflow"]',
+    output: resolve(repoRoot, 'docs/assets/launch/clean-design-agent-workflow-v2.webp'),
+    width: 1600,
+    height: 900,
+    format: 'webp',
+  },
+  'artifact-world': {
+    source: resolve(repoRoot, 'docs/assets/launch/source/artifact-world.html'),
+    selector: '[data-export="artifact-world"]',
+    output: resolve(repoRoot, 'docs/assets/launch/clean-design-artifact-world-v2.webp'),
+    width: 1600,
+    height: 900,
+    format: 'webp',
+  },
+  'social-preview': {
+    source: resolve(repoRoot, 'docs/assets/launch/source/social-preview.html'),
+    selector: '[data-export="social-preview"]',
+    output: resolve(repoRoot, 'docs/assets/launch/github-social-preview-v2.jpg'),
+    width: 1280,
+    height: 640,
+    format: 'jpeg',
+  },
 };
 
 export async function renderStage({ source, selector, output, width, height, format = 'webp' }) {
