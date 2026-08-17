@@ -3,35 +3,33 @@
 <p align="center"><a href="../../README.md">English</a> · <b>简体中文</b></p>
 
 <p align="center">
-  <strong>本地优先的视觉创作工作室，直接使用你已经在用的 AI 工具。</strong>
+  <strong>智能体负责创造，作品留在你的 Mac。</strong><br>
+  本地优先的视觉创作工作室，直接使用你已经在用的 AI 工具。
 </p>
 
 <p align="center">
   <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/nxxxsooo/clean-design?style=flat-square&labelColor=191816&color=df5d36"></a>
-  <a href="#下载"><img alt="运行平台" src="https://img.shields.io/badge/macOS-Apple%20Silicon-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
-  <a href="../../LICENSE"><img alt="许可证" src="https://img.shields.io/badge/license-Apache--2.0-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
+  <a href="#下载"><img alt="运行平台：搭载 Apple 芯片的 macOS" src="https://img.shields.io/badge/macOS-Apple%20Silicon-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
   <a href="../../PRIVACY.md"><img alt="无需账户" src="https://img.shields.io/badge/account-not%20required-191816?style=flat-square&labelColor=191816&color=6d6962"></a>
 </p>
-
-![以编辑设计形式呈现的 Clean Design Mac 应用首页](../../docs/assets/launch/clean-design-readme-hero.webp)
 
 <p align="center">
   <a href="https://github.com/nxxxsooo/clean-design/releases/latest"><img alt="下载 Apple 芯片 Mac 版本" src="../../docs/assets/readme/download-macos-zh.svg" width="312"></a>
 </p>
 
-Clean Design 把一句想法变成 Mac 上可继续编辑的视觉项目。你可以使用已有的本地 AI CLI 或自己的模型提供商密钥，在画布上持续打磨，检查项目文件，并导出可移交的完整成果。
+![真实、可编辑的 Clean Design Mac 视觉工作区](../../docs/assets/launch/clean-design-product-proof-v2.webp)
 
-<p><img alt="默认本地" src="../../docs/assets/readme/value-local-default-zh.svg" height="24"> 项目、素材、历史和导出文件都保存在本地</p>
+Clean Design 把一句想法变成 Mac 上真实存在的视觉项目。你可以使用受支持的本地 AI CLI 或自己的模型提供商密钥生成内容，在画布上继续打磨，检查项目文件，并导出可移交的完整成果。
 
-<p><img alt="无需账户" src="../../docs/assets/readme/value-no-account-zh.svg" height="24"> 无需 Clean Design 账户、订阅，不含产品遥测和自动更新</p>
-
-<p><img alt="智能体或密钥" src="../../docs/assets/readme/value-agent-key-zh.svg" height="24"> BYOK 模型提供商在应用内单独配置</p>
+- **使用你已经拥有的 AI。** 接入 Codex、Claude Code、Antigravity、OpenCode、Pi，或单独配置 BYOK 模型提供商。
+- **保留真实、可编辑的项目。** 项目、素材、历史、主题、预览和 `DESIGN.md` 不会随着一次生成结束而失去价值。
+- **让作品继续向前。** 导出不可变的移交包，其中包含项目文件、设计上下文、清单和可用预览。
 
 ## 使用你自己的智能体
 
-<img alt="" src="../../docs/assets/readme/section-accent.svg" width="112">
+![五个受支持的本地 AI CLI 进入 Clean Design 画布并导出可移交成果](../../docs/assets/launch/clean-design-agent-workflow-v2.webp)
 
-Clean Design 通过你本机已经安装的 CLI 生成内容，不需要额外购买 AI 订阅。
+Clean Design 通过你本机已经安装的 CLI 生成内容，不需要额外注册 Clean Design 账户，也不需要再购买一份 AI 订阅。
 
 | 运行时 | 检测到的命令 |
 |---|---|
@@ -41,21 +39,26 @@ Clean Design 通过你本机已经安装的 CLI 生成内容，不需要额外�
 | OpenCode | `opencode-cli`，回退到 `opencode` |
 | Pi | `pi` |
 
-更习惯直接用 API 密钥？可以在应用内配置 BYOK 模型提供商。
+更习惯直接用 API 密钥？可以在应用内单独配置 BYOK 模型提供商。
 
-## 可以做什么
+## 不只制作界面
 
-<img alt="" src="../../docs/assets/readme/section-accent.svg" width="112">
+![由原型、演示文稿、文档、设计系统、品牌、图像、视频和音频组成的视觉工作室](../../docs/assets/launch/clean-design-artifact-world-v2.webp)
 
-原型 · 演示文稿 · 文档 · 设计系统 · 品牌套件 · 图像 · 视频 · 音频
+**原型 · 演示文稿 · 文档 · 设计系统 · 品牌套件 · 图像 · 视频 · 音频**
 
-![Clean Design 可创作的作品类型视觉集合](../../docs/assets/launch/clean-design-artifacts.webp)
+每一件作品都是磁盘上真实存在的项目：可以在画布上继续编辑，可以按文件检查，也可以导出成移交包，而不是被困在托管工作区里。
 
-每一件作品都是磁盘上真实存在的项目：可以在画布上继续编辑，可以按文件检查，也可以导出成完整的移交包。
+## 默认本地
+
+- 项目、素材、历史、设置和导出文件都保存在你的 Mac 上。
+- 无需 Clean Design 账户、订阅或托管工作区，不含产品遥测和自动更新。
+- 本地 HTTP 服务只监听回环地址，并保留经过认证的本地 IPC 边界。
+- 只有在你选择模型提供商、明确调用本地 CLI，或主动请求某项资源时，应用才会产生相应网络请求。
+
+完整边界见 [PRIVACY.md](../../PRIVACY.md)。
 
 ## 下载
-
-<img alt="" src="../../docs/assets/readme/section-accent.svg" width="112">
 
 Clean Design 面向 Apple 芯片 Mac。请从对应的 [GitHub Release](https://github.com/nxxxsooo/clean-design/releases) 下载 DMG 或 ZIP，以及 `SHA256SUMS.txt`。
 
@@ -65,23 +68,16 @@ Clean Design 面向 Apple 芯片 Mac。请从对应的 [GitHub Release](https://
 shasum -a 256 -c SHA256SUMS.txt
 ```
 
-打开 DMG，将 `Clean Design.app` 复制到 `/Applications`。v0.1.0 使用临时签名，但没有经过 Apple 公证，因此 Gatekeeper 可能要求确认。校验下载来源后，请按住 Control 点按应用并选择「打开」。如果 macOS 仍然拦截：
+> [!IMPORTANT]
+> Clean Design v0.1.0 使用 ad-hoc 签名，但没有经过 Apple 公证。校验下载来源后，请打开 DMG，将 `Clean Design.app` 移入 `/Applications`；如果 Gatekeeper 要求确认，请按住 Control 点按应用并选择「打开」。
+
+如果 macOS 仍然拦截已经校验的应用：
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/Clean Design.app"
 ```
 
 版本更新需要手动完成：退出 Clean Design 后替换应用即可。项目和设置保存在单独的位置，不会随应用替换而消失。
-
-## 工作方式
-
-![从描述想法到可编辑画布再到项目移交包的 Clean Design 工作流](../../docs/assets/launch/clean-design-workflow.webp)
-
-```text
-描述想法 -> 生成 -> 视觉打磨 -> 导出
-```
-
-Clean Design 让每个视觉项目保持可编辑。你可以使用预览和画布工具，管理素材与主题，维护 `DESIGN.md`，并生成不可变的项目移交包，其中包含项目文件、清单、设计上下文和可用预览。
 
 ## 本地开发
 
@@ -102,12 +98,6 @@ pnpm tools-pack mac install
 ```
 
 Clean Design 不会安装全局 CLI。
-
-## 隐私
-
-<img alt="" src="../../docs/assets/readme/section-accent.svg" width="112">
-
-本地服务只监听回环地址，并保留经过认证的本地 IPC 边界。只有在你选择模型提供商、明确调用本地 CLI，或主动请求某项资源时，应用才会产生相应网络请求。详见 [PRIVACY.md](../../PRIVACY.md)。
 
 ## 来源与许可证
 

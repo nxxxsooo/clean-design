@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { test } from 'node:test';
+import test from 'node:test';
 
 const sourceUrl = new URL('../docs/assets/launch/source/product-proof.html', import.meta.url);
 const sourceRoot = new URL('../docs/assets/launch/source/', import.meta.url);
@@ -17,7 +17,7 @@ for (const [file, id] of [
   ['agent-workflow.html', 'agent-workflow'],
   ['artifact-world.html', 'artifact-world'],
   ['social-preview.html', 'social-preview'],
-]) {
+] as const) {
   test(`${id} exposes one deterministic export stage without remote assets`, async () => {
     const source = await readFile(new URL(file, sourceRoot), 'utf8');
 
@@ -49,3 +49,18 @@ test('artifact world represents every public artifact family without baked label
   }
   assert.doesNotMatch(source, />\s*(Prototype|Deck|Document|Design system|Brand kit|Image|Video|Audio)\s*</i);
 });
+
+for (const readme of ['README.md', 'docs/i18n/README.zh-CN.md']) {
+  test(`${readme} uses the three-act v2 visual family`, async () => {
+    const text = await readFile(new URL(`../${readme}`, import.meta.url), 'utf8');
+
+    for (const asset of [
+      'clean-design-product-proof-v2.webp',
+      'clean-design-agent-workflow-v2.webp',
+      'clean-design-artifact-world-v2.webp',
+    ]) {
+      assert.match(text, new RegExp(asset));
+    }
+    assert.doesNotMatch(text, /section-accent\.svg|value-(?:local-default|no-account|agent-key)/);
+  });
+}

@@ -33,8 +33,8 @@
 - Create `docs/assets/launch/source/agent-workflow.html` — Act II runtime-to-canvas-to-handoff composition.
 - Create `docs/assets/launch/source/artifact-world.html` — Act III format-world composition.
 - Create `docs/assets/launch/source/social-preview.html` — dedicated 2:1 share-card composition derived from Act I, not a landing screenshot.
-- Create `scripts/render-clean-design-public-visuals.mjs` — resolve the existing `e2e` Playwright dependency, render named stages, and invoke `cwebp` or ImageMagick for delivery formats.
-- Create `scripts/render-clean-design-public-visuals.test.mjs` — verify source IDs, local asset lineage, forbidden baked copy, output dimensions, and file decode.
+- Create `scripts/render-clean-design-public-visuals.ts` — resolve the existing `e2e` Playwright dependency, render named stages, and invoke `cwebp` or ImageMagick for delivery formats.
+- Create `scripts/render-clean-design-public-visuals.test.ts` — verify source IDs, local asset lineage, forbidden baked copy, output dimensions, and file decode.
 - Create `docs/assets/launch/clean-design-product-proof-v2.webp` — canonical Act I README delivery.
 - Create `docs/assets/launch/clean-design-agent-workflow-v2.webp` — canonical Act II README delivery.
 - Create `docs/assets/launch/clean-design-artifact-world-v2.webp` — canonical Act III README delivery.
@@ -62,8 +62,8 @@
 ### Task 1: Reproducible Act I Product-Proof Asset
 
 **Files:**
-- Create: `scripts/render-clean-design-public-visuals.test.mjs`
-- Create: `scripts/render-clean-design-public-visuals.mjs`
+- Create: `scripts/render-clean-design-public-visuals.test.ts`
+- Create: `scripts/render-clean-design-public-visuals.ts`
 - Create: `docs/assets/launch/source/public-visuals.css`
 - Create: `docs/assets/launch/source/product-proof.html`
 - Create: `docs/assets/launch/clean-design-product-proof-v2.webp`
@@ -74,7 +74,7 @@
 
 - [ ] **Step 1: Write the failing source-contract test**
 
-Create `scripts/render-clean-design-public-visuals.test.mjs` with Node's built-in test runner. The first test must require a local source, one export selector, the existing real Home capture, and no baked public headline:
+Create `scripts/render-clean-design-public-visuals.test.ts` with Node's built-in test runner. The first test must require a local source, one export selector, the existing real Home capture, and no baked public headline:
 
 ```js
 import assert from 'node:assert/strict';
@@ -96,7 +96,7 @@ test('product proof uses the real local Home capture without baked marketing cop
 Run:
 
 ```bash
-node --test scripts/render-clean-design-public-visuals.test.mjs
+node --experimental-strip-types --test scripts/render-clean-design-public-visuals.test.ts
 ```
 
 Expected: FAIL with `ENOENT` for `product-proof.html`.
@@ -120,7 +120,7 @@ Keep the real screen at least 72% of the canvas width, raise its contrast, and r
 
 - [ ] **Step 4: Implement the deterministic renderer**
 
-Create `scripts/render-clean-design-public-visuals.mjs`. Resolve Playwright from the existing `e2e` package and render a selector to PNG before converting to WebP:
+Create `scripts/render-clean-design-public-visuals.ts`. Resolve Playwright from the existing `e2e` package and render a selector to PNG before converting to WebP:
 
 ```js
 import { createRequire } from 'node:module';
@@ -151,8 +151,8 @@ The executable entry renders Act I to `docs/assets/launch/clean-design-product-p
 Run:
 
 ```bash
-node scripts/render-clean-design-public-visuals.mjs product-proof
-node --test scripts/render-clean-design-public-visuals.test.mjs
+node --experimental-strip-types scripts/render-clean-design-public-visuals.ts product-proof
+node --experimental-strip-types --test scripts/render-clean-design-public-visuals.test.ts
 file docs/assets/launch/clean-design-product-proof-v2.webp
 magick identify -format '%wx%h %[colorspace]\n' docs/assets/launch/clean-design-product-proof-v2.webp
 ```
@@ -164,15 +164,15 @@ Inspect the full image and a README-width downscale. Reject the asset if Home co
 - [ ] **Step 6: Commit Act I source and output**
 
 ```bash
-git add scripts/render-clean-design-public-visuals.mjs scripts/render-clean-design-public-visuals.test.mjs docs/assets/launch/source/public-visuals.css docs/assets/launch/source/product-proof.html docs/assets/launch/clean-design-product-proof-v2.webp
+git add scripts/render-clean-design-public-visuals.ts scripts/render-clean-design-public-visuals.test.ts docs/assets/launch/source/public-visuals.css docs/assets/launch/source/product-proof.html docs/assets/launch/clean-design-product-proof-v2.webp
 git commit -m "design: add reproducible Clean Design product proof"
 ```
 
 ### Task 2: Act II Workflow, Act III Artifact World, and Social Source
 
 **Files:**
-- Modify: `scripts/render-clean-design-public-visuals.test.mjs`
-- Modify: `scripts/render-clean-design-public-visuals.mjs`
+- Modify: `scripts/render-clean-design-public-visuals.test.ts`
+- Modify: `scripts/render-clean-design-public-visuals.ts`
 - Modify: `docs/assets/launch/source/public-visuals.css`
 - Create: `docs/assets/launch/source/agent-workflow.html`
 - Create: `docs/assets/launch/source/artifact-world.html`
@@ -212,7 +212,7 @@ The workflow test additionally requires all five local SVG paths and forbids `by
 Run:
 
 ```bash
-node --test scripts/render-clean-design-public-visuals.test.mjs
+node --experimental-strip-types --test scripts/render-clean-design-public-visuals.test.ts
 ```
 
 Expected: Act I test PASS and new source tests FAIL with `ENOENT`.
@@ -266,8 +266,8 @@ Create `social-preview.html` at 1280×640 using the product-proof source treatme
 Add the three target definitions and an `all` loop. Run:
 
 ```bash
-node scripts/render-clean-design-public-visuals.mjs all
-node --test scripts/render-clean-design-public-visuals.test.mjs
+node --experimental-strip-types scripts/render-clean-design-public-visuals.ts all
+node --experimental-strip-types --test scripts/render-clean-design-public-visuals.test.ts
 magick identify docs/assets/launch/clean-design-*-v2.webp docs/assets/launch/github-social-preview-v2.jpg
 ```
 
@@ -280,7 +280,7 @@ Create `/Users/mingjian/Documents/sync/Designs/clean-design-public-surfaces/inde
 - [ ] **Step 8: Commit the complete canonical visual family**
 
 ```bash
-git add scripts/render-clean-design-public-visuals.mjs scripts/render-clean-design-public-visuals.test.mjs docs/assets/launch/source docs/assets/launch/clean-design-agent-workflow-v2.webp docs/assets/launch/clean-design-artifact-world-v2.webp docs/assets/launch/github-social-preview-v2.jpg
+git add scripts/render-clean-design-public-visuals.ts scripts/render-clean-design-public-visuals.test.ts docs/assets/launch/source docs/assets/launch/clean-design-agent-workflow-v2.webp docs/assets/launch/clean-design-artifact-world-v2.webp docs/assets/launch/github-social-preview-v2.jpg
 git commit -m "design: add Clean Design workflow and artifact visuals"
 ```
 
@@ -296,7 +296,7 @@ git commit -m "design: add Clean Design workflow and artifact visuals"
 
 - [ ] **Step 1: Write a failing structural assertion**
 
-Add a test to `scripts/render-clean-design-public-visuals.test.mjs` that reads both READMEs and expects the three v2 images, no section-accent SVG, and no old value-label SVG references:
+Add a test to `scripts/render-clean-design-public-visuals.test.ts` that reads both READMEs and expects the three v2 images, no section-accent SVG, and no old value-label SVG references:
 
 ```js
 for (const readme of ['README.md', 'docs/i18n/README.zh-CN.md']) {
@@ -315,7 +315,7 @@ for (const readme of ['README.md', 'docs/i18n/README.zh-CN.md']) {
 Run:
 
 ```bash
-node --test scripts/render-clean-design-public-visuals.test.mjs
+node --experimental-strip-types --test scripts/render-clean-design-public-visuals.test.ts
 ```
 
 Expected: image-reference assertions FAIL against both current READMEs.
@@ -350,7 +350,7 @@ Inspect rendered images, table markup, alerts, and links in both outputs.
 - [ ] **Step 8: Run focused and repository checks**
 
 ```bash
-node --test scripts/render-clean-design-public-visuals.test.mjs
+node --experimental-strip-types --test scripts/render-clean-design-public-visuals.test.ts
 pnpm guard
 pnpm typecheck
 git diff --check
@@ -361,7 +361,7 @@ Expected: all PASS.
 - [ ] **Step 9: Commit the GitHub public-surface refresh**
 
 ```bash
-git add README.md docs/i18n/README.zh-CN.md scripts/render-clean-design-public-visuals.test.mjs
+git add README.md docs/i18n/README.zh-CN.md scripts/render-clean-design-public-visuals.test.ts
 git commit -m "docs: refresh Clean Design GitHub landing"
 ```
 
@@ -508,7 +508,7 @@ Load `superpowers:verification-before-completion` before any success claim. Use 
 - [ ] **Step 2: Re-run the Clean Design repository acceptance set**
 
 ```bash
-node --test scripts/render-clean-design-public-visuals.test.mjs
+node --experimental-strip-types --test scripts/render-clean-design-public-visuals.test.ts
 pnpm guard
 pnpm typecheck
 git diff --check
