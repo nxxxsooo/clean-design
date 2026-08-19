@@ -2451,6 +2451,30 @@ export async function createDesktopRuntime(options: DesktopRuntimeOptions): Prom
     void shell.openExternal(url);
   });
 
+  // Window lifecycle attribution, both platforms. On macOS the `close`
+  // handler below cancels the close and hides instead, so a window that
+  // disappears has either been hidden (process survives) or genuinely
+  // destroyed (process is going away). Those two look identical to a user and
+  // previously left no trace at all. Each fires at most once per window.
+  window.on("close", () => {
+    console.info("[open-design desktop] main window close requested", {
+      platform: process.platform,
+      stopped,
+      isVisible: window.isVisible(),
+      trace: new Error("window close trace").stack,
+    });
+  });
+  window.on("closed", () => {
+    console.info("[open-design desktop] main window destroyed", {
+      platform: process.platform,
+      stopped,
+      trace: new Error("window destroyed trace").stack,
+    });
+  });
+  window.on("hide", () => {
+    console.info("[open-design desktop] main window hidden", { stopped });
+  });
+
   if (process.platform === "darwin") {
     // Track the in-flight fullscreen-enter window so the close handler can
     // tell mid-transition apart from "definitely not fullscreen". HTML

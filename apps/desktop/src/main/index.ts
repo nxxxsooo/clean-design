@@ -635,7 +635,19 @@ export async function runDesktopMain(
     return activeDesktop.status();
   }
 
-  async function shutdown(): Promise<void> {
+  async function shutdown(reason = "unspecified"): Promise<void> {
+    // Shutdown attribution. Six call sites can reach this function and they
+    // all produce the same observable result: exit code 0, a clean session
+    // stamp, and no error. That made a self-vanishing window impossible to
+    // attribute from logs alone. Every caller passes a distinct reason so the
+    // next occurrence names its own trigger. Logged once per process, so the
+    // stack capture is free.
+    console.info("[open-design desktop] shutdown initiated", {
+      reason,
+      alreadyShuttingDown: shuttingDown,
+      windowCount: BrowserWindow.getAllWindows().length,
+      trace: new Error("shutdown trace").stack,
+    });
     if (shuttingDown) return;
     shuttingDown = true;
     await options.beforeShutdown?.().catch((error: unknown) => {
@@ -653,8 +665,8 @@ export async function runDesktopMain(
     app.quit();
   }
 
-  function shutdownAndExit(): void {
-    void shutdown().finally(() => process.exit(0));
+  function shutdownAndExit(reason = "unspecified"): void {
+    void shutdown(reason).finally(() => process.exit(0));
   }
 
   console.info("[open-design desktop] starting desktop IPC server", { ipc: runtime.ipc });
@@ -672,7 +684,7 @@ export async function runDesktopMain(
             return await desktopStatusSnapshot(activeDesktop);
           case SIDECAR_MESSAGES.SHUTDOWN:
             setImmediate(() => {
-              shutdownAndExit();
+              shutdownAndExit("ipc-shutdown-message");
             });
             return { accepted: true };
         }
@@ -758,22 +770,22 @@ export async function runDesktopMain(
   removeDiagnosticsIpc = registerDesktopDiagnosticsIpc({
     discoverDaemonBaseUrl: resolveDaemonBaseUrl(runtime, options),
   });
-  attachParentMonitor(shutdown);
+  attachParentMonitor(() => shutdown("parent-monitor-parent-died"));
 
   app.on("before-quit", (event) => {
     if (shuttingDown) return;
     event.preventDefault();
-    void shutdown().finally(() => process.exit(0));
+    void shutdown("before-quit-handler-1").finally(() => process.exit(0));
   });
 
   app.on("before-quit", (event) => {
     if (shuttingDown) return;
     event.preventDefault();
-    shutdownAndExit();
+    shutdownAndExit("before-quit-handler-2");
   });
 
   app.on("window-all-closed", () => {
-    shutdownAndExit();
+    shutdownAndExit("window-all-closed");
   });
 
   app.on("activate", () => {
@@ -782,9 +794,23 @@ export async function runDesktopMain(
 
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
-      shutdownAndExit();
+      shutdownAndExit(`signal-${signal}`);
     });
   }
+
+  // Records the exit even when no shutdown() path ran — the combination
+  // `shuttingDown: false` with a zero code is the signature of a teardown
+  // that bypassed every attributed path above.
+  //
+  // Uncaught faults are deliberately NOT handled here. `attachDesktopProcessErrorFilter()`
+  // (called earlier in this function) already owns that policy: it logs,
+  // then detaches and re-throws anything non-harmless to restore Node's default
+  // crash path. Adding a second listener here would log the fault and keep the
+  // process alive in an undefined state — the exact regression documented in
+  // apps/desktop/src/main/uncaught-exception.ts.
+  process.on("exit", (code) => {
+    console.info("[open-design desktop] process exit", { code, shuttingDown });
+  });
 }
 
 if (isDirectEntry()) {
