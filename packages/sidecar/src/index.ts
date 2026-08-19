@@ -47,4 +47,8 @@ export {
 export { bootstrapSidecarRuntime, createSidecarLaunchEnv } from "./bootstrap.js";
 export { allocatePort } from "./port.js";
 export { readJsonFile, removeFile, removePointerIfCurrent, writeJsonFile } from "./json-file.js";
+export { readPrivateJson, writePrivateJson } from "./private-json.js";
+export type { ReadPrivateJsonOptions } from "./private-json.js";
+export { acquireStartupLock } from "./startup-lock.js";
+export type { AcquireStartupLockOptions, StartupLockHandle } from "./startup-lock.js";
 export { createJsonIpcServer, requestJsonIpc } from "./json-ipc.js";

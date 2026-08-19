@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import {
   APP_KEYS,
+  CLEAN_DESIGN_SERVICE_PROTOCOL_VERSION,
   OPEN_DESIGN_SIDECAR_CONTRACT,
   SIDECAR_ENV,
   SIDECAR_MESSAGES,
@@ -14,6 +15,7 @@ import {
   type DesktopRenderSlidesInput,
   type DesktopRenderSlidesResult,
   type MintImportTokenResult,
+  type ServiceStatusSnapshot,
   type SidecarStamp,
 } from "@open-design/sidecar-proto";
 import {
@@ -35,6 +37,14 @@ import {
 import { clearCredentialMemory, syncCredentialMemory } from '../credential-memory.js';
 import { trustedHandoffRootStore } from '../handoff/root-runtime.js';
 import { setAuthenticatedTrustedHandoffRoot } from '../handoff/trusted-roots.js';
+import { createLocalServiceAuthenticator } from '../services/local-service-auth.js';
+import { createServiceLeaseRegistry } from '../services/local-service-leases.js';
+import {
+  clearServiceRuntimeDescriptor,
+  resolveServiceRuntimePaths,
+  writeServiceRuntimeDescriptor,
+  writeServiceSecret,
+} from '../services/local-service-runtime.js';
 import path from 'node:path';
 
 /**
@@ -52,6 +62,12 @@ export function withCurrentDesktopAuthGate(snapshot: DaemonStatusSnapshot): Daem
 
 const DAEMON_PORT_ENV = SIDECAR_ENV.DAEMON_PORT;
 const WEB_PORT_ENV = SIDECAR_ENV.WEB_PORT;
+
+/**
+ * Advertised service build identity. Clients compare this against their own
+ * expectation and refuse to attach to a service they cannot speak to.
+ */
+const DAEMON_SERVICE_VERSION = "0.15.1";
 const TOOLS_DEV_PARENT_PID_ENV = SIDECAR_ENV.TOOLS_DEV_PARENT_PID;
 const DESKTOP_IMPORT_TOKEN_TTL_MS = 60_000;
 
@@ -179,6 +195,47 @@ export async function startDaemonSidecar(runtime: SidecarRuntimeContext<SidecarS
     updatedAt: new Date().toISOString(),
     url: serverHandle.url,
   };
+
+  // Local service boundary: a fresh secret per service start, plus a private
+  // descriptor so a plugin bridge can decide whether to attach before it
+  // opens a socket. Leases from a previous daemon cannot authenticate here
+  // because the secret is regenerated.
+  const serviceRuntimePaths = resolveServiceRuntimePaths(runtime.ipc);
+  const serviceSecret = await writeServiceSecret(serviceRuntimePaths.secretPath);
+  const serviceLeases = createServiceLeaseRegistry();
+  const serviceAuth = createLocalServiceAuthenticator({
+    leaseRegistry: serviceLeases,
+    secret: serviceSecret,
+  });
+
+  function serviceStatus(): ServiceStatusSnapshot {
+    return {
+      activeClients: serviceLeases.status().activeClients,
+      activeOperations: 0,
+      protocolVersion: CLEAN_DESIGN_SERVICE_PROTOCOL_VERSION,
+      queuedOperations: 0,
+      renderActive: 0,
+      renderQueued: 0,
+    };
+  }
+
+  function currentState(): DaemonStatusSnapshot {
+    return { ...withCurrentDesktopAuthGate(state), service: serviceStatus() };
+  }
+
+  if (serverHandle.url) {
+    await writeServiceRuntimeDescriptor(serviceRuntimePaths.runtimeDescriptorPath, {
+      dataRootFingerprint: runtime.base,
+      executableFingerprint: process.execPath,
+      internalUrl: serverHandle.url,
+      namespace: runtime.namespace,
+      pid: process.pid,
+      protocolVersion: CLEAN_DESIGN_SERVICE_PROTOCOL_VERSION,
+      serviceVersion: DAEMON_SERVICE_VERSION,
+      startedAt: state.updatedAt ?? new Date().toISOString(),
+    });
+  }
+
   let ipcServer: JsonIpcServerHandle | null = null;
   let stopped = false;
   let resolveStopped!: () => void;
@@ -191,6 +248,11 @@ export async function startDaemonSidecar(runtime: SidecarRuntimeContext<SidecarS
     stopped = true;
     state.state = "stopped";
     state.updatedAt = new Date().toISOString();
+    // Stop advertising this service before tearing down transports so a
+    // racing client attaches to nothing rather than a dying daemon.
+    await clearServiceRuntimeDescriptor(serviceRuntimePaths.runtimeDescriptorPath).catch(
+      () => undefined,
+    );
     await ipcServer?.close().catch(() => undefined);
     await serverHandle.stop().catch(() => undefined);
     clearCredentialMemory();
@@ -208,7 +270,23 @@ export async function startDaemonSidecar(runtime: SidecarRuntimeContext<SidecarS
           // PR #974 round 6 (mrcfps): recompute the gate flag per
           // request so `tools-dev start desktop` sees the live value
           // (the flag flips after REGISTER_DESKTOP_AUTH and stays sticky).
-          return withCurrentDesktopAuthGate(state);
+          return currentState();
+        case SIDECAR_MESSAGES.SERVICE_CHALLENGE:
+          return serviceAuth.issueChallenge(request.input);
+        case SIDECAR_MESSAGES.ACQUIRE_SERVICE_CLIENT: {
+          const acquired = serviceAuth.acquire(request.input);
+          // The session key stays in daemon memory; only the lease
+          // descriptor and server proof cross the socket.
+          return { lease: acquired.lease };
+        }
+        case SIDECAR_MESSAGES.RENEW_SERVICE_CLIENT: {
+          const renewed = serviceAuth.verifyLeaseInput(request.input, "renew");
+          return { expiresAt: renewed.expiresAt, leaseId: renewed.leaseId };
+        }
+        case SIDECAR_MESSAGES.RELEASE_SERVICE_CLIENT: {
+          serviceAuth.verifyLeaseInput(request.input, "release");
+          return { released: true };
+        }
         case SIDECAR_MESSAGES.SHUTDOWN:
           setImmediate(() => {
             void stop().finally(() => process.exit(0));
@@ -254,7 +332,7 @@ export async function startDaemonSidecar(runtime: SidecarRuntimeContext<SidecarS
 
   return {
     async status() {
-      return withCurrentDesktopAuthGate(state);
+      return currentState();
     },
     stop,
     waitUntilStopped() {

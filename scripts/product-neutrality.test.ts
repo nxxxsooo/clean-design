@@ -1,10 +1,39 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   collectProductNeutralityViolationsFromSource,
   isProductNeutralityCheckedPath,
 } from "./guard.ts";
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+test("documents the bounded first-party Codex plugin exception", () => {
+  const agents = readFileSync(join(repoRoot, "AGENTS.md"), "utf8");
+  const spec = readFileSync(
+    join(
+      repoRoot,
+      "docs/project/openspec/changes/clean-design-codex-plugin/specs/local-studio/spec.md",
+    ),
+    "utf8",
+  );
+  const combined = `${agents}\n${spec}`;
+
+  for (const phrase of [
+    "first-party `clean-design` plugin",
+    "global CLI",
+    "agent or provider execution",
+    "temporary headless service",
+  ]) {
+    assert.ok(
+      combined.includes(phrase),
+      `expected the plugin exception contract to document: ${phrase}`,
+    );
+  }
+});
 
 test("product-neutrality check rejects named orchestrator examples on public surfaces", () => {
   const violations = collectProductNeutralityViolationsFromSource(

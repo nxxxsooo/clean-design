@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   APP_KEYS,
+  CLEAN_DESIGN_SERVICE_LIMITS,
+  CLEAN_DESIGN_SERVICE_PROTOCOL_VERSION,
   normalizeDaemonSidecarMessage,
   normalizeDesktopSidecarMessage,
   normalizeNamespace,
@@ -352,4 +354,114 @@ describe("open-design sidecar contract", () => {
     ).toThrow(/unsupported artifact export image format/);
   });
 
+});
+
+describe("local service protocol", () => {
+  const clientNonce = "a".repeat(43);
+
+  it("keeps the sidecar stamp at exactly five fields", () => {
+    // Rich service state belongs in private runtime files, never in the stamp.
+    expect(SIDECAR_STAMP_FIELDS).toEqual(["app", "mode", "namespace", "ipc", "source"]);
+  });
+
+  it("exposes the renderer app key for the bounded render broker", () => {
+    expect(APP_KEYS.RENDERER).toBe("renderer");
+  });
+
+  it("pins the approved service limits", () => {
+    expect(CLEAN_DESIGN_SERVICE_PROTOCOL_VERSION).toBe(1);
+    expect(CLEAN_DESIGN_SERVICE_LIMITS).toEqual({
+      clientCapacity: 16,
+      idleExitMs: 60_000,
+      leaseRenewMs: 20_000,
+      leaseTtlMs: 45_000,
+      operationConcurrency: 2,
+      queueCapacity: 32,
+      renderConcurrency: 1,
+      restartMaxStarts: 3,
+      restartWindowMs: 300_000,
+    });
+  });
+
+  it("normalizes a well-formed service challenge", () => {
+    expect(
+      normalizeDaemonSidecarMessage({
+        input: { clientNonce, protocolVersion: 1, role: "mcp" },
+        type: SIDECAR_MESSAGES.SERVICE_CHALLENGE,
+      }),
+    ).toEqual({
+      input: { clientNonce, protocolVersion: 1, role: "mcp" },
+      type: "service-challenge",
+    });
+  });
+
+  it("rejects unknown handshake fields", () => {
+    expect(() =>
+      normalizeDaemonSidecarMessage({
+        input: { clientNonce, extra: true, protocolVersion: 1, role: "mcp" },
+        type: SIDECAR_MESSAGES.SERVICE_CHALLENGE,
+      }),
+    ).toThrow(/unsupported fields/);
+  });
+
+  it("rejects an unknown client role", () => {
+    expect(() =>
+      normalizeDaemonSidecarMessage({
+        input: { clientNonce, protocolVersion: 1, role: "agent" },
+        type: SIDECAR_MESSAGES.SERVICE_CHALLENGE,
+      }),
+    ).toThrow(/role/);
+  });
+
+  it("rejects an incompatible protocol version", () => {
+    expect(() =>
+      normalizeDaemonSidecarMessage({
+        input: { clientNonce, protocolVersion: 2, role: "mcp" },
+        type: SIDECAR_MESSAGES.SERVICE_CHALLENGE,
+      }),
+    ).toThrow(/protocolVersion/);
+  });
+
+  it("requires proof material when acquiring a client lease", () => {
+    expect(() =>
+      normalizeDaemonSidecarMessage({
+        input: { challengeId: "c1", clientNonce, protocolVersion: 1, role: "mcp" },
+        type: SIDECAR_MESSAGES.ACQUIRE_SERVICE_CLIENT,
+      }),
+    ).toThrow(/proof/);
+  });
+
+  it("never accepts a role on renew or release", () => {
+    // Roles are fixed at acquire time so a client cannot escalate itself.
+    for (const type of [
+      SIDECAR_MESSAGES.RENEW_SERVICE_CLIENT,
+      SIDECAR_MESSAGES.RELEASE_SERVICE_CLIENT,
+    ]) {
+      expect(() =>
+        normalizeDaemonSidecarMessage({
+          input: {
+            expiresAt: "2026-08-17T00:00:00.000Z",
+            leaseId: "l1",
+            nonce: clientNonce,
+            role: "desktop",
+            signature: "s".repeat(43),
+          },
+          type,
+        }),
+      ).toThrow(/unsupported fields/);
+    }
+  });
+
+  it("does not accept a runtime descriptor as a stamp", () => {
+    expect(() =>
+      normalizeSidecarStamp({
+        app: APP_KEYS.DAEMON,
+        internalUrl: "http://127.0.0.1:1/",
+        ipc: "/tmp/clean-design/ipc/contract-check/daemon.sock",
+        mode: "runtime",
+        namespace: "contract-check",
+        source: SIDECAR_SOURCES.PACKAGED,
+      }),
+    ).toThrow(/unsupported fields/);
+  });
 });

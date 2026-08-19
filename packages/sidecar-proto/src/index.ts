@@ -1,6 +1,7 @@
 export const APP_KEYS = Object.freeze({
   DAEMON: "daemon",
   DESKTOP: "desktop",
+  RENDERER: "renderer",
   WEB: "web",
 } as const);
 
@@ -81,6 +82,7 @@ export function resolveWindowsUninstallRegistryKey(namespace: string): string {
 }
 
 export const SIDECAR_MESSAGES = Object.freeze({
+  ACQUIRE_SERVICE_CLIENT: "acquire-service-client",
   CLICK: "click",
   CONSOLE: "console",
   EVAL: "eval",
@@ -88,7 +90,10 @@ export const SIDECAR_MESSAGES = Object.freeze({
   EXPORT_PDF: "export-pdf",
   MINT_IMPORT_TOKEN: "mint-import-token",
   REGISTER_DESKTOP_AUTH: "register-desktop-auth",
+  RELEASE_SERVICE_CLIENT: "release-service-client",
+  RENEW_SERVICE_CLIENT: "renew-service-client",
   SET_HANDOFF_ROOT: "set-handoff-root",
+  SERVICE_CHALLENGE: "service-challenge",
   SYNC_CREDENTIALS: "sync-credentials",
   RENDER_SLIDES: "render-slides",
   SCREENSHOT: "screenshot",
@@ -116,10 +121,127 @@ export class SidecarContractError extends Error {
 
 export type ServiceRuntimeState = "idle" | "running" | "starting" | "stopped" | "unknown";
 
+/**
+ * Wire compatibility marker for the local service boundary used by the
+ * first-party `clean-design` Codex plugin. A client that reports a
+ * different version is refused before any authentication work happens,
+ * so a stale bundled launcher can never half-speak to a newer daemon.
+ */
+export const CLEAN_DESIGN_SERVICE_PROTOCOL_VERSION = 1 as const;
+
+/**
+ * Fixed production bounds for the shared local service. These are part of
+ * the contract rather than tunables: the startup-storm and capacity tests
+ * assert against these exact numbers, and raising them silently would
+ * change the memory profile of a machine running many agent clients.
+ */
+export const CLEAN_DESIGN_SERVICE_LIMITS = Object.freeze({
+  clientCapacity: 16,
+  idleExitMs: 60_000,
+  leaseRenewMs: 20_000,
+  leaseTtlMs: 45_000,
+  operationConcurrency: 2,
+  queueCapacity: 32,
+  renderConcurrency: 1,
+  restartMaxStarts: 3,
+  restartWindowMs: 5 * 60_000,
+} as const);
+
+export type ServiceClientRole = "desktop" | "mcp";
+
+/**
+ * Private runtime descriptor written next to the namespace socket. This is
+ * deliberately separate from `SidecarStamp`: the stamp stays at five fields
+ * for process discovery, while richer service state lives in an owner-only
+ * file that never appears in a process listing.
+ */
+export type ServiceRuntimeDescriptor = {
+  dataRootFingerprint: string;
+  executableFingerprint: string;
+  internalUrl: string;
+  namespace: string;
+  pid: number;
+  protocolVersion: typeof CLEAN_DESIGN_SERVICE_PROTOCOL_VERSION;
+  serviceVersion: string;
+  startedAt: string;
+};
+
+export type ServiceChallengeInput = {
+  clientNonce: string;
+  protocolVersion: number;
+  role: ServiceClientRole;
+};
+
+export type ServiceChallengeResult = {
+  challengeId: string;
+  expiresAt: string;
+  serverNonce: string;
+};
+
+export type AcquireServiceClientInput = ServiceChallengeInput & {
+  challengeId: string;
+  proof: string;
+  serverNonce: string;
+};
+
+export type ServiceLease = {
+  expiresAt: string;
+  leaseId: string;
+  role: ServiceClientRole;
+  serverProof: string;
+};
+
+/**
+ * Renew and release carry no role. The role is bound to the lease at
+ * acquire time, so a client holding a `desktop` lease cannot present
+ * itself as `mcp` later, and vice versa.
+ */
+export type SignedServiceLeaseInput = {
+  expiresAt: string;
+  leaseId: string;
+  nonce: string;
+  signature: string;
+};
+
+export type ServiceStatusSnapshot = {
+  activeClients: number;
+  activeOperations: number;
+  protocolVersion: typeof CLEAN_DESIGN_SERVICE_PROTOCOL_VERSION;
+  queuedOperations: number;
+  renderActive: number;
+  renderQueued: number;
+};
+
+export type ServiceChallengeMessage = {
+  input: ServiceChallengeInput;
+  type: typeof SIDECAR_MESSAGES.SERVICE_CHALLENGE;
+};
+
+export type AcquireServiceClientMessage = {
+  input: AcquireServiceClientInput;
+  type: typeof SIDECAR_MESSAGES.ACQUIRE_SERVICE_CLIENT;
+};
+
+export type RenewServiceClientMessage = {
+  input: SignedServiceLeaseInput;
+  type: typeof SIDECAR_MESSAGES.RENEW_SERVICE_CLIENT;
+};
+
+export type ReleaseServiceClientMessage = {
+  input: SignedServiceLeaseInput;
+  type: typeof SIDECAR_MESSAGES.RELEASE_SERVICE_CLIENT;
+};
+
 export type DaemonStatusSnapshot = {
   pid?: number | null;
   state: ServiceRuntimeState;
   trustedWebOriginPort?: number | null;
+  /**
+   * Live counters for the shared local service boundary. Absent on a
+   * daemon that has not started the service handshake, so a plain
+   * STATUS consumer keeps working unchanged.
+   */
+  service?: ServiceStatusSnapshot;
   updatedAt?: string;
   url: string | null;
   /**
@@ -422,6 +544,10 @@ export type DaemonSidecarMessage =
   | SidecarStatusMessage
   | SidecarShutdownMessage
   | RegisterDesktopAuthMessage
+  | ServiceChallengeMessage
+  | AcquireServiceClientMessage
+  | RenewServiceClientMessage
+  | ReleaseServiceClientMessage
   | SetHandoffRootMessage
   | SyncCredentialsMessage
   | MintImportTokenMessage;
@@ -666,6 +792,61 @@ function normalizeMintImportTokenInput(input: unknown): MintImportTokenInput {
   return { baseDir: normalizeNonEmptyString(value.baseDir, "mint-import-token baseDir") };
 }
 
+function normalizeServiceClientRole(value: unknown, label: string): ServiceClientRole {
+  if (value !== "desktop" && value !== "mcp") {
+    throw new Error(`${label} role must be "desktop" or "mcp"`);
+  }
+  return value;
+}
+
+function normalizeServiceProtocolVersion(value: unknown, label: string): number {
+  if (value !== CLEAN_DESIGN_SERVICE_PROTOCOL_VERSION) {
+    throw new Error(
+      `${label} protocolVersion must be ${CLEAN_DESIGN_SERVICE_PROTOCOL_VERSION}`,
+    );
+  }
+  return value;
+}
+
+function normalizeServiceChallengeInput(input: unknown): ServiceChallengeInput {
+  const value = assertObject(input, "service-challenge input");
+  assertKnownKeys(value, ["clientNonce", "protocolVersion", "role"], "service-challenge input");
+  return {
+    clientNonce: normalizeNonEmptyString(value.clientNonce, "service-challenge clientNonce"),
+    protocolVersion: normalizeServiceProtocolVersion(value.protocolVersion, "service-challenge"),
+    role: normalizeServiceClientRole(value.role, "service-challenge"),
+  };
+}
+
+function normalizeAcquireServiceClientInput(input: unknown): AcquireServiceClientInput {
+  const value = assertObject(input, "acquire-service-client input");
+  assertKnownKeys(
+    value,
+    ["challengeId", "clientNonce", "proof", "protocolVersion", "role", "serverNonce"],
+    "acquire-service-client input",
+  );
+  return {
+    challengeId: normalizeNonEmptyString(value.challengeId, "acquire-service-client challengeId"),
+    clientNonce: normalizeNonEmptyString(value.clientNonce, "acquire-service-client clientNonce"),
+    proof: normalizeNonEmptyString(value.proof, "acquire-service-client proof"),
+    protocolVersion: normalizeServiceProtocolVersion(value.protocolVersion, "acquire-service-client"),
+    role: normalizeServiceClientRole(value.role, "acquire-service-client"),
+    serverNonce: normalizeNonEmptyString(value.serverNonce, "acquire-service-client serverNonce"),
+  };
+}
+
+function normalizeSignedServiceLeaseInput(input: unknown, label: string): SignedServiceLeaseInput {
+  const value = assertObject(input, `${label} input`);
+  // No `role` key: the lease role is fixed at acquire time.
+  assertKnownKeys(value, ["expiresAt", "leaseId", "nonce", "signature"], `${label} input`);
+  return {
+    expiresAt: normalizeNonEmptyString(value.expiresAt, `${label} expiresAt`),
+    leaseId: normalizeNonEmptyString(value.leaseId, `${label} leaseId`),
+    nonce: normalizeNonEmptyString(value.nonce, `${label} nonce`),
+    signature: normalizeNonEmptyString(value.signature, `${label} signature`),
+  };
+}
+
 function normalizeBoolean(value: unknown, label: string): boolean {
   if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
   return value;
@@ -781,6 +962,22 @@ export function normalizeDaemonSidecarMessage(input: unknown): DaemonSidecarMess
   if (type === SIDECAR_MESSAGES.SYNC_CREDENTIALS) {
     assertKnownKeys(value, ["input", "type"], "daemon sidecar message");
     return { input: normalizeSyncCredentialsInput(value.input), type };
+  }
+  if (type === SIDECAR_MESSAGES.SERVICE_CHALLENGE) {
+    assertKnownKeys(value, ["input", "type"], "daemon sidecar message");
+    return { input: normalizeServiceChallengeInput(value.input), type };
+  }
+  if (type === SIDECAR_MESSAGES.ACQUIRE_SERVICE_CLIENT) {
+    assertKnownKeys(value, ["input", "type"], "daemon sidecar message");
+    return { input: normalizeAcquireServiceClientInput(value.input), type };
+  }
+  if (type === SIDECAR_MESSAGES.RENEW_SERVICE_CLIENT) {
+    assertKnownKeys(value, ["input", "type"], "daemon sidecar message");
+    return { input: normalizeSignedServiceLeaseInput(value.input, "renew-service-client"), type };
+  }
+  if (type === SIDECAR_MESSAGES.RELEASE_SERVICE_CLIENT) {
+    assertKnownKeys(value, ["input", "type"], "daemon sidecar message");
+    return { input: normalizeSignedServiceLeaseInput(value.input, "release-service-client"), type };
   }
   if (type === SIDECAR_MESSAGES.SET_HANDOFF_ROOT) {
     assertKnownKeys(value, ['input', 'type'], 'daemon sidecar message');
