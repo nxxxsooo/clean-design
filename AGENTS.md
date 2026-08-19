@@ -77,6 +77,12 @@ pnpm tools-pack mac build --to all
 pnpm tools-pack mac install
 ```
 
+A local build without `--portable` bakes the repository's `.tmp/tools-pack/runtime`
+roots into the packaged config, so the installed app reads a different namespace
+base root than a release build and cannot see user-level projects, data, or logs.
+Use `--portable` whenever a local build must reproduce real user state. `mac install`
+consumes the DMG, so `--to app` alone produces a bundle that must be copied manually.
+
 ## Engineering Rules
 
 - Keep app-private implementation inside its owning app; communicate through shared contracts and local HTTP/IPC APIs.
