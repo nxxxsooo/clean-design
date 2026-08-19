@@ -1034,7 +1034,7 @@ test('[P0] @critical Settings keeps Local CLI and BYOK model choices isolated af
         version: '0.80.0',
         models: [
           { id: 'default', label: 'Default' },
-          { id: 'gpt-5.5', label: 'GPT 5.5' },
+          { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol' },
         ],
       },
     ],
@@ -1049,7 +1049,7 @@ test('[P0] @critical Settings keeps Local CLI and BYOK model choices isolated af
     mode: 'daemon',
     agentId: 'codex',
     agentModels: {
-      codex: { model: 'gpt-5.5' },
+      codex: { model: 'gpt-5.6-sol' },
     },
   });
 
@@ -1061,7 +1061,7 @@ test('[P0] @critical Settings keeps Local CLI and BYOK model choices isolated af
     mode: 'api',
     model: 'gpt-4o-mini',
     agentModels: {
-      codex: { model: 'gpt-5.5' },
+      codex: { model: 'gpt-5.6-sol' },
     },
   });
 

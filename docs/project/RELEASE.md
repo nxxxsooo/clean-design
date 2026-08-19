@@ -43,8 +43,8 @@ failed or unverified item blocks both public visibility and the release tag.
 
 ## Publication
 
-- [ ] The final commit is pushed to the private `nxxxsooo/clean-design` remote.
+- [x] The final commit is pushed to the private `nxxxsooo/clean-design` remote.
 - [x] A clean checkout reproduces the accepted build and tests.
-- [ ] Repository visibility is changed to public only after this checklist is
+- [x] Repository visibility is changed to public only after this checklist is
       complete.
-- [ ] Tag `v0.1.0` is created and pushed only from the audited public commit.
+- [x] Tag `v0.1.0` is created and pushed only from the audited public commit.

@@ -22,15 +22,7 @@ export const opencodeAgentDef = {
       parse: parseLineSeparatedModels,
       timeoutMs: 15_000,
     },
-    fallbackModels: [
-      DEFAULT_MODEL_OPTION,
-      {
-        id: 'anthropic/claude-sonnet-4-5',
-        label: 'anthropic/claude-sonnet-4-5',
-      },
-      { id: 'openai/gpt-5', label: 'openai/gpt-5' },
-      { id: 'google/gemini-2.5-pro', label: 'google/gemini-2.5-pro' },
-    ],
+    fallbackModels: [DEFAULT_MODEL_OPTION],
     // OpenCode's CLI help currently exposes model selection and session
     // controls, but not an explicit per-run reasoning / effort flag. Keep
     // `reasoningOptions` undefined and do not synthesize argv for

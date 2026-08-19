@@ -4276,14 +4276,6 @@ function MediaProvidersSection({
   const visibleProviders = MEDIA_PROVIDERS.filter(
     (p) => p.settingsVisible !== false,
   );
-  // Split the catalog into two surfaces:
-  //   - "Available" — daemon ships a real client, user can paste a key
-  //     and it works. Rendered as full editable cards.
-  //   - "Coming soon" — listed for transparency / roadmap signaling but
-  //     the daemon has no client yet, so the form fields would be
-  //     disabled placeholders. Hiding them behind a <details> keeps the
-  //     primary list focused (was 16 cards, now 8) without dropping the
-  //     informational value.
   const availableProviders = visibleProviders
     .filter((p) => p.integrated)
     .slice()
@@ -4295,10 +4287,6 @@ function MediaProvidersSection({
       if (aConfigured !== bConfigured) return aConfigured ? -1 : 1;
       return a.label.localeCompare(b.label);
     });
-  const comingSoonProviders = visibleProviders
-    .filter((p) => !p.integrated)
-    .slice()
-    .sort((a, b) => a.label.localeCompare(b.label));
   const updateProvider = (
     provider: MediaProvider,
     patch: {
@@ -4417,10 +4405,8 @@ function MediaProvidersSection({
           const hasPendingEdit = Boolean(entry.apiKey.trim()) && !credentialIsConfigured(entry.apiKey);
           const isSavedState = credentialIsConfigured(entry.apiKey) || Boolean(entry.apiKeyConfigured && !hasPendingEdit);
           const tail = entry.apiKeyTail?.trim();
-          // Every provider rendered in the main list is integrated by
-          // construction (see availableProviders filter), so the inputs
-          // are always editable here. Non-integrated entries live in
-          // the "Coming soon" <details> below.
+          // Every provider rendered in the list is integrated by construction,
+          // so its inputs are always editable.
           const disabled = false;
           const supportsCustomModel = provider.supportsCustomModel === true;
           const requiresCredentials = provider.credentialsRequired !== false;
@@ -4541,59 +4527,6 @@ function MediaProvidersSection({
           );
         })}
       </div>
-      {comingSoonProviders.length > 0 ? (
-        // Roadmap drawer. We still want to advertise that we know
-        // these providers exist (so users don't ask "where is Fal?"),
-        // but disabled placeholder cards in the main list were noise.
-        // Closed by default — opens to a compact name + hint + docs
-        // link list, no inputs because there's nothing to wire up yet.
-        // TODO(i18n): inline English placeholders; promote to locale
-        // keys when we touch this section again.
-        <details className="library-group media-provider-coming-soon">
-          <summary className="memory-details-summary">
-            <span className="memory-details-title">
-              {t('common.comingSoon')}
-            </span>
-            <span className="filter-pill-count">
-              {comingSoonProviders.length}
-            </span>
-          </summary>
-          <p className="hint" style={{ marginTop: 4, marginBottom: 8 }}>
-            {t('settings.mediaProviderComingSoonHint')}
-          </p>
-          <ul className="media-provider-coming-soon-list">
-            {comingSoonProviders.map((provider) => {
-              const docsHref = sanitizeHttpsUrl(provider.docsUrl);
-              return (
-                <li
-                  key={provider.id}
-                  className="media-provider-coming-soon-item"
-                >
-                  <div className="media-provider-coming-soon-meta">
-                    <span className="media-provider-name">
-                      {provider.label}
-                    </span>
-                    <span className="media-provider-hint">
-                      {provider.hint}
-                    </span>
-                  </div>
-                  {docsHref ? (
-                    <a
-                      href={docsHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="ghost-link"
-                    >
-                      {t('settings.agentInstall.docs')}
-                      <Icon name="external-link" size={11} />
-                    </a>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        </details>
-      ) : null}
     </section>
   );
 }

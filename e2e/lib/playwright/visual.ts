@@ -6,12 +6,12 @@ import { fulfillAgentsRoute } from './mock-factory.js';
 import { T } from '@/timeouts';
 
 const STORAGE_KEY = 'clean-design:config';
-const GITHUB_STARS_STORAGE_KEY = 'open-design:gh-stars';
-const VISUAL_STABILITY_STORAGE_KEY = 'open-design:visual-stability';
+const GITHUB_STARS_STORAGE_KEY = 'clean-design:gh-stars';
+const VISUAL_STABILITY_STORAGE_KEY = 'clean-design:visual-stability';
 const VISUAL_STYLE_ID = 'od-visual-stability-style';
 // Keep this exact-route mock narrow so unrelated GitHub UI still behaves normally.
-const VISUAL_GITHUB_REPO_API = 'https://api.github.com/repos/nexu-io/open-design';
-const VISUAL_GITHUB_STARS = 40_000;
+const VISUAL_GITHUB_REPO_API = 'https://api.github.com/repos/nxxxsooo/clean-design';
+const VISUAL_GITHUB_STARS = 0;
 
 type VisualConfig = {
   mode: 'daemon' | 'api';
@@ -55,16 +55,13 @@ export const VISUAL_CLI_AGENTS = [
     name: 'Claude Code',
     bin: 'claude',
     available: true,
-    version: '2.1.31',
+    version: '2.1.233',
     models: [
       { id: 'default', label: 'Default (CLI config)' },
-      { id: 'sonnet-alias', label: 'Sonnet (alias)' },
-      { id: 'opus-alias', label: 'Opus (alias)' },
-      { id: 'haiku-alias', label: 'Haiku (alias)' },
-      { id: 'sonnet-nightly', label: 'Sonnet Nightly' },
-      { id: 'opus-nightly', label: 'Opus Nightly' },
-      { id: 'sonnet-4.5', label: 'Sonnet 4.5' },
-      { id: 'opus-4.5', label: 'Opus 4.5' },
+      { id: 'fable', label: 'Fable' },
+      { id: 'opus', label: 'Opus' },
+      { id: 'sonnet', label: 'Sonnet' },
+      { id: 'haiku', label: 'Haiku' },
     ],
   },
   {
@@ -72,14 +69,13 @@ export const VISUAL_CLI_AGENTS = [
     name: 'Codex CLI',
     bin: 'codex',
     available: true,
-    version: '0.134.0',
+    version: '0.147.0',
     models: [
       { id: 'default', label: 'Default (CLI config)' },
-      { id: 'gpt-5.4', label: 'GPT-5.4' },
-      { id: 'gpt-5.4-mini', label: 'GPT-5.4-Mini' },
-      { id: 'gpt-5.3-codex-spark', label: 'GPT-5.3-Codex-Spark' },
-      { id: 'gpt-5.3', label: 'GPT-5.3' },
-      { id: 'gpt-5.2', label: 'GPT-5.2' },
+      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' },
+      { id: 'gpt-5.3-codex-spark', label: 'GPT-5.3 Codex Spark' },
     ],
   },
   {
@@ -87,7 +83,7 @@ export const VISUAL_CLI_AGENTS = [
     name: 'Antigravity',
     bin: 'agy',
     available: true,
-    version: '1.0.3',
+    version: '1.1.13',
     models: [{ id: 'default', label: 'Default (CLI config)' }],
   },
   {
@@ -95,7 +91,7 @@ export const VISUAL_CLI_AGENTS = [
     name: 'OpenCode',
     bin: 'opencode',
     available: true,
-    version: '1.14.0',
+    version: '1.18.18',
     models: [{ id: 'default', label: 'Default (CLI config)' }],
   },
   {
@@ -103,7 +99,7 @@ export const VISUAL_CLI_AGENTS = [
     name: 'Pi',
     bin: 'pi',
     available: true,
-    version: '0.50.0',
+    version: '0.84.2',
     models: [{ id: 'default', label: 'Default (CLI config)' }],
   },
 ] as const;

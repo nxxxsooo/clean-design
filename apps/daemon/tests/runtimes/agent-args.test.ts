@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'vitest';
 import {
   antigravity,
@@ -14,7 +13,6 @@ import {
   tmpdir,
   writeFileSync,
 } from './helpers/test-helpers.js';
-import { writeAntigravityModelSelection } from '../../src/runtimes/defs/antigravity.js';
 import { agentCapabilities } from '../../src/runtimes/capabilities.js';
 
 test('opencode args keep the documented run/json argv and ignore unsupported reasoning options', () => {
@@ -204,10 +202,26 @@ test('pi args combine model, thinking, and extraAllowedDirs', () => {
 // the daemon would render the resulting empty reply as a "successful"
 // agent response — exactly the failure mode the auth/quota guard at
 // server.ts ~12090 is meant to catch but for the wrong reason.
-test('antigravity pipes prompt via stdin via -p flag (print mode)', () => {
+test('antigravity discovers current models and passes the selected id through argv', () => {
   assert.equal(antigravity.bin, 'agy');
   assert.equal(antigravity.streamFormat, 'plain');
   assert.equal(antigravity.promptViaStdin, true);
+
+  assert.deepEqual(antigravity.listModels?.args, ['models']);
+  assert.deepEqual(
+    antigravity.listModels?.parse(
+      [
+        'Fetching available models...',
+        'gemini-3.7-flash-high\tGemini 3.7 Flash (High)',
+        'claude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)',
+      ].join('\n'),
+    ),
+    [
+      { id: 'default', label: 'Default (CLI config)' },
+      { id: 'gemini-3.7-flash-high', label: 'Gemini 3.7 Flash (High)' },
+      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Thinking)' },
+    ],
+  );
 
   const args = antigravity.buildArgs('write hello world', [], [], {}, {});
   assert.deepEqual(args, ['-p', '-']);
@@ -217,23 +231,19 @@ test('antigravity pipes prompt via stdin via -p flag (print mode)', () => {
   });
   assert.deepEqual(argsWithLog, ['--log-file', '/tmp/od-agy-test.log', '-p', '-']);
 
-  // No `--model` flag exists upstream, so buildArgs argv must stay the
-  // same regardless of which label the user picks.
-  // Pass a temp antigravitySettingsPath so buildArgs does not touch the
-  // real ~/.gemini/antigravity-cli/settings.json during a unit test run.
-  const settingsDir = mkdtempSync(join(tmpdir(), 'od-agy-argv-'));
-  try {
-    const withModel = antigravity.buildArgs('hi', [], [], {
-      model: 'Gemini 3.1 Pro (High)',
-    }, {
-      agentLogFilePath: '/tmp/od-agy-test.log',
-      antigravitySettingsPath: join(settingsDir, 'settings.json'),
-    });
-    assert.equal(withModel.includes('--model'), false);
-    assert.deepEqual(withModel, ['--log-file', '/tmp/od-agy-test.log', '-p', '-']);
-  } finally {
-    rmSync(settingsDir, { recursive: true, force: true });
-  }
+  const withModel = antigravity.buildArgs('hi', [], [], {
+    model: 'gemini-3.7-flash-high',
+  }, {
+    agentLogFilePath: '/tmp/od-agy-test.log',
+  });
+  assert.deepEqual(withModel, [
+    '--log-file',
+    '/tmp/od-agy-test.log',
+    '--model',
+    'gemini-3.7-flash-high',
+    '-p',
+    '-',
+  ]);
 
   // Argv must NOT carry `-c` even on follow-up turns. We tested resume
   // mode and found agy's `-c` activates an internal agentic loop (tool
@@ -257,91 +267,31 @@ test('antigravity pipes prompt via stdin via -p flag (print mode)', () => {
 
   assert.equal(antigravity.maxPromptArgBytes, undefined);
 
-  // Picker exposes the synthetic Default + the 8 labels agy's TUI
-  // Switch-Model surfaces for consumer-tier accounts. The set is small
-  // enough to ship statically; revisit when upstream adds an `agy
-  // models` subcommand (also tracked under issue #35).
+  // Fallback mirrors the current `agy models` catalogue and is used only
+  // when live discovery fails.
   assert.deepEqual(
     antigravity.fallbackModels.map((m) => m.id),
     [
       'default',
-      'Gemini 3.1 Pro (High)',
-      'Gemini 3.1 Pro (Low)',
-      'Gemini 3.5 Flash (High)',
-      'Gemini 3.5 Flash (Medium)',
-      'Gemini 3.5 Flash (Low)',
-      'Claude Sonnet 4.6 (Thinking)',
-      'Claude Opus 4.6 (Thinking)',
-      'GPT-OSS 120B (Medium)',
+      'gemini-3.7-flash-high',
+      'gemini-3.7-flash-medium',
+      'gemini-3.7-flash-low',
+      'gemini-3.6-flash-high',
+      'gemini-3.6-flash-medium',
+      'gemini-3.6-flash-low',
+      'gemini-3.5-flash-high',
+      'gemini-3.5-flash-medium',
+      'gemini-3.5-flash-low',
+      'gemini-3.1-pro-high',
+      'gemini-3.1-pro-low',
+      'claude-sonnet-4-6',
+      'claude-opus-4-6-thinking',
+      'gpt-oss-120b-medium',
     ],
   );
 
-  // `agy` v1.0.3 has no `--model` flag (upstream #35), no `models`
-  // subcommand, and no `/model` slash command — a user-typed model id
-  // would be silently ignored at spawn, looking like an OD bug. The
-  // settings UI hides the "Custom (fill below)" option when this is
-  // `false`. Remove this opt-out once upstream wires #35.
+  // Keep custom entry hidden because the live catalogue is authoritative.
   assert.equal(antigravity.supportsCustomModel, false);
-});
-
-// `agy` reads `~/.gemini/antigravity-cli/settings.json` on every CLI
-// startup — verified by capturing the `--log-file` line `Propagating
-// selected model override to backend: label=…`. Routing OD's model
-// picker through that file lets the user choose a model from Settings
-// even though agy has no `--model` flag (upstream issue #35).
-//
-// Two behaviors must hold and are pinned here:
-//
-//   1. Picking "default" must NOT touch settings.json — respect the
-//      label the user previously set inside agy's own TUI.
-//   2. Picking a concrete label must write that exact string into the
-//      `model` field while preserving every other key (e.g.
-//      `trustedWorkspaces` that agy populates on first-run consent).
-test('antigravity persists model selection to agy settings.json', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'od-antigravity-settings-'));
-  try {
-    const settingsPath = join(dir, 'settings.json');
-
-    // 1. Pre-seed the file as agy would after onboarding: a model label
-    //    plus a trustedWorkspaces array the user has already consented to.
-    writeFileSync(
-      settingsPath,
-      JSON.stringify(
-        {
-          model: 'GPT-OSS 120B (Medium)',
-          trustedWorkspaces: ['/tmp/od-project'],
-        },
-        null,
-        2,
-      ),
-    );
-
-    // 2. Write a new label and assert the model swap + trusted list intact.
-    writeAntigravityModelSelection('Gemini 3.1 Pro (High)', settingsPath);
-    const after = JSON.parse(readFileSync(settingsPath, 'utf8'));
-    assert.equal(after.model, 'Gemini 3.1 Pro (High)');
-    assert.deepEqual(after.trustedWorkspaces, ['/tmp/od-project']);
-
-    // 3. When the file doesn't exist (fresh install before onboarding),
-    //    we must create it rather than crash the spawn pipeline.
-    const freshPath = join(dir, 'fresh', 'settings.json');
-    writeAntigravityModelSelection('Claude Sonnet 4.6 (Thinking)', freshPath);
-    assert.ok(existsSync(freshPath));
-    assert.equal(
-      JSON.parse(readFileSync(freshPath, 'utf8')).model,
-      'Claude Sonnet 4.6 (Thinking)',
-    );
-
-    // 4. When the existing file is corrupt JSON, we must rewrite it from
-    //    scratch instead of leaving agy with an unparseable settings file.
-    const corruptPath = join(dir, 'corrupt-settings.json');
-    writeFileSync(corruptPath, '{not valid json');
-    writeAntigravityModelSelection('Gemini 3.5 Flash (Low)', corruptPath);
-    const recovered = JSON.parse(readFileSync(corruptPath, 'utf8'));
-    assert.equal(recovered.model, 'Gemini 3.5 Flash (Low)');
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
 });
 
 // ---- reasoning-effort clamp ------------------------------------------------

@@ -51,6 +51,18 @@ Extract the existing symlink-safe project walker into a packet input collector. 
 
 Use existing HTML screenshot, PDF, deck, document, and media exporters. Required artifacts abort and clean the temporary packet; optional deck PPTX failure becomes a manifest warning. Clipboard is outside packet transactionality, so its failure never invalidates a completed export.
 
+### Runtime model choices follow the owning CLI
+
+Prefer live model discovery for Antigravity, OpenCode, and Pi, with a Default-only fallback where discovery is unavailable. Claude exposes only Default, Fable, Opus, Sonnet, and Haiku aliases while preserving custom input and native routing. Codex exposes only Default, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, and `gpt-5.3-codex-spark`. The product does not write another CLI's settings file to select a model.
+
+### The public launch explains the local product with product evidence
+
+The bilingual launch page uses the confirmed A hero for AI creators: a centered, vertically stacked composition with the headline, supporting copy, and direct-download actions given full width above a real Clean Design product screenshot. This prevents copy and buttons from being cramped into a narrow left column while keeping the product window legible as evidence. The hero fits the initial viewport, remains a single column below 768 px, uses restrained motion with reduced-motion support, and does not change the packaged startup animation or in-app Home. The remaining sequence is proof, workflow, artifact gallery, local CLIs and BYOK, local/privacy boundaries, then download and Gatekeeper guidance.
+
+### Publication follows one finite acceptance pass
+
+Distribution consists of an Apple Silicon DMG, ZIP, and SHA-256 checksums, an English README plus Chinese README, repository metadata, a `v0.1.0` tag, and a GitHub Release. Publication occurs only after Node 24 guard/typecheck/tests, one representative real generation and handoff inspection, packaged build/install/launch/quit/uninstall, visible identity checks, and the existing release boundary audit pass. Agent-verifiable checks are not delegated back to the user.
+
 ## Risks / Trade-offs
 
 - [Large inherited daemon leaves dormant code reachable by future changes] -> remove route registration and add forbidden-surface/egress regression guards.

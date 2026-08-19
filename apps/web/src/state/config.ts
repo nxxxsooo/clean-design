@@ -459,7 +459,7 @@ export const KNOWN_PROVIDERS: KnownProvider[] = [
     protocol: 'aihubmix',
     baseUrl: 'https://aihubmix.com/v1',
     preferredModels: [
-      'gpt-5.5',
+      'gpt-5.6-sol',
       'gpt-4o',
       'gpt-4o-mini',
       'claude-opus-4-8',

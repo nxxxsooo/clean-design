@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="88" height="24" viewBox="0 0 88 24" role="img" aria-label="默认本地">
+  <rect width="88" height="24" rx="6" fill="#191816"/>
+  <rect width="2" height="24" rx="1" fill="#df5d36"/>
+  <text x="45" y="16" fill="#f7f3ed" font-family="PingFang SC, Noto Sans CJK SC, Arial, Helvetica, sans-serif" font-size="12" font-weight="700" text-anchor="middle">默认本地</text>
+</svg>

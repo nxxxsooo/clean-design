@@ -32,7 +32,7 @@ const AGENTS = [
     version: '0.134.0',
     models: [
       { id: 'default', label: 'Default (CLI config)' },
-      { id: 'gpt-5.5', label: 'GPT 5.5' },
+      { id: 'gpt-5.6-sol', label: 'GPT 5.6 Sol' },
     ],
   },
   {

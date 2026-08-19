@@ -1,8 +1,11 @@
 import { test } from 'vitest';
 import {
-  AGENT_DEFS, assert, chmodSync, claude, codex, detectAgents, join, mkdtempSync, rmSync, tmpdir, withEnvSnapshot, withPlatform, writeFileSync,
+  AGENT_DEFS, assert, chmodSync, claude, codex, detectAgents, join, mkdtempSync, opencode, pi, rmSync, tmpdir, withEnvSnapshot, withPlatform, writeFileSync,
 } from './helpers/test-helpers.js';
-import { codexNeedsDangerFullAccessSandbox } from '../../src/runtimes/defs/codex.js';
+import {
+  codexNeedsDangerFullAccessSandbox,
+  parseCodexDebugModels,
+} from '../../src/runtimes/defs/codex.js';
 import {
   BUILT_IN_AGENT_DEFS,
   readLocalAgentProfileDefs,
@@ -353,16 +356,10 @@ test('codex args keep plugins enabled when OD_CODEX_DISABLE_PLUGINS is not 1', (
 test('codex model picker includes current OpenAI choices in priority order', async () => {
   const expectedModels = [
     'default',
-    'gpt-5.5',
-    'gpt-5.4',
-    'gpt-5.4-mini',
-    'gpt-5.3-codex',
-    'gpt-5.1',
-    'gpt-5.1-codex-mini',
-    'gpt-5-codex',
-    'gpt-5',
-    'o3',
-    'o4-mini',
+    'gpt-5.6-sol',
+    'gpt-5.6-terra',
+    'gpt-5.6-luna',
+    'gpt-5.3-codex-spark',
   ];
 
   assert.deepEqual(codex.fallbackModels.map((m) => m.id), expectedModels);
@@ -381,11 +378,11 @@ test('codex model picker includes current OpenAI choices in priority order', asy
     '',
     [],
     [],
-    { model: 'gpt-5.5', reasoning: 'xhigh' },
+    { model: 'gpt-5.6-sol', reasoning: 'xhigh' },
     { cwd: '/tmp/od-project' },
   );
   assert.ok(args.includes('--model'));
-  assert.ok(args.includes('gpt-5.5'));
+  assert.ok(args.includes('gpt-5.6-sol'));
   assert.ok(args.includes('model_reasoning_effort="xhigh"'));
 
   const dir = mkdtempSync(join(tmpdir(), 'od-agents-codex-models-'));
@@ -412,6 +409,43 @@ test('codex model picker includes current OpenAI choices in priority order', asy
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('codex live model discovery filters retired and unrelated model ids', () => {
+  assert.deepEqual(
+    parseCodexDebugModels(
+      JSON.stringify({
+        models: [
+          { slug: 'gpt-5.5', display_name: 'GPT-5.5' },
+          { slug: 'gpt-5.6-sol', display_name: 'GPT-5.6 Sol' },
+          { slug: 'gpt-5.4-mini', display_name: 'GPT-5.4 mini' },
+          { slug: 'gpt-5.3-codex-spark', display_name: 'Codex Spark' },
+          { slug: 'gpt-5.6-terra', display_name: 'GPT-5.6 Terra' },
+          { slug: 'gpt-5.6-luna', display_name: 'GPT-5.6 Luna' },
+        ],
+      }),
+    ),
+    [
+      { id: 'default', label: 'Default (CLI config)' },
+      { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+      { id: 'gpt-5.3-codex-spark', label: 'Codex Spark' },
+      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+      { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' },
+    ],
+  );
+});
+
+test('supported local runtimes keep only their approved fallback model choices', () => {
+  assert.deepEqual(claude.fallbackModels.map((model) => model.id), [
+    'default',
+    'fable',
+    'opus',
+    'sonnet',
+    'haiku',
+  ]);
+  assert.equal(claude.fetchModels, undefined);
+  assert.deepEqual(opencode.fallbackModels.map((model) => model.id), ['default']);
+  assert.deepEqual(pi.fallbackModels.map((model) => model.id), ['default']);
 });
 
 test('claude probes auth status so rescans reflect CLI auth changes', async () => {
@@ -549,32 +583,32 @@ exit 0
   }
 });
 
-test('codex parses live model catalog from debug models JSON', () => {
+test('codex listModels parser ignores unapproved live model ids', () => {
   assert.ok(codex.listModels, 'codex must define live model discovery');
   const parsed = codex.listModels.parse(JSON.stringify({
     models: [
       {
-        slug: 'gpt-6-codex',
-        display_name: 'GPT-6 Codex',
+        slug: 'gpt-5.6-sol',
+        display_name: 'GPT-5.6 Sol',
         visibility: 'list',
       },
       {
-        slug: 'gpt-6-codex-mini',
-        display_name: 'GPT-6 Codex Mini',
+        slug: 'gpt-5.5',
+        display_name: 'GPT-5.5',
         visibility: 'list',
       },
       {
-        slug: 'gpt-hidden-internal',
-        display_name: 'Hidden internal',
-        visibility: 'hidden',
+        slug: 'gpt-5.3-codex-spark',
+        display_name: 'Codex Spark',
+        visibility: 'list',
       },
     ],
   }));
 
   assert.deepEqual(parsed, [
     { id: 'default', label: 'Default (CLI config)' },
-    { id: 'gpt-6-codex', label: 'GPT-6 Codex' },
-    { id: 'gpt-6-codex-mini', label: 'GPT-6 Codex Mini' },
+    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+    { id: 'gpt-5.3-codex-spark', label: 'Codex Spark' },
   ]);
 });
 
@@ -588,7 +622,7 @@ test('codex detection surfaces live debug models separately from fallback models
         `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "codex-cli 9.9.9"; exit 0; fi
 if [ "$1" = "debug" ] && [ "$2" = "models" ]; then
-  printf '%s\\n' '{"models":[{"slug":"gpt-6-codex","display_name":"GPT-6 Codex","visibility":"list"}]}'
+  printf '%s\\n' '{"models":[{"slug":"gpt-5.6-terra","display_name":"GPT-5.6 Terra","visibility":"list"},{"slug":"gpt-5.4-mini","display_name":"GPT-5.4 mini","visibility":"list"}]}'
   exit 0
 fi
 if [ "$1" = "login" ] && [ "$2" = "status" ]; then echo "Logged in using ChatGPT"; exit 0; fi
@@ -608,7 +642,7 @@ exit 2
       assert.equal(detected.modelsSource, 'live');
       assert.deepEqual(detected.models.map((m: { id: string }) => m.id), [
         'default',
-        'gpt-6-codex',
+        'gpt-5.6-terra',
       ]);
     });
   } finally {
@@ -616,11 +650,12 @@ exit 2
   }
 });
 
-test('codex picker includes gpt-5.1 model family', () => {
+test('codex picker excludes retired model families', () => {
   const pickerModels = new Set(codex.fallbackModels.map((model) => model.id));
 
-  assert.equal(pickerModels.has('gpt-5.1'), true);
-  assert.equal(pickerModels.has('gpt-5.1-codex-mini'), true);
+  assert.equal(pickerModels.has('gpt-5.5'), false);
+  assert.equal(pickerModels.has('gpt-5.4'), false);
+  assert.equal(pickerModels.has('gpt-5.4-mini'), false);
 });
 
 // Recent Codex CLI versions reject a bare `-` argv sentinel; passing it

@@ -43,3 +43,11 @@
 - [x] 6.2 Build, install, launch, restart, quit, uninstall, and clean the Apple Silicon application; verify loopback sidecars terminate and product data stays namespace-scoped
 - [x] 6.3 Complete one representative real generation through either an allowlisted local CLI or configured BYOK provider, then export and inspect one handoff packet
 - [x] 6.4 Run the final product-boundary audit for removed services, unsupported runtimes, unintended outbound destinations, visible identity, secrets, and required provenance; repair concrete findings
+
+## 7. Public v0.1.0 Release
+
+- [x] 7.1 Refresh Claude, Codex, Antigravity, OpenCode, and Pi model choices and focused tests without exposing retired models or writing external CLI settings
+- [x] 7.2 Implement the bilingual public launch page with the confirmed A hero, real product imagery, direct downloads, English and Chinese README files, and GitHub metadata
+- [x] 7.3 Build the Apple Silicon DMG and ZIP, generate SHA-256 checksums, and verify packaged title, icon, startup, Home, launch, quit, uninstall, and cleanup behavior
+- [x] 7.4 Run Node 24 guard, typecheck, affected tests, one real supported generation, one handoff export inspection, and the finite release-boundary audit; repair concrete failures
+- [x] 7.5 Publish the repository, `v0.1.0` tag, release notes, and verified artifacts, then confirm the public landing and download links

@@ -9,6 +9,8 @@ Open Design 0.16.1 provides the visual creation workflow we want, but its later 
 - **BREAKING** Remove accounts, hosted cloud services, teams, billing, promotions, news, deployment, auto-update, telemetry, external MCP/plugin-host integration, and inherited coding-agent adapters outside the five-runtime allowlist.
 - Replace coding-agent selection and generated transcript handoff with deterministic, immutable prompt packets written to a trusted external root.
 - Replace renderer-stored plaintext provider secrets with an Electron `safeStorage` credential vault and reference-based daemon registration.
+- Refresh the five supported runtime model selectors from their native CLIs with small, explicit fallbacks.
+- Publish a bilingual Clean Design launch surface and verified Apple Silicon release artifacts after one finite acceptance pass.
 
 ## Capabilities
 

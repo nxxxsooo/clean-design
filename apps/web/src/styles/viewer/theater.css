@@ -631,66 +631,6 @@
   color: var(--text-muted);
 }
 
-/* ============================================================
-   Coming-soon disabled affordance for viewer toolbar buttons
-   ============================================================ */
-.viewer-action[data-coming-soon='true'] {
-  position: relative;
-  z-index: 5;
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.viewer-action[data-coming-soon='true']:hover { background: var(--bg-subtle); color: var(--text-muted); }
-.viewer-action[data-coming-soon='true']::after {
-  content: 'Coming soon';
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(17, 24, 39, 0.95);
-  color: white;
-  font-size: 10.5px;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
-  letter-spacing: 0.03em;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 120ms var(--ease-out);
-  z-index: 10;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-.viewer-action[data-coming-soon='true']:hover::after { opacity: 1; }
-.viewer-toggle[data-coming-soon='true'] {
-  position: relative;
-  z-index: 5;
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.viewer-toggle[data-coming-soon='true']:hover { background: var(--bg-subtle); }
-.viewer-toggle[data-coming-soon='true']::after {
-  content: 'Coming soon';
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(17, 24, 39, 0.95);
-  color: white;
-  font-size: 10.5px;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
-  letter-spacing: 0.03em;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 120ms var(--ease-out);
-  z-index: 10;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-.viewer-toggle[data-coming-soon='true']:hover::after { opacity: 1; }
-
 /* Polished toolbar button states — coordinate with the global system.
    Hover: subtle bg + soft border so groups look intentional. */
 .viewer-action,
@@ -699,7 +639,7 @@
   border: 1px solid transparent;
   transition: background 120ms var(--ease-out), border-color 120ms var(--ease-out), color 120ms var(--ease-out);
 }
-.viewer-action:hover:not(:disabled):not([data-coming-soon='true']),
+.viewer-action:hover:not(:disabled),
 .viewer-tab:hover { border-color: var(--border); }
 .viewer-tab.active { border-color: var(--border); }
 
